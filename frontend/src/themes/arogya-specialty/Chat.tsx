@@ -59,28 +59,36 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
   };
 
   useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (transcript && listening) {
-      timer = setTimeout(() => handleSend(transcript), 1500);
-    }
-    return () => clearTimeout(timer);
-  }, [transcript, listening, handleSend]);
+  let timer: NodeJS.Timeout;
+  
+  if (transcript && listening) {
+    // If user stops talking for 1.5 seconds, trigger send
+    timer = setTimeout(() => {
+      console.log("Silence detected. Stopping mic and sending...");
+      
+      // Stop the mic first
+      SpeechRecognition.stopListening();
+      
+      // Send the current transcript
+      handleSend(transcript);
+    }, 1500); 
+  }
+  
+  return () => clearTimeout(timer);
+}, [transcript, listening, handleSend]);
 
   const toggleMic = () => {
     if (listening) {
-      // 1. Force a hard stop
+      console.log("Manually turning off...");
       SpeechRecognition.stopListening();
-      // 2. Extra safety: If it's being stubborn, abort the process entirely
-      console.log("Mic turning off...");
       return;
     }
 
-    // 3. Start logic
-    resetTranscript(); // Clear old text before starting
+    resetTranscript();
     SpeechRecognition.startListening({ 
       continuous: true, 
       language: language 
-    }).catch((err) => {
+    }).catch(err => {
       console.error("Mic Error:", err);
     });
   };
