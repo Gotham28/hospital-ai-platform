@@ -4,6 +4,7 @@ from sqlalchemy.sql import func
 from app.db.base_class import Base
 
 class Hospital(Base):
+    __tablename__ = "hospital"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False, index=True)
     slug = Column(String, unique=True, index=True, nullable=False) # e.g., "apollo-delhi" for URLs
