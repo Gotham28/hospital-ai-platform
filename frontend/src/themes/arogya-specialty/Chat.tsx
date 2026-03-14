@@ -67,21 +67,21 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
   }, [transcript, listening, handleSend]);
 
   const toggleMic = () => {
-    // Mobile browsers require the start command to be the IMMEDIATE 
-    // result of a click. We've removed extra logic checks here.
     if (listening) {
+      // 1. Force a hard stop
       SpeechRecognition.stopListening();
+      // 2. Extra safety: If it's being stubborn, abort the process entirely
+      console.log("Mic turning off...");
       return;
     }
 
-    // Explicitly request permission and start
+    // 3. Start logic
+    resetTranscript(); // Clear old text before starting
     SpeechRecognition.startListening({ 
       continuous: true, 
       language: language 
     }).catch((err) => {
-      console.error("Mobile Mic Error:", err);
-      // This alert will tell us if it's a Permission or a Support issue
-      alert(`Mic Error: ${err.message}`);
+      console.error("Mic Error:", err);
     });
   };
 
