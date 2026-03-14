@@ -136,6 +136,7 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
             {listening 
               ? (language === 'en-US' ? "Listening..." : "ശ്രദ്ധിക്കുന്നു...") 
               : (language === 'en-US' ? "Tap to speak" : "സംസാരിക്കാൻ ടാപ്പ് ചെയ്യുക")}
+              {!browserSupportsSpeechRecognition && <span className="text-red-500 block">! Library Not Initialized</span>}
           </p>
         </div>
       </div>
