@@ -47,13 +47,14 @@ def get_doctor_availability(sheet_id: str, force_refresh: bool = False):
                 doctor_id = str(row.get("Doctor ID", "")).strip()
                 name = str(row.get("Doctor Name", "")).strip()
                 if not doctor_id or not name: continue
+                absent_dates_raw = row.get("Absent Dates (comma-separated)", "")
 
                 doctors[doctor_id] = {
                     "id": doctor_id,
                     "name": name,
                     "department": str(row.get("Department", "")).strip(),
                     "schedule": str(row.get("Base Schedule", "")).strip(),
-                    "absent_dates": str(row.get("Absent Dates", "")).strip(),
+                    "absent_dates": str(absent_dates_raw).strip(),
                 }
 
             _cache[sheet_id] = doctors

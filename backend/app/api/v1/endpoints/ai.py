@@ -27,7 +27,7 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 class ChatRequest(BaseModel):
     question: str
     hospital_id: int 
-    language: Optional[str] = "en"  # NEW: Supports 'en' or 'ml' for regional responses
+    language: Optional[str] = "en"
 
 # -------------------------------------------------
 # UTILITIES
@@ -44,7 +44,9 @@ def resolve_doctor_id(user_text: str, doctor_data: dict):
     best_match, best_score = None, 0
 
     for doctor_id, d in doctor_data.items():
-        norm_name = normalize_name(d.get("name", ""))
+        # d is now a dictionary containing 'name' and 'absent_dates'
+        name = d.get("name", "") if isinstance(d, dict) else str(d)
+        norm_name = normalize_name(name)
         query_tokens, name_tokens = set(normalized_query.split()), set(norm_name.split())
         
         if not query_tokens or not name_tokens: continue
@@ -52,53 +54,13 @@ def resolve_doctor_id(user_text: str, doctor_data: dict):
         score = len(query_tokens & name_tokens) / len(name_tokens)
         if score > best_score:
             best_score = score
-            best_match = (doctor_id, d.get("name"))
+            best_match = (doctor_id, name)
 
     return best_match if best_score >= 0.5 else (None, None)
 
 # -------------------------------------------------
 # ENDPOINTS
 # -------------------------------------------------
-
-@router.post("/ingest")
-async def ingest_hospital_knowledge(
-    content: str = Body(..., embed=True),
-    db: Session = Depends(get_db),
-    hospital_id: int = Depends(get_current_tenant)
-):
-    try:
-        splitter = RecursiveCharacterTextSplitter(chunk_size=1200, chunk_overlap=200)
-        chunks = splitter.split_text(content)
-
-        for chunk in chunks:
-            response = client.embeddings.create(input=chunk, model="text-embedding-3-small")
-            vector = response.data[0].embedding
-
-            new_entry = KnowledgeBase(
-                hospital_id=hospital_id,
-                content=chunk,
-                embedding=vector
-            )
-            db.add(new_entry)
-        
-        db.commit()
-        return {"status": "success", "message": f"Arogya processed {len(chunks)} knowledge chunks."}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/upload-pdf")
-async def upload_pdf(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    hospital_id: int = Depends(get_current_tenant)
-):
-    try:
-        pdf_bytes = await file.read()
-        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-        full_text = "\n".join([page.get_text() for page in doc])
-        return await ingest_hospital_knowledge(content=full_text, db=db, hospital_id=hospital_id)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"PDF Processing failed: {str(e)}")
 
 @router.post("/chat")
 async def chat_with_arogya(
@@ -108,6 +70,9 @@ async def chat_with_arogya(
     hospital_id = request.hospital_id
     question = request.question
     target_lang = request.language
+    
+    # CRITICAL: Get current date in the exact format used in your Google Sheet (DD-MM-YYYY)
+    today_str = datetime.now().strftime("%d-%m-%Y") 
 
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
     if not hospital:
@@ -123,13 +88,22 @@ async def chat_with_arogya(
     availability_context = ""
     if hospital.google_sheet_id:
         try:
+            # Assuming get_doctor_availability returns: 
+            # {"DR1004": {"name": "Dr. C. Mohankrishnan", "absent_dates": "14-03-2026", "available_today": "Yes"}}
             doctors_live_data = get_doctor_availability(sheet_id=hospital.google_sheet_id)
             doc_id, doc_name = resolve_doctor_id(question, doctors_live_data)
             
             if doc_id:
-                availability_context = f"LIVE STATUS for {doc_name}: {doctors_live_data.get(doc_id)} "
-        except Exception:
-            availability_context = "Live doctor availability currently offline."
+                doc_info = doctors_live_data.get(doc_id)
+                absent_dates = str(doc_info.get("absent_dates", ""))
+                
+                # Check if today's date exists in the comma-separated absent dates string
+                if today_str in [date.strip() for date in absent_dates.split(",")]:
+                    availability_context = f"IMPORTANT LIVE STATUS: {doc_name} is ABSENT TODAY ({today_str}). Do not book appointments for them today."
+                else:
+                    availability_context = f"LIVE STATUS for {doc_name}: Available today."
+        except Exception as e:
+            availability_context = f"Live doctor availability currently offline. Error: {str(e)}"
 
     # 3. VECTOR SEARCH (KNOWLEDGE BASE PDFs)
     resp = client.embeddings.create(input=question, model="text-embedding-3-small")
@@ -138,17 +112,18 @@ async def chat_with_arogya(
     ).limit(3).all()
     kb_context = "\n".join([r.content for r in results])
 
-    # 4. FINAL COMPLETION WITH REGIONAL LOGIC
-    # NEW: Instructing GPT-4o-mini to respond in the selected language
+    # 4. FINAL COMPLETION
     lang_instruction = "IMPORTANT: Respond strictly in Malayalam (മലയാളം)." if target_lang == "ml" else "Respond in English."
 
     system_prompt = f"""
-    You are Arogya, the AI for {hospital.name}.
+    You are Arogya, the AI for {hospital.name}. 
+    Current Date: {today_str}
+    
     {hospital.system_prompt}
-
     {lang_instruction}
 
     {doctor_directory_context}
+    
     {availability_context}
     
     ADDITIONAL KNOWLEDGE:

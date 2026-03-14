@@ -1,11 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-# These imports are likely bringing in the Router objects directly
-from app.api.v1.endpoints import hospitals, auth, ai 
+
+# Import the router objects from your endpoint files
+from app.api.v1.endpoints.auth import router as auth_router
+from app.api.v1.endpoints.hospitals import router as hospitals_router
+from app.api.v1.endpoints.ai import router as ai_router
 
 app = FastAPI(title="Hospital AI Platform")
 
 # --- CORS Configuration ---
+# This allows both your local development and your live Vercel site to talk to this API
 origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
@@ -18,23 +22,27 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    # Adding this helps with complex requests like file uploads for AI training
+    # Exposing headers is helpful for tracking AI upload progress and token usage
     expose_headers=["*"], 
 )
 
 # --- Include Routers ---
-# Since 'auth', 'hospitals', and 'ai' are likely already the Router objects,
-# we remove the '.router' suffix to fix the AttributeError.
+# Note: The prefixes here combine with the @router paths in your endpoint files
 
-# 1. Auth Router (Login/Token)
-app.include_router(auth, prefix="/api/v1/auth", tags=["auth"])
+# 1. Auth Router (Handles Login and Token Generation)
+app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
 
-# 2. Hospitals Router (Staff/Settings)
-app.include_router(hospitals, prefix="/api/v1/hospitals", tags=["hospitals"])
+# 2. Hospitals Router (Handles Staff management and Hospital settings)
+app.include_router(hospitals_router, prefix="/api/v1/hospitals", tags=["hospitals"])
 
-# 3. AI Router (Chat/Training)
-app.include_router(ai, prefix="/api/v1/ai", tags=["AI"])
+# 3. AI Router (Handles /chat, /ingest, and /upload-pdf)
+# We use /api/v1/ai so that the frontend calls /api/v1/ai/chat
+app.include_router(ai_router, prefix="/api/v1/ai", tags=["AI"])
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to Hospital AI Platform API"}
+    return {
+        "status": "online",
+        "message": "Welcome to the Hospital AI Platform API",
+        "version": "v1.0.0"
+    }
