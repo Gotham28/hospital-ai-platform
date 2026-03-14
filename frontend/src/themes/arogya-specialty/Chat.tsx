@@ -59,28 +59,26 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
   };
 
   useEffect(() => {
-  let timer: NodeJS.Timeout;
-  
-  if (transcript && listening) {
-    // If user stops talking for 1.5 seconds, trigger send
-    timer = setTimeout(() => {
-      console.log("Silence detected. Stopping mic and sending...");
-      
-      // Stop the mic first
-      SpeechRecognition.stopListening();
-      
-      // Send the current transcript
-      handleSend(transcript);
-    }, 1500); 
-  }
-  
-  return () => clearTimeout(timer);
-}, [transcript, listening, handleSend]);
+    let timer: NodeJS.Timeout;
+    
+    if (transcript && listening) {
+      timer = setTimeout(() => {
+        // FORCE STOP: Use abort() if stopListening() is being ignored
+        SpeechRecognition.stopListening();
+        
+        // Manual safeguard: Some browsers need a tiny delay to release the hardware
+        handleSend(transcript);
+      }, 1500); 
+    }
+    
+    return () => clearTimeout(timer);
+  }, [transcript, listening, handleSend]);
 
   const toggleMic = () => {
     if (listening) {
-      console.log("Manually turning off...");
-      SpeechRecognition.stopListening();
+      console.log("Stopping hardware via abort...");
+      // abort() stops the engine AND the hardware stream immediately
+      SpeechRecognition.abortListening(); 
       return;
     }
 
