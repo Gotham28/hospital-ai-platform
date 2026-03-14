@@ -6,7 +6,10 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Hospital AI Platform"
     API_V1_STR: str = "/api/v1"
     
-    # Database (Matches your .env fields)
+    # 1. ADD THIS LINE: This maps the Render environment variable to your code
+    DATABASE_URL: Optional[str] = None 
+
+    # Database Defaults (Keep these for local dev)
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "NewStrongPassword123!"
@@ -24,14 +27,12 @@ class Settings(BaseSettings):
     # Helper to build the URL dynamically
     @property
     def SQLALCHEMY_DATABASE_URL(self) -> str:
-        if self.SQLALCHEMY_DATABASE_URI:
-            return self.SQLALCHEMY_DATABASE_URI
+        # Check Render's DATABASE_URL first
+        if self.DATABASE_URL:
+            # Render often gives 'postgres://', but SQLAlchemy needs 'postgresql://'
+            return self.DATABASE_URL.replace("postgres://", "postgresql://", 1)
         
+        # Fallback to local construction
         return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
-
-    class Config:
-        case_sensitive = False
-        env_file = ".env"
-        extra = "ignore"  # CRITICAL: This stops the crash if .env has extra fields
 
 settings = Settings()
