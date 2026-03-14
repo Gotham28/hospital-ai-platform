@@ -9,6 +9,7 @@ app = FastAPI(title="Hospital AI Platform")
 origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "https://hospital-ai-platform.vercel.app",  # Your main production URL
 ]
 
 app.add_middleware(
@@ -17,6 +18,8 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # Adding this helps with complex requests like file uploads for AI training
+    expose_headers=["*"], 
 )
 
 # --- Include Routers ---
