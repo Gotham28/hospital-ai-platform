@@ -1,21 +1,18 @@
 import os
 import re
-import fitz  # PyMuPDF
 from typing import List, Optional
 from datetime import datetime
 from pydantic import BaseModel
 from openai import OpenAI
 from sqlalchemy.orm import Session
-from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException
 
-from app.api.deps import get_db, get_current_tenant
+from app.api.deps import get_db
 from app.models.hospital import Hospital 
 from app.models.knowledge import KnowledgeBase 
 from app.models.usage import UsageLedger
 from app.models.doctor import Doctor 
 from app.availability import get_doctor_availability
-
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 router = APIRouter()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -44,7 +41,6 @@ def resolve_doctor_id(user_text: str, doctor_data: dict):
     best_match, best_score = None, 0
 
     for doctor_id, d in doctor_data.items():
-        # d is now a dictionary containing 'name' and 'absent_dates'
         name = d.get("name", "") if isinstance(d, dict) else str(d)
         norm_name = normalize_name(name)
         query_tokens, name_tokens = set(normalized_query.split()), set(norm_name.split())
@@ -59,7 +55,7 @@ def resolve_doctor_id(user_text: str, doctor_data: dict):
     return best_match if best_score >= 0.5 else (None, None)
 
 # -------------------------------------------------
-# ENDPOINTS
+# ENDPOINT
 # -------------------------------------------------
 
 @router.post("/chat")
@@ -70,8 +66,6 @@ async def chat_with_arogya(
     hospital_id = request.hospital_id
     question = request.question
     target_lang = request.language
-    
-    # CRITICAL: Get current date in the exact format used in your Google Sheet (DD-MM-YYYY)
     today_str = datetime.now().strftime("%d-%m-%Y") 
 
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
@@ -88,8 +82,6 @@ async def chat_with_arogya(
     availability_context = ""
     if hospital.google_sheet_id:
         try:
-            # Assuming get_doctor_availability returns: 
-            # {"DR1004": {"name": "Dr. C. Mohankrishnan", "absent_dates": "14-03-2026", "available_today": "Yes"}}
             doctors_live_data = get_doctor_availability(sheet_id=hospital.google_sheet_id)
             doc_id, doc_name = resolve_doctor_id(question, doctors_live_data)
             
@@ -97,13 +89,12 @@ async def chat_with_arogya(
                 doc_info = doctors_live_data.get(doc_id)
                 absent_dates = str(doc_info.get("absent_dates", ""))
                 
-                # Check if today's date exists in the comma-separated absent dates string
                 if today_str in [date.strip() for date in absent_dates.split(",")]:
-                    availability_context = f"IMPORTANT LIVE STATUS: {doc_name} is ABSENT TODAY ({today_str}). Do not book appointments for them today."
+                    availability_context = f"IMPORTANT LIVE STATUS: {doc_name} is ABSENT TODAY ({today_str}). Tell the user they are unavailable."
                 else:
-                    availability_context = f"LIVE STATUS for {doc_name}: Available today."
+                    availability_context = f"LIVE STATUS for {doc_name}: Available today ({today_str})."
         except Exception as e:
-            availability_context = f"Live doctor availability currently offline. Error: {str(e)}"
+            availability_context = f"Availability sync temporarily offline."
 
     # 3. VECTOR SEARCH (KNOWLEDGE BASE PDFs)
     resp = client.embeddings.create(input=question, model="text-embedding-3-small")
@@ -112,18 +103,20 @@ async def chat_with_arogya(
     ).limit(3).all()
     kb_context = "\n".join([r.content for r in results])
 
-    # 4. FINAL COMPLETION
-    lang_instruction = "IMPORTANT: Respond strictly in Malayalam (മലയാളം)." if target_lang == "ml" else "Respond in English."
+    # 4. FINAL COMPLETION & LANGUAGE
+    if target_lang == "ml":
+        lang_instruction = "IMPORTANT: Respond ONLY in Malayalam script (മലയാളം). Do not use English script."
+    else:
+        lang_instruction = "Respond strictly in English."
 
     system_prompt = f"""
-    You are Arogya, the AI for {hospital.name}. 
+    You are Arogya, the AI Assistant for {hospital.name}. 
     Current Date: {today_str}
     
     {hospital.system_prompt}
     {lang_instruction}
 
     {doctor_directory_context}
-    
     {availability_context}
     
     ADDITIONAL KNOWLEDGE:
@@ -138,7 +131,7 @@ async def chat_with_arogya(
         ]
     )
     
-    # 5. Save to Ledger
+    # 5. SAVE TO USAGE LEDGER
     usage = ai_response.usage
     db.add(UsageLedger(
         hospital_id=hospital_id,

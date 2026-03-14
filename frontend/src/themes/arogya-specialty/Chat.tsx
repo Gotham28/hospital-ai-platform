@@ -1,10 +1,7 @@
-// themes/arogya-specialty/Chat.tsx
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 import api from '../../api/axios';
 import ChatMessage from './ChatMessage';
-// Added 'Send' icon:
 import { Mic, MicOff, Languages, Loader2, Activity, Send } from 'lucide-react'; 
 
 interface ChatProps {
@@ -20,7 +17,7 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
   const [language, setLanguage] = useState<'en-US' | 'ml-IN'>('en-US');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
-  const [inputText, setInputText] = useState(''); // New state for text input
+  const [inputText, setInputText] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -40,7 +37,7 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
     const userMessage = text.trim();
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     resetTranscript();
-    setInputText(''); // Clear text bar after sending
+    setInputText('');
     setIsTyping(true);
 
     try {
@@ -51,26 +48,20 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
       });
       setMessages(prev => [...prev, { role: 'assistant', content: response.data.answer }]);
     } catch (error) {
-      setMessages(prev => [...prev, { role: 'assistant', content: "Connection to Arogya failed." }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: "Arogya is currently busy. Please try again." }]);
     } finally {
       setIsTyping(false);
     }
   }, [hospitalId, language, resetTranscript]);
 
-  // Handle manual Enter key press
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSend(inputText);
-    }
+    if (e.key === 'Enter') handleSend(inputText);
   };
 
-  // Silence-based auto-send for voice
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (transcript && listening) {
-      timer = setTimeout(() => {
-        handleSend(transcript);
-      }, 1200);
+      timer = setTimeout(() => handleSend(transcript), 1500);
     }
     return () => clearTimeout(timer);
   }, [transcript, listening, handleSend]);
@@ -79,14 +70,18 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
     if (listening) {
       SpeechRecognition.stopListening();
     } else {
-      SpeechRecognition.startListening({ continuous: true, language });
+      // Ensure 'language' here is either 'en-US' or 'ml-IN'
+      SpeechRecognition.startListening({ 
+          continuous: true, 
+          language: language // This must be the state variable
+      });
     }
   };
 
   if (!browserSupportsSpeechRecognition) return <p>Voice features not supported.</p>;
 
   return (
-    <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 flex flex-col h-[550px]">
+    <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 flex flex-col h-[600px]">
       {/* Header */}
       <div className="bg-emerald-600 p-4 text-white flex justify-between items-center shrink-0">
         <h3 className="font-bold flex items-center gap-2">
@@ -101,23 +96,18 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
         </button>
       </div>
 
-      {/* Messages Area */}
+      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
         {messages.map((msg, idx) => (
           <ChatMessage key={idx} role={msg.role} content={msg.content} />
         ))}
-        {transcript && (
-          <div className="flex justify-end italic text-emerald-600 animate-pulse text-xs bg-emerald-50 p-2 rounded-lg">
-            {transcript}...
-          </div>
-        )}
         {isTyping && <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />}
         <div ref={scrollRef} />
       </div>
 
       {/* Input Area */}
       <div className="p-4 border-t bg-white">
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-2 mb-4">
           <input
             type="text"
             value={inputText}
@@ -129,7 +119,7 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
           <button 
             onClick={() => handleSend(inputText)}
             disabled={!inputText.trim()}
-            className="p-2 bg-emerald-600 text-white rounded-full disabled:bg-slate-300 transition-colors"
+            className="p-2 bg-emerald-600 text-white rounded-full disabled:bg-slate-300"
           >
             <Send className="w-4 h-4" />
           </button>
@@ -138,12 +128,14 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
         <div className="flex flex-col items-center gap-1">
           <button
             onClick={toggleMic}
-            className={`p-3 rounded-full transition-all ${listening ? 'bg-red-500 text-white animate-pulse shadow-lg scale-110' : 'bg-slate-100 text-emerald-600 hover:bg-emerald-50'}`}
+            className={`p-4 rounded-full transition-all ${listening ? 'bg-red-500 text-white animate-pulse' : 'bg-slate-100 text-emerald-600'}`}
           >
-            {listening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+            {listening ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
           </button>
-          <p className="text-[9px] uppercase tracking-widest text-slate-400 font-bold">
-            {listening ? "Listening..." : "Or tap to speak"}
+          <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">
+            {listening 
+              ? (language === 'en-US' ? "Listening..." : "ശ്രദ്ധിക്കുന്നു...") 
+              : (language === 'en-US' ? "Tap to speak" : "സംസാരിക്കാൻ ടാപ്പ് ചെയ്യുക")}
           </p>
         </div>
       </div>
