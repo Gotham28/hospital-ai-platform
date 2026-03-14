@@ -135,23 +135,24 @@ async def bulk_upload_and_sync(
     
     sheet_rows = []
     for row in reader:
-        # Generate our own unique ID as requested
+        # Normalize keys to handle case sensitivity and spaces
+        normalized_row = {k.strip().lower(): v for k, v in row.items()}
+        
         auto_id = f"H{hospital_id}-D-{uuid.uuid4().hex[:4].upper()}"
         
-        # Map your CSV headers to our Database fields
-        name = row.get('Doctor Name', 'Unknown')
-        dept = row.get('Department', 'General')
-        schedule = row.get('Base Schedule', 'Not Specified')
+        # Robust mapping: checks for 'doctor name' or just 'name'
+        name = normalized_row.get('doctor name') or normalized_row.get('name') or 'Unknown'
+        dept = normalized_row.get('department') or 'General'
+        schedule = normalized_row.get('base schedule') or normalized_row.get('schedule') or 'Not Specified'
 
-        # Save to local PostgreSQL
-        # Inside bulk_upload_and_sync
         doctor = Doctor(
-        doctor_id=auto_id,
-        name=row.get('Doctor Name', 'Unknown'),
-        department=row.get('Department', 'General'), # Matches the model now
-        base_schedule=row.get('Base Schedule', 'Not Specified'),
-        hospital_id=hospital_id
-)
+            doctor_id=auto_id,
+            name=name,
+            department=dept,
+            base_schedule=schedule,
+            hospital_id=hospital_id
+        )
+        db.add(doctor) # You were missing this db.add() in the code snippet!
         
         # Prepare for Google Sheet (ID, Name, Dept, Schedule, Absent, Available)
         sheet_rows.append([auto_id, name, dept, schedule, "", "Yes"])
