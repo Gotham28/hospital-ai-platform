@@ -2,6 +2,11 @@ from app.db.session import SessionLocal
 from app.models.hospital import Hospital
 from app.models.user import User
 from passlib.context import CryptContext
+# Add these lines to the top of seed.py
+from app.models.hospital import Hospital
+from app.models.user import User
+# Ensure the Doctor model is imported so SQLAlchemy can "see" it
+from app.models.doctor import Doctor
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 db = SessionLocal()
