@@ -67,15 +67,22 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
   }, [transcript, listening, handleSend]);
 
   const toggleMic = () => {
+    // Mobile browsers require the start command to be the IMMEDIATE 
+    // result of a click. We've removed extra logic checks here.
     if (listening) {
       SpeechRecognition.stopListening();
-    } else {
-      // Ensure 'language' here is either 'en-US' or 'ml-IN'
-      SpeechRecognition.startListening({ 
-          continuous: true, 
-          language: language // This must be the state variable
-      });
+      return;
     }
+
+    // Explicitly request permission and start
+    SpeechRecognition.startListening({ 
+      continuous: true, 
+      language: language 
+    }).catch((err) => {
+      console.error("Mobile Mic Error:", err);
+      // This alert will tell us if it's a Permission or a Support issue
+      alert(`Mic Error: ${err.message}`);
+    });
   };
 
   if (!browserSupportsSpeechRecognition) return <p>Voice features not supported.</p>;
