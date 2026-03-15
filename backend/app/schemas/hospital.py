@@ -7,8 +7,8 @@ class HospitalBase(BaseModel):
     slug: str
     address: Optional[str] = None
     is_active: Optional[bool] = True
-    # ADD THESE:
-    system_prompt: Optional[str] = "You are Arogya, a helpful assistant..."
+    # YOU MUST ADD THESE TWO:
+    system_prompt: Optional[str] = "You are Arogya, a helpful assistant."
     google_sheet_id: Optional[str] = None
 
 class HospitalCreate(HospitalBase):
