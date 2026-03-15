@@ -14,7 +14,7 @@ const KnowledgeBaseUpload = ({ hospitalId }: { hospitalId: string | undefined })
     try {
       // Include hospital_id in the payload
       await api.post('/ai/ingest', { 
-        content: text,
+        text: text,
         hospital_id: hospitalId 
       });
       alert("Arogya has learned this information!");
