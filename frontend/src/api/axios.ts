@@ -7,13 +7,12 @@ import axios from 'axios';
  * encoded in the bearer token.
  */
 const api = axios.create({
-  // VITE_API_URL should be "http://localhost:8000/api/v1" in your .env
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1',
+  // Force the use of the environment variable
+  baseURL: import.meta.env.VITE_API_URL, 
   headers: {
     'Content-Type': 'application/json',
   },
 });
-
 // Request Interceptor: Attaches the JWT to every outgoing call
 api.interceptors.request.use(
   (config) => {
