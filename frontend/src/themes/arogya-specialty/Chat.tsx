@@ -27,21 +27,26 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
 
   const handleSend = useCallback(async (text: string) => {
     if (!text.trim()) return;
-    const userMessage = text.trim();
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
-    resetTranscript();
-    setInputText('');
+
+    // 1. Force the mic to STOP immediately on send
+    SpeechRecognition.stopListening();
+    SpeechRecognition.abortListening();
+    resetTranscript(); 
+
+    setMessages(prev => [...prev, { role: 'user', content: text }]);
     setIsTyping(true);
 
     try {
+      // 2. Add a 5-second timeout so the UI doesn't hang
       const response = await api.post('/ai/chat', {
-        question: userMessage,
+        question: text,
         hospital_id: parseInt(hospitalId),
         language: language === 'ml-IN' ? 'ml' : 'en'
-      });
+      }, { timeout: 5000 }); 
+
       setMessages(prev => [...prev, { role: 'assistant', content: response.data.answer }]);
     } catch (error) {
-      setMessages(prev => [...prev, { role: 'assistant', content: "Unable to reach Arogya." }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: "Arogya is having trouble. Please try again." }]);
     } finally {
       setIsTyping(false);
     }
