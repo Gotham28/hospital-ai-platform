@@ -64,14 +64,30 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
     return () => clearTimeout(timer);
   }, [transcript, listening, handleSend]);
 
-  const toggleMic = () => {
-    if (listening) {
-      SpeechRecognition.abortListening();
-      return;
-    }
-    resetTranscript();
-    SpeechRecognition.startListening({ continuous: true, language });
-  };
+    const toggleMic = () => {
+      if (listening) {
+        // Explicitly stop and give it a small delay before state resets
+        SpeechRecognition.stopListening();
+        return;
+      }
+
+      // Clear previous text to avoid double-processing
+      resetTranscript();
+
+      // The 'continuous: true' helps prevent the 'auto-off' on short pauses
+      SpeechRecognition.startListening({ 
+        continuous: true, 
+        language: language === 'ml' ? 'ml-IN' : 'en-IN' 
+      });
+    };
+
+    // Add this useEffect to handle the "Auto-Stop" when user stops speaking
+    useEffect(() => {
+      if (transcript && !listening) {
+        // Optional: Auto-send when the user stops talking
+        // handleSend(transcript);
+      }
+    }, [listening, transcript]);
 
   return (
     <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 flex flex-col h-[600px]">
