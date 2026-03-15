@@ -6,16 +6,15 @@ import axios from 'axios';
  * It ensures every request to the backend includes the hospital_id 
  * encoded in the bearer token.
  */
-const baseURL = import.meta.env.VITE_API_URL;
-
-console.log("🚀 API Initialization:", {
-  envValue: import.meta.env.VITE_API_URL,
-  finalBaseURL: baseURL
-});
+const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:8000/api/v1'
+  : 'https://hospital-ai-platform.onrender.com/api/v1';
 
 const api = axios.create({
-  baseURL: 'https://hospital-ai-platform.onrender.com/api/v1',
-  headers: { 'Content-Type': 'application/json' },
+  baseURL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
 // Add this temporary log to see what the browser is actually using
