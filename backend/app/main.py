@@ -11,19 +11,17 @@ app = FastAPI(title="Hospital AI Platform")
 # --- CORS Configuration ---
 # This allows both your local development and your live Vercel site to talk to this API
 origins = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "https://hospital-ai-platform.vercel.app",  # Your main production URL
+    "https://hospital-ai-platform.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:5173",  # Vite's default port
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    # Exposing headers is helpful for tracking AI upload progress and token usage
-    expose_headers=["*"], 
+    allow_methods=["*"],  # Allows GET, POST, OPTIONS, etc.
+    allow_headers=["*"],  # Allows Authorization headers
 )
 
 # --- Include Routers ---
