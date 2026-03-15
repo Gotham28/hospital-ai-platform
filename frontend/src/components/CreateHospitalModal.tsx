@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import axios from 'axios';
+import api from '../api/axios'; // Use your centralized API config
 import { X } from 'lucide-react';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void; // Trigger refresh after adding
+  onSuccess: () => void; 
 }
 
 export default function CreateHospitalModal({ isOpen, onClose, onSuccess }: Props) {
@@ -13,8 +13,12 @@ export default function CreateHospitalModal({ isOpen, onClose, onSuccess }: Prop
     name: '',
     slug: '',
     address: '',
-    is_active: true
+    is_active: true,
+    // Ensure these match your new Backend Schema (HospitalCreate)
+    system_prompt: 'You are Arogya, a helpful assistant for this hospital.',
+    google_sheet_id: ''
   });
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -26,13 +30,26 @@ export default function CreateHospitalModal({ isOpen, onClose, onSuccess }: Prop
     setError('');
 
     try {
-      await axios.post('http://127.0.0.1:8000/api/v1/hospitals/', formData);
-      onSuccess(); // Tell parent to refresh
-      onClose();   // Close modal
+      // Logic: This will now use https://hospital-ai-platform.onrender.com/api/v1/hospitals/
+      await api.post('/hospitals/', formData);
+      
+      onSuccess(); // Refresh the list
+      onClose();   // Close the modal
+      
       // Reset form
-      setFormData({ name: '', slug: '', address: '', is_active: true });
+      setFormData({ 
+        name: '', 
+        slug: '', 
+        address: '', 
+        is_active: true,
+        system_prompt: 'You are Arogya, a helpful assistant for this hospital.',
+        google_sheet_id: ''
+      });
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to create hospital');
+      console.error("Submission Error:", err.response?.data);
+      // If the backend returns a specific error (like 'Slug already exists'), show it
+      const errorMessage = err.response?.data?.detail;
+      setError(Array.isArray(errorMessage) ? 'Validation Error' : (errorMessage || 'Failed to create hospital'));
     } finally {
       setLoading(false);
     }
@@ -65,7 +82,7 @@ export default function CreateHospitalModal({ isOpen, onClose, onSuccess }: Prop
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={formData.name}
               onChange={e => setFormData({ ...formData, name: e.target.value })}
-              placeholder="e.g. City General"
+              placeholder="e.g. Arogya Specialty"
             />
           </div>
 
@@ -77,9 +94,9 @@ export default function CreateHospitalModal({ isOpen, onClose, onSuccess }: Prop
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={formData.slug}
               onChange={e => setFormData({ ...formData, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })}
-              placeholder="e.g. city-general"
+              placeholder="e.g. arogya-specialty"
             />
-            <p className="text-xs text-gray-400 mt-1">Used in URLs. Auto-formatted.</p>
+            <p className="text-xs text-gray-400 mt-1">Must be unique. No spaces.</p>
           </div>
 
           <div>
@@ -88,7 +105,7 @@ export default function CreateHospitalModal({ isOpen, onClose, onSuccess }: Prop
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={formData.address}
               onChange={e => setFormData({ ...formData, address: e.target.value })}
-              rows={3}
+              rows={2}
             />
           </div>
 
@@ -105,7 +122,7 @@ export default function CreateHospitalModal({ isOpen, onClose, onSuccess }: Prop
               disabled={loading}
               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
             >
-              {loading ? 'Saving...' : 'Create Hospital'}
+              {loading ? 'Connecting to Cloud...' : 'Create Hospital'}
             </button>
           </div>
         </form>
