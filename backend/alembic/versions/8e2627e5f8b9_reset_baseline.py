@@ -1,8 +1,8 @@
-"""Add Hospital and Tenant relationship
+"""reset_baseline
 
-Revision ID: 17c94b3cd7f7
-Revises: 8e0a89ea395a
-Create Date: 2026-02-24 11:35:04.093965
+Revision ID: 8e2627e5f8b9
+Revises: 
+Create Date: 2026-03-15 12:11:35.352593
 
 """
 from typing import Sequence, Union
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '17c94b3cd7f7'
-down_revision: Union[str, None] = '8e0a89ea395a'
+revision: str = '8e2627e5f8b9'
+down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
