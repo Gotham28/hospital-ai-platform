@@ -14,10 +14,8 @@ console.log("🚀 API Initialization:", {
 });
 
 const api = axios.create({
-  baseURL: baseURL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL: 'https://hospital-ai-platform.onrender.com/api/v1',
+  headers: { 'Content-Type': 'application/json' },
 });
 
 // Add this temporary log to see what the browser is actually using
