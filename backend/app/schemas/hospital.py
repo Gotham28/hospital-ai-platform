@@ -8,8 +8,10 @@ class HospitalBase(BaseModel):
     slug: str
     address: Optional[str] = None
     is_active: Optional[bool] = True
+    # ADD THESE TWO LINES:
+    system_prompt: Optional[str] = "You are Arogya..."
+    google_sheet_id: Optional[str] = None
 
-# Properties to receive on creation
 class HospitalCreate(HospitalBase):
     pass
 
