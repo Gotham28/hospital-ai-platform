@@ -6,8 +6,15 @@ import axios from 'axios';
  * It ensures every request to the backend includes the hospital_id 
  * encoded in the bearer token.
  */
+const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+
+console.log("🚀 API Initialization:", {
+  envValue: import.meta.env.VITE_API_URL,
+  finalBaseURL: baseURL
+});
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL, 
+  baseURL: baseURL,
   headers: {
     'Content-Type': 'application/json',
   },
