@@ -20,7 +20,9 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # -------------------------------------------------
 # MODELS
 # -------------------------------------------------
-
+class IngestRequest(BaseModel):
+    hospital_id: int
+    text: str
 class ChatRequest(BaseModel):
     question: str
     hospital_id: int 
@@ -57,7 +59,33 @@ def resolve_doctor_id(user_text: str, doctor_data: dict):
 # -------------------------------------------------
 # ENDPOINT
 # -------------------------------------------------
+@router.post("/ingest")
+async def ingest_knowledge(
+    request: IngestRequest, 
+    db: Session = Depends(get_db)
+):
+    try:
+        # Create the embedding (this is what allows the vector search to work)
+        resp = client.embeddings.create(
+            input=request.text, 
+            model="text-embedding-3-small"
+        )
+        embedding = resp.data[0].embedding
 
+        # Save to the KnowledgeBase table
+        new_entry = KnowledgeBase(
+            hospital_id=request.hospital_id,
+            content=request.text,
+            embedding=embedding,
+            created_at=datetime.utcnow()
+        )
+        db.add(new_entry)
+        db.commit()
+        
+        return {"status": "success", "message": "Knowledge added to Arogya's brain"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 @router.post("/chat")
 async def chat_with_arogya(
     request: ChatRequest, 

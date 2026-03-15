@@ -19,12 +19,11 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["https://hospital-ai-platform.vercel.app", "http://localhost:5173"],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"], # Explicitly list them
-    allow_headers=["Content-Type", "Authorization", "Accept"], # Explicitly list common headers
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"], # Be explicit here
+    allow_headers=["*"],
 )
-
 # --- Include Routers ---
 # Note: The prefixes here combine with the @router paths in your endpoint files
 
