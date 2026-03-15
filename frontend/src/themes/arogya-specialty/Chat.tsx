@@ -66,21 +66,20 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
 
     const toggleMic = () => {
       if (listening) {
-        // Explicitly stop and give it a small delay before state resets
         SpeechRecognition.stopListening();
         return;
       }
 
-      // Clear previous text to avoid double-processing
       resetTranscript();
-
-      // The 'continuous: true' helps prevent the 'auto-off' on short pauses
+      
+      // Map your internal language state to the browser-standard BCP 47 codes
+      const micLanguage = language === 'ml' ? 'ml-IN' : 'en-IN';
+      
       SpeechRecognition.startListening({ 
         continuous: true, 
-        language: language === 'ml' ? 'ml-IN' : 'en-IN' 
+        language: micLanguage 
       });
     };
-
     // Add this useEffect to handle the "Auto-Stop" when user stops speaking
     useEffect(() => {
       if (transcript && !listening) {
