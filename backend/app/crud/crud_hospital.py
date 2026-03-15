@@ -16,7 +16,10 @@ def create_hospital(db: Session, hospital: HospitalCreate):
         name=hospital.name,
         slug=hospital.slug,
         address=hospital.address,
-        is_active=hospital.is_active
+        is_active=hospital.is_active,
+        # Ensure your HospitalCreate schema includes these, or add defaults here
+        system_prompt=getattr(hospital, 'system_prompt', "You are Arogya..."),
+        google_sheet_id=getattr(hospital, 'google_sheet_id', None)
     )
     db.add(db_obj)
     db.commit()
