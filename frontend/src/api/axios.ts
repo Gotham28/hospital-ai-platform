@@ -6,7 +6,7 @@ import axios from 'axios';
  * It ensures every request to the backend includes the hospital_id 
  * encoded in the bearer token.
  */
-const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+const baseURL = import.meta.env.VITE_API_URL;
 
 console.log("🚀 API Initialization:", {
   envValue: import.meta.env.VITE_API_URL,
