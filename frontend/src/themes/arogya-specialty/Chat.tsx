@@ -76,25 +76,20 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
 
   const toggleMic = () => {
     if (listening) {
-      console.log("Stopping hardware via abort...");
-      // abort() stops the engine AND the hardware stream immediately
-      SpeechRecognition.abortListening(); 
+      console.log("Forcing Stop...");
+      SpeechRecognition.stopListening();
+      // Force the browser to release the hardware immediately
+      window.speechSynthesis.cancel(); 
       return;
     }
 
     resetTranscript();
     SpeechRecognition.startListening({ 
-      continuous: true, 
+      continuous: false, // CHANGE THIS TO FALSE for better mobile control
       language: language 
-    }).catch(err => {
-      console.error("Mic Error:", err);
     });
   };
-
-  if (!browserSupportsSpeechRecognition) return <p>Voice features not supported.</p>;
-
-  return (
-    <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 flex flex-col h-[600px]">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 flex flex-col h-[600px]">
       {/* Header */}
       <div className="bg-emerald-600 p-4 text-white flex justify-between items-center shrink-0">
         <h3 className="font-bold flex items-center gap-2">
@@ -137,6 +132,11 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
             <Send className="w-4 h-4" />
           </button>
         </div>
+
+  if (!browserSupportsSpeechRecognition) return <p>Voice features not supported.</p>;
+
+  return (
+
         
         <div className="flex flex-col items-center gap-1">
           <button
