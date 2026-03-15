@@ -68,29 +68,29 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
     return () => clearTimeout(timer);
   }, [transcript, listening, handleSend]);
 
-  const toggleMic = async () => {
-    if (listening) {
-      SpeechRecognition.stopListening();
-      return;
-    }
+// Force the state to update properly
+const toggleMic = async () => {
+  if (listening) {
+    await SpeechRecognition.stopListening();
+    return;
+  }
 
-    resetTranscript();
-    
-    // Explicitly abort any hanging sessions before starting a new one
-    await SpeechRecognition.abortListening();
+  // IMPORTANT: Ensure resetTranscript is called before starting
+  resetTranscript();
+  
+  // Explicitly mapping the exact strings the browser expects
+  const currentLang = language === 'ml-IN' ? 'ml-IN' : 'en-US';
 
-    // Map internal language state to BCP 47 codes
-    const micLanguage = language === 'ml-IN' ? 'ml-IN' : 'en-US';
-    
-    try {
-      await SpeechRecognition.startListening({ 
-        continuous: true, 
-        language: micLanguage 
-      });
-    } catch (err) {
-      console.error("Mic start failed:", err);
-    }
-  };
+  try {
+    await SpeechRecognition.startListening({ 
+      continuous: true, 
+      language: currentLang 
+    });
+    console.log("Mic started with language:", currentLang);
+  } catch (err) {
+    console.error("Mic failed to start:", err);
+  }
+};
 
   return (
     <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 flex flex-col h-[600px]">
