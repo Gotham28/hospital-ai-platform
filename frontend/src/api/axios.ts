@@ -7,12 +7,14 @@ import axios from 'axios';
  * encoded in the bearer token.
  */
 const api = axios.create({
-  // Force the use of the environment variable
   baseURL: import.meta.env.VITE_API_URL, 
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+// Add this temporary log to see what the browser is actually using
+console.log("Current API BaseURL:", import.meta.env.VITE_API_URL);
 // Request Interceptor: Attaches the JWT to every outgoing call
 api.interceptors.request.use(
   (config) => {
