@@ -1,13 +1,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
+from app.db.base import Base
 # Import the router objects from your endpoint files
 from app.api.v1.endpoints.auth import router as auth_router
 from app.api.v1.endpoints.hospitals import router as hospitals_router
 from app.api.v1.endpoints.ai import router as ai_router
-
+from app.db.session import engine
 app = FastAPI(title="Hospital AI Platform")
-
+Base.metadata.create_all(bind=engine)
 # --- CORS Configuration ---
 # This allows both your local development and your live Vercel site to talk to this API
 origins = [

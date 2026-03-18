@@ -1,16 +1,17 @@
 import csv
 import io
 import uuid
+from sqlalchemy import func
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File
 from sqlalchemy.orm import Session
-
+from datetime import datetime # Add this at the top
 from app import crud, schemas
 from app.api.deps import get_db, get_current_tenant
 from app.models.hospital import Hospital
 from app.models.doctor import Doctor
 from app.availability import get_sheet_client # Ensure this is configured
-
+from app.models.usage import UsageLedger
 router = APIRouter()
 
 # -------------------------------------------------
@@ -203,4 +204,34 @@ def get_hospital_by_slug(slug: str, db: Session = Depends(get_db)):
         "id": hospital.id, 
         "name": hospital.name, 
         "google_sheet_id": hospital.google_sheet_id
+    }
+
+
+@router.get("/{hospital_id}/billing")
+async def get_hospital_billing(hospital_id: int, db: Session = Depends(get_db)):
+    # Calculate start of current month
+    first_day = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    stats = db.query(
+        func.sum(UsageLedger.total_tokens).label("tokens"),
+        func.sum(UsageLedger.estimated_cost).label("cost"),
+        func.count(UsageLedger.id).label("total_chats")
+    ).filter(
+        UsageLedger.hospital_id == hospital_id,
+        UsageLedger.created_at >= first_day
+    ).first()
+
+    # Calculation logic for your markup
+    raw_cost = stats.cost or 0.0
+    margin_multiplier = 5.0  # 500% markup (standard for SaaS)
+    platform_fee_inr = 2500.0 # Base monthly platform fee
+    
+    return {
+        "period": first_day.strftime("%B %Y"),
+        "usage": {
+            "total_chats": stats.total_chats or 0,
+            "tokens_consumed": stats.tokens or 0,
+            "raw_cost_usd": round(raw_cost, 4),
+        },
+        "estimated_invoice_inr": round(platform_fee_inr + (raw_cost * 83 * margin_multiplier), 2)
     }
