@@ -41,15 +41,13 @@ const handleSend = useCallback(async (text: string) => {
   const messageToSend = text.trim();
   if (!messageToSend) return;
 
-  // 1. HARD KILL the microphone immediately
-  // .stop() tells the browser to finish, .abort() cuts the power/process
+  // STEP 1: FORCE THE KILL
+  // .abort() is more aggressive than .stop()
   SpeechRecognition.abortListening(); 
   
-  // 2. Small delay to ensure the browser UI updates the 'listening' state
-  setTimeout(() => {
-    resetTranscript();
-    setInputText('');
-  }, 100);
+  // STEP 2: Clear the "Ghost" text immediately
+  resetTranscript();
+  setInputText('');
 
   setMessages(prev => [...prev, { role: 'user', content: messageToSend }]);
   setIsTyping(true);
@@ -62,7 +60,7 @@ const handleSend = useCallback(async (text: string) => {
     });
     setMessages(prev => [...prev, { role: 'assistant', content: response.data.answer }]);
   } catch (error) {
-    setMessages(prev => [...prev, { role: 'assistant', content: "Arogya is having trouble. Please try again." }]);
+    setMessages(prev => [...prev, { role: 'assistant', content: "Error. Please try again." }]);
   } finally {
     setIsTyping(false);
   }
@@ -89,16 +87,16 @@ const handleSend = useCallback(async (text: string) => {
 
   const toggleMic = async () => {
     if (listening) {
-      // Change stopListening to abortListening for an instant shutoff
+      // Hard kill for manual stop too
       await SpeechRecognition.abortListening();
-      return;
+    } else {
+      resetTranscript();
+      // Start listening
+      await SpeechRecognition.startListening({ 
+        continuous: true, 
+        language: language 
+      });
     }
-    
-    resetTranscript();
-    await SpeechRecognition.startListening({ 
-      continuous: true, 
-      language: language 
-    });
   };
 
   return (
