@@ -21,6 +21,20 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
 
   const { transcript, listening, resetTranscript, browserSupportsSpeechRecognition } = useSpeechRecognition();
 
+  // 1. PRODUCTION-SAFE KILL
+  const stopMicSafely = useCallback(() => {
+    try {
+      if (SpeechRecognition.abortListening) {
+        SpeechRecognition.abortListening();
+      } else {
+        SpeechRecognition.stopListening();
+      }
+      resetTranscript();
+    } catch (e) {
+      console.error("Mic stop failed", e);
+    }
+  }, [resetTranscript]);
+
   useEffect(() => {
     const welcome = language === 'ml-IN' 
       ? "👋 നമസ്കാരം! ഞാൻ **ആരോഗ്യ**. എനിക്ക് എങ്ങനെ സഹായിക്കാനാകും?"
@@ -32,16 +46,13 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, transcript]);
 
-  // STABLE SEND LOGIC
+  // 2. PRODUCTION-SAFE SEND
   const handleSend = useCallback(async (text: string) => {
     const messageToSend = text.trim();
     if (!messageToSend) return;
 
-    // 1. Stop the mic properly
-    SpeechRecognition.stopListening(); 
-    
-    // 2. Immediate UI Reset
-    resetTranscript();
+    // KILL MIC FIRST - Don't await it, just trigger it
+    stopMicSafely();
     setInputText('');
 
     setMessages(prev => [...prev, { role: 'user', content: messageToSend }]);
@@ -59,43 +70,33 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
     } finally {
       setIsTyping(false);
     }
-  }, [hospitalId, language, resetTranscript]);
+  }, [hospitalId, language, stopMicSafely]);
 
-  // STABLE AUTO-SEND
+  // 3. SILENCE TIMER
   useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (transcript && listening) {
-      timer = setTimeout(() => {
-        handleSend(transcript);
-      }, 2500);
-    }
+    if (!transcript || !listening) return;
+
+    const timer = setTimeout(() => {
+      handleSend(transcript);
+    }, 2500);
+
     return () => clearTimeout(timer);
   }, [transcript, listening, handleSend]);
 
-  // STABLE MIC TOGGLE
-  const toggleMic = async () => {
+  const toggleMic = () => {
     if (listening) {
-      SpeechRecognition.stopListening();
+      stopMicSafely();
     } else {
-      // Clear before starting to prevent "ghost" text from previous sessions
       resetTranscript();
-      
-      // Requesting the mic
-      try {
-        await SpeechRecognition.startListening({ 
-          continuous: true, 
-          language: language 
-        });
-      } catch (err) {
-        console.error("Mic start error:", err);
-        // Fallback: try one more time without continuous if hardware is being picky
-        SpeechRecognition.startListening({ language: language });
-      }
+      SpeechRecognition.startListening({ 
+        continuous: true, 
+        language: language 
+      });
     }
   };
 
   if (!browserSupportsSpeechRecognition) {
-    return <div className="p-4 text-center text-red-500 text-sm bg-red-50 rounded-lg">Browser does not support voice features.</div>;
+    return <div className="p-4 text-center">Voice not supported here.</div>;
   }
 
   return (
@@ -108,14 +109,10 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
           </h3>
           <button 
             onClick={() => setLanguage(l => l === 'en-US' ? 'ml-IN' : 'en-US')}
-            className="bg-emerald-700 px-3 py-1 rounded-md text-xs font-bold hover:bg-emerald-800 transition-colors"
+            className="bg-emerald-700 px-3 py-1 rounded-md text-xs font-bold"
           >
             {language === 'en-US' ? 'English' : 'മലയാളം'}
           </button>
-        </div>
-        <div className="flex items-center gap-1 opacity-80">
-          <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
-          <span className="text-[9px] uppercase font-bold tracking-wider text-green-100">Database Live</span>
         </div>
       </div>
 
@@ -125,18 +122,19 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
           <ChatMessage key={idx} role={msg.role} content={msg.content} />
         ))}
         
-        {transcript && (
+        {/* Live Preview */}
+        {listening && transcript && (
           <div className="flex justify-end">
-            <div className={`px-4 py-2 rounded-2xl rounded-tr-none text-sm italic border ${listening ? 'bg-emerald-50 text-emerald-700 border-emerald-100 opacity-100' : 'bg-gray-50 text-gray-500 border-gray-200 opacity-50'}`}>
+            <div className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-2xl rounded-tr-none text-sm italic border border-emerald-100">
               {transcript}...
             </div>
           </div>
         )}
 
         {isTyping && (
-          <div className="flex items-center gap-2 text-emerald-600 p-2 bg-white rounded-lg w-fit shadow-sm border border-slate-100">
+          <div className="flex items-center gap-2 text-emerald-600 p-2 bg-white rounded-lg w-fit shadow-sm">
             <Loader2 className="w-3 h-3 animate-spin" />
-            <span className="text-[10px] font-bold uppercase tracking-tight">Arogya is checking...</span>
+            <span className="text-[10px] font-bold">Checking...</span>
           </div>
         )}
         <div ref={scrollRef} />
@@ -149,7 +147,7 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
             <button
               key={i}
               onClick={() => handleSend(text)}
-              className="flex-none bg-white border border-emerald-100 text-emerald-700 text-[11px] px-3 py-1.5 rounded-full shadow-sm hover:bg-emerald-50 flex items-center gap-1"
+              className="flex-none bg-white border border-emerald-100 text-emerald-700 text-[11px] px-3 py-1.5 rounded-full shadow-sm"
             >
               <Zap className="w-3 h-3 text-amber-400 fill-amber-400" /> {text}
             </button>
@@ -157,7 +155,7 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
         </div>
       </div>
 
-      {/* Input Area */}
+      {/* Input */}
       <div className="p-4 border-t bg-white shrink-0">
         <div className="flex items-center gap-2 mb-4">
           <input
@@ -165,13 +163,10 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend(inputText)}
-            placeholder={language === 'en-US' ? "Type message..." : "സന്ദേശം..."}
-            className="flex-1 bg-slate-100 border-none rounded-full px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+            placeholder={language === 'en-US' ? "Type..." : "സന്ദേശം..."}
+            className="flex-1 bg-slate-100 border-none rounded-full px-4 py-2 text-sm outline-none"
           />
-          <button 
-            onClick={() => handleSend(inputText)} 
-            className="p-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-700"
-          >
+          <button onClick={() => handleSend(inputText)} className="p-2 bg-emerald-600 text-white rounded-full">
             <Send className="w-4 h-4" />
           </button>
         </div>
@@ -179,17 +174,14 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
         <div className="flex flex-col items-center">
           <button
             onClick={toggleMic}
-            disabled={isTyping}
-            className={`p-4 rounded-full transition-all transform active:scale-90 ${
-              listening 
-                ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-200' 
-                : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
-            } ${isTyping ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className={`p-4 rounded-full transition-all shadow-lg ${
+              listening ? 'bg-red-500 text-white animate-pulse' : 'bg-slate-100 text-emerald-600'
+            }`}
           >
             {listening ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
           </button>
           <p className="text-[9px] uppercase tracking-widest text-slate-400 font-black mt-2">
-            {listening ? (language === 'en-US' ? "Listening..." : "ശ്രദ്ധിക്കുന്നു...") : (language === 'en-US' ? "Tap to speak" : "സംസാരിക്കുക")}
+             {listening ? "Listening..." : "Tap to speak"}
           </p>
         </div>
       </div>
