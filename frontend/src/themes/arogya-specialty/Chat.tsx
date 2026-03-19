@@ -37,34 +37,36 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
   }, [messages, transcript]);
 
   // Optimized Send Logic
-  const handleSend = useCallback(async (text: string) => {
-    const messageToSend = text.trim();
-    if (!messageToSend) return;
+const handleSend = useCallback(async (text: string) => {
+  const messageToSend = text.trim();
+  if (!messageToSend) return;
 
-    // 1. Kill Mic Hardware immediately
-    SpeechRecognition.stopListening();
-    
-    // 2. Clear UI Inputs
-    setInputText('');
+  // 1. HARD KILL the microphone immediately
+  // .stop() tells the browser to finish, .abort() cuts the power/process
+  SpeechRecognition.abortListening(); 
+  
+  // 2. Small delay to ensure the browser UI updates the 'listening' state
+  setTimeout(() => {
     resetTranscript();
+    setInputText('');
+  }, 100);
 
-    setMessages(prev => [...prev, { role: 'user', content: messageToSend }]);
-    setIsTyping(true);
+  setMessages(prev => [...prev, { role: 'user', content: messageToSend }]);
+  setIsTyping(true);
 
-    try {
-      const response = await api.post('/ai/chat', {
-        question: messageToSend,
-        hospital_id: parseInt(hospitalId),
-        language: language === 'ml-IN' ? 'ml' : 'en'
-      });
-      setMessages(prev => [...prev, { role: 'assistant', content: response.data.answer }]);
-    } catch (error) {
-      console.error("Chat Error:", error);
-      setMessages(prev => [...prev, { role: 'assistant', content: "Arogya is having trouble. Please try again." }]);
-    } finally {
-      setIsTyping(false);
-    }
-  }, [hospitalId, language, resetTranscript]);
+  try {
+    const response = await api.post('/ai/chat', {
+      question: messageToSend,
+      hospital_id: parseInt(hospitalId),
+      language: language === 'ml-IN' ? 'ml' : 'en'
+    });
+    setMessages(prev => [...prev, { role: 'assistant', content: response.data.answer }]);
+  } catch (error) {
+    setMessages(prev => [...prev, { role: 'assistant', content: "Arogya is having trouble. Please try again." }]);
+  } finally {
+    setIsTyping(false);
+  }
+}, [hospitalId, language, resetTranscript]);
 
   // AUTO-SEND LOGIC: Triggers after 2 seconds of silence
   useEffect(() => {
