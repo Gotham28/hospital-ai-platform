@@ -69,25 +69,35 @@ const handleSend = useCallback(async (text: string) => {
 }, [hospitalId, language, resetTranscript]);
 
   // AUTO-SEND LOGIC: Triggers after 2 seconds of silence
+// AUTO-SEND LOGIC with Hard Mic Kill
   useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (transcript && listening) {
-      timer = setTimeout(() => {
-        handleSend(transcript);
-      }, 2000); // 2 second silence threshold
-    }
-    return () => clearTimeout(timer);
-  }, [transcript, listening, handleSend]);
+  let timer: NodeJS.Timeout;
+
+  if (transcript && listening) {
+    // If the user stops talking for 2 seconds
+    timer = setTimeout(() => {
+      // 1. Force the mic to stop immediately before calling the API
+      SpeechRecognition.abortListening(); 
+      
+      // 2. Trigger the send function
+      handleSend(transcript);
+    }, 2000);
+  }
+
+  return () => clearTimeout(timer);
+}, [transcript, listening, handleSend]);
 
   const toggleMic = async () => {
     if (listening) {
-      await SpeechRecognition.stopListening();
+      // Change stopListening to abortListening for an instant shutoff
+      await SpeechRecognition.abortListening();
       return;
     }
+    
     resetTranscript();
     await SpeechRecognition.startListening({ 
-        continuous: true, 
-        language: language 
+      continuous: true, 
+      language: language 
     });
   };
 

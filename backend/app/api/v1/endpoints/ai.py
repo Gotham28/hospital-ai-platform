@@ -137,18 +137,34 @@ async def chat_with_arogya(
     else:
         lang_instruction = "Respond strictly in English."
 
-    system_prompt = f"""
-    You are Arogya, the AI Assistant for {hospital.name}. 
-    Current Date: {today_str}
-    
-    {hospital.system_prompt}
-    {lang_instruction}
+# Add this specific instruction block to your lang_instruction or prompt
+    behavior_guidelines = """
+    CRITICAL INSTRUCTIONS FOR MALAYALAM:
+    1. Use 'Manglish' style: Use English technical terms written in Malayalam script. 
+    - Example: Use 'കാർഡിയോളജി വിഭാഗം' (Cardiology Department) instead of literal translations.
+    - Example: Use 'സെക്കൻഡ് ഫ്ലോർ' (Second Floor) instead of 'രണ്ടാം നില'.
+    2. Tone: Professional but conversational, like a hospital receptionist.
+    3. If the data is not in your context, say "എനിക്ക് ക്ഷമിക്കണം, ആ വിവരം എന്റെ പക്കലില്ല" 
+    (Sorry, I don't have that info) instead of guessing.
+    4. Keep responses under 2 sentences unless listing doctors.
+    """
 
-    {doctor_directory_context}
-    {availability_context}
-    
-    ADDITIONAL KNOWLEDGE:
-    {kb_context}
+    system_prompt = f"""
+        You are Arogya, the AI Assistant for {hospital.name}. 
+        Current Date: {today_str}
+        
+        {hospital.system_prompt}
+        {lang_instruction}
+        {behavior_guidelines} 
+
+        {doctor_directory_context}
+        {availability_context}
+        
+        ADDITIONAL KNOWLEDGE:
+        {kb_context}
+        
+        Final Instruction: Respond in the language requested by the user. 
+        If they speak Malayalam, use the Manglish style described above.
     """
     
     ai_response = client.chat.completions.create(
