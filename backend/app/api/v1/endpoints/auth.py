@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import datetime, timedelta, timezone
@@ -7,14 +8,14 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db
 from app.models.user import User
 
-# Match these exactly with your .env or deps.py
-SECRET_KEY = "dev-secret-key" 
+# FIX #1 (continued): Load SECRET_KEY from environment.
+# Must match the value in deps.py — both read from the same env var.
+SECRET_KEY = os.getenv("JWT_SECRET", "dev-secret-key-change-in-production")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# FIXED: Removed double-prefix to stop 404 error
 router = APIRouter(tags=["auth"])
 
 def create_access_token(data: dict):
@@ -26,11 +27,11 @@ def create_access_token(data: dict):
 @router.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == form_data.username).first()
-    
+
     if not user or not pwd_context.verify(form_data.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect email or password")
-    
-    # The Magic Key: hospital_id is now safely inside the token
+
+    # hospital_id is safely encoded inside the token
     access_token = create_access_token(
         data={"sub": user.email, "hospital_id": user.hospital_id}
     )

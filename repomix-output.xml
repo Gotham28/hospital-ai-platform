@@ -1,0 +1,3629 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+.gitignore
+backend/alembic.ini
+backend/alembic/env.py
+backend/alembic/README
+backend/alembic/script.py.mako
+backend/alembic/versions/1557c23751d2_clean_baseline.py
+backend/alembic/versions/8e2627e5f8b9_reset_baseline.py
+backend/app/api/__init__.py
+backend/app/api/deps.py
+backend/app/api/v1/endpoints/__init__.py
+backend/app/api/v1/endpoints/ai.py
+backend/app/api/v1/endpoints/auth.py
+backend/app/api/v1/endpoints/hospitals.py
+backend/app/api/v1/endpoints/usage.py
+backend/app/availability.py
+backend/app/core/__init__.py
+backend/app/core/config.py
+backend/app/crud/__init__.py
+backend/app/crud/crud_hospital.py
+backend/app/crud/crud_user.py
+backend/app/db/base_class.py
+backend/app/db/base.py
+backend/app/db/session.py
+backend/app/main.py
+backend/app/models/__init__.py
+backend/app/models/doctor.py
+backend/app/models/hospital.py
+backend/app/models/knowledge.py
+backend/app/models/usage.py
+backend/app/models/user.py
+backend/app/schemas/__init__.py
+backend/app/schemas/hospital.py
+backend/app/schemas/user.py
+backend/create_tables.py
+backend/google_credentials.json
+backend/seed.py
+frontend/.gitignore
+frontend/eslint.config.js
+frontend/index.html
+frontend/package.json
+frontend/postcss.config.js
+frontend/public/vite.svg
+frontend/README.md
+frontend/src/api/axios.ts
+frontend/src/App.css
+frontend/src/App.tsx
+frontend/src/assets/react.svg
+frontend/src/components/ChatPreview.tsx
+frontend/src/components/CreateHospitalModal.tsx
+frontend/src/components/HospitalStats.tsx
+frontend/src/components/UsageStats.tsx
+frontend/src/index.css
+frontend/src/layouts/DashboardLayout.tsx
+frontend/src/main.tsx
+frontend/src/pages/Dashboard.py
+frontend/src/pages/Dashboard.tsx
+frontend/src/pages/Doctors.tsx
+frontend/src/pages/KnowledgeBase.tsx
+frontend/src/pages/Login.tsx
+frontend/src/pages/Settings.tsx
+frontend/src/themes/arogya-specialty/Chat.tsx
+frontend/src/themes/arogya-specialty/ChatMessage.tsx
+frontend/src/themes/arogya-specialty/index.tsx
+frontend/src/themes/README.txt
+frontend/src/themes/registry.ts
+frontend/src/themes/ThemeLoader.tsx
+frontend/tailwind.config.js
+frontend/tsconfig.app.json
+frontend/tsconfig.json
+frontend/tsconfig.node.json
+frontend/vercel.json
+package.json
+requirements.txt
+vite.config.ts
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path=".gitignore">
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Environment
+.env
+
+# Node
+node_modules/
+
+# Build
+dist/
+build/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+</file>
+
+<file path="backend/alembic.ini">
+# A generic, single database configuration.
+
+[alembic]
+# path to migration scripts.
+# this is typically a path given in POSIX (e.g. forward slashes)
+# format, relative to the token %(here)s which refers to the location of this
+# ini file
+script_location = %(here)s/alembic
+
+# template used to generate migration file names; The default value is %%(rev)s_%%(slug)s
+# Uncomment the line below if you want the files to be prepended with date and time
+# see https://alembic.sqlalchemy.org/en/latest/tutorial.html#editing-the-ini-file
+# for all available tokens
+# file_template = %%(year)d_%%(month).2d_%%(day).2d_%%(hour).2d%%(minute).2d-%%(rev)s_%%(slug)s
+
+# sys.path path, will be prepended to sys.path if present.
+# defaults to the current working directory.  for multiple paths, the path separator
+# is defined by "path_separator" below.
+prepend_sys_path = .
+
+
+# timezone to use when rendering the date within the migration file
+# as well as the filename.
+# If specified, requires the python>=3.9 or backports.zoneinfo library and tzdata library.
+# Any required deps can installed by adding `alembic[tz]` to the pip requirements
+# string value is passed to ZoneInfo()
+# leave blank for localtime
+# timezone =
+
+# max length of characters to apply to the "slug" field
+# truncate_slug_length = 40
+
+# set to 'true' to run the environment during
+# the 'revision' command, regardless of autogenerate
+# revision_environment = false
+
+# set to 'true' to allow .pyc and .pyo files without
+# a source .py file to be detected as revisions in the
+# versions/ directory
+# sourceless = false
+
+# version location specification; This defaults
+# to <script_location>/versions.  When using multiple version
+# directories, initial revisions must be specified with --version-path.
+# The path separator used here should be the separator specified by "path_separator"
+# below.
+# version_locations = %(here)s/bar:%(here)s/bat:%(here)s/alembic/versions
+
+# path_separator; This indicates what character is used to split lists of file
+# paths, including version_locations and prepend_sys_path within configparser
+# files such as alembic.ini.
+# The default rendered in new alembic.ini files is "os", which uses os.pathsep
+# to provide os-dependent path splitting.
+#
+# Note that in order to support legacy alembic.ini files, this default does NOT
+# take place if path_separator is not present in alembic.ini.  If this
+# option is omitted entirely, fallback logic is as follows:
+#
+# 1. Parsing of the version_locations option falls back to using the legacy
+#    "version_path_separator" key, which if absent then falls back to the legacy
+#    behavior of splitting on spaces and/or commas.
+# 2. Parsing of the prepend_sys_path option falls back to the legacy
+#    behavior of splitting on spaces, commas, or colons.
+#
+# Valid values for path_separator are:
+#
+# path_separator = :
+# path_separator = ;
+# path_separator = space
+# path_separator = newline
+#
+# Use os.pathsep. Default configuration used for new projects.
+path_separator = os
+
+# set to 'true' to search source files recursively
+# in each "version_locations" directory
+# new in Alembic version 1.10
+# recursive_version_locations = false
+
+# the output encoding used when revision files
+# are written from script.py.mako
+# output_encoding = utf-8
+
+# database URL.  This is consumed by the user-maintained env.py script only.
+# other means of configuring database URLs may be customized within the env.py
+# file.
+sqlalchemy.url = driver://user:pass@localhost/dbname
+
+
+[post_write_hooks]
+# post_write_hooks defines scripts or Python functions that are run
+# on newly generated revision scripts.  See the documentation for further
+# detail and examples
+
+# format using "black" - use the console_scripts runner, against the "black" entrypoint
+# hooks = black
+# black.type = console_scripts
+# black.entrypoint = black
+# black.options = -l 79 REVISION_SCRIPT_FILENAME
+
+# lint with attempts to fix using "ruff" - use the exec runner, execute a binary
+# hooks = ruff
+# ruff.type = exec
+# ruff.executable = %(here)s/.venv/bin/ruff
+# ruff.options = check --fix REVISION_SCRIPT_FILENAME
+
+# Logging configuration.  This is also consumed by the user-maintained
+# env.py script only.
+[loggers]
+keys = root,sqlalchemy,alembic
+
+[handlers]
+keys = console
+
+[formatters]
+keys = generic
+
+[logger_root]
+level = WARNING
+handlers = console
+qualname =
+
+[logger_sqlalchemy]
+level = WARNING
+handlers =
+qualname = sqlalchemy.engine
+
+[logger_alembic]
+level = INFO
+handlers =
+qualname = alembic
+
+[handler_console]
+class = StreamHandler
+args = (sys.stderr,)
+level = NOTSET
+formatter = generic
+
+[formatter_generic]
+format = %(levelname)-5.5s [%(name)s] %(message)s
+datefmt = %H:%M:%S
+</file>
+
+<file path="backend/alembic/env.py">
+import os
+import sys
+from logging.config import fileConfig
+
+from sqlalchemy import engine_from_config
+from sqlalchemy import pool
+from alembic import context
+from dotenv import load_dotenv  # ### NEW: Import dotenv
+
+# ### NEW: Add the project root to the path so we can import 'app'
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
+# ### NEW: Load environment variables from .env
+load_dotenv()
+
+# ### NEW: Import your Base model so Alembic can see your tables!
+# Change 'app.db.base' to wherever your SQLAlchemy Base is defined.
+# If you don't have a Base yet, keep it as None, but you MUST update this later.
+try:
+    from app.db.base import Base
+    target_metadata = Base.metadata
+except ImportError:
+    target_metadata = None
+    print("WARNING: Could not import app.db.base.Base. Autogenerate will not work.")
+
+# this is the Alembic Config object
+config = context.config
+
+# ### NEW: Overwrite the sqlalchemy.url in the config with the one from .env
+# We use the SYNC driver (psycopg2) for migrations, not the ASYNC one.
+db_url = os.getenv("DATABASE_URL")
+if not db_url:
+    raise ValueError("DATABASE_URL not found in .env file!")
+config.set_main_option("sqlalchemy.url", db_url)
+
+
+# Interpret the config file for Python logging.
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name)
+
+
+def run_migrations_offline() -> None:
+    """Run migrations in 'offline' mode."""
+    url = config.get_main_option("sqlalchemy.url")
+    context.configure(
+        url=url,
+        target_metadata=target_metadata,
+        literal_binds=True,
+        dialect_opts={"paramstyle": "named"},
+    )
+
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+def run_migrations_online() -> None:
+    """Run migrations in 'online' mode."""
+    
+    # ### NEW: We must ensure the engine uses the config we just updated
+    connectable = engine_from_config(
+        config.get_section(config.config_ini_section, {}),
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+    )
+
+    with connectable.connect() as connection:
+        context.configure(
+            connection=connection, target_metadata=target_metadata
+        )
+
+        with context.begin_transaction():
+            context.run_migrations()
+
+
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    run_migrations_online()
+</file>
+
+<file path="backend/alembic/README">
+Generic single-database configuration.
+</file>
+
+<file path="backend/alembic/script.py.mako">
+"""${message}
+
+Revision ID: ${up_revision}
+Revises: ${down_revision | comma,n}
+Create Date: ${create_date}
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+${imports if imports else ""}
+
+# revision identifiers, used by Alembic.
+revision: str = ${repr(up_revision)}
+down_revision: Union[str, None] = ${repr(down_revision)}
+branch_labels: Union[str, Sequence[str], None] = ${repr(branch_labels)}
+depends_on: Union[str, Sequence[str], None] = ${repr(depends_on)}
+
+
+def upgrade() -> None:
+    """Upgrade schema."""
+    ${upgrades if upgrades else "pass"}
+
+
+def downgrade() -> None:
+    """Downgrade schema."""
+    ${downgrades if downgrades else "pass"}
+</file>
+
+<file path="backend/alembic/versions/1557c23751d2_clean_baseline.py">
+"""clean_baseline
+
+Revision ID: 1557c23751d2
+Revises: 8e2627e5f8b9
+Create Date: 2026-03-15 12:20:14.818663
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+
+
+# revision identifiers, used by Alembic.
+revision: str = '1557c23751d2'
+down_revision: Union[str, None] = '8e2627e5f8b9'
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    """Upgrade schema."""
+    # ### commands auto generated by Alembic - please adjust! ###
+    pass
+    # ### end Alembic commands ###
+
+
+def downgrade() -> None:
+    """Downgrade schema."""
+    # ### commands auto generated by Alembic - please adjust! ###
+    pass
+    # ### end Alembic commands ###
+</file>
+
+<file path="backend/alembic/versions/8e2627e5f8b9_reset_baseline.py">
+"""reset_baseline
+
+Revision ID: 8e2627e5f8b9
+Revises: 
+Create Date: 2026-03-15 12:11:35.352593
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+
+
+# revision identifiers, used by Alembic.
+revision: str = '8e2627e5f8b9'
+down_revision: Union[str, None] = None
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    """Upgrade schema."""
+    # ### commands auto generated by Alembic - please adjust! ###
+    pass
+    # ### end Alembic commands ###
+
+
+def downgrade() -> None:
+    """Downgrade schema."""
+    # ### commands auto generated by Alembic - please adjust! ###
+    pass
+    # ### end Alembic commands ###
+</file>
+
+<file path="backend/app/api/__init__.py">
+
+</file>
+
+<file path="backend/app/api/deps.py">
+from typing import Generator
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from jose import jwt, JWTError
+from app.db.session import SessionLocal
+
+# This matches the settings in your .env
+SECRET_KEY = "dev-secret-key" 
+ALGORITHM = "HS256"
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login")
+
+def get_db() -> Generator:
+    try:
+        db = SessionLocal()
+        yield db
+    finally:
+        db.close()
+
+def get_current_tenant(token: str = Depends(oauth2_scheme)) -> int:
+    """
+    The Magic Key: Extracts the hospital_id from the JWT.
+    If the token is invalid or missing the ID, it denies access.
+    """
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        hospital_id: int = payload.get("hospital_id")
+        if hospital_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication credentials: No tenant ID found",
+            )
+        return hospital_id
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+        )
+</file>
+
+<file path="backend/app/api/v1/endpoints/__init__.py">
+# Location: D:\Hospital\hospital-ai-platform\backend\app\api\v1\endpoints\__init__.py
+
+from .hospitals import router as hospitals
+from .auth import router as auth
+from .ai import router as ai
+</file>
+
+<file path="backend/app/api/v1/endpoints/auth.py">
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
+from datetime import datetime, timedelta, timezone
+from jose import jwt
+from passlib.context import CryptContext
+from sqlalchemy.orm import Session
+from app.api.deps import get_db
+from app.models.user import User
+
+# Match these exactly with your .env or deps.py
+SECRET_KEY = "dev-secret-key" 
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# FIXED: Removed double-prefix to stop 404 error
+router = APIRouter(tags=["auth"])
+
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+@router.post("/login")
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == form_data.username).first()
+    
+    if not user or not pwd_context.verify(form_data.password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Incorrect email or password")
+    
+    # The Magic Key: hospital_id is now safely inside the token
+    access_token = create_access_token(
+        data={"sub": user.email, "hospital_id": user.hospital_id}
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+</file>
+
+<file path="backend/app/api/v1/endpoints/usage.py">
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from sqlalchemy import func
+from app.api.deps import get_db, get_current_tenant
+from app.models.usage import UsageLedger # Import from the model file
+
+router = APIRouter(tags=["Usage"])
+
+@router.get("/summary")
+def get_usage_summary(
+    db: Session = Depends(get_db),
+    hospital_id: int = Depends(get_current_tenant) # The Magic Key
+):
+    stats = db.query(
+        func.sum(UsageLedger.total_tokens).label("total_tokens"),
+        func.sum(UsageLedger.estimated_cost).label("estimated_cost")
+    ).filter(UsageLedger.hospital_id == hospital_id).first()
+
+    return {
+        "total_tokens": stats.total_tokens or 0,
+        "estimated_cost": stats.estimated_cost or 0.0
+    }
+</file>
+
+<file path="backend/app/core/__init__.py">
+
+</file>
+
+<file path="backend/app/crud/__init__.py">
+from .crud_hospital import create_hospital, get_hospital, get_hospital_by_slug, get_hospitals
+from .crud_user import create_user, get_user, get_user_by_email
+</file>
+
+<file path="backend/app/crud/crud_user.py">
+from sqlalchemy.orm import Session
+from app.models.user import User
+from app.schemas.user import UserCreate
+
+def get_user(db: Session, user_id: int):
+    return db.query(User).filter(User.id == user_id).first()
+
+def get_user_by_email(db: Session, email: str):
+    return db.query(User).filter(User.email == email).first()
+
+def create_user(db: Session, user: UserCreate):
+    # TODO: Hash the password later!
+    fake_hashed_password = user.password + "notreallyhashed"
+    
+    db_obj = User(
+        email=user.email,
+        hashed_password=fake_hashed_password,
+        full_name=user.full_name,
+        hospital_id=user.hospital_id,
+        is_superuser=user.is_superuser,
+        is_active=user.is_active,
+    )
+    db.add(db_obj)
+    db.commit()
+    db.refresh(db_obj)
+    return db_obj
+</file>
+
+<file path="backend/app/db/base_class.py">
+from typing import Any
+from sqlalchemy.ext.declarative import as_declarative, declared_attr
+
+@as_declarative()
+class Base:
+    id: Any
+    __name__: str
+
+    # Generate __tablename__ automatically from class name
+    # e.g., 'User' model -> 'user' table
+    @declared_attr
+    def __tablename__(cls) -> str:
+        return cls.__name__.lower()
+</file>
+
+<file path="backend/app/db/session.py">
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from app.core.config import settings
+
+# Create the database engine
+engine = create_engine(settings.SQLALCHEMY_DATABASE_URL)
+
+# Create a Session factory
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+</file>
+
+<file path="backend/app/models/__init__.py">
+
+</file>
+
+<file path="backend/app/models/doctor.py">
+from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy.orm import relationship
+from app.db.base_class import Base
+
+class Doctor(Base):
+    __tablename__ = "doctors"
+
+    id = Column(Integer, primary_key=True, index=True)
+    doctor_id = Column(String, index=True, nullable=False)
+    name = Column(String, nullable=False)
+    # Add these two missing columns:
+    department = Column(String, nullable=True) 
+    base_schedule = Column(String, nullable=True)
+    
+    hospital_id = Column(Integer, ForeignKey("hospital.id"), nullable=False)
+    hospital = relationship("Hospital", back_populates="doctors")
+</file>
+
+<file path="backend/app/models/knowledge.py">
+from sqlalchemy import Column, Integer, Text, ForeignKey, DateTime
+from sqlalchemy.sql import func
+from pgvector.sqlalchemy import Vector
+from app.db.base_class import Base
+
+class KnowledgeBase(Base):
+    __tablename__ = "knowledge_base"
+
+    id = Column(Integer, primary_key=True, index=True)
+    hospital_id = Column(Integer, ForeignKey("hospital.id"), nullable=False)
+    content = Column(Text, nullable=False) # The actual text (e.g., Doctor timings)
+    
+    # Vector column: 1536 dimensions for OpenAI's text-embedding-3-small
+    embedding = Column(Vector(1536)) 
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+</file>
+
+<file path="backend/app/models/usage.py">
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
+from datetime import datetime, timezone
+from app.db.base_class import Base
+
+class UsageLedger(Base):
+    __tablename__ = "usage_ledger"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    hospital_id = Column(Integer, ForeignKey("hospital.id"))
+    endpoint = Column(String)  # e.g., "/chat" or "/ingest"
+    prompt_tokens = Column(Integer)
+    completion_tokens = Column(Integer)
+    total_tokens = Column(Integer)
+    estimated_cost = Column(Float) 
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+</file>
+
+<file path="backend/app/models/user.py">
+from sqlalchemy import Boolean, Column, Integer, String, ForeignKey # Added ForeignKey
+from sqlalchemy.orm import relationship # Added relationship
+from app.db.base_class import Base
+
+class User(Base):
+    id = Column(Integer, primary_key=True, index=True)
+    full_name = Column(String, index=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    is_active = Column(Boolean(), default=True)
+    is_superuser = Column(Boolean(), default=False)
+    
+    # --- NEW: Multi-Tenancy Link ---
+    hospital_id = Column(Integer, ForeignKey("hospital.id"), nullable=True) # Nullable for Superadmins
+    hospital = relationship("Hospital", back_populates="users")
+</file>
+
+<file path="backend/app/schemas/__init__.py">
+from .hospital import Hospital, HospitalCreate, HospitalUpdate
+from .user import User, UserCreate, UserUpdate
+</file>
+
+<file path="backend/app/schemas/user.py">
+from typing import Optional
+from pydantic import BaseModel, EmailStr
+
+# Shared properties
+class UserBase(BaseModel):
+    email: EmailStr
+    is_active: Optional[bool] = True
+    is_superuser: bool = False
+    full_name: Optional[str] = None
+    hospital_id: Optional[int] = None
+
+# Properties to receive on creation
+class UserCreate(UserBase):
+    password: str
+
+# Properties to receive on update
+class UserUpdate(UserBase):
+    password: Optional[str] = None
+
+# Properties to return to client
+class User(UserBase):
+    id: int
+    
+    class Config:
+        from_attributes = True
+</file>
+
+<file path="backend/create_tables.py">
+from app.db.base import Base
+from app.db.session import engine
+# Import all your models here so SQLAlchemy knows they exist
+from app.models.hospital import Hospital
+from app.models.user import User
+from app.models.doctor import Doctor 
+
+print("Creating database tables...")
+Base.metadata.create_all(bind=engine)
+print("Tables created successfully!")
+</file>
+
+<file path="frontend/.gitignore">
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+</file>
+
+<file path="frontend/eslint.config.js">
+import js from '@eslint/js'
+import globals from 'globals'
+import reactHooks from 'eslint-plugin-react-hooks'
+import reactRefresh from 'eslint-plugin-react-refresh'
+import tseslint from 'typescript-eslint'
+import { defineConfig, globalIgnores } from 'eslint/config'
+
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      js.configs.recommended,
+      tseslint.configs.recommended,
+      reactHooks.configs.flat.recommended,
+      reactRefresh.configs.vite,
+    ],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: globals.browser,
+    },
+  },
+])
+</file>
+
+<file path="frontend/index.html">
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>frontend</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+</file>
+
+<file path="frontend/postcss.config.js">
+export default {
+  plugins: {
+    '@tailwindcss/postcss': {},
+    autoprefixer: {},
+  },
+}
+</file>
+
+<file path="frontend/public/vite.svg">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="31.88" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 257"><defs><linearGradient id="IconifyId1813088fe1fbc01fb466" x1="-.828%" x2="57.636%" y1="7.652%" y2="78.411%"><stop offset="0%" stop-color="#41D1FF"></stop><stop offset="100%" stop-color="#BD34FE"></stop></linearGradient><linearGradient id="IconifyId1813088fe1fbc01fb467" x1="43.376%" x2="50.316%" y1="2.242%" y2="89.03%"><stop offset="0%" stop-color="#FFEA83"></stop><stop offset="8.333%" stop-color="#FFDD35"></stop><stop offset="100%" stop-color="#FFA800"></stop></linearGradient></defs><path fill="url(#IconifyId1813088fe1fbc01fb466)" d="M255.153 37.938L134.897 252.976c-2.483 4.44-8.862 4.466-11.382.048L.875 37.958c-2.746-4.814 1.371-10.646 6.827-9.67l120.385 21.517a6.537 6.537 0 0 0 2.322-.004l117.867-21.483c5.438-.991 9.574 4.796 6.877 9.62Z"></path><path fill="url(#IconifyId1813088fe1fbc01fb467)" d="M185.432.063L96.44 17.501a3.268 3.268 0 0 0-2.634 3.014l-5.474 92.456a3.268 3.268 0 0 0 3.997 3.378l24.777-5.718c2.318-.535 4.413 1.507 3.936 3.838l-7.361 36.047c-.495 2.426 1.782 4.5 4.151 3.78l15.304-4.649c2.372-.72 4.652 1.36 4.15 3.788l-11.698 56.621c-.732 3.542 3.979 5.473 5.943 2.437l1.313-2.028l72.516-144.72c1.215-2.423-.88-5.186-3.54-4.672l-25.505 4.922c-2.396.462-4.435-1.77-3.759-4.114l16.646-57.705c.677-2.35-1.37-4.583-3.769-4.113Z"></path></svg>
+</file>
+
+<file path="frontend/README.md">
+# React + TypeScript + Vite
+
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+
+Currently, two official plugins are available:
+
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+
+## React Compiler
+
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+
+## Expanding the ESLint configuration
+
+If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+
+```js
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
+
+      // Remove tseslint.configs.recommended and replace with this
+      tseslint.configs.recommendedTypeChecked,
+      // Alternatively, use this for stricter rules
+      tseslint.configs.strictTypeChecked,
+      // Optionally, add this for stylistic rules
+      tseslint.configs.stylisticTypeChecked,
+
+      // Other configs...
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
+```
+
+You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+
+```js
+// eslint.config.js
+import reactX from 'eslint-plugin-react-x'
+import reactDom from 'eslint-plugin-react-dom'
+
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
+      // Enable lint rules for React
+      reactX.configs['recommended-typescript'],
+      // Enable lint rules for React DOM
+      reactDom.configs.recommended,
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
+```
+</file>
+
+<file path="frontend/src/App.css">
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}
+</file>
+
+<file path="frontend/src/App.tsx">
+import { Routes, Route, Navigate, Link } from 'react-router-dom';
+import DashboardLayout from './layouts/DashboardLayout';
+import CreateHospitalModal from './components/CreateHospitalModal';
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard'; 
+import DoctorsPage from './pages/Doctors';
+import SettingsPage from './pages/Settings'; 
+import ThemeLoader from './themes/ThemeLoader';
+import api from './api/axios';
+import { useEffect, useState } from 'react';
+import { Plus } from 'lucide-react';
+
+function HospitalList() {
+  const [hospitals, setHospitals] = useState<any[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const fetchHospitals = () => {
+    api.get('/hospitals/')
+      .then(res => setHospitals(res.data))
+      .catch(console.error);
+  };
+
+  useEffect(() => { fetchHospitals(); }, []);
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-gray-900">Hospital Management</h2>
+        <button 
+          onClick={() => setIsModalOpen(true)} 
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          <Plus className="w-4 h-4" /> Add Hospital
+        </button>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-3">
+        {hospitals.map((h: any) => (
+          <div key={h.id} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+            <h3 className="font-bold text-gray-900 text-lg">{h.name}</h3>
+            <p className="text-xs text-gray-400 mb-4">Slug: {h.slug}</p>
+            
+            <div className="flex gap-2 border-t pt-4">
+              <Link 
+                to={`/hospitals/${h.id}/training`} 
+                className="flex-1 text-center text-xs bg-blue-600 text-white py-2 rounded-md font-medium hover:bg-blue-700"
+              >
+                Train AI
+              </Link>
+              <Link 
+                to={`/hospitals/${h.id}/settings`} 
+                className="flex-1 text-center text-xs border border-gray-300 text-gray-600 py-2 rounded-md font-medium hover:bg-gray-50"
+              >
+                Settings
+              </Link>
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      <CreateHospitalModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        onSuccess={fetchHospitals} 
+      />
+    </div>
+  );
+}
+
+export default function App() {
+  const isAuthenticated = !!localStorage.getItem('token');
+
+  return (
+    <Routes>
+      {/* Public Patient-Facing Route */}
+      <Route path="/p/:hospitalSlug" element={<ThemeLoader />} />
+      
+      {/* Authentication Route */}
+      <Route path="/login" element={<Login />} />
+
+      {/* Protected Admin Routes */}
+      <Route element={isAuthenticated ? <DashboardLayout /> : <Navigate to="/login" replace />}>
+        {/* Main Hospital Selection Screen */}
+        <Route path="/" element={<HospitalList />} /> 
+        
+        {/* Context-Specific Routes (Notice the consistent use of :hospitalId) */}
+        <Route path="/hospitals/:hospitalId/doctors" element={<DoctorsPage />} /> 
+        <Route path="/hospitals/:hospitalId/training" element={<Dashboard />} /> 
+        <Route path="/hospitals/:hospitalId/settings" element={<SettingsPage />} />
+      </Route>
+
+      {/* Catch-all Fallback */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+</file>
+
+<file path="frontend/src/assets/react.svg">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="35.93" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 228"><path fill="#00D8FF" d="M210.483 73.824a171.49 171.49 0 0 0-8.24-2.597c.465-1.9.893-3.777 1.273-5.621c6.238-30.281 2.16-54.676-11.769-62.708c-13.355-7.7-35.196.329-57.254 19.526a171.23 171.23 0 0 0-6.375 5.848a155.866 155.866 0 0 0-4.241-3.917C100.759 3.829 77.587-4.822 63.673 3.233C50.33 10.957 46.379 33.89 51.995 62.588a170.974 170.974 0 0 0 1.892 8.48c-3.28.932-6.445 1.924-9.474 2.98C17.309 83.498 0 98.307 0 113.668c0 15.865 18.582 31.778 46.812 41.427a145.52 145.52 0 0 0 6.921 2.165a167.467 167.467 0 0 0-2.01 9.138c-5.354 28.2-1.173 50.591 12.134 58.266c13.744 7.926 36.812-.22 59.273-19.855a145.567 145.567 0 0 0 5.342-4.923a168.064 168.064 0 0 0 6.92 6.314c21.758 18.722 43.246 26.282 56.54 18.586c13.731-7.949 18.194-32.003 12.4-61.268a145.016 145.016 0 0 0-1.535-6.842c1.62-.48 3.21-.974 4.76-1.488c29.348-9.723 48.443-25.443 48.443-41.52c0-15.417-17.868-30.326-45.517-39.844Zm-6.365 70.984c-1.4.463-2.836.91-4.3 1.345c-3.24-10.257-7.612-21.163-12.963-32.432c5.106-11 9.31-21.767 12.459-31.957c2.619.758 5.16 1.557 7.61 2.4c23.69 8.156 38.14 20.213 38.14 29.504c0 9.896-15.606 22.743-40.946 31.14Zm-10.514 20.834c2.562 12.94 2.927 24.64 1.23 33.787c-1.524 8.219-4.59 13.698-8.382 15.893c-8.067 4.67-25.32-1.4-43.927-17.412a156.726 156.726 0 0 1-6.437-5.87c7.214-7.889 14.423-17.06 21.459-27.246c12.376-1.098 24.068-2.894 34.671-5.345a134.17 134.17 0 0 1 1.386 6.193ZM87.276 214.515c-7.882 2.783-14.16 2.863-17.955.675c-8.075-4.657-11.432-22.636-6.853-46.752a156.923 156.923 0 0 1 1.869-8.499c10.486 2.32 22.093 3.988 34.498 4.994c7.084 9.967 14.501 19.128 21.976 27.15a134.668 134.668 0 0 1-4.877 4.492c-9.933 8.682-19.886 14.842-28.658 17.94ZM50.35 144.747c-12.483-4.267-22.792-9.812-29.858-15.863c-6.35-5.437-9.555-10.836-9.555-15.216c0-9.322 13.897-21.212 37.076-29.293c2.813-.98 5.757-1.905 8.812-2.773c3.204 10.42 7.406 21.315 12.477 32.332c-5.137 11.18-9.399 22.249-12.634 32.792a134.718 134.718 0 0 1-6.318-1.979Zm12.378-84.26c-4.811-24.587-1.616-43.134 6.425-47.789c8.564-4.958 27.502 2.111 47.463 19.835a144.318 144.318 0 0 1 3.841 3.545c-7.438 7.987-14.787 17.08-21.808 26.988c-12.04 1.116-23.565 2.908-34.161 5.309a160.342 160.342 0 0 1-1.76-7.887Zm110.427 27.268a347.8 347.8 0 0 0-7.785-12.803c8.168 1.033 15.994 2.404 23.343 4.08c-2.206 7.072-4.956 14.465-8.193 22.045a381.151 381.151 0 0 0-7.365-13.322Zm-45.032-43.861c5.044 5.465 10.096 11.566 15.065 18.186a322.04 322.04 0 0 0-30.257-.006c4.974-6.559 10.069-12.652 15.192-18.18ZM82.802 87.83a323.167 323.167 0 0 0-7.227 13.238c-3.184-7.553-5.909-14.98-8.134-22.152c7.304-1.634 15.093-2.97 23.209-3.984a321.524 321.524 0 0 0-7.848 12.897Zm8.081 65.352c-8.385-.936-16.291-2.203-23.593-3.793c2.26-7.3 5.045-14.885 8.298-22.6a321.187 321.187 0 0 0 7.257 13.246c2.594 4.48 5.28 8.868 8.038 13.147Zm37.542 31.03c-5.184-5.592-10.354-11.779-15.403-18.433c4.902.192 9.899.29 14.978.29c5.218 0 10.376-.117 15.453-.343c-4.985 6.774-10.018 12.97-15.028 18.486Zm52.198-57.817c3.422 7.8 6.306 15.345 8.596 22.52c-7.422 1.694-15.436 3.058-23.88 4.071a382.417 382.417 0 0 0 7.859-13.026a347.403 347.403 0 0 0 7.425-13.565Zm-16.898 8.101a358.557 358.557 0 0 1-12.281 19.815a329.4 329.4 0 0 1-23.444.823c-7.967 0-15.716-.248-23.178-.732a310.202 310.202 0 0 1-12.513-19.846h.001a307.41 307.41 0 0 1-10.923-20.627a310.278 310.278 0 0 1 10.89-20.637l-.001.001a307.318 307.318 0 0 1 12.413-19.761c7.613-.576 15.42-.876 23.31-.876H128c7.926 0 15.743.303 23.354.883a329.357 329.357 0 0 1 12.335 19.695a358.489 358.489 0 0 1 11.036 20.54a329.472 329.472 0 0 1-11 20.722Zm22.56-122.124c8.572 4.944 11.906 24.881 6.52 51.026c-.344 1.668-.73 3.367-1.15 5.09c-10.622-2.452-22.155-4.275-34.23-5.408c-7.034-10.017-14.323-19.124-21.64-27.008a160.789 160.789 0 0 1 5.888-5.4c18.9-16.447 36.564-22.941 44.612-18.3ZM128 90.808c12.625 0 22.86 10.235 22.86 22.86s-10.235 22.86-22.86 22.86s-22.86-10.235-22.86-22.86s10.235-22.86 22.86-22.86Z"></path></svg>
+</file>
+
+<file path="frontend/src/components/ChatPreview.tsx">
+import React, { useState } from 'react';
+import api from '../api/axios';
+import { Send, Bot } from 'lucide-react';
+
+interface ChatPreviewProps {
+  hospitalId?: string;
+}
+
+const ChatPreview: React.FC<ChatPreviewProps> = ({ hospitalId }) => {
+  const [question, setQuestion] = useState('');
+  const [messages, setMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!question.trim()) return;
+
+    const userMessage = question;
+    setMessages((prev) => [...prev, { role: 'user', text: userMessage }]);
+    setQuestion('');
+    setLoading(true);
+
+    try {
+      // FIX: Use 'question' instead of 'message' to match ai.py
+      // FIX: Wrap hospitalId in Number() to match the 'int' type in Pydantic
+      const response = await api.post('/ai/chat', { 
+        question: userMessage, 
+        hospital_id: Number(hospitalId) 
+      });
+      
+      // Backend returns { "answer": "..." }
+      const aiResponse = response.data.answer;
+      setMessages((prev) => [...prev, { role: 'ai', text: aiResponse }]);
+    } catch (err: any) {
+      console.error("Chat Error Detail:", err.response?.data);
+      const errorMsg = err.response?.status === 401 
+        ? "Session expired. Please log in again." 
+        : "I'm having trouble connecting to my brain right now.";
+      setMessages((prev) => [...prev, { role: 'ai', text: errorMsg }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-[500px] w-full max-w-lg border rounded-2xl bg-gray-50 shadow-inner">
+      <div className="p-4 border-b bg-white rounded-t-2xl flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Bot className="text-blue-600" />
+          <h3 className="font-bold text-gray-800">Arogya Assistant Preview</h3>
+        </div>
+        <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-mono">
+          ID: {hospitalId}
+        </span>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.length === 0 && (
+          <div className="text-center mt-10">
+            <p className="text-sm text-gray-400">Ask a question to test the AI training for this hospital.</p>
+          </div>
+        )}
+        {messages.map((msg, i) => (
+          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${
+              msg.role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white border text-gray-800 rounded-tl-none'
+            }`}>
+              {msg.text}
+            </div>
+          </div>
+        ))}
+        {loading && <div className="text-xs text-gray-400 animate-pulse">Arogya is thinking...</div>}
+      </div>
+
+      <form onSubmit={handleSendMessage} className="p-4 bg-white border-t rounded-b-2xl flex gap-2">
+        <input
+          className="flex-1 text-sm p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Ask about doctor timings..."
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+        />
+        <button type="submit" disabled={loading} className="bg-blue-600 p-2 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+          <Send size={18} />
+        </button>
+      </form>
+    </div>
+  );
+};
+
+export default ChatPreview;
+</file>
+
+<file path="frontend/src/components/HospitalStats.tsx">
+import { useEffect, useState } from 'react';
+import api from '../api/axios';
+import { Activity, CreditCard, TrendingUp } from 'lucide-react';
+
+export default function HospitalStats({ hospitalId }: { hospitalId: number }) {
+  const [billing, setBilling] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchBilling = async () => {
+      try {
+        const res = await api.get(`/hospitals/${hospitalId}/billing`);
+        setBilling(res.data);
+        setError(null);
+      } catch (err) {
+        console.error("Billing fetch failed", err);
+        setError("Could not load billing data.");
+      }
+    };
+    if (hospitalId) fetchBilling();
+  }, [hospitalId]);
+
+  // 1. Handle Loading State
+  if (!billing && !error) {
+    return (
+      <div className="p-8 text-center animate-pulse bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+        <p className="text-gray-500 font-medium">Calculating real-time usage...</p>
+      </div>
+    );
+  }
+
+  // 2. Handle Error State
+  if (error) {
+    return (
+      <div className="p-4 bg-red-50 text-red-600 rounded-lg border border-red-100">
+        {error}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      {/* Activity Card */}
+      <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+        <div className="flex items-center gap-3 text-blue-600 mb-4">
+          <Activity size={20} />
+          <h4 className="font-semibold text-gray-700">Monthly Usage</h4>
+        </div>
+        <div className="space-y-1">
+          {/* Use Optional Chaining ?. to prevent crashes */}
+          <p className="text-2xl font-bold text-gray-900">
+            {billing?.usage?.total_chats ?? 0}
+          </p>
+          <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
+            {(billing?.usage?.tokens_consumed ?? 0).toLocaleString()} tokens used
+          </p>
+        </div>
+      </div>
+
+      {/* Internal Cost Card */}
+      <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+        <div className="flex items-center gap-3 text-orange-600 mb-4">
+          <TrendingUp size={20} />
+          <h4 className="font-semibold text-gray-700">Gothos Cost (USD)</h4>
+        </div>
+        <div className="space-y-1">
+          <p className="text-2xl font-bold text-gray-900">
+            ${billing?.usage?.raw_cost_usd ?? "0.00"}
+          </p>
+          <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
+            Total OpenAI Overhead
+          </p>
+        </div>
+      </div>
+
+      {/* The Invoice Card (INR) */}
+      <div className="bg-blue-600 p-6 rounded-xl shadow-lg text-white transform hover:scale-[1.02] transition-transform">
+        <div className="flex items-center gap-3 mb-4 opacity-90">
+          <CreditCard size={20} />
+          <h4 className="font-semibold">Current Invoice</h4>
+        </div>
+        <div className="space-y-1">
+          <p className="text-3xl font-bold">
+            ₹{(billing?.invoice?.total_due_inr ?? 0).toLocaleString()}
+          </p>
+          <p className="text-xs opacity-75 font-medium uppercase tracking-wider">
+            Platform: ₹{billing?.invoice?.platform_fee ?? 0} + Usage
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="frontend/src/components/UsageStats.tsx">
+import React, { useEffect, useState } from 'react';
+import api from '../api/axios';
+
+const UsageStats = () => {
+  const [stats, setStats] = useState({ total_tokens: 0, estimated_cost: 0 });
+
+  useEffect(() => {
+    // We'll need to create this GET /usage/summary endpoint next
+    api.get('/usage/summary')
+      .then(res => setStats(res.data))
+      .catch(console.error);
+  }, []);
+
+  return (
+    <div className="p-6 bg-white rounded-xl shadow border border-gray-100">
+      <h3 className="text-lg font-bold text-gray-800 mb-4">Billing & Usage</h3>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-blue-50 p-4 rounded-lg">
+          <p className="text-xs text-blue-600 uppercase font-bold">Total Tokens</p>
+          <p className="text-2xl font-mono">{stats.total_tokens.toLocaleString()}</p>
+        </div>
+        <div className="bg-green-50 p-4 rounded-lg">
+          <p className="text-xs text-green-600 uppercase font-bold">Estimated Cost</p>
+          <p className="text-2xl font-mono">${stats.estimated_cost.toFixed(4)}</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default UsageStats;
+</file>
+
+<file path="frontend/src/index.css">
+@import "tailwindcss";
+</file>
+
+<file path="frontend/src/layouts/DashboardLayout.tsx">
+import { Outlet, Link, useNavigate, useParams } from 'react-router-dom';
+import { LayoutDashboard, Users, Building2, Settings, LogOut, BrainCircuit } from 'lucide-react';
+
+export default function DashboardLayout() {
+  const navigate = useNavigate();
+  // 1. Grab the hospitalId from the URL so the links stay dynamic
+  const { hospitalId } = useParams();
+
+  const handleSignOut = () => {
+    localStorage.removeItem('token');
+    navigate('/login');
+  };
+
+  return (
+    <div className="flex h-screen bg-gray-50">
+      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col shadow-sm">
+        <div className="p-6 border-b">
+          <h2 className="text-xl font-bold text-blue-600 flex items-center gap-2">
+            <Building2 className="w-6 h-6" /> Corvus Labs
+          </h2>
+        </div>
+
+        <nav className="flex-1 p-4 space-y-2">
+          {/* Main Hospital List (Reset context) */}
+          <Link to="/" className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-blue-50 rounded-lg text-sm font-medium transition-colors">
+            <LayoutDashboard className="w-5 h-5" /> Hospitals
+          </Link>
+
+          {/* 2. Dynamic Links: Only show if a Hospital is selected */}
+          {hospitalId && (
+            <>
+              <div className="mt-6 mb-2 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                Management
+              </div>
+              
+              <Link 
+                to={`/hospitals/${hospitalId}/training`} 
+                className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-blue-50 rounded-lg text-sm font-medium transition-colors"
+              >
+                <BrainCircuit className="w-5 h-5 text-blue-500" /> AI Training
+              </Link>
+
+              <Link 
+                to={`/hospitals/${hospitalId}/doctors`} 
+                className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-blue-50 rounded-lg text-sm font-medium transition-colors"
+              >
+                <Users className="w-5 h-5 text-blue-500" /> Doctors
+              </Link>
+
+              <Link 
+                to={`/hospitals/${hospitalId}/settings`} 
+                className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-blue-50 rounded-lg text-sm font-medium transition-colors"
+              >
+                <Settings className="w-5 h-5 text-blue-500" /> Settings
+              </Link>
+            </>
+          )}
+        </nav>
+
+        <div className="p-4 border-t">
+          <button onClick={handleSignOut} className="flex items-center gap-3 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium w-full transition-colors">
+            <LogOut className="w-5 h-5" /> Sign Out
+          </button>
+        </div>
+      </aside>
+
+      <main className="flex-1 overflow-auto bg-gray-50">
+        <div className="p-8">
+          <Outlet />
+        </div>
+      </main>
+    </div>
+  );
+}
+</file>
+
+<file path="frontend/src/pages/Dashboard.py">
+import React, { useEffect, useState } from 'react';
+import api from '../api/axios';
+
+const Dashboard = () => {
+  const [hospitalName, setHospitalName] = useState('Loading...');
+
+  useEffect(() => {
+    // Basic test to see if the "Magic Key" works
+    api.get('/hospitals/me')
+      .then(res => setHospitalName(res.data.name))
+      .catch(() => setHospitalName('Arogya Specialty Hospital'));
+  }, []);
+
+  return (
+    <div className="p-8">
+      <h1 className="text-3xl font-bold text-gray-800">Welcome to the Portal</h1>
+      <p className="mt-2 text-gray-600">Managing: {hospitalName}</p>
+      
+      <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="p-6 bg-blue-50 rounded-xl border border-blue-100">
+          <h3 className="font-bold text-blue-800">AI Status</h3>
+          <p className="text-sm text-blue-600">Arogya is online and ready.</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;
+</file>
+
+<file path="frontend/src/pages/Doctors.tsx">
+import React, { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import api from '../api/axios';
+import { Search, Loader2, Upload, Users } from 'lucide-react';
+
+const DoctorsPage = () => {
+  const { hospitalId } = useParams();
+  const [doctors, setDoctors] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchDoctors = async () => {
+    try {
+      const res = await api.get(`/hospitals/${hospitalId}/doctors`);
+      setDoctors(res.data);
+    } catch (err) {
+      console.error("Failed to fetch doctors", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDoctors();
+  }, [hospitalId]);
+
+  // Automatic Bulk Upload Handler
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      setLoading(true);
+      // This hits the backend endpoint that generates IDs automatically
+      await api.post(`/hospitals/${hospitalId}/doctors/bulk-upload`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      alert("Doctors imported successfully! IDs have been assigned automatically.");
+      fetchDoctors(); // Refresh the list to show new IDs
+    } catch (err) {
+      alert("Import failed. Ensure the file format is correct.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="p-8 space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Doctor Directory</h2>
+          <p className="text-gray-500 text-sm">Upload your staff list; IDs are assigned automatically for AI syncing.</p>
+        </div>
+        
+        {/* Bulk Upload Button (Replaces manual inputs) */}
+        <div className="relative">
+          <input 
+            type="file" 
+            id="bulk-upload" 
+            className="hidden" 
+            onChange={handleFileUpload} 
+            accept=".csv,.txt"
+            disabled={loading}
+          />
+          <label 
+            htmlFor="bulk-upload" 
+            className={`flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer font-medium shadow-sm ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            Upload Staff Document
+          </label>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center gap-3">
+          <Search className="w-5 h-5 text-gray-400" />
+          <input 
+            type="text" 
+            placeholder="Search doctors or specialties..." 
+            className="bg-transparent border-none focus:ring-0 text-sm w-full"
+          />
+        </div>
+
+        {loading ? (
+          <div className="p-20 flex flex-col items-center justify-center text-gray-400">
+            <Loader2 className="animate-spin mb-2" />
+            <p>Syncing directory...</p>
+          </div>
+        ) : doctors.length === 0 ? (
+          <div className="p-20 text-center">
+            <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Users className="w-8 h-8 text-blue-200" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900">No doctors found</h3>
+            <p className="text-gray-500 max-w-xs mx-auto mt-1">
+              Upload your hospital staff list to begin. IDs will be generated for your Google Sheet.
+            </p>
+          </div>
+        ) : (
+          <table className="w-full text-left">
+            <thead className="bg-gray-50 text-xs uppercase text-gray-500 font-semibold border-b">
+              <tr>
+                <th className="p-4">Auto-Generated ID</th>
+                <th className="p-4">Name</th>
+                <th className="p-4">Department</th>
+                <th className="p-4">Connection Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {doctors.map((doc: any) => (
+                <tr key={doc.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="p-4 font-mono text-sm text-blue-600 font-bold">{doc.doctor_id}</td>
+                  <td className="p-4 text-sm font-medium text-gray-900">{doc.name}</td>
+                  <td className="p-4 text-sm text-gray-500">{doc.department || 'General'}</td>
+                  <td className="p-4">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      Active & Ready
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default DoctorsPage;
+</file>
+
+<file path="frontend/src/pages/Login.tsx">
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import api from '../api/axios';
+
+const Login = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    try {
+      const formData = new FormData();
+      formData.append('username', email); 
+      formData.append('password', password);
+
+      const response = await api.post('/auth/login', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      // Save the token
+      localStorage.setItem('token', response.data.access_token);
+      
+      // REDIRECT FIX: Change '/dashboard' to '/' to reach the Hospital List
+      navigate('/'); 
+      
+      // Optional: Force a refresh to ensure DashboardLayout recognizes the new token
+      window.location.reload(); 
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Login failed. Check your credentials.');
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-gray-100">
+      <form onSubmit={handleLogin} className="p-8 bg-white shadow-lg rounded-xl w-96">
+        <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">Hospital Admin Portal</h2>
+        {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700">Email</label>
+          <input 
+            type="email" 
+            className="w-full p-2 border rounded mt-1 outline-none focus:ring-2 focus:ring-blue-500" 
+            value={email} 
+            onChange={(e) => setEmail(e.target.value)} 
+            required 
+          />
+        </div>
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700">Password</label>
+          <input 
+            type="password" 
+            className="w-full p-2 border rounded mt-1 outline-none focus:ring-2 focus:ring-blue-500" 
+            value={password} 
+            onChange={(e) => setPassword(e.target.value)} 
+            required 
+          />
+        </div>
+        <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">
+          Sign In
+        </button>
+      </form>
+    </div>
+  );
+};
+
+export default Login;
+</file>
+
+<file path="frontend/src/themes/arogya-specialty/index.tsx">
+import 'regenerator-runtime/runtime'; 
+import React from 'react';
+import Chat from './Chat'; 
+import { ShieldCheck, Activity } from 'lucide-react';
+
+// REMOVE: import ReactDOM from 'react-dom/client'; <-- This belongs in main.tsx, not here.
+
+interface ArogyaThemeProps {
+  hospitalId?: number;
+  hospitalName?: string;
+}
+
+const ArogyaTheme: React.FC<ArogyaThemeProps> = ({ hospitalId, hospitalName }) => {
+  return (
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
+      <header className="bg-white border-b px-8 py-4 flex justify-between items-center sticky top-0 z-10">
+        <div className="flex items-center gap-2">
+          <div className="w-10 h-10 bg-emerald-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">A</div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-800">
+            {hospitalName || 'Arogya'} <span className="text-emerald-600">Specialty</span>
+          </h1>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-6 py-12 grid lg:grid-cols-2 gap-12 items-center">
+        <div className="space-y-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-medium">
+            <ShieldCheck className="w-4 h-4" /> Powered by Gothos Labs
+          </div>
+          <h2 className="text-5xl font-extrabold leading-tight">
+            Advanced Care, <br />
+            <span className="text-emerald-600">Voice-Enabled AI.</span>
+          </h2>
+          <p className="text-lg text-slate-600">
+            Welcome to the official portal for {hospitalName}. Experience the future of healthcare with our regional voice assistant.
+          </p>
+        </div>
+
+        <div className="flex flex-col items-center">
+          {/* Ensure hospitalId is passed correctly to the Chat logic */}
+          <Chat hospitalId={hospitalId?.toString() || ""} />
+        </div>
+      </main>
+    </div>
+  );
+};
+
+export default ArogyaTheme;
+</file>
+
+<file path="frontend/src/themes/README.txt">
+This **README.md** is designed to be the "Source of Truth" for your multi-tenant hospital platform. It covers the folder structure, the connection between the frontend and the FastAPI brain, and how to scale the system for new clients.
+
+---
+
+# 🏥 Multi-Tenant AI Hospital Platform (Gothos/Arogya)
+
+This platform allows multiple hospitals to have their own branded patient portals, powered by a central AI engine that access specific doctor directories and medical knowledge bases.
+
+## 🏗️ Core Architecture
+
+The system uses a **Slug-based Multi-tenancy** model:
+
+1. **URL Structure**: `domain.com/p/{hospital-slug}`.
+2. **Theme Loading**: The `ThemeLoader` identifies the slug, fetches the `hospital_id` from the PostgreSQL database, and dynamically imports the corresponding React theme.
+3. **Data Isolation**: Every AI request includes the `hospital_id` so the backend only searches that specific hospital's data.
+
+---
+
+## 📂 Frontend Folder Structure
+
+To add a new hospital, create a folder in `src/themes/` named exactly after the database slug.
+
+```text
+src/
+├── api/
+│   └── axios.ts          # Central API instance (No hardcoded URLs)
+├── themes/
+│   ├── registry.ts       # Dynamic import logic (import.meta.glob)
+│   ├── ThemeLoader.tsx   # The "Switch" that loads themes based on URL
+│   └── [slug]/           # Hospital-specific folder (e.g., 'arogya')
+│       ├── index.tsx     # Theme entry point
+│       └── components/   # Bolt-generated UI components
+
+```
+
+---
+
+## 🚀 Creating a New Theme (Integration Steps)
+
+### 1. The Entry Point (`index.tsx`)
+
+Your theme must export a default component that accepts `hospitalId` and `hospitalName` as props.
+
+```tsx
+// src/themes/[slug]/index.tsx
+import Chat from './Chat';
+
+const HospitalTheme = ({ hospitalId, hospitalName }) => (
+  <div className="theme-container">
+    <header>{hospitalName}</header>
+    <Chat hospitalId={hospitalId} />
+  </div>
+);
+export default HospitalTheme;
+
+```
+
+### 2. Connecting the AI Chat (`Chat.tsx`)
+
+When porting code from **Bolt.new**, you must refactor the `sendMessage` function to align with the FastAPI backend.
+
+* **Request Method**: `POST /api/v1/ai/chat`.
+* **Request Body**: Must include `question` (string) and `hospital_id` (int).
+* **Response Body**: The AI's reply is found in `res.data.answer`.
+
+### 3. Styling & Animations
+
+Copy custom `@keyframes` (like `slideUp` or `fadeIn`) from the Bolt `index.css` into the root `src/index.css` to make them globally available.
+
+---
+
+## 🧠 Backend Logic (FastAPI)
+
+### Doctor Directory Sync
+
+The system processes CSV files (like `full_doctor_availability_sheet.csv`) and stores them in the `doctors` table. The AI queries this table during chat to provide real-time staff information.
+
+### Knowledge Base (RAG)
+
+Hospitals can upload PDFs. The backend splits these into chunks, generates embeddings, and stores them in PostgreSQL using `pgvector`.
+
+---
+
+## 🛠️ Developer Checklist for New Hospitals
+
+* [ ] **Database**: Create the hospital entry in the admin dashboard and note the **Slug**.
+* [ ] **Sync**: Bulk upload the doctor CSV for that specific `hospital_id`.
+* [ ] **Files**: Create `src/themes/[slug]/index.tsx`.
+* [ ] **API**: Ensure the Chat component uses the shared `api` instance and passes `hospitalId`.
+* [ ] **Assets**: Place custom logos in `public/themes/[slug]/`.
+
+---
+
+**Would you like me to create a "troubleshooting" section for this README to help you debug common issues like 422 Unprocessable Content or 404 Not Found?**
+</file>
+
+<file path="frontend/src/themes/registry.ts">
+import React from 'react';
+
+// Finds all index.tsx files in any subfolder of 'themes'
+const themeModules = import.meta.glob('./**/index.tsx');
+
+export const getThemeComponent = (slug: string) => {
+  // We want to find a key that looks like './arogya/index.tsx'
+  const normalizedSlug = slug.toLowerCase().trim();
+  const pathKey = `./${normalizedSlug}/index.tsx`;
+  
+  if (themeModules[pathKey]) {
+    return React.lazy(themeModules[pathKey] as any);
+  }
+
+  // Debugging help: logs all found paths if one fails
+  console.warn(`Theme not found for: ${pathKey}. Available:`, Object.keys(themeModules));
+  return null;
+};
+</file>
+
+<file path="frontend/src/themes/ThemeLoader.tsx">
+import React, { Suspense, useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { getThemeComponent } from './registry'; // Use the dynamic function
+import api from '../api/axios';
+
+const ThemeLoader = () => {
+  const { hospitalSlug } = useParams<{ hospitalSlug: string }>();
+  const [hospitalData, setHospitalData] = useState<{ id: number; name: string } | null>(null);
+
+  // Dynamically find the component based on the URL slug
+  const SelectedTheme = hospitalSlug ? getThemeComponent(hospitalSlug) : null;
+
+  useEffect(() => {
+  if (hospitalSlug) {
+    // REMOVE '/api/v1' from the string! 
+    // Axios adds it automatically from your config.
+    api.get(`/hospitals/slug/${hospitalSlug}`) 
+      .then(res => {
+        setHospitalData(res.data);
+      })
+      .catch(err => {
+        console.error("Backend Lookup Failed for Slug:", hospitalSlug, err);
+      });
+  }
+}, [hospitalSlug]);
+
+  if (!SelectedTheme) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-50">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold text-gray-800">404</h1>
+          <p className="text-gray-500">This hospital portal has not been designed yet.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Suspense fallback={<div className="h-screen flex items-center justify-center">Loading Portal...</div>}>
+      {hospitalData ? (
+        <SelectedTheme hospitalId={hospitalData.id} hospitalName={hospitalData.name} />
+      ) : (
+        <div className="h-screen flex items-center justify-center">Connecting to Arogya Brain...</div>
+      )}
+    </Suspense>
+  );
+};
+
+export default ThemeLoader;
+</file>
+
+<file path="frontend/tailwind.config.js">
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
+</file>
+
+<file path="frontend/tsconfig.app.json">
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "types": ["vite/client"],
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  },
+  "include": ["src"]
+}
+</file>
+
+<file path="frontend/tsconfig.json">
+{
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
+}
+</file>
+
+<file path="frontend/tsconfig.node.json">
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "types": ["node"],
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  },
+  "include": ["vite.config.ts"]
+}
+</file>
+
+<file path="frontend/vercel.json">
+{
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
+</file>
+
+<file path="package.json">
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "axios": "^1.13.5",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.575.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.13.1",
+    "react-speech-recognition": "^4.0.1",
+    "regenerator-runtime": "^0.14.1",
+    "tailwind-merge": "^3.5.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@tailwindcss/postcss": "^4.2.1",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "autoprefixer": "^10.4.27",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.2.1",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.48.0",
+    "vite": "^7.3.1"
+  }
+}
+</file>
+
+<file path="vite.config.ts">
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [react()],
+})
+</file>
+
+<file path="backend/app/availability.py">
+import os
+from datetime import datetime
+from pathlib import Path
+import gspread
+from google.oauth2.service_account import Credentials
+
+# -------------------------------------------------
+# CREDENTIALS PATH
+# -------------------------------------------------
+# Ensure your 'google_credentials.json' is in the backend root folder
+CREDENTIALS_PATH = Path(__file__).resolve().parent.parent / "google_credentials.json"
+
+_cache = {}
+_cache_time = {}
+
+def get_sheet_client():
+    """Ported from your previous model"""
+    if not CREDENTIALS_PATH.exists():
+        raise FileNotFoundError(f"Google credentials missing at: {CREDENTIALS_PATH}")
+
+    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+    creds = Credentials.from_service_account_file(str(CREDENTIALS_PATH), scopes=scopes)
+    return gspread.authorize(creds)
+
+def get_doctor_availability(sheet_id: str, force_refresh: bool = False):
+    """
+    MODIFIED: Now accepts a specific sheet_id for multi-tenancy.
+    """
+    if not sheet_id:
+        return {}
+
+    global _cache, _cache_time
+    now = datetime.now()
+
+    # Per-hospital caching
+    last_refresh = _cache_time.get(sheet_id)
+    
+    if (force_refresh or sheet_id not in _cache or 
+        (last_refresh and (now - last_refresh).total_seconds() > 300)):
+        try:
+            client = get_sheet_client()
+            sheet = client.open_by_key(sheet_id).sheet1
+            records = sheet.get_all_records()
+
+            doctors = {}
+            for row in records:
+                doctor_id = str(row.get("Doctor ID", "")).strip()
+                name = str(row.get("Doctor Name", "")).strip()
+                if not doctor_id or not name: continue
+                absent_dates_raw = row.get("Absent Dates (comma-separated)", "")
+
+                doctors[doctor_id] = {
+                    "id": doctor_id,
+                    "name": name,
+                    "department": str(row.get("Department", "")).strip(),
+                    "schedule": str(row.get("Base Schedule", "")).strip(),
+                    "absent_dates": str(absent_dates_raw).strip(),
+                }
+
+            _cache[sheet_id] = doctors
+            _cache_time[sheet_id] = now
+            print(f"[Availability] Loaded {len(doctors)} doctors for Sheet: {sheet_id}")
+
+        except Exception as e:
+            print(f"[Availability] Fetch failed: {repr(e)}")
+            return _cache.get(sheet_id, {})
+
+    return _cache.get(sheet_id, {})
+</file>
+
+<file path="backend/app/crud/crud_hospital.py">
+from sqlalchemy.orm import Session
+from app.models.hospital import Hospital
+from app.schemas.hospital import HospitalCreate
+
+def get_hospital(db: Session, hospital_id: int):
+    return db.query(Hospital).filter(Hospital.id == hospital_id).first()
+
+def get_hospital_by_slug(db: Session, slug: str):
+    return db.query(Hospital).filter(Hospital.slug == slug).first()
+
+def get_hospitals(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(Hospital).offset(skip).limit(limit).all()
+
+def create_hospital(db: Session, hospital: HospitalCreate):
+    db_obj = Hospital(
+        name=hospital.name,
+        slug=hospital.slug,
+        address=hospital.address,
+        is_active=hospital.is_active,
+        # Ensure your HospitalCreate schema includes these, or add defaults here
+        system_prompt=getattr(hospital, 'system_prompt', "You are Arogya..."),
+        google_sheet_id=getattr(hospital, 'google_sheet_id', None)
+    )
+    db.add(db_obj)
+    db.commit()
+    db.refresh(db_obj)
+    return db_obj
+</file>
+
+<file path="backend/app/db/base.py">
+from app.db.base_class import Base  # noqa
+from app.models.hospital import Hospital  # noqa
+from app.models.doctor import Doctor  # noqa
+from app.models.user import User  # noqa
+</file>
+
+<file path="backend/seed.py">
+from app.db.session import SessionLocal
+from app.models.hospital import Hospital
+from app.models.user import User
+from passlib.context import CryptContext
+# Add these lines to the top of seed.py
+from app.models.hospital import Hospital
+from app.models.user import User
+# Ensure the Doctor model is imported so SQLAlchemy can "see" it
+from app.models.doctor import Doctor
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+db = SessionLocal()
+
+def seed_data():
+    try:
+        # 1. Check if Hospital exists, if not, create it
+        hospital = db.query(Hospital).filter(Hospital.slug == "arogya-specialty").first()
+        
+        if not hospital:
+            hospital = Hospital(
+                name="Arogya Specialty Hospital",
+                slug="arogya-specialty",
+                is_active=True
+            )
+            db.add(hospital)
+            db.commit()
+            db.refresh(hospital)
+            print(f"Created new hospital: {hospital.name}")
+        else:
+            print(f"Hospital already exists: {hospital.name} (ID: {hospital.id})")
+
+        # 2. Check if Admin User exists, if not, create it
+        admin_email = "admin@arogya.com"
+        user = db.query(User).filter(User.email == admin_email).first()
+
+        if not user:
+            admin_user = User(
+                email=admin_email,
+                hashed_password=pwd_context.hash("admin123"),
+                hospital_id=hospital.id,
+                is_active=True
+            )
+            db.add(admin_user)
+            db.commit()
+            print(f"Created admin user: {admin_email}")
+        else:
+            # If user exists, let's update the password to be sure it's admin123
+            user.hashed_password = pwd_context.hash("admin123")
+            user.hospital_id = hospital.id
+            db.commit()
+            print(f"Updated existing admin user: {admin_email}")
+            
+        print("\n✅ Success! Log in with admin@arogya.com / admin123")
+        
+    except Exception as e:
+        print(f"❌ Error seeding data: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+if __name__ == "__main__":
+    seed_data()
+</file>
+
+<file path="frontend/package.json">
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "axios": "^1.13.5",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.575.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "^7.13.1",
+    "react-speech-recognition": "^4.0.1",
+    "regenerator-runtime": "^0.14.1",
+    "tailwind-merge": "^3.5.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@tailwindcss/postcss": "^4.2.1",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "autoprefixer": "^10.4.27",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.2.1",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.48.0",
+    "vite": "^7.3.1"
+  }
+}
+</file>
+
+<file path="frontend/src/components/CreateHospitalModal.tsx">
+import { useState } from 'react';
+import api from '../api/axios'; // Use your centralized API config
+import { X } from 'lucide-react';
+
+interface Props {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void; 
+}
+
+export default function CreateHospitalModal({ isOpen, onClose, onSuccess }: Props) {
+  const [formData, setFormData] = useState({
+    name: '',
+    slug: '',
+    address: '',
+    is_active: true,
+    // Ensure these match your new Backend Schema (HospitalCreate)
+    system_prompt: 'You are Arogya, a helpful assistant for this hospital.',
+    google_sheet_id: ''
+  });
+  
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      // Logic: This will now use https://hospital-ai-platform.onrender.com/api/v1/hospitals/
+      await api.post('/hospitals/', formData);
+      
+      onSuccess(); // Refresh the list
+      onClose();   // Close the modal
+      
+      // Reset form
+      setFormData({ 
+        name: '', 
+        slug: '', 
+        address: '', 
+        is_active: true,
+        system_prompt: 'You are Arogya, a helpful assistant for this hospital.',
+        google_sheet_id: ''
+      });
+    } catch (err: any) {
+      console.error("Submission Error:", err.response?.data);
+      // If the backend returns a specific error (like 'Slug already exists'), show it
+      const errorMessage = err.response?.data?.detail;
+      setError(Array.isArray(errorMessage) ? 'Validation Error' : (errorMessage || 'Failed to create hospital'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+          <h3 className="font-semibold text-gray-800">Add New Hospital</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {error && (
+            <div className="p-3 bg-red-50 text-red-600 text-sm rounded-md">
+              {error}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Hospital Name</label>
+            <input
+              required
+              type="text"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={formData.name}
+              onChange={e => setFormData({ ...formData, name: e.target.value })}
+              placeholder="e.g. Arogya Specialty"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Slug (Unique ID)</label>
+            <input
+              required
+              type="text"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={formData.slug}
+              onChange={e => setFormData({ ...formData, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })}
+              placeholder="e.g. arogya-specialty"
+            />
+            <p className="text-xs text-gray-400 mt-1">Must be unique. No spaces.</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+            <textarea
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={formData.address}
+              onChange={e => setFormData({ ...formData, address: e.target.value })}
+              rows={2}
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-md"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
+            >
+              {loading ? 'Connecting to Cloud...' : 'Create Hospital'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="frontend/src/main.tsx">
+import 'regenerator-runtime/runtime'; 
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import { BrowserRouter } from 'react-router-dom'
+import App from './App.tsx'
+import './index.css'
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  </React.StrictMode>,
+)
+</file>
+
+<file path="frontend/src/pages/KnowledgeBase.tsx">
+import React, { useState } from 'react';
+import api from '../api/axios';
+import { FileText, Send, Upload } from 'lucide-react';
+
+// Added hospitalId prop to the component definition
+const KnowledgeBaseUpload = ({ hospitalId }: { hospitalId: string | undefined }) => {
+  const [text, setText] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [uploadType, setUploadType] = useState<'text' | 'pdf'>('text');
+
+  const handleTextUpload = async () => {
+    if (!hospitalId) return alert("No hospital selected");
+    setLoading(true);
+    try {
+      // Include hospital_id in the payload
+      await api.post('/ai/ingest', { 
+        text: text,
+        hospital_id: hospitalId 
+      });
+      alert("Arogya has learned this information!");
+      setText('');
+    } catch (err) {
+      alert("Failed to upload knowledge.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePdfUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !hospitalId) return;
+
+    setLoading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+    // Explicitly append hospital_id to formData for the multi-part request
+    formData.append('hospital_id', hospitalId);
+
+    try {
+      await api.post('/ai/upload-pdf', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      alert(`${file.name} has been processed and added to Arogya's brain!`);
+    } catch (err) {
+      alert("Failed to process PDF.");
+    } finally {
+      setLoading(false);
+      event.target.value = ''; 
+    }
+  };
+
+  return (
+    <div className="max-w-4xl bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="flex border-b border-gray-100">
+        <button 
+          onClick={() => setUploadType('text')}
+          className={`flex-1 p-4 text-sm font-medium flex items-center justify-center gap-2 ${uploadType === 'text' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-gray-500 hover:bg-gray-50'}`}
+        >
+          <Send className="w-4 h-4" /> Manual Text
+        </button>
+        <button 
+          onClick={() => setUploadType('pdf')}
+          className={`flex-1 p-4 text-sm font-medium flex items-center justify-center gap-2 ${uploadType === 'pdf' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-gray-500 hover:bg-gray-50'}`}
+        >
+          <FileText className="w-4 h-4" /> Upload PDF
+        </button>
+      </div>
+
+      <div className="p-8">
+        {uploadType === 'text' && (
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold text-gray-800">Train with Text</h3>
+            <p className="text-sm text-gray-500">Paste FAQs or rules for this specific hospital.</p>
+            <textarea 
+              className="w-full h-48 p-4 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm leading-relaxed"
+              placeholder="Enter knowledge here..."
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+            />
+            <button 
+              onClick={handleTextUpload}
+              disabled={loading || !text}
+              className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 font-semibold transition-colors flex items-center justify-center gap-2"
+            >
+              {loading ? 'Processing...' : 'Sync to AI Brain'}
+            </button>
+          </div>
+        )}
+
+        {uploadType === 'pdf' && (
+          <div className="py-12 text-center border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Upload className="w-8 h-8 text-blue-600" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-800">Drop Hospital PDF here</h3>
+            <input 
+              type="file" 
+              accept=".pdf" 
+              onChange={handlePdfUpload} 
+              id="pdf-input" 
+              className="hidden" 
+              disabled={loading}
+            />
+            <label 
+              htmlFor="pdf-input"
+              className={`cursor-pointer px-8 py-3 bg-white border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 font-medium transition-all ${loading ? 'opacity-50 pointer-events-none' : ''}`}
+            >
+              {loading ? 'Reading Document...' : 'Select File'}
+            </label>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default KnowledgeBaseUpload;
+</file>
+
+<file path="frontend/src/pages/Settings.tsx">
+import React, { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom'; 
+import api from '../api/axios';
+import { Save } from 'lucide-react';
+// 1. IMPORT the component here
+import HospitalStats from '../components/HospitalStats'; 
+
+const Settings = () => {
+  const { hospitalId } = useParams(); 
+  
+  const [settings, setSettings] = useState({ 
+    name: '', 
+    address: '', 
+    system_prompt: '', 
+    google_sheet_id: '' 
+  });
+
+  useEffect(() => {
+    api.get(`/hospitals/${hospitalId}`)
+      .then(res => setSettings(res.data))
+      .catch(err => console.error("Could not load hospital settings", err));
+  }, [hospitalId]);
+
+  const handleSave = async () => {
+    try {
+      await api.patch(`/hospitals/${hospitalId}`, settings);
+      alert("Settings updated successfully!");
+    } catch (err) {
+      alert("Failed to update settings.");
+    }
+  };
+
+  return (
+    <div className="p-8 max-w-4xl space-y-8">
+      <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100">
+        <h2 className="text-2xl font-bold text-gray-800 mb-6">Hospital Configuration</h2>
+
+        {/* 2. PLACED STATS AT THE TOP */}
+        <div className="mb-8 border-b pb-8">
+          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Current Usage & Billing</h3>
+          {/* Note: We use Number(hospitalId) to match the prop type */}
+          <HospitalStats hospitalId={Number(hospitalId)} /> 
+        </div>
+
+        <div className="grid gap-6">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Hospital Name</label>
+            <input 
+              className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" 
+              value={settings.name} 
+              onChange={(e) => setSettings({...settings, name: e.target.value})}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Google Sheet ID (Live Availability)</label>
+            <input 
+              className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm" 
+              placeholder="e.g. 1aBCdEfgHijkLmNoPqRsTuVwXyZ"
+              value={settings.google_sheet_id || ''} 
+              onChange={(e) => setSettings({...settings, google_sheet_id: e.target.value})}
+            />
+            <p className="text-xs text-gray-400 mt-2">
+              Tip: Share your sheet with: <span className="text-blue-600 font-medium">arogya-bot@arogya-483613.iam.gserviceaccount.com</span>
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">AI System Prompt</label>
+            <textarea 
+              className="w-full p-3 border border-gray-200 rounded-lg h-32 focus:ring-2 focus:ring-blue-500 outline-none" 
+              value={settings.system_prompt} 
+              onChange={(e) => setSettings({...settings, system_prompt: e.target.value})}
+            />
+          </div>
+        </div>
+
+        <div className="mt-8">
+          <button 
+            onClick={handleSave} 
+            className="flex items-center gap-2 bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 font-bold transition-all shadow-md active:scale-95"
+          >
+            <Save className="w-5 h-5" /> Save Configuration
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Settings;
+</file>
+
+<file path="frontend/src/themes/arogya-specialty/ChatMessage.tsx">
+import React from 'react';
+import ReactMarkdown from 'react-markdown'; // Run: npm install react-markdown
+
+interface ChatMessageProps {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+const ChatMessage: React.FC<ChatMessageProps> = ({ role, content }) => {
+  const isUser = role === 'user';
+
+  return (
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
+      {/* Avatar Icons make it feel more "human" */}
+      {!isUser && (
+        <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mr-2 text-xs font-bold border border-emerald-200">
+          A
+        </div>
+      )}
+
+      <div className={`max-w-[85%] p-4 rounded-2xl shadow-sm text-sm leading-relaxed ${
+        isUser 
+          ? 'bg-emerald-600 text-white rounded-tr-none' 
+          : 'bg-white border border-gray-100 text-gray-800 rounded-tl-none'
+      }`}>
+        {/* We use ReactMarkdown so bold text and lists actually show up */}
+        <div className="prose prose-sm max-w-none prose-emerald">
+           <ReactMarkdown>{content}</ReactMarkdown>
+        </div>
+      </div>
+
+      {isUser && (
+        <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center ml-2 text-xs font-bold border border-gray-300">
+          U
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ChatMessage;
+</file>
+
+<file path="backend/app/api/v1/endpoints/hospitals.py">
+import csv
+import io
+import uuid
+from sqlalchemy import func
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File
+from sqlalchemy.orm import Session
+from datetime import datetime # Add this at the top
+from app import crud, schemas
+from app.api.deps import get_db, get_current_tenant
+from app.models.hospital import Hospital
+from app.models.doctor import Doctor
+from app.availability import get_sheet_client # Ensure this is configured
+from app.models.usage import UsageLedger
+router = APIRouter()
+
+# -------------------------------------------------
+# 1. SUPER ADMIN ENDPOINTS
+# -------------------------------------------------
+
+@router.post("/", response_model=schemas.hospital.Hospital)
+def create_hospital(
+    *,
+    db: Session = Depends(get_db),
+    hospital_in: schemas.hospital.HospitalCreate,
+):
+    """Create a new hospital tenant."""
+    hospital = crud.crud_hospital.get_hospital_by_slug(db, slug=hospital_in.slug)
+    if hospital:
+        raise HTTPException(
+            status_code=400,
+            detail="The hospital with this slug already exists in the system.",
+        )
+    return crud.crud_hospital.create_hospital(db=db, hospital=hospital_in)
+
+@router.get("/", response_model=List[schemas.hospital.Hospital])
+def read_hospitals(
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 100,
+):
+    """List all registered hospitals."""
+    return crud.crud_hospital.get_hospitals(db, skip=skip, limit=limit)
+
+
+# -------------------------------------------------
+# 2. HOSPITAL MANAGEMENT (BY ID)
+# -------------------------------------------------
+
+@router.get("/{hospital_id}", response_model=schemas.hospital.Hospital)
+def get_hospital_by_id(
+    hospital_id: int, 
+    db: Session = Depends(get_db)
+):
+    """Fetch specific hospital info."""
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+    return hospital
+
+@router.patch("/{hospital_id}")
+def update_specific_hospital(
+    hospital_id: int,
+    payload: dict = Body(...),
+    db: Session = Depends(get_db)
+):
+    """Update settings for a specific hospital."""
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+    
+    # Update fields dynamically
+    for key, value in payload.items():
+        if hasattr(hospital, key):
+            setattr(hospital, key, value)
+    
+    db.commit()
+    db.refresh(hospital)
+    return {"status": "success", "message": f"Settings for {hospital.name} updated."}
+
+
+# -------------------------------------------------
+# 3. DOCTOR MANAGEMENT (MULTI-TENANT)
+# -------------------------------------------------
+
+@router.get("/{hospital_id}/doctors")
+def get_hospital_doctors(
+    hospital_id: int, 
+    db: Session = Depends(get_db)
+):
+    """Fetch the staff directory for a specific hospital."""
+    return db.query(Doctor).filter(Doctor.hospital_id == hospital_id).all()
+
+@router.post("/{hospital_id}/doctors")
+def add_doctor(
+    hospital_id: int,
+    payload: dict = Body(...),
+    db: Session = Depends(get_db)
+):
+    """Add a single doctor manually."""
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+
+    new_doc = Doctor(
+        name=payload["name"],
+        doctor_id=payload["doctor_id"],
+        specialty=payload.get("specialty", "General Physician"),
+        hospital_id=hospital_id
+    )
+    db.add(new_doc)
+    db.commit()
+    db.refresh(new_doc)
+    return new_doc
+
+
+# -------------------------------------------------
+# 4. BULK UPLOAD & GOOGLE SHEET SYNC
+# -------------------------------------------------
+
+@router.post("/{hospital_id}/doctors/bulk-upload")
+async def bulk_upload_and_sync(
+    hospital_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    # 1. Verify Hospital and Sheet
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital or not hospital.google_sheet_id:
+        raise HTTPException(status_code=400, detail="Google Sheet ID not configured")
+
+    # 2. Read and Parse CSV safely
+    content = await file.read()
+    stream = io.StringIO(content.decode("utf-8"))
+    reader = csv.DictReader(stream) # Automatically uses the first row as headers
+    
+    sheet_rows = []
+    for row in reader:
+        # Normalize keys to handle case sensitivity and spaces
+        normalized_row = {k.strip().lower(): v for k, v in row.items()}
+        
+        auto_id = f"H{hospital_id}-D-{uuid.uuid4().hex[:4].upper()}"
+        
+        # Robust mapping: checks for 'doctor name' or just 'name'
+        name = normalized_row.get('doctor name') or normalized_row.get('name') or 'Unknown'
+        dept = normalized_row.get('department') or 'General'
+        schedule = normalized_row.get('base schedule') or normalized_row.get('schedule') or 'Not Specified'
+
+        doctor = Doctor(
+            doctor_id=auto_id,
+            name=name,
+            department=dept,
+            base_schedule=schedule,
+            hospital_id=hospital_id
+        )
+        db.add(doctor) # You were missing this db.add() in the code snippet!
+        
+        # Prepare for Google Sheet (ID, Name, Dept, Schedule, Absent, Available)
+        sheet_rows.append([auto_id, name, dept, schedule, "", "Yes"])
+
+    # 3. Sync to Google Sheets
+    try:
+        client = get_sheet_client()
+        sheet = client.open_by_key(hospital.google_sheet_id).sheet1
+        sheet.append_rows(sheet_rows)
+        db.commit()
+        return {"message": f"Successfully imported {len(sheet_rows)} doctors."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Google Sheet Sync Failed: {str(e)}")
+
+
+# -------------------------------------------------
+# 5. AUTH-BASED HELPERS (TENANT ADMIN)
+# -------------------------------------------------
+
+@router.get("/me", response_model=schemas.hospital.Hospital)
+def get_my_hospital(
+    db: Session = Depends(get_db), 
+    hospital_id: int = Depends(get_current_tenant)
+):
+    """Get hospital info based on the admin's login token."""
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+    return hospital
+
+@router.patch("/me")
+def update_hospital_settings(
+    payload: dict = Body(...),
+    db: Session = Depends(get_db),
+    hospital_id: int = Depends(get_current_tenant)
+):
+    """Update settings for the logged-in admin's hospital."""
+    return update_specific_hospital(hospital_id=hospital_id, payload=payload, db=db)
+
+@router.get("/slug/{slug}")
+def get_hospital_by_slug(slug: str, db: Session = Depends(get_db)):
+    hospital = db.query(Hospital).filter(Hospital.slug == slug).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+    # Return everything the patient site needs
+    return {
+        "id": hospital.id, 
+        "name": hospital.name, 
+        "google_sheet_id": hospital.google_sheet_id
+    }
+
+
+@router.get("/{hospital_id}/billing")
+async def get_hospital_billing(hospital_id: int, db: Session = Depends(get_db)):
+    # Calculate start of current month
+    first_day = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    stats = db.query(
+        func.sum(UsageLedger.total_tokens).label("tokens"),
+        func.sum(UsageLedger.estimated_cost).label("cost"),
+        func.count(UsageLedger.id).label("total_chats")
+    ).filter(
+        UsageLedger.hospital_id == hospital_id,
+        UsageLedger.created_at >= first_day
+    ).first()
+
+    # Calculation logic for your markup
+    raw_cost = stats.cost or 0.0
+    margin_multiplier = 5.0  # 500% markup (standard for SaaS)
+    platform_fee_inr = 2500.0 # Base monthly platform fee
+    
+    return {
+        "period": first_day.strftime("%B %Y"),
+        "usage": {
+            "total_chats": stats.total_chats or 0,
+            "tokens_consumed": stats.tokens or 0,
+            "raw_cost_usd": round(raw_cost, 4),
+        },
+        "estimated_invoice_inr": round(platform_fee_inr + (raw_cost * 83 * margin_multiplier), 2)
+    }
+</file>
+
+<file path="backend/app/core/config.py">
+from typing import Optional
+from pydantic_settings import BaseSettings
+
+class Settings(BaseSettings):
+    # Core
+    PROJECT_NAME: str = "Hospital AI Platform"
+    API_V1_STR: str = "/api/v1"
+    
+    # 1. ADD THIS LINE: This maps the Render environment variable to your code
+    DATABASE_URL: Optional[str] = None 
+
+    # Database Defaults (Keep these for local dev)
+    POSTGRES_SERVER: str = "localhost"
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "NewStrongPassword123!"
+    POSTGRES_DB: str = "hospital_ai"
+    POSTGRES_PORT: str = "5432"
+    
+    # Optional: If you want to override the full URL
+    SQLALCHEMY_DATABASE_URI: Optional[str] = None
+
+    # App Secrets
+    REDIS_URL: str = "redis://localhost:6379"
+    OPENAI_API_KEY: str = "sk-placeholder"
+    JWT_SECRET: str = "supersecret"
+
+    # Helper to build the URL dynamically
+    @property
+    def SQLALCHEMY_DATABASE_URL(self) -> str:
+        # Check Render's DATABASE_URL first
+        if self.DATABASE_URL:
+            # Render often gives 'postgres://', but SQLAlchemy needs 'postgresql://'
+            return self.DATABASE_URL.replace("postgres://", "postgresql://", 1)
+        
+        # Fallback to local construction
+        return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+
+settings = Settings()
+</file>
+
+<file path="backend/app/models/hospital.py">
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+from app.db.base_class import Base
+
+class Hospital(Base):
+    __tablename__ = "hospital"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, index=True)
+    slug = Column(String, unique=True, index=True, nullable=False) # e.g., "apollo-delhi" for URLs
+    address = Column(String, nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    system_prompt = Column(Text, default="You are Arogya, a helpful assistant for a specialty hospital.")
+    # Add this column to your existing Hospital class
+    google_sheet_id = Column(String, nullable=True)
+    # Relationship: One Hospital has many Users
+    users = relationship("User", back_populates="hospital")
+    # Inside your Hospital class in app/models/hospital.py
+    doctors = relationship("Doctor", back_populates="hospital", cascade="all, delete-orphan")
+</file>
+
+<file path="frontend/src/pages/Dashboard.tsx">
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom'; 
+import api from '../api/axios';
+import KnowledgeBaseUpload from './KnowledgeBase'; 
+import ChatPreview from '../components/ChatPreview'; 
+// NEW: Import the Billing Component we designed
+import HospitalStats from '../components/HospitalStats'; 
+
+const Dashboard = () => {
+  const { hospitalId } = useParams(); 
+  const navigate = useNavigate();
+  const [hospital, setHospital] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!hospitalId) {
+      navigate('/hospitals');
+      return;
+    }
+
+    setLoading(true);
+    api.get(`/hospitals/${hospitalId}`)
+      .then(res => {
+        setHospital(res.data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Dashboard Fetch Error:", err);
+        setHospital(null);
+        setLoading(false);
+      });
+  }, [hospitalId, navigate]);
+
+  if (loading) return <div className="p-8 text-center animate-pulse">Loading Command Center...</div>;
+
+  if (!hospital) {
+    return (
+      <div className="p-8 text-center">
+        <h1 className="text-2xl font-bold text-red-600">Hospital Not Found</h1>
+        <p className="mt-2 text-gray-500">The hospital ID "{hospitalId}" does not exist in the cloud database.</p>
+        <button 
+          onClick={() => navigate('/hospitals')}
+          className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          Back to Hospital List
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-8 space-y-8 max-w-7xl mx-auto">
+      {/* HEADER SECTION */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Arogya Command Center</h1>
+          <p className="text-gray-600">
+            Managing: <span className="font-semibold text-blue-600">{hospital.name}</span>
+          </p>
+          <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider">ID: {hospital.id} | SLUG: {hospital.slug}</p>
+        </div>
+        <button 
+          onClick={() => navigate('/hospitals')}
+          className="text-sm font-medium text-gray-500 hover:text-blue-600 transition-colors"
+        >
+          &larr; Switch Hospital
+        </button>
+      </div>
+
+      {/* NEW: BILLING & ANALYTICS SECTION */}
+      {/* This component will fetch and show the monthly tokens, cost, and invoice */}
+      <section>
+        <h2 className="text-xl font-semibold text-gray-800 mb-4">Business Analytics</h2>
+        <HospitalStats hospitalId={Number(hospitalId)} />
+      </section>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* TRAINING SECTION */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">1</div>
+            <h2 className="text-xl font-semibold text-gray-700">Train Your AI</h2>
+          </div>
+          <KnowledgeBaseUpload hospitalId={hospitalId} />
+        </div>
+
+        {/* PREVIEW SECTION */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-bold">2</div>
+            <h2 className="text-xl font-semibold text-gray-700">Test Arogya Chat</h2>
+          </div>
+          <ChatPreview hospitalId={hospitalId} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;
+</file>
+
+<file path="backend/app/schemas/hospital.py">
+from typing import Optional
+from datetime import datetime
+from pydantic import BaseModel
+
+class HospitalBase(BaseModel):
+    name: str
+    slug: str
+    address: Optional[str] = None
+    is_active: Optional[bool] = True
+    # YOU MUST ADD THESE TWO:
+    system_prompt: Optional[str] = "You are Arogya, a helpful assistant."
+    google_sheet_id: Optional[str] = None
+
+class HospitalCreate(HospitalBase):
+    pass
+
+class HospitalUpdate(HospitalBase):
+    name: Optional[str] = None
+    slug: Optional[str] = None
+
+class Hospital(HospitalBase):
+    id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+</file>
+
+<file path="requirements.txt">
+alembic==1.18.4
+annotated-doc==0.0.4
+annotated-types==0.7.0
+anyio==4.12.1
+bcrypt==4.0.1
+certifi==2026.1.4
+cffi==2.0.0
+charset-normalizer==3.4.4
+click==8.3.1
+colorama==0.4.6
+cryptography==46.0.5
+distro==1.9.0
+dnspython==2.8.0
+ecdsa==0.19.1
+email-validator==2.3.0
+fastapi==0.129.2
+google-auth==2.48.0
+google-auth-oauthlib==1.3.0
+greenlet==3.3.2
+gspread==6.2.1
+gunicorn==25.1.0
+h11==0.16.0
+httpcore==1.0.9
+httplib2==0.31.2
+httpx==0.28.1
+idna==3.11
+jiter==0.13.0
+jsonpatch==1.33
+jsonpointer==3.0.0
+langchain-core==1.2.16
+langchain-text-splitters==1.1.1
+langsmith==0.7.9
+Mako==1.3.10
+MarkupSafe==3.0.3
+numpy==2.4.2
+oauth2client==4.1.3
+oauthlib==3.3.1
+openai==2.21.0
+orjson==3.11.7
+packaging==26.0
+passlib==1.7.4
+pgvector==0.4.2
+psycopg2-binary==2.9.11
+pyasn1==0.6.2
+pyasn1_modules==0.4.2
+pycparser==3.0
+pydantic==2.12.5
+pydantic-settings==2.13.1
+pydantic_core==2.41.5
+PyMuPDF==1.27.1
+pyparsing==3.3.2
+python-dotenv==1.2.1
+python-jose==3.5.0
+python-multipart==0.0.22
+PyYAML==6.0.3
+redis==7.2.0
+requests==2.32.5
+requests-oauthlib==2.0.0
+requests-toolbelt==1.0.0
+rsa==4.9.1
+six==1.17.0
+sniffio==1.3.1
+SQLAlchemy==2.0.46
+starlette==0.52.1
+tenacity==9.1.4
+tqdm==4.67.3
+typing-inspection==0.4.2
+typing_extensions==4.15.0
+urllib3==2.6.3
+uuid_utils==0.14.1
+uvicorn==0.41.0
+xxhash==3.6.0
+zstandard==0.25.0
+</file>
+
+<file path="backend/app/api/v1/endpoints/ai.py">
+import os
+import re
+from typing import List, Optional
+from datetime import datetime
+from pydantic import BaseModel
+from openai import OpenAI
+from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException
+
+from app.api.deps import get_db
+from app.models.hospital import Hospital 
+from app.models.knowledge import KnowledgeBase 
+from app.models.usage import UsageLedger
+from app.models.doctor import Doctor 
+from app.availability import get_doctor_availability
+
+router = APIRouter()
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+# -------------------------------------------------
+# MODELS
+# -------------------------------------------------
+class IngestRequest(BaseModel):
+    hospital_id: int
+    text: str
+class ChatRequest(BaseModel):
+    question: str
+    hospital_id: int 
+    language: Optional[str] = "en"
+
+# -------------------------------------------------
+# UTILITIES
+# -------------------------------------------------
+
+def normalize_name(text: str) -> str:
+    text = text.lower()
+    text = re.sub(r"dr\.?", "", text)
+    text = re.sub(r"[^a-z\s]", "", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+def resolve_doctor_id(user_text: str, doctor_data: dict):
+    normalized_query = normalize_name(user_text)
+    best_match, best_score = None, 0
+
+    for doctor_id, d in doctor_data.items():
+        name = d.get("name", "") if isinstance(d, dict) else str(d)
+        norm_name = normalize_name(name)
+        query_tokens, name_tokens = set(normalized_query.split()), set(norm_name.split())
+        
+        if not query_tokens or not name_tokens: continue
+        
+        score = len(query_tokens & name_tokens) / len(name_tokens)
+        if score > best_score:
+            best_score = score
+            best_match = (doctor_id, name)
+
+    return best_match if best_score >= 0.5 else (None, None)
+
+# -------------------------------------------------
+# ENDPOINT
+# -------------------------------------------------
+@router.post("/ingest")
+async def ingest_knowledge(
+    request: IngestRequest, 
+    db: Session = Depends(get_db)
+):
+    try:
+        # Create the embedding (this is what allows the vector search to work)
+        resp = client.embeddings.create(
+            input=request.text, 
+            model="text-embedding-3-small"
+        )
+        embedding = resp.data[0].embedding
+
+        # Save to the KnowledgeBase table
+        new_entry = KnowledgeBase(
+            hospital_id=request.hospital_id,
+            content=request.text,
+            embedding=embedding,
+            created_at=datetime.utcnow()
+        )
+        db.add(new_entry)
+        db.commit()
+        
+        return {"status": "success", "message": "Knowledge added to Arogya's brain"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+@router.post("/chat")
+async def chat_with_arogya(
+    request: ChatRequest, 
+    db: Session = Depends(get_db)
+):
+    hospital_id = request.hospital_id
+    question = request.question
+    target_lang = request.language
+    today_str = datetime.now().strftime("%d-%m-%Y") 
+
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+    
+    # 1. SEARCH DOCTOR DATABASE (Static Directory)
+    doctors_list = db.query(Doctor).filter(Doctor.hospital_id == hospital_id).all()
+    doctor_directory_context = "LIST OF DOCTORS AND SPECIALTIES:\n"
+    for d in doctors_list:
+        doctor_directory_context += f"- {d.name} ({d.department}): Schedule {d.base_schedule}\n"
+
+    # 2. FETCH LIVE AVAILABILITY (GOOGLE SHEETS)
+    availability_context = ""
+    if hospital.google_sheet_id:
+        try:
+            doctors_live_data = get_doctor_availability(sheet_id=hospital.google_sheet_id)
+            doc_id, doc_name = resolve_doctor_id(question, doctors_live_data)
+            
+            if doc_id:
+                doc_info = doctors_live_data.get(doc_id)
+                absent_dates = str(doc_info.get("absent_dates", ""))
+                
+                if today_str in [date.strip() for date in absent_dates.split(",")]:
+                    availability_context = f"IMPORTANT LIVE STATUS: {doc_name} is ABSENT TODAY ({today_str}). Tell the user they are unavailable."
+                else:
+                    availability_context = f"LIVE STATUS for {doc_name}: Available today ({today_str})."
+        except Exception as e:
+            availability_context = f"Availability sync temporarily offline."
+
+    # 3. VECTOR SEARCH (KNOWLEDGE BASE PDFs)
+    resp = client.embeddings.create(input=question, model="text-embedding-3-small")
+    results = db.query(KnowledgeBase).filter(KnowledgeBase.hospital_id == hospital_id).order_by(
+        KnowledgeBase.embedding.cosine_distance(resp.data[0].embedding)
+    ).limit(3).all()
+    kb_context = "\n".join([r.content for r in results])
+
+    # 4. FINAL COMPLETION & LANGUAGE
+    if target_lang == "ml":
+        lang_instruction = "IMPORTANT: Respond ONLY in Malayalam script (മലയാളം). Do not use English script."
+    else:
+        lang_instruction = "Respond strictly in English."
+
+# Add this specific instruction block to your lang_instruction or prompt
+    behavior_guidelines = """
+    CRITICAL INSTRUCTIONS FOR MALAYALAM:
+    1. Use 'Manglish' style: Use English technical terms written in Malayalam script. 
+    - Example: Use 'കാർഡിയോളജി വിഭാഗം' (Cardiology Department) instead of literal translations.
+    - Example: Use 'സെക്കൻഡ് ഫ്ലോർ' (Second Floor) instead of 'രണ്ടാം നില'.
+    2. Tone: Professional but conversational, like a hospital receptionist.
+    3. If the data is not in your context, say "എനിക്ക് ക്ഷമിക്കണം, ആ വിവരം എന്റെ പക്കലില്ല" 
+    (Sorry, I don't have that info) instead of guessing.
+    4. Keep responses under 2 sentences unless listing doctors.
+    """
+
+    system_prompt = f"""
+        You are Arogya, the AI Assistant for {hospital.name}. 
+        Current Date: {today_str}
+        
+        {hospital.system_prompt}
+        {lang_instruction}
+        {behavior_guidelines} 
+
+        {doctor_directory_context}
+        {availability_context}
+        
+        ADDITIONAL KNOWLEDGE:
+        {kb_context}
+        
+        Final Instruction: Respond in the language requested by the user. 
+        If they speak Malayalam, use the Manglish style described above.
+    """
+    
+    ai_response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": system_prompt}, 
+            {"role": "user", "content": question}
+        ]
+    )
+    
+    # 5. SAVE TO USAGE LEDGER
+    usage = ai_response.usage
+    db.add(UsageLedger(
+        hospital_id=hospital_id,
+        endpoint="/chat",
+        total_tokens=usage.total_tokens,
+        estimated_cost=(usage.total_tokens / 1_000_000) * 0.15
+    ))
+    db.commit()
+
+    return {"answer": ai_response.choices[0].message.content}
+</file>
+
+<file path="frontend/src/api/axios.ts">
+import axios from 'axios';
+
+/**
+ * Hospital AI Platform - Axios Configuration
+ * * This instance handles the 'Magic Key' (JWT) injection automatically.
+ * It ensures every request to the backend includes the hospital_id 
+ * encoded in the bearer token.
+ */
+const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:8000/api/v1'
+  : 'https://hospital-ai-platform.onrender.com/api/v1';
+
+const api = axios.create({
+  baseURL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Add this temporary log to see what the browser is actually using
+console.log("Current API BaseURL:", import.meta.env.VITE_API_URL);
+// Request Interceptor: Attaches the JWT to every outgoing call
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    
+    if (token) {
+      // Every request now carries the 'Magic Key' verification
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response Interceptor: Handles global errors (like expired tokens)
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      // If the Magic Key is invalid or expired, boot to login
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
+export default api;
+</file>
+
+<file path="backend/app/main.py">
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.db.base import Base
+# Import the router objects from your endpoint files
+from app.api.v1.endpoints.auth import router as auth_router
+from app.api.v1.endpoints.hospitals import router as hospitals_router
+from app.api.v1.endpoints.ai import router as ai_router
+from app.db.session import engine
+app = FastAPI(title="Hospital AI Platform")
+Base.metadata.create_all(bind=engine)
+# --- CORS Configuration ---
+# This allows both your local development and your live Vercel site to talk to this API
+origins = [
+    "https://hospital-ai-platform.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://hospital-ai-platform.vercel.app", "http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"], # Be explicit here
+    allow_headers=["*"],
+)
+# --- Include Routers ---
+# Note: The prefixes here combine with the @router paths in your endpoint files
+
+# 1. Auth Router (Handles Login and Token Generation)
+app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
+
+# 2. Hospitals Router (Handles Staff management and Hospital settings)
+app.include_router(hospitals_router, prefix="/api/v1/hospitals", tags=["hospitals"])
+
+# 3. AI Router (Handles /chat, /ingest, and /upload-pdf)
+# We use /api/v1/ai so that the frontend calls /api/v1/ai/chat
+app.include_router(ai_router, prefix="/api/v1/ai", tags=["AI"])
+
+@app.get("/")
+def read_root():
+    return {
+        "status": "online",
+        "message": "Welcome to the Hospital AI Platform API",
+        "version": "v1.0.0"
+    }
+</file>
+
+<file path="frontend/src/themes/arogya-specialty/Chat.tsx">
+import React, { useState, useEffect, useRef } from 'react';
+import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
+import api from '../../api/axios';
+import ChatMessage from './ChatMessage';
+import { Mic, MicOff, Languages, Loader2, Activity, Send, Zap } from 'lucide-react';
+
+interface ChatProps { hospitalId: string; }
+interface Message { role: 'user' | 'assistant'; content: string; }
+
+const SUGGESTIONS = {
+  'en-US': ["Who is the cardiologist today?", "Where is the pharmacy?", "Visiting hours?", "Emergency contact"],
+  'ml-IN': ["കാർഡിയോളജിസ്റ്റ് ആരാണ്?", "ഫാർമസി എവിടെയാണ്?", "സന്ദർശന സമയം?", "അടിയന്തര നമ്പർ"]
+};
+
+const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
+  const [language, setLanguage] = useState<'en-US' | 'ml-IN'>('ml-IN');
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isTyping, setIsTyping] = useState(false);
+  const [inputText, setInputText] = useState('');
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const { transcript, listening, resetTranscript, browserSupportsSpeechRecognition } = useSpeechRecognition();
+
+  // 1. Simple, direct Send Function
+  const handleSend = async (text: string) => {
+    const messageToSend = text || inputText || transcript;
+    if (!messageToSend.trim()) return;
+
+    // Hard stop mic
+    SpeechRecognition.stopListening();
+    
+    // UI Reset
+    const currentText = messageToSend.trim();
+    setInputText('');
+    resetTranscript();
+
+    setMessages(prev => [...prev, { role: 'user', content: currentText }]);
+    setIsTyping(true);
+
+    try {
+      const response = await api.post('/ai/chat', {
+        question: currentText,
+        hospital_id: parseInt(hospitalId),
+        language: language === 'ml-IN' ? 'ml' : 'en'
+      });
+      setMessages(prev => [...prev, { role: 'assistant', content: response.data.answer }]);
+    } catch (error) {
+      setMessages(prev => [...prev, { role: 'assistant', content: "Error. Please try again." }]);
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  // 2. Simple Toggle
+  const toggleMic = () => {
+    if (listening) {
+      SpeechRecognition.stopListening();
+    } else {
+      resetTranscript();
+      SpeechRecognition.startListening({ 
+        continuous: true, 
+        language: language 
+      });
+    }
+  };
+
+  // 3. Auto-send Timer (Only if transcript exists)
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (transcript && listening) {
+      timer = setTimeout(() => {
+        handleSend(transcript);
+      }, 2500);
+    }
+    return () => clearTimeout(timer);
+  }, [transcript, listening]);
+
+  // 4. Welcome Message
+  useEffect(() => {
+    const welcome = language === 'ml-IN' 
+      ? "👋 നമസ്കാരം! ഞാൻ **ആരോഗ്യ**. എനിക്ക് എങ്ങനെ സഹായിക്കാനാകും?"
+      : "👋 Hello! I am **Arogya**. How can I help you today?";
+    setMessages([{ role: 'assistant', content: welcome }]);
+  }, [language]);
+
+  useEffect(() => {
+    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  if (!browserSupportsSpeechRecognition) {
+    return <div className="p-4 text-center text-red-500 bg-red-50">Voice features not supported.</div>;
+  }
+
+  return (
+    <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 flex flex-col h-[650px]">
+      {/* Header */}
+      <div className="bg-emerald-600 p-4 text-white shrink-0 shadow-md">
+        <div className="flex justify-between items-center">
+          <h3 className="font-bold flex items-center gap-2">
+            <Activity className="w-4 h-4" /> Ask Arogya
+          </h3>
+          <button 
+            onClick={() => setLanguage(l => l === 'en-US' ? 'ml-IN' : 'en-US')}
+            className="bg-emerald-700 px-3 py-1 rounded-md text-xs font-bold border border-white/20"
+          >
+            {language === 'en-US' ? 'English' : 'മലയാളം'}
+          </button>
+        </div>
+      </div>
+
+      {/* Chat Area */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
+        {messages.map((msg, idx) => (
+          <ChatMessage key={idx} role={msg.role} content={msg.content} />
+        ))}
+        
+        {listening && transcript && (
+          <div className="flex justify-end">
+            <div className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-2xl rounded-tr-none text-sm italic border border-emerald-100 shadow-sm animate-pulse">
+              {transcript}...
+            </div>
+          </div>
+        )}
+
+        {isTyping && (
+          <div className="flex items-center gap-2 text-emerald-600 p-2 bg-white rounded-lg w-fit shadow-sm border border-slate-100">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span className="text-[10px] font-bold">Arogya is checking...</span>
+          </div>
+        )}
+        <div ref={scrollRef} />
+      </div>
+
+      {/* Suggestions */}
+      <div className="px-4 py-2 bg-slate-50 border-t border-slate-100">
+        <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+          {SUGGESTIONS[language].map((text, i) => (
+            <button
+              key={i}
+              onClick={() => handleSend(text)}
+              className="flex-none bg-white border border-emerald-100 text-emerald-700 text-[11px] px-3 py-1.5 rounded-full shadow-sm hover:bg-emerald-50 active:scale-95 transition-all"
+            >
+              <Zap className="w-3 h-3 text-amber-400 fill-amber-400" /> {text}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Input Section */}
+      <div className="p-4 border-t bg-white shrink-0">
+        <div className="flex items-center gap-2 mb-4">
+          <input
+            type="text"
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSend(inputText)}
+            placeholder={language === 'en-US' ? "Ask anything..." : "ചോദിക്കൂ..."}
+            className="flex-1 bg-slate-100 border-none rounded-full px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+          />
+          <button 
+            onClick={() => handleSend(inputText)} 
+            className="p-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-700 transition-colors shadow-sm"
+          >
+            <Send className="w-4 h-4" />
+          </button>
+        </div>
+        
+        <div className="flex flex-col items-center">
+          <button
+            type="button"
+            onClick={toggleMic}
+            className={`p-4 rounded-full transition-all transform active:scale-90 shadow-lg ${
+              listening 
+                ? 'bg-red-500 text-white animate-pulse ring-4 ring-red-100' 
+                : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+            }`}
+          >
+            {listening ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+          </button>
+          <p className="text-[9px] uppercase tracking-widest text-slate-400 font-black mt-2">
+            {listening ? "Recording..." : (language === 'en-US' ? "Tap to speak" : "സംസാരിക്കുക")}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Chat;
+</file>
+
+</files>

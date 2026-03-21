@@ -5,17 +5,71 @@ from sqlalchemy import func
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File
 from sqlalchemy.orm import Session
-from datetime import datetime # Add this at the top
+from datetime import datetime
 from app import crud, schemas
 from app.api.deps import get_db, get_current_tenant
 from app.models.hospital import Hospital
 from app.models.doctor import Doctor
-from app.availability import get_sheet_client # Ensure this is configured
+from app.availability import get_sheet_client
 from app.models.usage import UsageLedger
+
 router = APIRouter()
 
+# =============================================================================
+# FIX #3: ROUTE ORDER — Static/named routes MUST come before /{hospital_id}.
+# FastAPI matches routes top-to-bottom. If /{hospital_id} is registered first,
+# it will intercept GET /me and GET /slug/arogya and try to cast the string as
+# an int, returning a 422 before the correct handler is ever reached.
+# =============================================================================
+
+
 # -------------------------------------------------
-# 1. SUPER ADMIN ENDPOINTS
+# 1. STATIC NAMED ROUTES (must be first)
+# -------------------------------------------------
+
+@router.get("/me", response_model=schemas.hospital.Hospital)
+def get_my_hospital(
+    db: Session = Depends(get_db),
+    hospital_id: int = Depends(get_current_tenant)
+):
+    """Get hospital info based on the admin's login token."""
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+    return hospital
+
+@router.patch("/me")
+def update_my_hospital_settings(
+    payload: dict = Body(...),
+    db: Session = Depends(get_db),
+    hospital_id: int = Depends(get_current_tenant)
+):
+    """Update settings for the logged-in admin's hospital."""
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+    for key, value in payload.items():
+        if hasattr(hospital, key):
+            setattr(hospital, key, value)
+    db.commit()
+    db.refresh(hospital)
+    return {"status": "success", "message": f"Settings for {hospital.name} updated."}
+
+@router.get("/slug/{slug}")
+def get_hospital_by_slug(slug: str, db: Session = Depends(get_db)):
+    """Public endpoint: resolve a slug to hospital id + name for ThemeLoader."""
+    hospital = db.query(Hospital).filter(Hospital.slug == slug).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+    return {
+        "id": hospital.id,
+        "name": hospital.name,
+        "google_sheet_id": hospital.google_sheet_id
+    }
+
+
+# -------------------------------------------------
+# 2. COLLECTION ROUTES
 # -------------------------------------------------
 
 @router.post("/", response_model=schemas.hospital.Hospital)
@@ -44,12 +98,12 @@ def read_hospitals(
 
 
 # -------------------------------------------------
-# 2. HOSPITAL MANAGEMENT (BY ID)
+# 3. PARAMETERISED ROUTES (must be last)
 # -------------------------------------------------
 
 @router.get("/{hospital_id}", response_model=schemas.hospital.Hospital)
 def get_hospital_by_id(
-    hospital_id: int, 
+    hospital_id: int,
     db: Session = Depends(get_db)
 ):
     """Fetch specific hospital info."""
@@ -62,30 +116,28 @@ def get_hospital_by_id(
 def update_specific_hospital(
     hospital_id: int,
     payload: dict = Body(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    # FIX #4: Added auth guard. Without this, any unauthenticated caller
+    # knowing a sequential hospital_id could overwrite system_prompt or
+    # google_sheet_id. Now requires a valid JWT.
+    _current_tenant: int = Depends(get_current_tenant),
 ):
-    """Update settings for a specific hospital."""
+    """Update settings for a specific hospital (requires auth)."""
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
     if not hospital:
         raise HTTPException(status_code=404, detail="Hospital not found")
-    
-    # Update fields dynamically
+
     for key, value in payload.items():
         if hasattr(hospital, key):
             setattr(hospital, key, value)
-    
+
     db.commit()
     db.refresh(hospital)
     return {"status": "success", "message": f"Settings for {hospital.name} updated."}
 
-
-# -------------------------------------------------
-# 3. DOCTOR MANAGEMENT (MULTI-TENANT)
-# -------------------------------------------------
-
 @router.get("/{hospital_id}/doctors")
 def get_hospital_doctors(
-    hospital_id: int, 
+    hospital_id: int,
     db: Session = Depends(get_db)
 ):
     """Fetch the staff directory for a specific hospital."""
@@ -105,7 +157,7 @@ def add_doctor(
     new_doc = Doctor(
         name=payload["name"],
         doctor_id=payload["doctor_id"],
-        specialty=payload.get("specialty", "General Physician"),
+        department=payload.get("department", "General Physician"),
         hospital_id=hospital_id
     )
     db.add(new_doc)
@@ -113,35 +165,24 @@ def add_doctor(
     db.refresh(new_doc)
     return new_doc
 
-
-# -------------------------------------------------
-# 4. BULK UPLOAD & GOOGLE SHEET SYNC
-# -------------------------------------------------
-
 @router.post("/{hospital_id}/doctors/bulk-upload")
 async def bulk_upload_and_sync(
     hospital_id: int,
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
-    # 1. Verify Hospital and Sheet
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
     if not hospital or not hospital.google_sheet_id:
         raise HTTPException(status_code=400, detail="Google Sheet ID not configured")
 
-    # 2. Read and Parse CSV safely
     content = await file.read()
     stream = io.StringIO(content.decode("utf-8"))
-    reader = csv.DictReader(stream) # Automatically uses the first row as headers
-    
+    reader = csv.DictReader(stream)
+
     sheet_rows = []
     for row in reader:
-        # Normalize keys to handle case sensitivity and spaces
         normalized_row = {k.strip().lower(): v for k, v in row.items()}
-        
         auto_id = f"H{hospital_id}-D-{uuid.uuid4().hex[:4].upper()}"
-        
-        # Robust mapping: checks for 'doctor name' or just 'name'
         name = normalized_row.get('doctor name') or normalized_row.get('name') or 'Unknown'
         dept = normalized_row.get('department') or 'General'
         schedule = normalized_row.get('base schedule') or normalized_row.get('schedule') or 'Not Specified'
@@ -153,12 +194,9 @@ async def bulk_upload_and_sync(
             base_schedule=schedule,
             hospital_id=hospital_id
         )
-        db.add(doctor) # You were missing this db.add() in the code snippet!
-        
-        # Prepare for Google Sheet (ID, Name, Dept, Schedule, Absent, Available)
+        db.add(doctor)
         sheet_rows.append([auto_id, name, dept, schedule, "", "Yes"])
 
-    # 3. Sync to Google Sheets
     try:
         client = get_sheet_client()
         sheet = client.open_by_key(hospital.google_sheet_id).sheet1
@@ -169,49 +207,10 @@ async def bulk_upload_and_sync(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Google Sheet Sync Failed: {str(e)}")
 
-
-# -------------------------------------------------
-# 5. AUTH-BASED HELPERS (TENANT ADMIN)
-# -------------------------------------------------
-
-@router.get("/me", response_model=schemas.hospital.Hospital)
-def get_my_hospital(
-    db: Session = Depends(get_db), 
-    hospital_id: int = Depends(get_current_tenant)
-):
-    """Get hospital info based on the admin's login token."""
-    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
-    if not hospital:
-        raise HTTPException(status_code=404, detail="Hospital not found")
-    return hospital
-
-@router.patch("/me")
-def update_hospital_settings(
-    payload: dict = Body(...),
-    db: Session = Depends(get_db),
-    hospital_id: int = Depends(get_current_tenant)
-):
-    """Update settings for the logged-in admin's hospital."""
-    return update_specific_hospital(hospital_id=hospital_id, payload=payload, db=db)
-
-@router.get("/slug/{slug}")
-def get_hospital_by_slug(slug: str, db: Session = Depends(get_db)):
-    hospital = db.query(Hospital).filter(Hospital.slug == slug).first()
-    if not hospital:
-        raise HTTPException(status_code=404, detail="Hospital not found")
-    # Return everything the patient site needs
-    return {
-        "id": hospital.id, 
-        "name": hospital.name, 
-        "google_sheet_id": hospital.google_sheet_id
-    }
-
-
 @router.get("/{hospital_id}/billing")
 async def get_hospital_billing(hospital_id: int, db: Session = Depends(get_db)):
-    # Calculate start of current month
     first_day = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    
+
     stats = db.query(
         func.sum(UsageLedger.total_tokens).label("tokens"),
         func.sum(UsageLedger.estimated_cost).label("cost"),
@@ -221,11 +220,14 @@ async def get_hospital_billing(hospital_id: int, db: Session = Depends(get_db)):
         UsageLedger.created_at >= first_day
     ).first()
 
-    # Calculation logic for your markup
     raw_cost = stats.cost or 0.0
-    margin_multiplier = 5.0  # 500% markup (standard for SaaS)
-    platform_fee_inr = 2500.0 # Base monthly platform fee
-    
+    margin_multiplier = 5.0
+    platform_fee_inr = 2500.0
+    total_due_inr = round(platform_fee_inr + (raw_cost * 83 * margin_multiplier), 2)
+
+    # FIX #5: Reshaped response to match what HospitalStats.tsx actually reads.
+    # Frontend expects billing.invoice.total_due_inr and billing.invoice.platform_fee.
+    # Old backend returned estimated_invoice_inr at the top level — key mismatch.
     return {
         "period": first_day.strftime("%B %Y"),
         "usage": {
@@ -233,5 +235,8 @@ async def get_hospital_billing(hospital_id: int, db: Session = Depends(get_db)):
             "tokens_consumed": stats.tokens or 0,
             "raw_cost_usd": round(raw_cost, 4),
         },
-        "estimated_invoice_inr": round(platform_fee_inr + (raw_cost * 83 * margin_multiplier), 2)
+        "invoice": {
+            "total_due_inr": total_due_inr,
+            "platform_fee": platform_fee_inr,
+        }
     }

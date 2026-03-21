@@ -1,11 +1,13 @@
+import os
 from typing import Generator
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 from app.db.session import SessionLocal
 
-# This matches the settings in your .env
-SECRET_KEY = "dev-secret-key" 
+# FIX #1: Load SECRET_KEY from environment, never hardcode it.
+# Set JWT_SECRET in your .env and Render environment variables.
+SECRET_KEY = os.getenv("JWT_SECRET", "dev-secret-key-change-in-production")
 ALGORITHM = "HS256"
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login")
