@@ -1,44 +1,139 @@
-import React, { useState } from 'react';
-import api from '../api/axios';
+import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot } from 'lucide-react';
 
 interface ChatPreviewProps {
   hospitalId?: string;
 }
 
+interface Message {
+  role: 'user' | 'ai';
+  text: string;
+  isStreaming?: boolean;
+}
+
+function buildHistory(messages: Message[]): { role: string; content: string }[] {
+  return messages
+    .filter(m => !m.isStreaming)
+    .map(m => ({
+      role: m.role === 'ai' ? 'assistant' : 'user',
+      content: m.text,
+    }));
+}
+
+function getBaseURL(): string {
+  return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:8000/api/v1'
+    : 'https://hospital-ai-platform.onrender.com/api/v1';
+}
+
 const ChatPreview: React.FC<ChatPreviewProps> = ({ hospitalId }) => {
   const [question, setQuestion] = useState('');
-  const [messages, setMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!question.trim()) return;
+    if (!question.trim() || isStreaming) return;
+
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
 
     const userMessage = question;
-    setMessages((prev) => [...prev, { role: 'user', text: userMessage }]);
+    const historySnapshot = buildHistory(messages);
+
+    setMessages(prev => [...prev, { role: 'user', text: userMessage }]);
+    setMessages(prev => [...prev, { role: 'ai', text: '', isStreaming: true }]);
     setQuestion('');
-    setLoading(true);
+    setIsStreaming(true);
 
     try {
-      // FIX: Use 'question' instead of 'message' to match ai.py
-      // FIX: Wrap hospitalId in Number() to match the 'int' type in Pydantic
-      const response = await api.post('/ai/chat', { 
-        question: userMessage, 
-        hospital_id: Number(hospitalId) 
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${getBaseURL()}/ai/chat-stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          question: userMessage,
+          hospital_id: Number(hospitalId),
+          history: historySnapshot,
+        }),
+        signal: abortRef.current.signal,
       });
-      
-      // Backend returns { "answer": "..." }
-      const aiResponse = response.data.answer;
-      setMessages((prev) => [...prev, { role: 'ai', text: aiResponse }]);
-    } catch (err: any) {
-      console.error("Chat Error Detail:", err.response?.data);
-      const errorMsg = err.response?.status === 401 
-        ? "Session expired. Please log in again." 
+
+      if (!response.ok || !response.body) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const frames = buffer.split('\n\n');
+        buffer = frames.pop() ?? '';
+
+        for (const frame of frames) {
+          if (!frame.startsWith('data: ')) continue;
+          const payload = frame.slice(6);
+
+          if (payload === '[DONE]') {
+            setMessages(prev =>
+              prev.map((m, i) =>
+                i === prev.length - 1 ? { ...m, isStreaming: false } : m
+              )
+            );
+            break;
+          }
+
+          if (payload.startsWith('[ERROR]')) {
+            setMessages(prev =>
+              prev.map((m, i) =>
+                i === prev.length - 1
+                  ? { ...m, text: "I'm having trouble right now. Please try again.", isStreaming: false }
+                  : m
+              )
+            );
+            break;
+          }
+
+          try {
+            const tokenText = JSON.parse(payload);
+            setMessages(prev =>
+              prev.map((m, i) =>
+                i === prev.length - 1 ? { ...m, text: m.text + tokenText } : m
+              )
+            );
+          } catch {
+            // skip malformed token
+          }
+        }
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return;
+
+      const errorMsg = (err instanceof Error && err.message.includes('401'))
+        ? "Session expired. Please log in again."
         : "I'm having trouble connecting to my brain right now.";
-      setMessages((prev) => [...prev, { role: 'ai', text: errorMsg }]);
+
+      setMessages(prev =>
+        prev.map((m, i) =>
+          i === prev.length - 1 ? { ...m, text: errorMsg, isStreaming: false } : m
+        )
+      );
     } finally {
-      setLoading(false);
+      setIsStreaming(false);
     }
   };
 
@@ -63,23 +158,43 @@ const ChatPreview: React.FC<ChatPreviewProps> = ({ hospitalId }) => {
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${
-              msg.role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white border text-gray-800 rounded-tl-none'
+              msg.role === 'user'
+                ? 'bg-blue-600 text-white rounded-tr-none'
+                : 'bg-white border text-gray-800 rounded-tl-none'
             }`}>
               {msg.text}
+              {msg.isStreaming && (
+                <span style={{
+                  display: 'inline-block',
+                  width: '2px',
+                  height: '12px',
+                  backgroundColor: '#2563eb',
+                  marginLeft: '2px',
+                  verticalAlign: 'middle',
+                  animation: 'blink 1s step-start infinite',
+                }} />
+              )}
             </div>
           </div>
         ))}
-        {loading && <div className="text-xs text-gray-400 animate-pulse">Arogya is thinking...</div>}
+        <div ref={scrollRef} />
       </div>
+
+      <style>{`@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }`}</style>
 
       <form onSubmit={handleSendMessage} className="p-4 bg-white border-t rounded-b-2xl flex gap-2">
         <input
-          className="flex-1 text-sm p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 text-sm p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
           placeholder="Ask about doctor timings..."
           value={question}
-          onChange={(e) => setQuestion(e.target.value)}
+          disabled={isStreaming}
+          onChange={e => setQuestion(e.target.value)}
         />
-        <button type="submit" disabled={loading} className="bg-blue-600 p-2 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+        <button
+          type="submit"
+          disabled={isStreaming}
+          className="bg-blue-600 p-2 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+        >
           <Send size={18} />
         </button>
       </form>
