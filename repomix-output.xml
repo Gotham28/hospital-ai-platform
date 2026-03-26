@@ -91,10 +91,10 @@ frontend/src/components/ChatPreview.tsx
 frontend/src/components/CreateHospitalModal.tsx
 frontend/src/components/HospitalStats.tsx
 frontend/src/components/UsageStats.tsx
+frontend/src/context/AuthContext.tsx
 frontend/src/index.css
 frontend/src/layouts/DashboardLayout.tsx
 frontend/src/main.tsx
-frontend/src/pages/Dashboard.py
 frontend/src/pages/Dashboard.tsx
 frontend/src/pages/Doctors.tsx
 frontend/src/pages/KnowledgeBase.tsx
@@ -477,93 +477,12 @@ def downgrade() -> None:
 
 </file>
 
-<file path="backend/app/api/deps.py">
-from typing import Generator
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from jose import jwt, JWTError
-from app.db.session import SessionLocal
-
-# This matches the settings in your .env
-SECRET_KEY = "dev-secret-key" 
-ALGORITHM = "HS256"
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login")
-
-def get_db() -> Generator:
-    try:
-        db = SessionLocal()
-        yield db
-    finally:
-        db.close()
-
-def get_current_tenant(token: str = Depends(oauth2_scheme)) -> int:
-    """
-    The Magic Key: Extracts the hospital_id from the JWT.
-    If the token is invalid or missing the ID, it denies access.
-    """
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        hospital_id: int = payload.get("hospital_id")
-        if hospital_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid authentication credentials: No tenant ID found",
-            )
-        return hospital_id
-    except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-        )
-</file>
-
 <file path="backend/app/api/v1/endpoints/__init__.py">
 # Location: D:\Hospital\hospital-ai-platform\backend\app\api\v1\endpoints\__init__.py
 
 from .hospitals import router as hospitals
 from .auth import router as auth
 from .ai import router as ai
-</file>
-
-<file path="backend/app/api/v1/endpoints/auth.py">
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
-from datetime import datetime, timedelta, timezone
-from jose import jwt
-from passlib.context import CryptContext
-from sqlalchemy.orm import Session
-from app.api.deps import get_db
-from app.models.user import User
-
-# Match these exactly with your .env or deps.py
-SECRET_KEY = "dev-secret-key" 
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# FIXED: Removed double-prefix to stop 404 error
-router = APIRouter(tags=["auth"])
-
-def create_access_token(data: dict):
-    to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-
-@router.post("/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == form_data.username).first()
-    
-    if not user or not pwd_context.verify(form_data.password, user.hashed_password):
-        raise HTTPException(status_code=400, detail="Incorrect email or password")
-    
-    # The Magic Key: hospital_id is now safely inside the token
-    access_token = create_access_token(
-        data={"sub": user.email, "hospital_id": user.hospital_id}
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
 </file>
 
 <file path="backend/app/api/v1/endpoints/usage.py">
@@ -598,35 +517,6 @@ def get_usage_summary(
 <file path="backend/app/crud/__init__.py">
 from .crud_hospital import create_hospital, get_hospital, get_hospital_by_slug, get_hospitals
 from .crud_user import create_user, get_user, get_user_by_email
-</file>
-
-<file path="backend/app/crud/crud_user.py">
-from sqlalchemy.orm import Session
-from app.models.user import User
-from app.schemas.user import UserCreate
-
-def get_user(db: Session, user_id: int):
-    return db.query(User).filter(User.id == user_id).first()
-
-def get_user_by_email(db: Session, email: str):
-    return db.query(User).filter(User.email == email).first()
-
-def create_user(db: Session, user: UserCreate):
-    # TODO: Hash the password later!
-    fake_hashed_password = user.password + "notreallyhashed"
-    
-    db_obj = User(
-        email=user.email,
-        hashed_password=fake_hashed_password,
-        full_name=user.full_name,
-        hospital_id=user.hospital_id,
-        is_superuser=user.is_superuser,
-        is_active=user.is_active,
-    )
-    db.add(db_obj)
-    db.commit()
-    db.refresh(db_obj)
-    return db_obj
 </file>
 
 <file path="backend/app/db/base_class.py">
@@ -984,296 +874,8 @@ export default defineConfig([
 }
 </file>
 
-<file path="frontend/src/App.tsx">
-import { Routes, Route, Navigate, Link } from 'react-router-dom';
-import DashboardLayout from './layouts/DashboardLayout';
-import CreateHospitalModal from './components/CreateHospitalModal';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard'; 
-import DoctorsPage from './pages/Doctors';
-import SettingsPage from './pages/Settings'; 
-import ThemeLoader from './themes/ThemeLoader';
-import api from './api/axios';
-import { useEffect, useState } from 'react';
-import { Plus } from 'lucide-react';
-
-function HospitalList() {
-  const [hospitals, setHospitals] = useState<any[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const fetchHospitals = () => {
-    api.get('/hospitals/')
-      .then(res => setHospitals(res.data))
-      .catch(console.error);
-  };
-
-  useEffect(() => { fetchHospitals(); }, []);
-
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Hospital Management</h2>
-        <button 
-          onClick={() => setIsModalOpen(true)} 
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" /> Add Hospital
-        </button>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-3">
-        {hospitals.map((h: any) => (
-          <div key={h.id} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-            <h3 className="font-bold text-gray-900 text-lg">{h.name}</h3>
-            <p className="text-xs text-gray-400 mb-4">Slug: {h.slug}</p>
-            
-            <div className="flex gap-2 border-t pt-4">
-              <Link 
-                to={`/hospitals/${h.id}/training`} 
-                className="flex-1 text-center text-xs bg-blue-600 text-white py-2 rounded-md font-medium hover:bg-blue-700"
-              >
-                Train AI
-              </Link>
-              <Link 
-                to={`/hospitals/${h.id}/settings`} 
-                className="flex-1 text-center text-xs border border-gray-300 text-gray-600 py-2 rounded-md font-medium hover:bg-gray-50"
-              >
-                Settings
-              </Link>
-            </div>
-          </div>
-        ))}
-      </div>
-      
-      <CreateHospitalModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        onSuccess={fetchHospitals} 
-      />
-    </div>
-  );
-}
-
-export default function App() {
-  const isAuthenticated = !!localStorage.getItem('token');
-
-  return (
-    <Routes>
-      {/* Public Patient-Facing Route */}
-      <Route path="/p/:hospitalSlug" element={<ThemeLoader />} />
-      
-      {/* Authentication Route */}
-      <Route path="/login" element={<Login />} />
-
-      {/* Protected Admin Routes */}
-      <Route element={isAuthenticated ? <DashboardLayout /> : <Navigate to="/login" replace />}>
-        {/* Main Hospital Selection Screen */}
-        <Route path="/" element={<HospitalList />} /> 
-        
-        {/* Context-Specific Routes (Notice the consistent use of :hospitalId) */}
-        <Route path="/hospitals/:hospitalId/doctors" element={<DoctorsPage />} /> 
-        <Route path="/hospitals/:hospitalId/training" element={<Dashboard />} /> 
-        <Route path="/hospitals/:hospitalId/settings" element={<SettingsPage />} />
-      </Route>
-
-      {/* Catch-all Fallback */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  );
-}
-</file>
-
 <file path="frontend/src/assets/react.svg">
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="35.93" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 228"><path fill="#00D8FF" d="M210.483 73.824a171.49 171.49 0 0 0-8.24-2.597c.465-1.9.893-3.777 1.273-5.621c6.238-30.281 2.16-54.676-11.769-62.708c-13.355-7.7-35.196.329-57.254 19.526a171.23 171.23 0 0 0-6.375 5.848a155.866 155.866 0 0 0-4.241-3.917C100.759 3.829 77.587-4.822 63.673 3.233C50.33 10.957 46.379 33.89 51.995 62.588a170.974 170.974 0 0 0 1.892 8.48c-3.28.932-6.445 1.924-9.474 2.98C17.309 83.498 0 98.307 0 113.668c0 15.865 18.582 31.778 46.812 41.427a145.52 145.52 0 0 0 6.921 2.165a167.467 167.467 0 0 0-2.01 9.138c-5.354 28.2-1.173 50.591 12.134 58.266c13.744 7.926 36.812-.22 59.273-19.855a145.567 145.567 0 0 0 5.342-4.923a168.064 168.064 0 0 0 6.92 6.314c21.758 18.722 43.246 26.282 56.54 18.586c13.731-7.949 18.194-32.003 12.4-61.268a145.016 145.016 0 0 0-1.535-6.842c1.62-.48 3.21-.974 4.76-1.488c29.348-9.723 48.443-25.443 48.443-41.52c0-15.417-17.868-30.326-45.517-39.844Zm-6.365 70.984c-1.4.463-2.836.91-4.3 1.345c-3.24-10.257-7.612-21.163-12.963-32.432c5.106-11 9.31-21.767 12.459-31.957c2.619.758 5.16 1.557 7.61 2.4c23.69 8.156 38.14 20.213 38.14 29.504c0 9.896-15.606 22.743-40.946 31.14Zm-10.514 20.834c2.562 12.94 2.927 24.64 1.23 33.787c-1.524 8.219-4.59 13.698-8.382 15.893c-8.067 4.67-25.32-1.4-43.927-17.412a156.726 156.726 0 0 1-6.437-5.87c7.214-7.889 14.423-17.06 21.459-27.246c12.376-1.098 24.068-2.894 34.671-5.345a134.17 134.17 0 0 1 1.386 6.193ZM87.276 214.515c-7.882 2.783-14.16 2.863-17.955.675c-8.075-4.657-11.432-22.636-6.853-46.752a156.923 156.923 0 0 1 1.869-8.499c10.486 2.32 22.093 3.988 34.498 4.994c7.084 9.967 14.501 19.128 21.976 27.15a134.668 134.668 0 0 1-4.877 4.492c-9.933 8.682-19.886 14.842-28.658 17.94ZM50.35 144.747c-12.483-4.267-22.792-9.812-29.858-15.863c-6.35-5.437-9.555-10.836-9.555-15.216c0-9.322 13.897-21.212 37.076-29.293c2.813-.98 5.757-1.905 8.812-2.773c3.204 10.42 7.406 21.315 12.477 32.332c-5.137 11.18-9.399 22.249-12.634 32.792a134.718 134.718 0 0 1-6.318-1.979Zm12.378-84.26c-4.811-24.587-1.616-43.134 6.425-47.789c8.564-4.958 27.502 2.111 47.463 19.835a144.318 144.318 0 0 1 3.841 3.545c-7.438 7.987-14.787 17.08-21.808 26.988c-12.04 1.116-23.565 2.908-34.161 5.309a160.342 160.342 0 0 1-1.76-7.887Zm110.427 27.268a347.8 347.8 0 0 0-7.785-12.803c8.168 1.033 15.994 2.404 23.343 4.08c-2.206 7.072-4.956 14.465-8.193 22.045a381.151 381.151 0 0 0-7.365-13.322Zm-45.032-43.861c5.044 5.465 10.096 11.566 15.065 18.186a322.04 322.04 0 0 0-30.257-.006c4.974-6.559 10.069-12.652 15.192-18.18ZM82.802 87.83a323.167 323.167 0 0 0-7.227 13.238c-3.184-7.553-5.909-14.98-8.134-22.152c7.304-1.634 15.093-2.97 23.209-3.984a321.524 321.524 0 0 0-7.848 12.897Zm8.081 65.352c-8.385-.936-16.291-2.203-23.593-3.793c2.26-7.3 5.045-14.885 8.298-22.6a321.187 321.187 0 0 0 7.257 13.246c2.594 4.48 5.28 8.868 8.038 13.147Zm37.542 31.03c-5.184-5.592-10.354-11.779-15.403-18.433c4.902.192 9.899.29 14.978.29c5.218 0 10.376-.117 15.453-.343c-4.985 6.774-10.018 12.97-15.028 18.486Zm52.198-57.817c3.422 7.8 6.306 15.345 8.596 22.52c-7.422 1.694-15.436 3.058-23.88 4.071a382.417 382.417 0 0 0 7.859-13.026a347.403 347.403 0 0 0 7.425-13.565Zm-16.898 8.101a358.557 358.557 0 0 1-12.281 19.815a329.4 329.4 0 0 1-23.444.823c-7.967 0-15.716-.248-23.178-.732a310.202 310.202 0 0 1-12.513-19.846h.001a307.41 307.41 0 0 1-10.923-20.627a310.278 310.278 0 0 1 10.89-20.637l-.001.001a307.318 307.318 0 0 1 12.413-19.761c7.613-.576 15.42-.876 23.31-.876H128c7.926 0 15.743.303 23.354.883a329.357 329.357 0 0 1 12.335 19.695a358.489 358.489 0 0 1 11.036 20.54a329.472 329.472 0 0 1-11 20.722Zm22.56-122.124c8.572 4.944 11.906 24.881 6.52 51.026c-.344 1.668-.73 3.367-1.15 5.09c-10.622-2.452-22.155-4.275-34.23-5.408c-7.034-10.017-14.323-19.124-21.64-27.008a160.789 160.789 0 0 1 5.888-5.4c18.9-16.447 36.564-22.941 44.612-18.3ZM128 90.808c12.625 0 22.86 10.235 22.86 22.86s-10.235 22.86-22.86 22.86s-22.86-10.235-22.86-22.86s10.235-22.86 22.86-22.86Z"></path></svg>
-</file>
-
-<file path="frontend/src/components/ChatPreview.tsx">
-import React, { useState } from 'react';
-import api from '../api/axios';
-import { Send, Bot } from 'lucide-react';
-
-interface ChatPreviewProps {
-  hospitalId?: string;
-}
-
-const ChatPreview: React.FC<ChatPreviewProps> = ({ hospitalId }) => {
-  const [question, setQuestion] = useState('');
-  const [messages, setMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!question.trim()) return;
-
-    const userMessage = question;
-    setMessages((prev) => [...prev, { role: 'user', text: userMessage }]);
-    setQuestion('');
-    setLoading(true);
-
-    try {
-      // FIX: Use 'question' instead of 'message' to match ai.py
-      // FIX: Wrap hospitalId in Number() to match the 'int' type in Pydantic
-      const response = await api.post('/ai/chat', { 
-        question: userMessage, 
-        hospital_id: Number(hospitalId) 
-      });
-      
-      // Backend returns { "answer": "..." }
-      const aiResponse = response.data.answer;
-      setMessages((prev) => [...prev, { role: 'ai', text: aiResponse }]);
-    } catch (err: any) {
-      console.error("Chat Error Detail:", err.response?.data);
-      const errorMsg = err.response?.status === 401 
-        ? "Session expired. Please log in again." 
-        : "I'm having trouble connecting to my brain right now.";
-      setMessages((prev) => [...prev, { role: 'ai', text: errorMsg }]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="flex flex-col h-[500px] w-full max-w-lg border rounded-2xl bg-gray-50 shadow-inner">
-      <div className="p-4 border-b bg-white rounded-t-2xl flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Bot className="text-blue-600" />
-          <h3 className="font-bold text-gray-800">Arogya Assistant Preview</h3>
-        </div>
-        <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-mono">
-          ID: {hospitalId}
-        </span>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.length === 0 && (
-          <div className="text-center mt-10">
-            <p className="text-sm text-gray-400">Ask a question to test the AI training for this hospital.</p>
-          </div>
-        )}
-        {messages.map((msg, i) => (
-          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${
-              msg.role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white border text-gray-800 rounded-tl-none'
-            }`}>
-              {msg.text}
-            </div>
-          </div>
-        ))}
-        {loading && <div className="text-xs text-gray-400 animate-pulse">Arogya is thinking...</div>}
-      </div>
-
-      <form onSubmit={handleSendMessage} className="p-4 bg-white border-t rounded-b-2xl flex gap-2">
-        <input
-          className="flex-1 text-sm p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="Ask about doctor timings..."
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-        />
-        <button type="submit" disabled={loading} className="bg-blue-600 p-2 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
-          <Send size={18} />
-        </button>
-      </form>
-    </div>
-  );
-};
-
-export default ChatPreview;
-</file>
-
-<file path="frontend/src/components/HospitalStats.tsx">
-import { useEffect, useState } from 'react';
-import api from '../api/axios';
-import { Activity, CreditCard, TrendingUp } from 'lucide-react';
-
-export default function HospitalStats({ hospitalId }: { hospitalId: number }) {
-  const [billing, setBilling] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchBilling = async () => {
-      try {
-        const res = await api.get(`/hospitals/${hospitalId}/billing`);
-        setBilling(res.data);
-        setError(null);
-      } catch (err) {
-        console.error("Billing fetch failed", err);
-        setError("Could not load billing data.");
-      }
-    };
-    if (hospitalId) fetchBilling();
-  }, [hospitalId]);
-
-  // 1. Handle Loading State
-  if (!billing && !error) {
-    return (
-      <div className="p-8 text-center animate-pulse bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
-        <p className="text-gray-500 font-medium">Calculating real-time usage...</p>
-      </div>
-    );
-  }
-
-  // 2. Handle Error State
-  if (error) {
-    return (
-      <div className="p-4 bg-red-50 text-red-600 rounded-lg border border-red-100">
-        {error}
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-      {/* Activity Card */}
-      <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-        <div className="flex items-center gap-3 text-blue-600 mb-4">
-          <Activity size={20} />
-          <h4 className="font-semibold text-gray-700">Monthly Usage</h4>
-        </div>
-        <div className="space-y-1">
-          {/* Use Optional Chaining ?. to prevent crashes */}
-          <p className="text-2xl font-bold text-gray-900">
-            {billing?.usage?.total_chats ?? 0}
-          </p>
-          <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
-            {(billing?.usage?.tokens_consumed ?? 0).toLocaleString()} tokens used
-          </p>
-        </div>
-      </div>
-
-      {/* Internal Cost Card */}
-      <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-        <div className="flex items-center gap-3 text-orange-600 mb-4">
-          <TrendingUp size={20} />
-          <h4 className="font-semibold text-gray-700">Gothos Cost (USD)</h4>
-        </div>
-        <div className="space-y-1">
-          <p className="text-2xl font-bold text-gray-900">
-            ${billing?.usage?.raw_cost_usd ?? "0.00"}
-          </p>
-          <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
-            Total OpenAI Overhead
-          </p>
-        </div>
-      </div>
-
-      {/* The Invoice Card (INR) */}
-      <div className="bg-blue-600 p-6 rounded-xl shadow-lg text-white transform hover:scale-[1.02] transition-transform">
-        <div className="flex items-center gap-3 mb-4 opacity-90">
-          <CreditCard size={20} />
-          <h4 className="font-semibold">Current Invoice</h4>
-        </div>
-        <div className="space-y-1">
-          <p className="text-3xl font-bold">
-            ₹{(billing?.invoice?.total_due_inr ?? 0).toLocaleString()}
-          </p>
-          <p className="text-xs opacity-75 font-medium uppercase tracking-wider">
-            Platform: ₹{billing?.invoice?.platform_fee ?? 0} + Usage
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
 </file>
 
 <file path="frontend/src/components/UsageStats.tsx">
@@ -1310,117 +912,71 @@ const UsageStats = () => {
 export default UsageStats;
 </file>
 
-<file path="frontend/src/index.css">
-@import "tailwindcss";
-</file>
+<file path="frontend/src/context/AuthContext.tsx">
+import React, { createContext, useContext, useState, useCallback } from 'react';
 
-<file path="frontend/src/layouts/DashboardLayout.tsx">
-import { Outlet, Link, useNavigate, useParams } from 'react-router-dom';
-import { LayoutDashboard, Users, Building2, Settings, LogOut, BrainCircuit } from 'lucide-react';
-
-export default function DashboardLayout() {
-  const navigate = useNavigate();
-  // 1. Grab the hospitalId from the URL so the links stay dynamic
-  const { hospitalId } = useParams();
-
-  const handleSignOut = () => {
-    localStorage.removeItem('token');
-    navigate('/login');
-  };
-
-  return (
-    <div className="flex h-screen bg-gray-50">
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col shadow-sm">
-        <div className="p-6 border-b">
-          <h2 className="text-xl font-bold text-blue-600 flex items-center gap-2">
-            <Building2 className="w-6 h-6" /> Corvus Labs
-          </h2>
-        </div>
-
-        <nav className="flex-1 p-4 space-y-2">
-          {/* Main Hospital List (Reset context) */}
-          <Link to="/" className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-blue-50 rounded-lg text-sm font-medium transition-colors">
-            <LayoutDashboard className="w-5 h-5" /> Hospitals
-          </Link>
-
-          {/* 2. Dynamic Links: Only show if a Hospital is selected */}
-          {hospitalId && (
-            <>
-              <div className="mt-6 mb-2 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                Management
-              </div>
-              
-              <Link 
-                to={`/hospitals/${hospitalId}/training`} 
-                className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-blue-50 rounded-lg text-sm font-medium transition-colors"
-              >
-                <BrainCircuit className="w-5 h-5 text-blue-500" /> AI Training
-              </Link>
-
-              <Link 
-                to={`/hospitals/${hospitalId}/doctors`} 
-                className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-blue-50 rounded-lg text-sm font-medium transition-colors"
-              >
-                <Users className="w-5 h-5 text-blue-500" /> Doctors
-              </Link>
-
-              <Link 
-                to={`/hospitals/${hospitalId}/settings`} 
-                className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-blue-50 rounded-lg text-sm font-medium transition-colors"
-              >
-                <Settings className="w-5 h-5 text-blue-500" /> Settings
-              </Link>
-            </>
-          )}
-        </nav>
-
-        <div className="p-4 border-t">
-          <button onClick={handleSignOut} className="flex items-center gap-3 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium w-full transition-colors">
-            <LogOut className="w-5 h-5" /> Sign Out
-          </button>
-        </div>
-      </aside>
-
-      <main className="flex-1 overflow-auto bg-gray-50">
-        <div className="p-8">
-          <Outlet />
-        </div>
-      </main>
-    </div>
-  );
+interface AuthContextValue {
+  isAuthenticated: boolean;
+  // Call login(token) after a successful API response.
+  // Stores the token in localStorage AND updates React state
+  // in one atomic step — no reload needed.
+  login: (token: string) => void;
+  // Call logout() to clear the token and flip state.
+  // React Router navigation happens in the caller (DashboardLayout)
+  // so the context stays navigation-library-agnostic.
+  logout: () => void;
 }
-</file>
 
-<file path="frontend/src/pages/Dashboard.py">
-import React, { useEffect, useState } from 'react';
-import api from '../api/axios';
+const AuthContext = createContext<AuthContextValue | null>(null);
 
-const Dashboard = () => {
-  const [hospitalName, setHospitalName] = useState('Loading...');
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  // Initialise from localStorage so a page refresh restores the session.
+  // This is the only place we read localStorage for auth — everything else
+  // reads from this state, which eliminates the stale-read bug in App.tsx.
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(
+    () => !!localStorage.getItem('token')
+  );
 
-  useEffect(() => {
-    // Basic test to see if the "Magic Key" works
-    api.get('/hospitals/me')
-      .then(res => setHospitalName(res.data.name))
-      .catch(() => setHospitalName('Arogya Specialty Hospital'));
+  const login = useCallback((token: string) => {
+    localStorage.setItem('token', token);
+    setIsAuthenticated(true);
+  }, []);
+
+  const logout = useCallback(() => {
+    localStorage.removeItem('token');
+    setIsAuthenticated(false);
   }, []);
 
   return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold text-gray-800">Welcome to the Portal</h1>
-      <p className="mt-2 text-gray-600">Managing: {hospitalName}</p>
-      
-      <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="p-6 bg-blue-50 rounded-xl border border-blue-100">
-          <h3 className="font-bold text-blue-800">AI Status</h3>
-          <p className="text-sm text-blue-600">Arogya is online and ready.</p>
-        </div>
-      </div>
-    </div>
+    <AuthContext.Provider value={{ isAuthenticated, login, logout }}>
+      {children}
+    </AuthContext.Provider>
   );
-};
+}
 
-export default Dashboard;
+// Typed hook — throws if used outside AuthProvider so mistakes surface fast.
+export function useAuth(): AuthContextValue {
+  const ctx = useContext(AuthContext);
+  if (!ctx) {
+    throw new Error('useAuth must be used inside <AuthProvider>');
+  }
+  return ctx;
+}
+</file>
+
+<file path="frontend/src/index.css">
+@import "tailwindcss";
+
+/* Hide scrollbar cross-browser while keeping scroll functionality.
+   Used on the suggestions chip row in Chat.tsx and any other
+   horizontally scrollable container that should not show a scrollbar. */
+.no-scrollbar {
+  scrollbar-width: none;        /* Firefox */
+  -ms-overflow-style: none;     /* IE / Edge legacy */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;                /* Chrome, Safari, Opera */
+}
 </file>
 
 <file path="frontend/src/pages/Doctors.tsx">
@@ -1557,79 +1113,6 @@ const DoctorsPage = () => {
 };
 
 export default DoctorsPage;
-</file>
-
-<file path="frontend/src/pages/Login.tsx">
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import api from '../api/axios';
-
-const Login = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const navigate = useNavigate();
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    try {
-      const formData = new FormData();
-      formData.append('username', email); 
-      formData.append('password', password);
-
-      const response = await api.post('/auth/login', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-
-      // Save the token
-      localStorage.setItem('token', response.data.access_token);
-      
-      // REDIRECT FIX: Change '/dashboard' to '/' to reach the Hospital List
-      navigate('/'); 
-      
-      // Optional: Force a refresh to ensure DashboardLayout recognizes the new token
-      window.location.reload(); 
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Login failed. Check your credentials.');
-    }
-  };
-
-  return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <form onSubmit={handleLogin} className="p-8 bg-white shadow-lg rounded-xl w-96">
-        <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">Hospital Admin Portal</h2>
-        {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700">Email</label>
-          <input 
-            type="email" 
-            className="w-full p-2 border rounded mt-1 outline-none focus:ring-2 focus:ring-blue-500" 
-            value={email} 
-            onChange={(e) => setEmail(e.target.value)} 
-            required 
-          />
-        </div>
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700">Password</label>
-          <input 
-            type="password" 
-            className="w-full p-2 border rounded mt-1 outline-none focus:ring-2 focus:ring-blue-500" 
-            value={password} 
-            onChange={(e) => setPassword(e.target.value)} 
-            required 
-          />
-        </div>
-        <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">
-          Sign In
-        </button>
-      </form>
-    </div>
-  );
-};
-
-export default Login;
 </file>
 
 <file path="frontend/src/themes/arogya-specialty/index.tsx">
@@ -1999,75 +1482,88 @@ export default defineConfig({
 })
 </file>
 
-<file path="backend/app/availability.py">
+<file path="backend/app/api/deps.py">
 import os
-from datetime import datetime
-from pathlib import Path
-import gspread
-from google.oauth2.service_account import Credentials
+from typing import Generator
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from jose import jwt, JWTError
+from app.db.session import SessionLocal
 
-# -------------------------------------------------
-# CREDENTIALS PATH
-# -------------------------------------------------
-# Ensure your 'google_credentials.json' is in the backend root folder
-CREDENTIALS_PATH = Path(__file__).resolve().parent.parent / "google_credentials.json"
+# FIX #1: Load SECRET_KEY from environment, never hardcode it.
+# Set JWT_SECRET in your .env and Render environment variables.
+SECRET_KEY = os.getenv("JWT_SECRET", "dev-secret-key-change-in-production")
+ALGORITHM = "HS256"
 
-_cache = {}
-_cache_time = {}
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login")
 
-def get_sheet_client():
-    """Ported from your previous model"""
-    if not CREDENTIALS_PATH.exists():
-        raise FileNotFoundError(f"Google credentials missing at: {CREDENTIALS_PATH}")
+def get_db() -> Generator:
+    try:
+        db = SessionLocal()
+        yield db
+    finally:
+        db.close()
 
-    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-    creds = Credentials.from_service_account_file(str(CREDENTIALS_PATH), scopes=scopes)
-    return gspread.authorize(creds)
-
-def get_doctor_availability(sheet_id: str, force_refresh: bool = False):
+def get_current_tenant(token: str = Depends(oauth2_scheme)) -> int:
     """
-    MODIFIED: Now accepts a specific sheet_id for multi-tenancy.
+    The Magic Key: Extracts the hospital_id from the JWT.
+    If the token is invalid or missing the ID, it denies access.
     """
-    if not sheet_id:
-        return {}
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        hospital_id: int = payload.get("hospital_id")
+        if hospital_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication credentials: No tenant ID found",
+            )
+        return hospital_id
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+        )
+</file>
 
-    global _cache, _cache_time
-    now = datetime.now()
+<file path="backend/app/api/v1/endpoints/auth.py">
+import os
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
+from datetime import datetime, timedelta, timezone
+from jose import jwt
+from passlib.context import CryptContext
+from sqlalchemy.orm import Session
+from app.api.deps import get_db
+from app.models.user import User
 
-    # Per-hospital caching
-    last_refresh = _cache_time.get(sheet_id)
-    
-    if (force_refresh or sheet_id not in _cache or 
-        (last_refresh and (now - last_refresh).total_seconds() > 300)):
-        try:
-            client = get_sheet_client()
-            sheet = client.open_by_key(sheet_id).sheet1
-            records = sheet.get_all_records()
+# FIX #1 (continued): Load SECRET_KEY from environment.
+# Must match the value in deps.py — both read from the same env var.
+SECRET_KEY = os.getenv("JWT_SECRET", "dev-secret-key-change-in-production")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
-            doctors = {}
-            for row in records:
-                doctor_id = str(row.get("Doctor ID", "")).strip()
-                name = str(row.get("Doctor Name", "")).strip()
-                if not doctor_id or not name: continue
-                absent_dates_raw = row.get("Absent Dates (comma-separated)", "")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-                doctors[doctor_id] = {
-                    "id": doctor_id,
-                    "name": name,
-                    "department": str(row.get("Department", "")).strip(),
-                    "schedule": str(row.get("Base Schedule", "")).strip(),
-                    "absent_dates": str(absent_dates_raw).strip(),
-                }
+router = APIRouter(tags=["auth"])
 
-            _cache[sheet_id] = doctors
-            _cache_time[sheet_id] = now
-            print(f"[Availability] Loaded {len(doctors)} doctors for Sheet: {sheet_id}")
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-        except Exception as e:
-            print(f"[Availability] Fetch failed: {repr(e)}")
-            return _cache.get(sheet_id, {})
+@router.post("/login")
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == form_data.username).first()
 
-    return _cache.get(sheet_id, {})
+    if not user or not pwd_context.verify(form_data.password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Incorrect email or password")
+
+    # hospital_id is safely encoded inside the token
+    access_token = create_access_token(
+        data={"sub": user.email, "hospital_id": user.hospital_id}
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
 </file>
 
 <file path="backend/app/crud/crud_hospital.py">
@@ -2093,6 +1589,40 @@ def create_hospital(db: Session, hospital: HospitalCreate):
         # Ensure your HospitalCreate schema includes these, or add defaults here
         system_prompt=getattr(hospital, 'system_prompt', "You are Arogya..."),
         google_sheet_id=getattr(hospital, 'google_sheet_id', None)
+    )
+    db.add(db_obj)
+    db.commit()
+    db.refresh(db_obj)
+    return db_obj
+</file>
+
+<file path="backend/app/crud/crud_user.py">
+from sqlalchemy.orm import Session
+from passlib.context import CryptContext
+from app.models.user import User
+from app.schemas.user import UserCreate
+
+# FIX #2: Use a real password hashing context, same as auth.py.
+# The old code used `user.password + "notreallyhashed"` — plaintext storage.
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def get_user(db: Session, user_id: int):
+    return db.query(User).filter(User.id == user_id).first()
+
+def get_user_by_email(db: Session, email: str):
+    return db.query(User).filter(User.email == email).first()
+
+def create_user(db: Session, user: UserCreate):
+    # FIX #2: Hash the password properly with bcrypt.
+    hashed_password = pwd_context.hash(user.password)
+
+    db_obj = User(
+        email=user.email,
+        hashed_password=hashed_password,
+        full_name=user.full_name,
+        hospital_id=user.hospital_id,
+        is_superuser=user.is_superuser,
+        is_active=user.is_active,
     )
     db.add(db_obj)
     db.commit()
@@ -2215,6 +1745,321 @@ if __name__ == "__main__":
     "vite": "^7.3.1"
   }
 }
+</file>
+
+<file path="frontend/src/App.tsx">
+import { Routes, Route, Navigate, Link } from 'react-router-dom';
+import DashboardLayout from './layouts/DashboardLayout';
+import CreateHospitalModal from './components/CreateHospitalModal';
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import DoctorsPage from './pages/Doctors';
+import SettingsPage from './pages/Settings';
+import ThemeLoader from './themes/ThemeLoader';
+import api from './api/axios';
+import { useEffect, useState } from 'react';
+import { Plus } from 'lucide-react';
+import { useAuth } from './context/AuthContext';
+
+function HospitalList() {
+  const [hospitals, setHospitals] = useState<any[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const fetchHospitals = () => {
+    api.get('/hospitals/')
+      .then(res => setHospitals(res.data))
+      .catch(console.error);
+  };
+
+  useEffect(() => { fetchHospitals(); }, []);
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-gray-900">Hospital Management</h2>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          <Plus className="w-4 h-4" /> Add Hospital
+        </button>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-3">
+        {hospitals.map((h: any) => (
+          <div key={h.id} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+            <h3 className="font-bold text-gray-900 text-lg">{h.name}</h3>
+            <p className="text-xs text-gray-400 mb-4">Slug: {h.slug}</p>
+
+            <div className="flex gap-2 border-t pt-4">
+              <Link
+                to={`/hospitals/${h.id}/training`}
+                className="flex-1 text-center text-xs bg-blue-600 text-white py-2 rounded-md font-medium hover:bg-blue-700"
+              >
+                Train AI
+              </Link>
+              <Link
+                to={`/hospitals/${h.id}/settings`}
+                className="flex-1 text-center text-xs border border-gray-300 text-gray-600 py-2 rounded-md font-medium hover:bg-gray-50"
+              >
+                Settings
+              </Link>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <CreateHospitalModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={fetchHospitals}
+      />
+    </div>
+  );
+}
+
+export default function App() {
+  // FIX: Read from AuthContext (useState) instead of localStorage directly.
+  // The old code was: const isAuthenticated = !!localStorage.getItem('token')
+  // That's a plain const evaluated once at render time and never updated,
+  // so after login() set the token, App still saw isAuthenticated=false
+  // until a full page reload forced a re-evaluation. Using the context
+  // state means any call to login() or logout() triggers a re-render here
+  // automatically, with no reload required.
+  const { isAuthenticated } = useAuth();
+
+  return (
+    <Routes>
+      {/* Public patient-facing route */}
+      <Route path="/p/:hospitalSlug" element={<ThemeLoader />} />
+
+      {/* Auth route — redirect to / if already logged in */}
+      <Route
+        path="/login"
+        element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
+      />
+
+      {/* Protected admin routes */}
+      <Route element={isAuthenticated ? <DashboardLayout /> : <Navigate to="/login" replace />}>
+        <Route path="/" element={<HospitalList />} />
+        <Route path="/hospitals/:hospitalId/doctors" element={<DoctorsPage />} />
+        <Route path="/hospitals/:hospitalId/training" element={<Dashboard />} />
+        <Route path="/hospitals/:hospitalId/settings" element={<SettingsPage />} />
+      </Route>
+
+      {/* Catch-all */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+</file>
+
+<file path="frontend/src/components/ChatPreview.tsx">
+import React, { useState, useRef, useEffect } from 'react';
+import { Send, Bot } from 'lucide-react';
+
+interface ChatPreviewProps {
+  hospitalId?: string;
+}
+
+interface Message {
+  role: 'user' | 'ai';
+  text: string;
+  isStreaming?: boolean;
+}
+
+function buildHistory(messages: Message[]): { role: string; content: string }[] {
+  return messages
+    .filter(m => !m.isStreaming)
+    .map(m => ({
+      role: m.role === 'ai' ? 'assistant' : 'user',
+      content: m.text,
+    }));
+}
+
+function getBaseURL(): string {
+  return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:8000/api/v1'
+    : 'https://hospital-ai-platform.onrender.com/api/v1';
+}
+
+const ChatPreview: React.FC<ChatPreviewProps> = ({ hospitalId }) => {
+  const [question, setQuestion] = useState('');
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!question.trim() || isStreaming) return;
+
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+
+    const userMessage = question;
+    const historySnapshot = buildHistory(messages);
+
+    setMessages(prev => [...prev, { role: 'user', text: userMessage }]);
+    setMessages(prev => [...prev, { role: 'ai', text: '', isStreaming: true }]);
+    setQuestion('');
+    setIsStreaming(true);
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${getBaseURL()}/ai/chat-stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          question: userMessage,
+          hospital_id: Number(hospitalId),
+          history: historySnapshot,
+        }),
+        signal: abortRef.current.signal,
+      });
+
+      if (!response.ok || !response.body) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const frames = buffer.split('\n\n');
+        buffer = frames.pop() ?? '';
+
+        for (const frame of frames) {
+          if (!frame.startsWith('data: ')) continue;
+          const payload = frame.slice(6);
+
+          if (payload === '[DONE]') {
+            setMessages(prev =>
+              prev.map((m, i) =>
+                i === prev.length - 1 ? { ...m, isStreaming: false } : m
+              )
+            );
+            break;
+          }
+
+          if (payload.startsWith('[ERROR]')) {
+            setMessages(prev =>
+              prev.map((m, i) =>
+                i === prev.length - 1
+                  ? { ...m, text: "I'm having trouble right now. Please try again.", isStreaming: false }
+                  : m
+              )
+            );
+            break;
+          }
+
+          try {
+            const tokenText = JSON.parse(payload);
+            setMessages(prev =>
+              prev.map((m, i) =>
+                i === prev.length - 1 ? { ...m, text: m.text + tokenText } : m
+              )
+            );
+          } catch {
+            // skip malformed token
+          }
+        }
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return;
+
+      const errorMsg = (err instanceof Error && err.message.includes('401'))
+        ? "Session expired. Please log in again."
+        : "I'm having trouble connecting to my brain right now.";
+
+      setMessages(prev =>
+        prev.map((m, i) =>
+          i === prev.length - 1 ? { ...m, text: errorMsg, isStreaming: false } : m
+        )
+      );
+    } finally {
+      setIsStreaming(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-[500px] w-full max-w-lg border rounded-2xl bg-gray-50 shadow-inner">
+      <div className="p-4 border-b bg-white rounded-t-2xl flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Bot className="text-blue-600" />
+          <h3 className="font-bold text-gray-800">Arogya Assistant Preview</h3>
+        </div>
+        <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-mono">
+          ID: {hospitalId}
+        </span>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.length === 0 && (
+          <div className="text-center mt-10">
+            <p className="text-sm text-gray-400">Ask a question to test the AI training for this hospital.</p>
+          </div>
+        )}
+        {messages.map((msg, i) => (
+          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${
+              msg.role === 'user'
+                ? 'bg-blue-600 text-white rounded-tr-none'
+                : 'bg-white border text-gray-800 rounded-tl-none'
+            }`}>
+              {msg.text}
+              {msg.isStreaming && (
+                <span style={{
+                  display: 'inline-block',
+                  width: '2px',
+                  height: '12px',
+                  backgroundColor: '#2563eb',
+                  marginLeft: '2px',
+                  verticalAlign: 'middle',
+                  animation: 'blink 1s step-start infinite',
+                }} />
+              )}
+            </div>
+          </div>
+        ))}
+        <div ref={scrollRef} />
+      </div>
+
+      <style>{`@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }`}</style>
+
+      <form onSubmit={handleSendMessage} className="p-4 bg-white border-t rounded-b-2xl flex gap-2">
+        <input
+          className="flex-1 text-sm p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
+          placeholder="Ask about doctor timings..."
+          value={question}
+          disabled={isStreaming}
+          onChange={e => setQuestion(e.target.value)}
+        />
+        <button
+          type="submit"
+          disabled={isStreaming}
+          className="bg-blue-600 p-2 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+        >
+          <Send size={18} />
+        </button>
+      </form>
+    </div>
+  );
+};
+
+export default ChatPreview;
 </file>
 
 <file path="frontend/src/components/CreateHospitalModal.tsx">
@@ -2352,141 +2197,298 @@ export default function CreateHospitalModal({ isOpen, onClose, onSuccess }: Prop
 }
 </file>
 
-<file path="frontend/src/main.tsx">
-import 'regenerator-runtime/runtime'; 
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import { BrowserRouter } from 'react-router-dom'
-import App from './App.tsx'
-import './index.css'
+<file path="frontend/src/components/HospitalStats.tsx">
+import { useEffect, useState } from 'react';
+import api from '../api/axios';
+import { Activity, CreditCard, TrendingUp } from 'lucide-react';
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
-  </React.StrictMode>,
-)
+export default function HospitalStats({ hospitalId }: { hospitalId: number }) {
+  const [billing, setBilling] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchBilling = async () => {
+      try {
+        const res = await api.get(`/hospitals/${hospitalId}/billing`);
+        setBilling(res.data);
+        setError(null);
+      } catch (err) {
+        console.error("Billing fetch failed", err);
+        setError("Could not load billing data.");
+      }
+    };
+    if (hospitalId) fetchBilling();
+  }, [hospitalId]);
+
+  if (!billing && !error) {
+    return (
+      <div className="p-8 text-center animate-pulse bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+        <p className="text-gray-500 font-medium">Calculating real-time usage...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 bg-red-50 text-red-600 rounded-lg border border-red-100">
+        {error}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      {/* Activity Card */}
+      <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+        <div className="flex items-center gap-3 text-blue-600 mb-4">
+          <Activity size={20} />
+          <h4 className="font-semibold text-gray-700">Monthly Usage</h4>
+        </div>
+        <div className="space-y-1">
+          <p className="text-2xl font-bold text-gray-900">
+            {billing?.usage?.total_chats ?? 0}
+          </p>
+          <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
+            {(billing?.usage?.tokens_consumed ?? 0).toLocaleString()} tokens used
+          </p>
+        </div>
+      </div>
+
+      {/* Internal Cost Card */}
+      <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+        <div className="flex items-center gap-3 text-orange-600 mb-4">
+          <TrendingUp size={20} />
+          <h4 className="font-semibold text-gray-700">Gothos Cost (USD)</h4>
+        </div>
+        <div className="space-y-1">
+          <p className="text-2xl font-bold text-gray-900">
+            ${billing?.usage?.raw_cost_usd ?? "0.00"}
+          </p>
+          <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
+            Total OpenAI Overhead
+          </p>
+        </div>
+      </div>
+
+      {/* Invoice Card (INR) */}
+      {/* FIX #5: Was reading billing?.invoice?.total_due_inr but the old backend
+          returned estimated_invoice_inr at the top level. Backend is now fixed to
+          return { invoice: { total_due_inr, platform_fee } } so this path is correct. */}
+      <div className="bg-blue-600 p-6 rounded-xl shadow-lg text-white transform hover:scale-[1.02] transition-transform">
+        <div className="flex items-center gap-3 mb-4 opacity-90">
+          <CreditCard size={20} />
+          <h4 className="font-semibold">Current Invoice</h4>
+        </div>
+        <div className="space-y-1">
+          <p className="text-3xl font-bold">
+            ₹{(billing?.invoice?.total_due_inr ?? 0).toLocaleString()}
+          </p>
+          <p className="text-xs opacity-75 font-medium uppercase tracking-wider">
+            Platform: ₹{billing?.invoice?.platform_fee ?? 0} + Usage
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 </file>
 
-<file path="frontend/src/pages/KnowledgeBase.tsx">
-import React, { useState } from 'react';
-import api from '../api/axios';
-import { FileText, Send, Upload } from 'lucide-react';
+<file path="frontend/src/layouts/DashboardLayout.tsx">
+import { Outlet, Link, useNavigate, useParams, useLocation } from 'react-router-dom';
+import { LayoutDashboard, Users, Building2, Settings, LogOut, BrainCircuit } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
-// Added hospitalId prop to the component definition
-const KnowledgeBaseUpload = ({ hospitalId }: { hospitalId: string | undefined }) => {
-  const [text, setText] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [uploadType, setUploadType] = useState<'text' | 'pdf'>('text');
+export default function DashboardLayout() {
+  const navigate = useNavigate();
+  const { hospitalId } = useParams();
+  const location = useLocation();
+  const { logout } = useAuth();
 
-  const handleTextUpload = async () => {
-    if (!hospitalId) return alert("No hospital selected");
-    setLoading(true);
-    try {
-      // Include hospital_id in the payload
-      await api.post('/ai/ingest', { 
-        text: text,
-        hospital_id: hospitalId 
-      });
-      alert("Arogya has learned this information!");
-      setText('');
-    } catch (err) {
-      alert("Failed to upload knowledge.");
-    } finally {
-      setLoading(false);
-    }
+  const handleSignOut = () => {
+    // FIX: Call context.logout() instead of localStorage.removeItem() directly.
+    // logout() clears localStorage AND sets isAuthenticated=false in context,
+    // which causes App.tsx to immediately swap DashboardLayout for
+    // <Navigate to="/login"> — clean SPA transition, no hard redirect.
+    logout();
+    navigate('/login');
   };
 
-  const handlePdfUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !hospitalId) return;
+  // Active link helper — highlights the current route in the sidebar.
+  // Previously all links had the same static style regardless of the current page.
+  const isActive = (path: string) => location.pathname === path;
+  const linkBase = 'flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors';
+  const linkActive = 'bg-blue-50 text-blue-600';
+  const linkIdle = 'text-gray-700 hover:bg-blue-50';
 
+  return (
+    <div className="flex h-screen bg-gray-50">
+      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col shadow-sm">
+        <div className="p-6 border-b">
+          <h2 className="text-xl font-bold text-blue-600 flex items-center gap-2">
+            <Building2 className="w-6 h-6" /> Corvus Labs
+          </h2>
+        </div>
+
+        <nav className="flex-1 p-4 space-y-2">
+          <Link
+            to="/"
+            className={`${linkBase} ${isActive('/') ? linkActive : linkIdle}`}
+          >
+            <LayoutDashboard className="w-5 h-5" /> Hospitals
+          </Link>
+
+          {hospitalId && (
+            <>
+              <div className="mt-6 mb-2 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                Management
+              </div>
+
+              <Link
+                to={`/hospitals/${hospitalId}/training`}
+                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/training`) ? linkActive : linkIdle}`}
+              >
+                <BrainCircuit className="w-5 h-5 text-blue-500" /> AI Training
+              </Link>
+
+              <Link
+                to={`/hospitals/${hospitalId}/doctors`}
+                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/doctors`) ? linkActive : linkIdle}`}
+              >
+                <Users className="w-5 h-5 text-blue-500" /> Doctors
+              </Link>
+
+              <Link
+                to={`/hospitals/${hospitalId}/settings`}
+                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/settings`) ? linkActive : linkIdle}`}
+              >
+                <Settings className="w-5 h-5 text-blue-500" /> Settings
+              </Link>
+            </>
+          )}
+        </nav>
+
+        <div className="p-4 border-t">
+          <button
+            onClick={handleSignOut}
+            className="flex items-center gap-3 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium w-full transition-colors"
+          >
+            <LogOut className="w-5 h-5" /> Sign Out
+          </button>
+        </div>
+      </aside>
+
+      <main className="flex-1 overflow-auto bg-gray-50">
+        <div className="p-8">
+          <Outlet />
+        </div>
+      </main>
+    </div>
+  );
+}
+</file>
+
+<file path="frontend/src/pages/Login.tsx">
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import api from '../api/axios';
+import { useAuth } from '../context/AuthContext';
+
+const Login = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const { login } = useAuth();
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
     setLoading(true);
-    const formData = new FormData();
-    formData.append('file', file);
-    // Explicitly append hospital_id to formData for the multi-part request
-    formData.append('hospital_id', hospitalId);
 
     try {
-      await api.post('/ai/upload-pdf', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      const formData = new FormData();
+      formData.append('username', email);
+      formData.append('password', password);
+
+      const response = await api.post('/auth/login', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
-      alert(`${file.name} has been processed and added to Arogya's brain!`);
-    } catch (err) {
-      alert("Failed to process PDF.");
+
+      // FIX: Call context.login() instead of localStorage.setItem() directly.
+      // login() does two things atomically:
+      //   1. Writes the token to localStorage (so page refreshes restore session)
+      //   2. Sets isAuthenticated = true in AuthContext state
+      // Step 2 causes App.tsx to re-render immediately, which switches the
+      // protected route from <Navigate to="/login"> to <DashboardLayout>,
+      // so navigate('/') lands on the hospital list correctly.
+      //
+      // REMOVED: window.location.reload()
+      // That was the workaround for the stale isAuthenticated const in App.tsx.
+      // With context-driven state it is not needed and was causing a white-flash
+      // on every login because the reload fired before React Router finished
+      // its own navigation.
+      login(response.data.access_token);
+      navigate('/');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Login failed. Check your credentials.');
     } finally {
       setLoading(false);
-      event.target.value = ''; 
     }
   };
 
   return (
-    <div className="max-w-4xl bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-      <div className="flex border-b border-gray-100">
-        <button 
-          onClick={() => setUploadType('text')}
-          className={`flex-1 p-4 text-sm font-medium flex items-center justify-center gap-2 ${uploadType === 'text' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-gray-500 hover:bg-gray-50'}`}
-        >
-          <Send className="w-4 h-4" /> Manual Text
-        </button>
-        <button 
-          onClick={() => setUploadType('pdf')}
-          className={`flex-1 p-4 text-sm font-medium flex items-center justify-center gap-2 ${uploadType === 'pdf' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-gray-500 hover:bg-gray-50'}`}
-        >
-          <FileText className="w-4 h-4" /> Upload PDF
-        </button>
-      </div>
+    <div className="flex items-center justify-center min-h-screen bg-gray-100">
+      <form onSubmit={handleLogin} className="p-8 bg-white shadow-lg rounded-xl w-96">
+        <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">
+          Hospital Admin Portal
+        </h2>
 
-      <div className="p-8">
-        {uploadType === 'text' && (
-          <div className="space-y-4">
-            <h3 className="text-lg font-bold text-gray-800">Train with Text</h3>
-            <p className="text-sm text-gray-500">Paste FAQs or rules for this specific hospital.</p>
-            <textarea 
-              className="w-full h-48 p-4 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm leading-relaxed"
-              placeholder="Enter knowledge here..."
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-            />
-            <button 
-              onClick={handleTextUpload}
-              disabled={loading || !text}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 font-semibold transition-colors flex items-center justify-center gap-2"
-            >
-              {loading ? 'Processing...' : 'Sync to AI Brain'}
-            </button>
-          </div>
+        {error && (
+          <p className="text-red-500 text-sm mb-4 p-3 bg-red-50 rounded-lg border border-red-100">
+            {error}
+          </p>
         )}
 
-        {uploadType === 'pdf' && (
-          <div className="py-12 text-center border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Upload className="w-8 h-8 text-blue-600" />
-            </div>
-            <h3 className="text-lg font-bold text-gray-800">Drop Hospital PDF here</h3>
-            <input 
-              type="file" 
-              accept=".pdf" 
-              onChange={handlePdfUpload} 
-              id="pdf-input" 
-              className="hidden" 
-              disabled={loading}
-            />
-            <label 
-              htmlFor="pdf-input"
-              className={`cursor-pointer px-8 py-3 bg-white border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 font-medium transition-all ${loading ? 'opacity-50 pointer-events-none' : ''}`}
-            >
-              {loading ? 'Reading Document...' : 'Select File'}
-            </label>
-          </div>
-        )}
-      </div>
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700">Email</label>
+          <input
+            type="email"
+            className="w-full p-2 border rounded mt-1 outline-none focus:ring-2 focus:ring-blue-500"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            required
+            disabled={loading}
+            autoComplete="email"
+          />
+        </div>
+
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700">Password</label>
+          <input
+            type="password"
+            className="w-full p-2 border rounded mt-1 outline-none focus:ring-2 focus:ring-blue-500"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            required
+            disabled={loading}
+            autoComplete="current-password"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {loading ? 'Signing in...' : 'Sign In'}
+        </button>
+      </form>
     </div>
   );
 };
 
-export default KnowledgeBaseUpload;
+export default Login;
 </file>
 
 <file path="frontend/src/pages/Settings.tsx">
@@ -2583,288 +2585,194 @@ const Settings = () => {
 export default Settings;
 </file>
 
-<file path="frontend/src/themes/arogya-specialty/ChatMessage.tsx">
-import React from 'react';
-import ReactMarkdown from 'react-markdown'; // Run: npm install react-markdown
+<file path="backend/app/availability.py">
+import logging
+from datetime import datetime
+from pathlib import Path
 
-interface ChatMessageProps {
-  role: 'user' | 'assistant';
-  content: string;
-}
+import gspread
+from google.oauth2.service_account import Credentials
 
-const ChatMessage: React.FC<ChatMessageProps> = ({ role, content }) => {
-  const isUser = role === 'user';
+logger = logging.getLogger(__name__)
 
-  return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
-      {/* Avatar Icons make it feel more "human" */}
-      {!isUser && (
-        <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mr-2 text-xs font-bold border border-emerald-200">
-          A
-        </div>
-      )}
+CREDENTIALS_PATH = Path(__file__).resolve().parent.parent / "google_credentials.json"
 
-      <div className={`max-w-[85%] p-4 rounded-2xl shadow-sm text-sm leading-relaxed ${
-        isUser 
-          ? 'bg-emerald-600 text-white rounded-tr-none' 
-          : 'bg-white border border-gray-100 text-gray-800 rounded-tl-none'
-      }`}>
-        {/* We use ReactMarkdown so bold text and lists actually show up */}
-        <div className="prose prose-sm max-w-none prose-emerald">
-           <ReactMarkdown>{content}</ReactMarkdown>
-        </div>
-      </div>
+_cache: dict = {}
+_cache_time: dict = {}
 
-      {isUser && (
-        <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center ml-2 text-xs font-bold border border-gray-300">
-          U
-        </div>
-      )}
-    </div>
-  );
-};
+# Cache TTL in seconds — 5 minutes is a good balance between freshness
+# and not hammering the Sheets API on every chat message.
+CACHE_TTL_SECONDS = 300
 
-export default ChatMessage;
-</file>
 
-<file path="backend/app/api/v1/endpoints/hospitals.py">
-import csv
-import io
-import uuid
-from sqlalchemy import func
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File
-from sqlalchemy.orm import Session
-from datetime import datetime # Add this at the top
-from app import crud, schemas
-from app.api.deps import get_db, get_current_tenant
-from app.models.hospital import Hospital
-from app.models.doctor import Doctor
-from app.availability import get_sheet_client # Ensure this is configured
-from app.models.usage import UsageLedger
-router = APIRouter()
+class AvailabilityError(Exception):
+    """
+    Raised when the Google Sheets availability fetch fails for any reason:
+    missing credentials, network error, quota exceeded, invalid sheet ID,
+    or permission denied.
 
-# -------------------------------------------------
-# 1. SUPER ADMIN ENDPOINTS
-# -------------------------------------------------
+    Callers (ai.py) catch this specifically to distinguish a real failure
+    from an intentionally empty sheet, and to set a safe, directive
+    fallback message in the system prompt rather than a vague string
+    the LLM might ignore.
+    """
+    pass
 
-@router.post("/", response_model=schemas.hospital.Hospital)
-def create_hospital(
-    *,
-    db: Session = Depends(get_db),
-    hospital_in: schemas.hospital.HospitalCreate,
-):
-    """Create a new hospital tenant."""
-    hospital = crud.crud_hospital.get_hospital_by_slug(db, slug=hospital_in.slug)
-    if hospital:
-        raise HTTPException(
-            status_code=400,
-            detail="The hospital with this slug already exists in the system.",
+
+def get_sheet_client() -> gspread.Client:
+    """
+    Authenticate and return a gspread client using the service account
+    credentials file.
+
+    Raises AvailabilityError if the credentials file is missing or
+    authentication fails, so the caller gets a typed exception rather
+    than a raw FileNotFoundError or google.auth exception.
+    """
+    if not CREDENTIALS_PATH.exists():
+        raise AvailabilityError(
+            f"Google credentials file not found at {CREDENTIALS_PATH}. "
+            "Download your service account key from Google Cloud Console "
+            "and place it at backend/google_credentials.json."
         )
-    return crud.crud_hospital.create_hospital(db=db, hospital=hospital_in)
 
-@router.get("/", response_model=List[schemas.hospital.Hospital])
-def read_hospitals(
-    db: Session = Depends(get_db),
-    skip: int = 0,
-    limit: int = 100,
-):
-    """List all registered hospitals."""
-    return crud.crud_hospital.get_hospitals(db, skip=skip, limit=limit)
-
-
-# -------------------------------------------------
-# 2. HOSPITAL MANAGEMENT (BY ID)
-# -------------------------------------------------
-
-@router.get("/{hospital_id}", response_model=schemas.hospital.Hospital)
-def get_hospital_by_id(
-    hospital_id: int, 
-    db: Session = Depends(get_db)
-):
-    """Fetch specific hospital info."""
-    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
-    if not hospital:
-        raise HTTPException(status_code=404, detail="Hospital not found")
-    return hospital
-
-@router.patch("/{hospital_id}")
-def update_specific_hospital(
-    hospital_id: int,
-    payload: dict = Body(...),
-    db: Session = Depends(get_db)
-):
-    """Update settings for a specific hospital."""
-    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
-    if not hospital:
-        raise HTTPException(status_code=404, detail="Hospital not found")
-    
-    # Update fields dynamically
-    for key, value in payload.items():
-        if hasattr(hospital, key):
-            setattr(hospital, key, value)
-    
-    db.commit()
-    db.refresh(hospital)
-    return {"status": "success", "message": f"Settings for {hospital.name} updated."}
+    try:
+        scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+        creds = Credentials.from_service_account_file(
+            str(CREDENTIALS_PATH), scopes=scopes
+        )
+        return gspread.authorize(creds)
+    except Exception as e:
+        raise AvailabilityError(
+            f"Failed to authenticate with Google Sheets API: {e}"
+        ) from e
 
 
-# -------------------------------------------------
-# 3. DOCTOR MANAGEMENT (MULTI-TENANT)
-# -------------------------------------------------
+def get_doctor_availability(
+    sheet_id: str,
+    force_refresh: bool = False
+) -> dict:
+    """
+    Fetch doctor availability data from a Google Sheet, with in-process
+    per-hospital caching (TTL: CACHE_TTL_SECONDS).
 
-@router.get("/{hospital_id}/doctors")
-def get_hospital_doctors(
-    hospital_id: int, 
-    db: Session = Depends(get_db)
-):
-    """Fetch the staff directory for a specific hospital."""
-    return db.query(Doctor).filter(Doctor.hospital_id == hospital_id).all()
+    Returns a dict keyed by doctor_id:
+        {
+            "H1-D-A1B2": {
+                "id": "H1-D-A1B2",
+                "name": "Dr. Rajesh Kumar",
+                "department": "Cardiology",
+                "schedule": "Mon-Fri 9am-1pm",
+                "absent_dates": "22-03-2026,23-03-2026",
+            },
+            ...
+        }
 
-@router.post("/{hospital_id}/doctors")
-def add_doctor(
-    hospital_id: int,
-    payload: dict = Body(...),
-    db: Session = Depends(get_db)
-):
-    """Add a single doctor manually."""
-    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
-    if not hospital:
-        raise HTTPException(status_code=404, detail="Hospital not found")
+    Returns {} if sheet_id is falsy (no sheet configured for this hospital).
 
-    new_doc = Doctor(
-        name=payload["name"],
-        doctor_id=payload["doctor_id"],
-        specialty=payload.get("specialty", "General Physician"),
-        hospital_id=hospital_id
+    Raises AvailabilityError if the fetch fails for any reason so callers
+    can provide a safe, explicit fallback rather than silently getting
+    stale or empty data.
+
+    Cache behaviour:
+        - On a successful fetch, the result is cached and the timestamp updated.
+        - On a failed fetch, the exception is raised immediately — we do NOT
+          silently return stale cache. The caller decides whether to use stale
+          data or show a safe fallback message. Serving stale data for
+          availability is safer than hallucinating, but the caller should know
+          it's stale.
+    """
+    if not sheet_id:
+        return {}
+
+    now = datetime.now()
+    last_refresh = _cache_time.get(sheet_id)
+    cache_is_fresh = (
+        sheet_id in _cache
+        and last_refresh is not None
+        and (now - last_refresh).total_seconds() < CACHE_TTL_SECONDS
     )
-    db.add(new_doc)
-    db.commit()
-    db.refresh(new_doc)
-    return new_doc
 
-
-# -------------------------------------------------
-# 4. BULK UPLOAD & GOOGLE SHEET SYNC
-# -------------------------------------------------
-
-@router.post("/{hospital_id}/doctors/bulk-upload")
-async def bulk_upload_and_sync(
-    hospital_id: int,
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db)
-):
-    # 1. Verify Hospital and Sheet
-    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
-    if not hospital or not hospital.google_sheet_id:
-        raise HTTPException(status_code=400, detail="Google Sheet ID not configured")
-
-    # 2. Read and Parse CSV safely
-    content = await file.read()
-    stream = io.StringIO(content.decode("utf-8"))
-    reader = csv.DictReader(stream) # Automatically uses the first row as headers
-    
-    sheet_rows = []
-    for row in reader:
-        # Normalize keys to handle case sensitivity and spaces
-        normalized_row = {k.strip().lower(): v for k, v in row.items()}
-        
-        auto_id = f"H{hospital_id}-D-{uuid.uuid4().hex[:4].upper()}"
-        
-        # Robust mapping: checks for 'doctor name' or just 'name'
-        name = normalized_row.get('doctor name') or normalized_row.get('name') or 'Unknown'
-        dept = normalized_row.get('department') or 'General'
-        schedule = normalized_row.get('base schedule') or normalized_row.get('schedule') or 'Not Specified'
-
-        doctor = Doctor(
-            doctor_id=auto_id,
-            name=name,
-            department=dept,
-            base_schedule=schedule,
-            hospital_id=hospital_id
+    if not force_refresh and cache_is_fresh:
+        logger.debug(
+            "[Availability] Cache hit for sheet_id=%s (%d doctors)",
+            sheet_id, len(_cache[sheet_id])
         )
-        db.add(doctor) # You were missing this db.add() in the code snippet!
-        
-        # Prepare for Google Sheet (ID, Name, Dept, Schedule, Absent, Available)
-        sheet_rows.append([auto_id, name, dept, schedule, "", "Yes"])
+        return _cache[sheet_id]
 
-    # 3. Sync to Google Sheets
+    # Cache is stale or missing — attempt a live fetch
+    logger.info("[Availability] Fetching sheet_id=%s from Google Sheets API", sheet_id)
+
     try:
         client = get_sheet_client()
-        sheet = client.open_by_key(hospital.google_sheet_id).sheet1
-        sheet.append_rows(sheet_rows)
-        db.commit()
-        return {"message": f"Successfully imported {len(sheet_rows)} doctors."}
+        sheet = client.open_by_key(sheet_id).sheet1
+        records = sheet.get_all_records()
+    except AvailabilityError:
+        # Re-raise typed errors from get_sheet_client() as-is
+        raise
+    except gspread.exceptions.SpreadsheetNotFound:
+        raise AvailabilityError(
+            f"Google Sheet not found (sheet_id={sheet_id}). "
+            "Check the Sheet ID in Settings and ensure the service account "
+            "has been granted Viewer access to this sheet."
+        )
+    except gspread.exceptions.APIError as e:
+        status = getattr(e.response, 'status_code', 'unknown')
+        raise AvailabilityError(
+            f"Google Sheets API error (HTTP {status}) for sheet_id={sheet_id}: {e}"
+        ) from e
     except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Google Sheet Sync Failed: {str(e)}")
+        raise AvailabilityError(
+            f"Unexpected error fetching sheet_id={sheet_id}: {type(e).__name__}: {e}"
+        ) from e
+
+    # Parse the sheet records into our internal format
+    doctors: dict = {}
+    skipped = 0
+
+    for row in records:
+        doctor_id = str(row.get("Doctor ID", "")).strip()
+        name = str(row.get("Doctor Name", "")).strip()
+
+        if not doctor_id or not name:
+            skipped += 1
+            continue
+
+        doctors[doctor_id] = {
+            "id": doctor_id,
+            "name": name,
+            "department": str(row.get("Department", "")).strip(),
+            "schedule": str(row.get("Base Schedule", "")).strip(),
+            "absent_dates": str(row.get("Absent Dates (comma-separated)", "")).strip(),
+        }
+
+    if skipped:
+        logger.warning(
+            "[Availability] Skipped %d rows with missing Doctor ID or Name "
+            "in sheet_id=%s",
+            skipped, sheet_id
+        )
+
+    # Update cache only after a successful parse
+    _cache[sheet_id] = doctors
+    _cache_time[sheet_id] = now
+
+    logger.info(
+        "[Availability] Loaded %d doctors from sheet_id=%s",
+        len(doctors), sheet_id
+    )
+
+    return doctors
 
 
-# -------------------------------------------------
-# 5. AUTH-BASED HELPERS (TENANT ADMIN)
-# -------------------------------------------------
+def get_cached_or_empty(sheet_id: str) -> dict:
+    """
+    Returns the last known good cache for this sheet_id, or {} if no
+    cache exists. Used by callers that want to gracefully degrade to
+    stale data rather than showing an error message to the patient.
 
-@router.get("/me", response_model=schemas.hospital.Hospital)
-def get_my_hospital(
-    db: Session = Depends(get_db), 
-    hospital_id: int = Depends(get_current_tenant)
-):
-    """Get hospital info based on the admin's login token."""
-    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
-    if not hospital:
-        raise HTTPException(status_code=404, detail="Hospital not found")
-    return hospital
-
-@router.patch("/me")
-def update_hospital_settings(
-    payload: dict = Body(...),
-    db: Session = Depends(get_db),
-    hospital_id: int = Depends(get_current_tenant)
-):
-    """Update settings for the logged-in admin's hospital."""
-    return update_specific_hospital(hospital_id=hospital_id, payload=payload, db=db)
-
-@router.get("/slug/{slug}")
-def get_hospital_by_slug(slug: str, db: Session = Depends(get_db)):
-    hospital = db.query(Hospital).filter(Hospital.slug == slug).first()
-    if not hospital:
-        raise HTTPException(status_code=404, detail="Hospital not found")
-    # Return everything the patient site needs
-    return {
-        "id": hospital.id, 
-        "name": hospital.name, 
-        "google_sheet_id": hospital.google_sheet_id
-    }
-
-
-@router.get("/{hospital_id}/billing")
-async def get_hospital_billing(hospital_id: int, db: Session = Depends(get_db)):
-    # Calculate start of current month
-    first_day = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    
-    stats = db.query(
-        func.sum(UsageLedger.total_tokens).label("tokens"),
-        func.sum(UsageLedger.estimated_cost).label("cost"),
-        func.count(UsageLedger.id).label("total_chats")
-    ).filter(
-        UsageLedger.hospital_id == hospital_id,
-        UsageLedger.created_at >= first_day
-    ).first()
-
-    # Calculation logic for your markup
-    raw_cost = stats.cost or 0.0
-    margin_multiplier = 5.0  # 500% markup (standard for SaaS)
-    platform_fee_inr = 2500.0 # Base monthly platform fee
-    
-    return {
-        "period": first_day.strftime("%B %Y"),
-        "usage": {
-            "total_chats": stats.total_chats or 0,
-            "tokens_consumed": stats.tokens or 0,
-            "raw_cost_usd": round(raw_cost, 4),
-        },
-        "estimated_invoice_inr": round(platform_fee_inr + (raw_cost * 83 * margin_multiplier), 2)
-    }
+    The caller is responsible for logging that stale data is being used.
+    """
+    return _cache.get(sheet_id, {})
 </file>
 
 <file path="backend/app/core/config.py">
@@ -2929,6 +2837,31 @@ class Hospital(Base):
     users = relationship("User", back_populates="hospital")
     # Inside your Hospital class in app/models/hospital.py
     doctors = relationship("Doctor", back_populates="hospital", cascade="all, delete-orphan")
+</file>
+
+<file path="frontend/src/main.tsx">
+import 'regenerator-runtime/runtime';
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import App from './App.tsx';
+import { AuthProvider } from './context/AuthContext.tsx';
+import './index.css';
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <BrowserRouter>
+      {/*
+        AuthProvider sits inside BrowserRouter so that any navigation
+        triggered inside login()/logout() can use React Router hooks.
+        It wraps App so every component in the tree can call useAuth().
+      */}
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </BrowserRouter>
+  </React.StrictMode>,
+);
 </file>
 
 <file path="frontend/src/pages/Dashboard.tsx">
@@ -3032,6 +2965,579 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+</file>
+
+<file path="frontend/src/pages/KnowledgeBase.tsx">
+import React, { useState } from 'react';
+import api from '../api/axios';
+import { FileText, Send, Upload, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+
+interface UploadResult {
+  filename: string;
+  pages_processed: number;
+  chunks_stored: number;
+  total_characters: number;
+  message: string;
+}
+
+const KnowledgeBaseUpload = ({ hospitalId }: { hospitalId: string | undefined }) => {
+  const [text, setText] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [uploadType, setUploadType] = useState<'text' | 'pdf'>('text');
+
+  // Replaced alert() with inline status so the user gets real feedback
+  // without a browser dialog that blocks the UI and shows no detail.
+  const [status, setStatus] = useState<{
+    type: 'success' | 'error';
+    message: string;
+    detail?: UploadResult;
+  } | null>(null);
+
+  const clearStatus = () => setStatus(null);
+
+  // ── TEXT UPLOAD ────────────────────────────────────────────────────────────
+
+  const handleTextUpload = async () => {
+    if (!hospitalId) {
+      setStatus({ type: 'error', message: 'No hospital selected.' });
+      return;
+    }
+    if (!text.trim()) {
+      setStatus({ type: 'error', message: 'Please enter some text before uploading.' });
+      return;
+    }
+
+    setLoading(true);
+    clearStatus();
+
+    try {
+      await api.post('/ai/ingest', {
+        text: text.trim(),
+        hospital_id: Number(hospitalId),
+      });
+      setStatus({ type: 'success', message: 'Knowledge synced to Arogya\'s brain successfully.' });
+      setText('');
+    } catch (err: any) {
+      const detail = err.response?.data?.detail;
+      setStatus({
+        type: 'error',
+        message: typeof detail === 'string'
+          ? detail
+          : 'Failed to upload knowledge. Please try again.',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── PDF UPLOAD ─────────────────────────────────────────────────────────────
+
+  const handlePdfUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !hospitalId) return;
+
+    // Client-side type check before hitting the network
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      setStatus({ type: 'error', message: 'Only PDF files are accepted.' });
+      event.target.value = '';
+      return;
+    }
+
+    setLoading(true);
+    clearStatus();
+
+    // hospital_id must be a FormData field (not JSON body) because this is
+    // a multipart request. The backend declares it as Form(...) and coerces
+    // the string to int automatically.
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('hospital_id', hospitalId);
+
+    try {
+      const response = await api.post('/ai/upload-pdf', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      // Backend returns a structured result — show it to the admin
+      const result: UploadResult = response.data;
+      setStatus({
+        type: 'success',
+        message: result.message,
+        detail: result,
+      });
+    } catch (err: any) {
+      const detail = err.response?.data?.detail;
+      setStatus({
+        type: 'error',
+        message: typeof detail === 'string'
+          ? detail
+          : 'Failed to process PDF. The file may be scanned, password-protected, or corrupted.',
+      });
+    } finally {
+      setLoading(false);
+      // Reset the file input so the same file can be re-uploaded if needed
+      event.target.value = '';
+    }
+  };
+
+  // ── RENDER ─────────────────────────────────────────────────────────────────
+
+  return (
+    <div className="max-w-4xl bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      {/* Tab switcher */}
+      <div className="flex border-b border-gray-100">
+        <button
+          onClick={() => { setUploadType('text'); clearStatus(); }}
+          className={`flex-1 p-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+            uploadType === 'text'
+              ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30'
+              : 'text-gray-500 hover:bg-gray-50'
+          }`}
+        >
+          <Send className="w-4 h-4" /> Manual Text
+        </button>
+        <button
+          onClick={() => { setUploadType('pdf'); clearStatus(); }}
+          className={`flex-1 p-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+            uploadType === 'pdf'
+              ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30'
+              : 'text-gray-500 hover:bg-gray-50'
+          }`}
+        >
+          <FileText className="w-4 h-4" /> Upload PDF
+        </button>
+      </div>
+
+      <div className="p-8">
+
+        {/* Inline status banner — replaces all alert() calls */}
+        {status && (
+          <div className={`mb-6 p-4 rounded-xl flex gap-3 items-start border ${
+            status.type === 'success'
+              ? 'bg-green-50 border-green-100 text-green-800'
+              : 'bg-red-50 border-red-100 text-red-800'
+          }`}>
+            {status.type === 'success'
+              ? <CheckCircle className="w-5 h-5 mt-0.5 shrink-0 text-green-600" />
+              : <AlertCircle className="w-5 h-5 mt-0.5 shrink-0 text-red-600" />
+            }
+            <div className="flex-1">
+              <p className="text-sm font-medium">{status.message}</p>
+
+              {/* PDF upload success shows the chunk breakdown */}
+              {status.type === 'success' && status.detail && (
+                <div className="mt-3 grid grid-cols-3 gap-3">
+                  <div className="bg-white rounded-lg p-3 border border-green-100 text-center">
+                    <p className="text-xl font-bold text-green-700">
+                      {status.detail.pages_processed}
+                    </p>
+                    <p className="text-xs text-green-600 mt-0.5">Pages read</p>
+                  </div>
+                  <div className="bg-white rounded-lg p-3 border border-green-100 text-center">
+                    <p className="text-xl font-bold text-green-700">
+                      {status.detail.chunks_stored}
+                    </p>
+                    <p className="text-xs text-green-600 mt-0.5">Chunks stored</p>
+                  </div>
+                  <div className="bg-white rounded-lg p-3 border border-green-100 text-center">
+                    <p className="text-xl font-bold text-green-700">
+                      {status.detail.total_characters.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-green-600 mt-0.5">Characters ingested</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Text upload panel */}
+        {uploadType === 'text' && (
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold text-gray-800">Train with Text</h3>
+            <p className="text-sm text-gray-500">
+              Paste FAQs, rules, or any hospital information for Arogya to learn.
+            </p>
+            <textarea
+              className="w-full h-48 p-4 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm leading-relaxed resize-none"
+              placeholder="Enter knowledge here — e.g. 'The OPD is open Monday to Saturday, 8am to 6pm. Emergency is open 24 hours.'"
+              value={text}
+              onChange={e => setText(e.target.value)}
+              disabled={loading}
+            />
+            <button
+              onClick={handleTextUpload}
+              disabled={loading || !text.trim()}
+              className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 font-semibold transition-colors flex items-center justify-center gap-2"
+            >
+              {loading
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Syncing...</>
+                : 'Sync to AI Brain'
+              }
+            </button>
+          </div>
+        )}
+
+        {/* PDF upload panel */}
+        {uploadType === 'pdf' && (
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold text-gray-800">Upload Hospital PDF</h3>
+            <p className="text-sm text-gray-500">
+              Brochures, staff directories, policy documents — Arogya will read and
+              index every page automatically. PDF must contain selectable text (not scanned images).
+            </p>
+
+            <div className={`py-12 text-center border-2 border-dashed rounded-xl transition-colors ${
+              loading ? 'border-blue-200 bg-blue-50/30' : 'border-gray-200 bg-gray-50/50 hover:border-blue-300'
+            }`}>
+              {loading ? (
+                <div className="flex flex-col items-center gap-3">
+                  <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
+                  <p className="text-sm font-medium text-blue-600">
+                    Reading and indexing PDF...
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    This may take a few seconds for large documents
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Upload className="w-8 h-8 text-blue-600" />
+                  </div>
+                  <p className="text-sm text-gray-600 mb-1 font-medium">
+                    Drop a PDF or click to select
+                  </p>
+                  <p className="text-xs text-gray-400 mb-4">
+                    Max recommended size: 10MB
+                  </p>
+                  <input
+                    type="file"
+                    accept=".pdf"
+                    onChange={handlePdfUpload}
+                    id="pdf-input"
+                    className="hidden"
+                    disabled={loading}
+                  />
+                  <label
+                    htmlFor="pdf-input"
+                    className="cursor-pointer px-8 py-3 bg-white border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 font-medium transition-all inline-block"
+                  >
+                    Select PDF
+                  </label>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default KnowledgeBaseUpload;
+</file>
+
+<file path="frontend/src/themes/arogya-specialty/ChatMessage.tsx">
+import React from 'react';
+import ReactMarkdown from 'react-markdown';
+
+interface ChatMessageProps {
+  role: 'user' | 'assistant';
+  content: string;
+  isStreaming?: boolean;
+}
+
+const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, isStreaming }) => {
+  const isUser = role === 'user';
+
+  return (
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
+      {!isUser && (
+        <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mr-2 text-xs font-bold border border-emerald-200 shrink-0">
+          A
+        </div>
+      )}
+
+      <div className={`max-w-[85%] p-4 rounded-2xl shadow-sm text-sm leading-relaxed ${
+        isUser
+          ? 'bg-emerald-600 text-white rounded-tr-none'
+          : 'bg-white border border-gray-100 text-gray-800 rounded-tl-none'
+      }`}>
+        <div className="prose prose-sm max-w-none prose-emerald">
+          <ReactMarkdown>{content}</ReactMarkdown>
+        </div>
+
+        {isStreaming && !isUser && (
+          <span style={{
+            display: 'inline-block',
+            width: '2px',
+            height: '14px',
+            backgroundColor: '#059669',
+            marginLeft: '2px',
+            verticalAlign: 'middle',
+            animation: 'blink 1s step-start infinite',
+          }} />
+        )}
+      </div>
+
+      {isUser && (
+        <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center ml-2 text-xs font-bold border border-gray-300 shrink-0">
+          U
+        </div>
+      )}
+
+      <style>{`@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }`}</style>
+    </div>
+  );
+};
+
+export default ChatMessage;
+</file>
+
+<file path="backend/app/api/v1/endpoints/hospitals.py">
+import csv
+import io
+import uuid
+from sqlalchemy import func
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File
+from sqlalchemy.orm import Session
+from datetime import datetime
+from app import crud, schemas
+from app.api.deps import get_db, get_current_tenant
+from app.models.hospital import Hospital
+from app.models.doctor import Doctor
+from app.availability import get_sheet_client
+from app.models.usage import UsageLedger
+
+router = APIRouter()
+
+# =============================================================================
+# FIX #3: ROUTE ORDER — Static/named routes MUST come before /{hospital_id}.
+# FastAPI matches routes top-to-bottom. If /{hospital_id} is registered first,
+# it will intercept GET /me and GET /slug/arogya and try to cast the string as
+# an int, returning a 422 before the correct handler is ever reached.
+# =============================================================================
+
+
+# -------------------------------------------------
+# 1. STATIC NAMED ROUTES (must be first)
+# -------------------------------------------------
+
+@router.get("/me", response_model=schemas.hospital.Hospital)
+def get_my_hospital(
+    db: Session = Depends(get_db),
+    hospital_id: int = Depends(get_current_tenant)
+):
+    """Get hospital info based on the admin's login token."""
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+    return hospital
+
+@router.patch("/me")
+def update_my_hospital_settings(
+    payload: dict = Body(...),
+    db: Session = Depends(get_db),
+    hospital_id: int = Depends(get_current_tenant)
+):
+    """Update settings for the logged-in admin's hospital."""
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+    for key, value in payload.items():
+        if hasattr(hospital, key):
+            setattr(hospital, key, value)
+    db.commit()
+    db.refresh(hospital)
+    return {"status": "success", "message": f"Settings for {hospital.name} updated."}
+
+@router.get("/slug/{slug}")
+def get_hospital_by_slug(slug: str, db: Session = Depends(get_db)):
+    """Public endpoint: resolve a slug to hospital id + name for ThemeLoader."""
+    hospital = db.query(Hospital).filter(Hospital.slug == slug).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+    return {
+        "id": hospital.id,
+        "name": hospital.name,
+        "google_sheet_id": hospital.google_sheet_id
+    }
+
+
+# -------------------------------------------------
+# 2. COLLECTION ROUTES
+# -------------------------------------------------
+
+@router.post("/", response_model=schemas.hospital.Hospital)
+def create_hospital(
+    *,
+    db: Session = Depends(get_db),
+    hospital_in: schemas.hospital.HospitalCreate,
+):
+    """Create a new hospital tenant."""
+    hospital = crud.crud_hospital.get_hospital_by_slug(db, slug=hospital_in.slug)
+    if hospital:
+        raise HTTPException(
+            status_code=400,
+            detail="The hospital with this slug already exists in the system.",
+        )
+    return crud.crud_hospital.create_hospital(db=db, hospital=hospital_in)
+
+@router.get("/", response_model=List[schemas.hospital.Hospital])
+def read_hospitals(
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 100,
+):
+    """List all registered hospitals."""
+    return crud.crud_hospital.get_hospitals(db, skip=skip, limit=limit)
+
+
+# -------------------------------------------------
+# 3. PARAMETERISED ROUTES (must be last)
+# -------------------------------------------------
+
+@router.get("/{hospital_id}", response_model=schemas.hospital.Hospital)
+def get_hospital_by_id(
+    hospital_id: int,
+    db: Session = Depends(get_db)
+):
+    """Fetch specific hospital info."""
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+    return hospital
+
+@router.patch("/{hospital_id}")
+def update_specific_hospital(
+    hospital_id: int,
+    payload: dict = Body(...),
+    db: Session = Depends(get_db),
+    # FIX #4: Added auth guard. Without this, any unauthenticated caller
+    # knowing a sequential hospital_id could overwrite system_prompt or
+    # google_sheet_id. Now requires a valid JWT.
+    _current_tenant: int = Depends(get_current_tenant),
+):
+    """Update settings for a specific hospital (requires auth)."""
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+
+    for key, value in payload.items():
+        if hasattr(hospital, key):
+            setattr(hospital, key, value)
+
+    db.commit()
+    db.refresh(hospital)
+    return {"status": "success", "message": f"Settings for {hospital.name} updated."}
+
+@router.get("/{hospital_id}/doctors")
+def get_hospital_doctors(
+    hospital_id: int,
+    db: Session = Depends(get_db)
+):
+    """Fetch the staff directory for a specific hospital."""
+    return db.query(Doctor).filter(Doctor.hospital_id == hospital_id).all()
+
+@router.post("/{hospital_id}/doctors")
+def add_doctor(
+    hospital_id: int,
+    payload: dict = Body(...),
+    db: Session = Depends(get_db)
+):
+    """Add a single doctor manually."""
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+
+    new_doc = Doctor(
+        name=payload["name"],
+        doctor_id=payload["doctor_id"],
+        department=payload.get("department", "General Physician"),
+        hospital_id=hospital_id
+    )
+    db.add(new_doc)
+    db.commit()
+    db.refresh(new_doc)
+    return new_doc
+
+@router.post("/{hospital_id}/doctors/bulk-upload")
+async def bulk_upload_and_sync(
+    hospital_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital or not hospital.google_sheet_id:
+        raise HTTPException(status_code=400, detail="Google Sheet ID not configured")
+
+    content = await file.read()
+    stream = io.StringIO(content.decode("utf-8"))
+    reader = csv.DictReader(stream)
+
+    sheet_rows = []
+    for row in reader:
+        normalized_row = {k.strip().lower(): v for k, v in row.items()}
+        auto_id = f"H{hospital_id}-D-{uuid.uuid4().hex[:4].upper()}"
+        name = normalized_row.get('doctor name') or normalized_row.get('name') or 'Unknown'
+        dept = normalized_row.get('department') or 'General'
+        schedule = normalized_row.get('base schedule') or normalized_row.get('schedule') or 'Not Specified'
+
+        doctor = Doctor(
+            doctor_id=auto_id,
+            name=name,
+            department=dept,
+            base_schedule=schedule,
+            hospital_id=hospital_id
+        )
+        db.add(doctor)
+        sheet_rows.append([auto_id, name, dept, schedule, "", "Yes"])
+
+    try:
+        client = get_sheet_client()
+        sheet = client.open_by_key(hospital.google_sheet_id).sheet1
+        sheet.append_rows(sheet_rows)
+        db.commit()
+        return {"message": f"Successfully imported {len(sheet_rows)} doctors."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Google Sheet Sync Failed: {str(e)}")
+
+@router.get("/{hospital_id}/billing")
+async def get_hospital_billing(hospital_id: int, db: Session = Depends(get_db)):
+    first_day = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    stats = db.query(
+        func.sum(UsageLedger.total_tokens).label("tokens"),
+        func.sum(UsageLedger.estimated_cost).label("cost"),
+        func.count(UsageLedger.id).label("total_chats")
+    ).filter(
+        UsageLedger.hospital_id == hospital_id,
+        UsageLedger.created_at >= first_day
+    ).first()
+
+    raw_cost = stats.cost or 0.0
+    margin_multiplier = 5.0
+    platform_fee_inr = 2500.0
+    total_due_inr = round(platform_fee_inr + (raw_cost * 83 * margin_multiplier), 2)
+
+    # FIX #5: Reshaped response to match what HospitalStats.tsx actually reads.
+    # Frontend expects billing.invoice.total_due_inr and billing.invoice.platform_fee.
+    # Old backend returned estimated_invoice_inr at the top level — key mismatch.
+    return {
+        "period": first_day.strftime("%B %Y"),
+        "usage": {
+            "total_chats": stats.total_chats or 0,
+            "tokens_consumed": stats.tokens or 0,
+            "raw_cost_usd": round(raw_cost, 4),
+        },
+        "invoice": {
+            "total_due_inr": total_due_inr,
+            "platform_fee": platform_fee_inr,
+        }
+    }
 </file>
 
 <file path="backend/app/schemas/hospital.py">
@@ -3142,37 +3648,76 @@ zstandard==0.25.0
 <file path="backend/app/api/v1/endpoints/ai.py">
 import os
 import re
-from typing import List, Optional
+import json
+import fitz  # PyMuPDF
+import logging
+from typing import List, Optional, AsyncGenerator
 from datetime import datetime
-from pydantic import BaseModel
-from openai import OpenAI
+from pydantic import BaseModel, Field
+from openai import OpenAI, AsyncOpenAI
 from sqlalchemy.orm import Session
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi.responses import StreamingResponse
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from app.api.deps import get_db
-from app.models.hospital import Hospital 
-from app.models.knowledge import KnowledgeBase 
+from app.models.hospital import Hospital
+from app.models.knowledge import KnowledgeBase
 from app.models.usage import UsageLedger
-from app.models.doctor import Doctor 
-from app.availability import get_doctor_availability
+from app.models.doctor import Doctor
+from app.availability import (
+    get_doctor_availability,
+    get_cached_or_empty,
+    AvailabilityError,
+)
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# -------------------------------------------------
+_api_key = os.getenv("OPENAI_API_KEY")
+if not _api_key:
+    raise RuntimeError("OPENAI_API_KEY environment variable is not set.")
+
+client = OpenAI(api_key=_api_key)
+async_client = AsyncOpenAI(api_key=_api_key)
+
+MAX_HISTORY_TURNS = 10
+PDF_CHUNK_SIZE = 800
+PDF_CHUNK_OVERLAP = 100
+
+DOCTOR_SECTION_MAX_CHARS    = 2_400
+KB_CHUNK_MAX_CHARS          = 500
+KB_SECTION_MAX_CHARS        = 1_500
+MAX_RELEVANT_DOCTORS        = 15
+DEFAULT_DOCTORS_IF_NO_MATCH = 5
+SYSTEM_PROMPT_WARN_CHARS    = 12_000
+
+
+# =============================================================================
 # MODELS
-# -------------------------------------------------
+# =============================================================================
+
 class IngestRequest(BaseModel):
     hospital_id: int
     text: str
+
+
+class HistoryMessage(BaseModel):
+    role: str
+    content: str
+
+
 class ChatRequest(BaseModel):
     question: str
-    hospital_id: int 
+    hospital_id: int
     language: Optional[str] = "en"
+    history: Optional[List[HistoryMessage]] = Field(default_factory=list)
 
-# -------------------------------------------------
-# UTILITIES
-# -------------------------------------------------
+
+# =============================================================================
+# DOCTOR RELEVANCE FILTERING
+# =============================================================================
 
 def normalize_name(text: str) -> str:
     text = text.lower()
@@ -3180,17 +3725,19 @@ def normalize_name(text: str) -> str:
     text = re.sub(r"[^a-z\s]", "", text)
     return re.sub(r"\s+", " ", text).strip()
 
+
 def resolve_doctor_id(user_text: str, doctor_data: dict):
+    """Fuzzy-match a doctor name mentioned in the user's question."""
     normalized_query = normalize_name(user_text)
     best_match, best_score = None, 0
 
     for doctor_id, d in doctor_data.items():
         name = d.get("name", "") if isinstance(d, dict) else str(d)
         norm_name = normalize_name(name)
-        query_tokens, name_tokens = set(normalized_query.split()), set(norm_name.split())
-        
-        if not query_tokens or not name_tokens: continue
-        
+        query_tokens = set(normalized_query.split())
+        name_tokens = set(norm_name.split())
+        if not query_tokens or not name_tokens:
+            continue
         score = len(query_tokens & name_tokens) / len(name_tokens)
         if score > best_score:
             best_score = score
@@ -3198,136 +3745,555 @@ def resolve_doctor_id(user_text: str, doctor_data: dict):
 
     return best_match if best_score >= 0.5 else (None, None)
 
-# -------------------------------------------------
-# ENDPOINT
-# -------------------------------------------------
-@router.post("/ingest")
-async def ingest_knowledge(
-    request: IngestRequest, 
-    db: Session = Depends(get_db)
-):
-    try:
-        # Create the embedding (this is what allows the vector search to work)
-        resp = client.embeddings.create(
-            input=request.text, 
-            model="text-embedding-3-small"
-        )
-        embedding = resp.data[0].embedding
 
-        # Save to the KnowledgeBase table
-        new_entry = KnowledgeBase(
-            hospital_id=request.hospital_id,
-            content=request.text,
-            embedding=embedding,
-            created_at=datetime.utcnow()
+def score_doctor_relevance(question: str, doctor: Doctor) -> float:
+    """Score how relevant a doctor record is to the patient's question."""
+    q_norm = normalize_name(question)
+    q_tokens = set(q_norm.split())
+    if not q_tokens:
+        return 0.0
+
+    doctor_text = " ".join(filter(None, [
+        doctor.name or "",
+        doctor.department or "",
+        doctor.base_schedule or "",
+        doctor.doctor_id or "",
+    ]))
+    d_norm = normalize_name(doctor_text)
+    d_tokens = set(d_norm.split())
+
+    if not d_tokens:
+        return 0.0
+
+    return len(q_tokens & d_tokens) / len(q_tokens)
+
+
+def build_doctor_context(question: str, doctors: List[Doctor]) -> tuple[str, int]:
+    """Relevance-filter and budget-cap the doctor directory section."""
+    if not doctors:
+        return "No doctors currently registered for this hospital.\n", 0
+
+    scored = sorted(
+        [(score_doctor_relevance(question, d), d) for d in doctors],
+        key=lambda x: x[0],
+        reverse=True,
+    )
+
+    top_score = scored[0][0] if scored else 0.0
+    limit = MAX_RELEVANT_DOCTORS if top_score > 0.05 else DEFAULT_DOCTORS_IF_NO_MATCH
+    selected = [d for _, d in scored[:limit]]
+
+    lines = []
+    total_chars = 0
+    truncated = False
+
+    for doctor in selected:
+        line = (
+            f"- {doctor.name}"
+            f" ({doctor.department or 'General'})"
+            f": Schedule {doctor.base_schedule or 'Not specified'}\n"
         )
-        db.add(new_entry)
-        db.commit()
-        
-        return {"status": "success", "message": "Knowledge added to Arogya's brain"}
+        if total_chars + len(line) > DOCTOR_SECTION_MAX_CHARS:
+            truncated = True
+            break
+        lines.append(line)
+        total_chars += len(line)
+
+    section = "RELEVANT DOCTORS FOR THIS QUERY:\n" + "".join(lines)
+    if truncated:
+        section += f"(List truncated to fit context. Total doctors on file: {len(doctors)})\n"
+
+    return section, len(lines)
+
+
+# =============================================================================
+# KB CONTEXT TRIMMING
+# =============================================================================
+
+def build_kb_context(chunks: list) -> tuple[str, int]:
+    """Trim each KB chunk and the total section to their character budgets."""
+    if not chunks:
+        return "", 0
+
+    trimmed_chunks = []
+    total_chars = 0
+
+    for chunk in chunks:
+        text = chunk.content.strip()
+        if len(text) > KB_CHUNK_MAX_CHARS:
+            text = text[:KB_CHUNK_MAX_CHARS].rsplit(" ", 1)[0] + "…"
+        if total_chars + len(text) > KB_SECTION_MAX_CHARS:
+            break
+        trimmed_chunks.append(text)
+        total_chars += len(text)
+
+    if not trimmed_chunks:
+        return "", 0
+
+    return "\n---\n".join(trimmed_chunks), len(trimmed_chunks)
+
+
+# =============================================================================
+# AVAILABILITY — with typed error handling
+# =============================================================================
+
+def fetch_availability_context(
+    question: str,
+    sheet_id: str,
+    hospital_id: int,
+    today_str: str,
+) -> str:
+    """
+    Fetch live doctor availability from Google Sheets and return a
+    directive string for the system prompt.
+
+    Three possible outcomes:
+
+    1. SUCCESS — doctor matched and their status is known:
+       Returns either an "ABSENT TODAY" warning or an "Available today"
+       confirmation. The LLM uses this as authoritative ground truth.
+
+    2. STALE CACHE FALLBACK — the live fetch failed but we have a recent
+       cached result (from a successful fetch within the current process):
+       Returns availability from cache, flagged as possibly stale so the
+       LLM can qualify its answer appropriately.
+
+    3. FULLY OFFLINE — fetch failed and no cache exists:
+       Returns an explicit directive instructing the LLM NOT to guess
+       and to redirect the patient to call reception. This is the safe
+       default that prevents hallucinated availability information.
+
+    The distinction between outcomes 2 and 3 matters clinically:
+    stale-cache data from 4 minutes ago is usually still correct; a
+    completely empty response with no data at all should never allow
+    the model to invent an answer.
+    """
+    try:
+        doctors_live_data = get_doctor_availability(sheet_id=sheet_id)
+
+        # Successful fetch — resolve any doctor mentioned in the question
+        doc_id, doc_name = resolve_doctor_id(question, doctors_live_data)
+
+        if not doc_id:
+            # No specific doctor mentioned — no availability context needed
+            return ""
+
+        doc_info = doctors_live_data.get(doc_id, {})
+        absent_dates_raw = str(doc_info.get("absent_dates", ""))
+        absent_dates = [d.strip() for d in absent_dates_raw.split(",") if d.strip()]
+
+        if today_str in absent_dates:
+            return (
+                f"IMPORTANT LIVE STATUS: {doc_name} is ABSENT TODAY ({today_str}). "
+                "Tell the patient they are unavailable and suggest they contact "
+                "reception to reschedule or see another doctor."
+            )
+        else:
+            return (
+                f"LIVE STATUS: {doc_name} is available today ({today_str}) "
+                "according to the live schedule."
+            )
+
+    except AvailabilityError as e:
+        # Typed error from availability.py — log it properly so it surfaces
+        # in Render's log stream, then attempt a graceful stale-cache fallback.
+        logger.error(
+            "[Availability] Fetch failed for hospital_id=%s sheet_id=%s: %s",
+            hospital_id, sheet_id, str(e)
+        )
+
+        stale_data = get_cached_or_empty(sheet_id)
+
+        if stale_data:
+            # We have stale data — try to use it but flag it to the LLM
+            doc_id, doc_name = resolve_doctor_id(question, stale_data)
+
+            if doc_id:
+                doc_info = stale_data.get(doc_id, {})
+                absent_dates_raw = str(doc_info.get("absent_dates", ""))
+                absent_dates = [d.strip() for d in absent_dates_raw.split(",") if d.strip()]
+
+                if today_str in absent_dates:
+                    return (
+                        f"AVAILABILITY DATA (may be up to 5 minutes old): "
+                        f"{doc_name} was marked ABSENT for today ({today_str}) "
+                        "in the last known schedule. Advise the patient to confirm "
+                        "by calling reception before visiting."
+                    )
+                else:
+                    return (
+                        f"AVAILABILITY DATA (may be up to 5 minutes old): "
+                        f"{doc_name} was marked as available today ({today_str}) "
+                        "in the last known schedule. Advise the patient to confirm "
+                        "by calling reception if time-sensitive."
+                    )
+
+            # Stale data exists but doctor not found in it — still offline
+            logger.info(
+                "[Availability] Stale cache exists for sheet_id=%s but "
+                "no doctor match found for question: %.80s",
+                sheet_id, question
+            )
+
+        # No stale data at all, or no doctor match in stale data —
+        # use the safe explicit directive so the LLM cannot guess.
+        logger.warning(
+            "[Availability] No usable data for hospital_id=%s. "
+            "Using safe offline fallback.",
+            hospital_id
+        )
+        return (
+            "SYSTEM NOTE: Live doctor availability data is currently unreachable. "
+            "You MUST NOT guess or fabricate whether any doctor is available. "
+            "If the patient asks about a specific doctor's availability, tell them "
+            "the live schedule is temporarily unavailable and ask them to call the "
+            "hospital reception directly to confirm."
+        )
+
     except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-@router.post("/chat")
-async def chat_with_arogya(
-    request: ChatRequest, 
-    db: Session = Depends(get_db)
-):
+        # Unexpected error — log it and use the safe fallback
+        logger.exception(
+            "[Availability] Unexpected error for hospital_id=%s: %s",
+            hospital_id, str(e)
+        )
+        return (
+            "SYSTEM NOTE: Live doctor availability data is currently unreachable. "
+            "You MUST NOT guess or fabricate whether any doctor is available. "
+            "Ask the patient to call reception directly to confirm."
+        )
+
+
+# =============================================================================
+# SHARED CONTEXT BUILDER
+# =============================================================================
+
+def build_context(request: ChatRequest, db: Session):
+    """Assemble the system prompt and full OpenAI message list."""
     hospital_id = request.hospital_id
     question = request.question
     target_lang = request.language
-    today_str = datetime.now().strftime("%d-%m-%Y") 
+    today_str = datetime.now().strftime("%d-%m-%Y")
 
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
     if not hospital:
         raise HTTPException(status_code=404, detail="Hospital not found")
-    
-    # 1. SEARCH DOCTOR DATABASE (Static Directory)
-    doctors_list = db.query(Doctor).filter(Doctor.hospital_id == hospital_id).all()
-    doctor_directory_context = "LIST OF DOCTORS AND SPECIALTIES:\n"
-    for d in doctors_list:
-        doctor_directory_context += f"- {d.name} ({d.department}): Schedule {d.base_schedule}\n"
 
-    # 2. FETCH LIVE AVAILABILITY (GOOGLE SHEETS)
+    # 1. Doctor directory (relevance-filtered + budget-capped)
+    all_doctors = db.query(Doctor).filter(Doctor.hospital_id == hospital_id).all()
+    doctor_context, doctors_included = build_doctor_context(question, all_doctors)
+
+    # 2. Live availability — now with typed error handling and safe fallback
     availability_context = ""
     if hospital.google_sheet_id:
-        try:
-            doctors_live_data = get_doctor_availability(sheet_id=hospital.google_sheet_id)
-            doc_id, doc_name = resolve_doctor_id(question, doctors_live_data)
-            
-            if doc_id:
-                doc_info = doctors_live_data.get(doc_id)
-                absent_dates = str(doc_info.get("absent_dates", ""))
-                
-                if today_str in [date.strip() for date in absent_dates.split(",")]:
-                    availability_context = f"IMPORTANT LIVE STATUS: {doc_name} is ABSENT TODAY ({today_str}). Tell the user they are unavailable."
-                else:
-                    availability_context = f"LIVE STATUS for {doc_name}: Available today ({today_str})."
-        except Exception as e:
-            availability_context = f"Availability sync temporarily offline."
+        availability_context = fetch_availability_context(
+            question=question,
+            sheet_id=hospital.google_sheet_id,
+            hospital_id=hospital_id,
+            today_str=today_str,
+        )
 
-    # 3. VECTOR SEARCH (KNOWLEDGE BASE PDFs)
-    resp = client.embeddings.create(input=question, model="text-embedding-3-small")
-    results = db.query(KnowledgeBase).filter(KnowledgeBase.hospital_id == hospital_id).order_by(
-        KnowledgeBase.embedding.cosine_distance(resp.data[0].embedding)
-    ).limit(3).all()
-    kb_context = "\n".join([r.content for r in results])
+    # 3. Vector search (pgvector RAG) — budget-trimmed
+    embed_resp = client.embeddings.create(input=question, model="text-embedding-3-small")
+    raw_results = (
+        db.query(KnowledgeBase)
+        .filter(KnowledgeBase.hospital_id == hospital_id)
+        .order_by(KnowledgeBase.embedding.cosine_distance(embed_resp.data[0].embedding))
+        .limit(3)
+        .all()
+    )
+    kb_context, chunks_included = build_kb_context(raw_results)
 
-    # 4. FINAL COMPLETION & LANGUAGE
-    if target_lang == "ml":
-        lang_instruction = "IMPORTANT: Respond ONLY in Malayalam script (മലയാളം). Do not use English script."
+    # 4. Language + behaviour
+    lang_instruction = (
+        "IMPORTANT: Respond ONLY in Malayalam script (മലയാളം). Do not use English script."
+        if target_lang == "ml"
+        else "Respond strictly in English."
+    )
+
+    behavior_guidelines = """RESPONSE GUIDELINES:
+- Malayalam: Use Manglish style — English technical terms in Malayalam script.
+  e.g. 'കാർഡിയോളജി വിഭാഗം' not a literal translation.
+- Tone: Professional but conversational, like a hospital receptionist.
+- If information is not in your context, say so clearly — do not guess.
+- Keep responses concise (1–2 sentences) unless listing multiple items."""
+
+    # 5. Assemble system prompt
+    system_prompt_parts = [
+        f"You are Arogya, the AI Assistant for {hospital.name}.",
+        f"Current Date: {today_str}",
+        "",
+        hospital.system_prompt or "",
+        lang_instruction,
+        "",
+        behavior_guidelines,
+        "",
+        doctor_context,
+    ]
+
+    if availability_context:
+        system_prompt_parts.append(availability_context)
+
+    if kb_context:
+        system_prompt_parts.extend(["", "ADDITIONAL KNOWLEDGE:", kb_context])
+
+    system_prompt_parts.append(
+        "\nRespond in the language used by the user. "
+        "You have memory of this conversation — give coherent, non-repetitive answers."
+    )
+
+    system_prompt = "\n".join(system_prompt_parts)
+
+    # 6. Budget telemetry
+    prompt_chars = len(system_prompt)
+    approx_tokens = prompt_chars // 4
+
+    if prompt_chars > SYSTEM_PROMPT_WARN_CHARS:
+        logger.warning(
+            "System prompt exceeds soft limit for hospital_id=%s: "
+            "%d chars (~%d tokens). doctors=%d/%d kb_chunks=%d",
+            hospital_id, prompt_chars, approx_tokens,
+            doctors_included, len(all_doctors), chunks_included,
+        )
     else:
-        lang_instruction = "Respond strictly in English."
+        logger.debug(
+            "System prompt for hospital_id=%s: %d chars (~%d tokens) "
+            "doctors=%d/%d kb_chunks=%d",
+            hospital_id, prompt_chars, approx_tokens,
+            doctors_included, len(all_doctors), chunks_included,
+        )
 
-# Add this specific instruction block to your lang_instruction or prompt
-    behavior_guidelines = """
-    CRITICAL INSTRUCTIONS FOR MALAYALAM:
-    1. Use 'Manglish' style: Use English technical terms written in Malayalam script. 
-    - Example: Use 'കാർഡിയോളജി വിഭാഗം' (Cardiology Department) instead of literal translations.
-    - Example: Use 'സെക്കൻഡ് ഫ്ലോർ' (Second Floor) instead of 'രണ്ടാം നില'.
-    2. Tone: Professional but conversational, like a hospital receptionist.
-    3. If the data is not in your context, say "എനിക്ക് ക്ഷമിക്കണം, ആ വിവരം എന്റെ പക്കലില്ല" 
-    (Sorry, I don't have that info) instead of guessing.
-    4. Keep responses under 2 sentences unless listing doctors.
-    """
+    # 7. Full message list
+    history_messages = build_history_messages(request.history or [])
+    openai_messages = (
+        [{"role": "system", "content": system_prompt}]
+        + history_messages
+        + [{"role": "user", "content": question}]
+    )
 
-    system_prompt = f"""
-        You are Arogya, the AI Assistant for {hospital.name}. 
-        Current Date: {today_str}
-        
-        {hospital.system_prompt}
-        {lang_instruction}
-        {behavior_guidelines} 
+    return system_prompt, openai_messages, hospital
 
-        {doctor_directory_context}
-        {availability_context}
-        
-        ADDITIONAL KNOWLEDGE:
-        {kb_context}
-        
-        Final Instruction: Respond in the language requested by the user. 
-        If they speak Malayalam, use the Manglish style described above.
-    """
-    
+
+# =============================================================================
+# HISTORY HELPERS
+# =============================================================================
+
+def build_history_messages(history: List[HistoryMessage]) -> List[dict]:
+    if not history:
+        return []
+    max_messages = MAX_HISTORY_TURNS * 2
+    trimmed = history[-max_messages:]
+    if trimmed and trimmed[0].role != "user":
+        trimmed = trimmed[1:]
+    return [{"role": msg.role, "content": msg.content} for msg in trimmed]
+
+
+# =============================================================================
+# PDF INGESTION HELPERS
+# =============================================================================
+
+def extract_text_from_pdf(pdf_bytes: bytes) -> tuple[str, int]:
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    pages_text = []
+    for page_num, page in enumerate(doc):
+        page_text = page.get_text("text").strip()
+        if page_text:
+            pages_text.append(f"[Page {page_num + 1}]\n{page_text}")
+    page_count = len(doc)
+    doc.close()
+    return "\n\n".join(pages_text), page_count
+
+
+def chunk_text(text: str) -> List[str]:
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=PDF_CHUNK_SIZE,
+        chunk_overlap=PDF_CHUNK_OVERLAP,
+        separators=["\n\n", "\n", ". ", " ", ""],
+    )
+    raw_chunks = splitter.split_text(text)
+    return [c.strip() for c in raw_chunks if len(c.strip()) > 50]
+
+
+def embed_chunks_batch(chunks: List[str]) -> List[List[float]]:
+    embeddings = []
+    batch_size = 100
+    for i in range(0, len(chunks), batch_size):
+        batch = chunks[i:i + batch_size]
+        resp = client.embeddings.create(input=batch, model="text-embedding-3-small")
+        embeddings.extend([item.embedding for item in resp.data])
+    return embeddings
+
+
+# =============================================================================
+# ENDPOINTS
+# =============================================================================
+
+@router.post("/ingest")
+async def ingest_knowledge(
+    request: IngestRequest,
+    db: Session = Depends(get_db)
+):
+    try:
+        resp = client.embeddings.create(input=request.text, model="text-embedding-3-small")
+        embedding = resp.data[0].embedding
+        db.add(KnowledgeBase(
+            hospital_id=request.hospital_id,
+            content=request.text,
+            embedding=embedding,
+            created_at=datetime.utcnow()
+        ))
+        db.commit()
+        return {"status": "success", "message": "Knowledge added to Arogya's brain"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/upload-pdf")
+async def upload_pdf(
+    file: UploadFile = File(...),
+    hospital_id: int = Form(...),
+    db: Session = Depends(get_db)
+):
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=422, detail="Only PDF files are accepted.")
+
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+
+    pdf_bytes = await file.read()
+    if not pdf_bytes:
+        raise HTTPException(status_code=422, detail="Uploaded file is empty.")
+    if not pdf_bytes.startswith(b"%PDF"):
+        raise HTTPException(status_code=422, detail="File does not appear to be a valid PDF.")
+
+    try:
+        full_text, page_count = extract_text_from_pdf(pdf_bytes)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Could not read PDF: {e}")
+
+    if not full_text.strip():
+        raise HTTPException(
+            status_code=422,
+            detail="No readable text found. Scanned image-only PDFs are not supported."
+        )
+
+    chunks = chunk_text(full_text)
+    if not chunks:
+        raise HTTPException(status_code=422, detail="PDF text was too short to produce knowledge chunks.")
+
+    try:
+        embeddings = embed_chunks_batch(chunks)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Embedding failed: {e}")
+
+    try:
+        for chunk_content, embedding in zip(chunks, embeddings):
+            db.add(KnowledgeBase(
+                hospital_id=hospital_id,
+                content=chunk_content,
+                embedding=embedding,
+                created_at=datetime.utcnow()
+            ))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+    return {
+        "status": "success",
+        "filename": file.filename,
+        "pages_processed": page_count,
+        "chunks_stored": len(chunks),
+        "total_characters": sum(len(c) for c in chunks),
+        "message": (
+            f"'{file.filename}' processed successfully. "
+            f"{page_count} pages → {len(chunks)} knowledge chunks stored for {hospital.name}."
+        )
+    }
+
+
+@router.post("/chat")
+async def chat_with_arogya(
+    request: ChatRequest,
+    db: Session = Depends(get_db)
+):
+    _, openai_messages, _ = build_context(request, db)
+
     ai_response = client.chat.completions.create(
         model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": system_prompt}, 
-            {"role": "user", "content": question}
-        ]
+        messages=openai_messages
     )
-    
-    # 5. SAVE TO USAGE LEDGER
+
     usage = ai_response.usage
     db.add(UsageLedger(
-        hospital_id=hospital_id,
+        hospital_id=request.hospital_id,
         endpoint="/chat",
+        prompt_tokens=usage.prompt_tokens,
+        completion_tokens=usage.completion_tokens,
         total_tokens=usage.total_tokens,
         estimated_cost=(usage.total_tokens / 1_000_000) * 0.15
     ))
     db.commit()
 
     return {"answer": ai_response.choices[0].message.content}
+
+
+@router.post("/chat-stream")
+async def chat_stream(
+    request: ChatRequest,
+    db: Session = Depends(get_db)
+):
+    _, openai_messages, _ = build_context(request, db)
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        prompt_tokens = 0
+        completion_tokens = 0
+        total_tokens = 0
+
+        try:
+            stream = await async_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=openai_messages,
+                stream=True,
+                stream_options={"include_usage": True}
+            )
+
+            async for chunk in stream:
+                delta = chunk.choices[0].delta if chunk.choices else None
+                token = delta.content if delta and delta.content else None
+                if token:
+                    yield f"data: {json.dumps(token)}\n\n"
+                if chunk.usage:
+                    prompt_tokens = chunk.usage.prompt_tokens
+                    completion_tokens = chunk.usage.completion_tokens
+                    total_tokens = chunk.usage.total_tokens
+
+            yield "data: [DONE]\n\n"
+
+            if total_tokens > 0:
+                db.add(UsageLedger(
+                    hospital_id=request.hospital_id,
+                    endpoint="/chat-stream",
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=total_tokens,
+                    estimated_cost=(total_tokens / 1_000_000) * 0.15
+                ))
+                db.commit()
+
+        except Exception as e:
+            yield f"data: [ERROR] {str(e)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        }
+    )
 </file>
 
 <file path="frontend/src/api/axios.ts">
@@ -3435,188 +4401,412 @@ def read_root():
 </file>
 
 <file path="frontend/src/themes/arogya-specialty/Chat.tsx">
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
-import api from '../../api/axios';
 import ChatMessage from './ChatMessage';
-import { Mic, MicOff, Languages, Loader2, Activity, Send, Zap } from 'lucide-react';
+import { Mic, MicOff, Loader2, Activity, Send, Zap, X } from 'lucide-react';
 
 interface ChatProps { hospitalId: string; }
-interface Message { role: 'user' | 'assistant'; content: string; }
+
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+  isWelcome?: boolean;
+  isStreaming?: boolean;
+}
 
 const SUGGESTIONS = {
   'en-US': ["Who is the cardiologist today?", "Where is the pharmacy?", "Visiting hours?", "Emergency contact"],
   'ml-IN': ["കാർഡിയോളജിസ്റ്റ് ആരാണ്?", "ഫാർമസി എവിടെയാണ്?", "സന്ദർശന സമയം?", "അടിയന്തര നമ്പർ"]
 };
 
+// Silence duration in ms after which recording stops automatically.
+// 3 seconds gives Malayalam speakers enough time between words without
+// keeping the mic open indefinitely.
+const SILENCE_TIMEOUT_MS = 3000;
+
+function buildHistory(messages: Message[]): { role: string; content: string }[] {
+  return messages
+    .filter(m => !m.isWelcome && !m.isStreaming)
+    .map(m => ({ role: m.role, content: m.content }));
+}
+
+function getBaseURL(): string {
+  return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:8000/api/v1'
+    : 'https://hospital-ai-platform.onrender.com/api/v1';
+}
+
 const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
   const [language, setLanguage] = useState<'en-US' | 'ml-IN'>('ml-IN');
   const [messages, setMessages] = useState<Message[]>([]);
-  const [isTyping, setIsTyping] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const [inputText, setInputText] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  const { transcript, listening, resetTranscript, browserSupportsSpeechRecognition } = useSpeechRecognition();
+  // silenceTimer fires after SILENCE_TIMEOUT_MS of no new transcript words.
+  // It only stops the mic — it does NOT send. The user sends manually.
+  const silenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 1. Simple, direct Send Function
-  const handleSend = async (text: string) => {
-    const messageToSend = text || inputText || transcript;
-    if (!messageToSend.trim()) return;
+  // Track the last transcript we saw so we can detect when new words arrive.
+  const lastTranscriptRef = useRef('');
 
-    // Hard stop mic
-    SpeechRecognition.stopListening();
-    
-    // UI Reset
-    const currentText = messageToSend.trim();
-    setInputText('');
-    resetTranscript();
+  const {
+    transcript,
+    listening,
+    resetTranscript,
+    browserSupportsSpeechRecognition,
+  } = useSpeechRecognition();
 
-    setMessages(prev => [...prev, { role: 'user', content: currentText }]);
-    setIsTyping(true);
+  // ── SEND ────────────────────────────────────────────────────────────────────
 
-    try {
-      const response = await api.post('/ai/chat', {
-        question: currentText,
-        hospital_id: parseInt(hospitalId),
-        language: language === 'ml-IN' ? 'ml' : 'en'
-      });
-      setMessages(prev => [...prev, { role: 'assistant', content: response.data.answer }]);
-    } catch (error) {
-      setMessages(prev => [...prev, { role: 'assistant', content: "Error. Please try again." }]);
-    } finally {
-      setIsTyping(false);
-    }
-  };
+  const handleSend = useCallback(async (textOverride?: string) => {
+    const text = (textOverride ?? inputText).trim();
+    if (!text || isStreaming) return;
 
-  // 2. Simple Toggle
-  const toggleMic = () => {
+    // Stop mic if still running
     if (listening) {
       SpeechRecognition.stopListening();
-    } else {
-      resetTranscript();
-      SpeechRecognition.startListening({ 
-        continuous: true, 
-        language: language 
+      if (silenceTimer.current) clearTimeout(silenceTimer.current);
+    }
+
+    // Cancel any in-flight stream
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+
+    const historySnapshot = buildHistory(messages);
+    setInputText('');
+    resetTranscript();
+    lastTranscriptRef.current = '';
+
+    setMessages(prev => [...prev, { role: 'user', content: text }]);
+    setMessages(prev => [...prev, { role: 'assistant', content: '', isStreaming: true }]);
+    setIsStreaming(true);
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${getBaseURL()}/ai/chat-stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          question: text,
+          hospital_id: parseInt(hospitalId),
+          language: language === 'ml-IN' ? 'ml' : 'en',
+          history: historySnapshot,
+        }),
+        signal: abortRef.current.signal,
       });
-    }
-  };
 
-  // 3. Auto-send Timer (Only if transcript exists)
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (transcript && listening) {
-      timer = setTimeout(() => {
-        handleSend(transcript);
-      }, 2500);
-    }
-    return () => clearTimeout(timer);
-  }, [transcript, listening]);
+      if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`);
 
-  // 4. Welcome Message
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const frames = buffer.split('\n\n');
+        buffer = frames.pop() ?? '';
+
+        for (const frame of frames) {
+          if (!frame.startsWith('data: ')) continue;
+          const payload = frame.slice(6);
+
+          if (payload === '[DONE]') {
+            setMessages(prev =>
+              prev.map((m, i) => i === prev.length - 1 ? { ...m, isStreaming: false } : m)
+            );
+            break;
+          }
+
+          if (payload.startsWith('[ERROR]')) {
+            setMessages(prev =>
+              prev.map((m, i) =>
+                i === prev.length - 1
+                  ? { ...m, content: 'Sorry, something went wrong. Please try again.', isStreaming: false }
+                  : m
+              )
+            );
+            break;
+          }
+
+          try {
+            const tokenText = JSON.parse(payload);
+            setMessages(prev =>
+              prev.map((m, i) =>
+                i === prev.length - 1 ? { ...m, content: m.content + tokenText } : m
+              )
+            );
+          } catch { /* skip malformed token */ }
+        }
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return;
+      setMessages(prev =>
+        prev.map((m, i) =>
+          i === prev.length - 1
+            ? { ...m, content: 'Error connecting to Arogya. Please try again.', isStreaming: false }
+            : m
+        )
+      );
+    } finally {
+      setIsStreaming(false);
+    }
+  }, [inputText, messages, isStreaming, hospitalId, language]);
+
+  // ── MIC TOGGLE ──────────────────────────────────────────────────────────────
+
+  const startListening = useCallback(() => {
+    resetTranscript();
+    lastTranscriptRef.current = '';
+    SpeechRecognition.startListening({ continuous: true, language });
+  }, [language, resetTranscript]);
+
+  const stopListening = useCallback(() => {
+    SpeechRecognition.stopListening();
+    if (silenceTimer.current) {
+      clearTimeout(silenceTimer.current);
+      silenceTimer.current = null;
+    }
+    // Do NOT send here — the transcript stays in the input for the user to review.
+  }, []);
+
+  const toggleMic = useCallback(() => {
+    if (listening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  }, [listening, startListening, stopListening]);
+
+  // Discard the current voice transcript without sending.
+  const cancelVoice = useCallback(() => {
+    stopListening();
+    resetTranscript();
+    lastTranscriptRef.current = '';
+    setInputText('');
+  }, [stopListening, resetTranscript]);
+
+  // ── VOICE → INPUT SYNC ──────────────────────────────────────────────────────
+  //
+  // KEY DESIGN DECISION:
+  // Instead of auto-sending on silence, we flow the transcript into the
+  // text input in real time. The user sees exactly what was heard and can
+  // edit or send at their own pace.
+  //
+  // The silence timer only STOPS THE MIC — it never calls handleSend.
+  // This eliminates the race condition entirely.
+
   useEffect(() => {
-    const welcome = language === 'ml-IN' 
+    if (!listening) return;
+
+    // New words arrived — update the input field
+    if (transcript !== lastTranscriptRef.current) {
+      lastTranscriptRef.current = transcript;
+      setInputText(transcript);
+
+      // Reset the silence timer every time new words arrive.
+      // If no new words arrive within SILENCE_TIMEOUT_MS, stop the mic
+      // (but keep the transcript in the input — don't discard it).
+      if (silenceTimer.current) clearTimeout(silenceTimer.current);
+      silenceTimer.current = setTimeout(() => {
+        if (listening) {
+          stopListening();
+          // The transcript is already in inputText — user can see it and edit.
+        }
+      }, SILENCE_TIMEOUT_MS);
+    }
+  }, [transcript, listening, stopListening]);
+
+  // Clean up timer if the component unmounts while recording
+  useEffect(() => {
+    return () => {
+      if (silenceTimer.current) clearTimeout(silenceTimer.current);
+    };
+  }, []);
+
+  // ── LANGUAGE SWITCH ─────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    // Stop any recording when language changes
+    if (listening) stopListening();
+    resetTranscript();
+    setInputText('');
+    lastTranscriptRef.current = '';
+
+    const welcome = language === 'ml-IN'
       ? "👋 നമസ്കാരം! ഞാൻ **ആരോഗ്യ**. എനിക്ക് എങ്ങനെ സഹായിക്കാനാകും?"
       : "👋 Hello! I am **Arogya**. How can I help you today?";
-    setMessages([{ role: 'assistant', content: welcome }]);
+    setMessages([{ role: 'assistant', content: welcome, isWelcome: true }]);
   }, [language]);
+
+  // ── SCROLL ──────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   if (!browserSupportsSpeechRecognition) {
-    return <div className="p-4 text-center text-red-500 bg-red-50">Voice features not supported.</div>;
+    return (
+      <div className="p-4 text-center text-red-500 bg-red-50 rounded-xl">
+        Voice input is not supported in this browser. Please use Chrome or Edge.
+      </div>
+    );
   }
+
+  // ── RENDER ──────────────────────────────────────────────────────────────────
+
+  // Whether we are in "voice mode" — mic is active or there's a pending
+  // voice transcript in the input that hasn't been sent yet.
+  const isVoiceMode = listening || (inputText.length > 0 && lastTranscriptRef.current === inputText);
 
   return (
     <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 flex flex-col h-[650px]">
+
       {/* Header */}
       <div className="bg-emerald-600 p-4 text-white shrink-0 shadow-md">
         <div className="flex justify-between items-center">
           <h3 className="font-bold flex items-center gap-2">
             <Activity className="w-4 h-4" /> Ask Arogya
           </h3>
-          <button 
+          <button
             onClick={() => setLanguage(l => l === 'en-US' ? 'ml-IN' : 'en-US')}
-            className="bg-emerald-700 px-3 py-1 rounded-md text-xs font-bold border border-white/20"
+            disabled={isStreaming}
+            className="bg-emerald-700 px-3 py-1 rounded-md text-xs font-bold border border-white/20 disabled:opacity-50"
           >
             {language === 'en-US' ? 'English' : 'മലയാളം'}
           </button>
         </div>
       </div>
 
-      {/* Chat Area */}
+      {/* Chat area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
         {messages.map((msg, idx) => (
-          <ChatMessage key={idx} role={msg.role} content={msg.content} />
+          <ChatMessage
+            key={idx}
+            role={msg.role}
+            content={msg.content}
+            isStreaming={msg.isStreaming}
+          />
         ))}
-        
-        {listening && transcript && (
-          <div className="flex justify-end">
-            <div className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-2xl rounded-tr-none text-sm italic border border-emerald-100 shadow-sm animate-pulse">
-              {transcript}...
-            </div>
+
+        {isStreaming && messages[messages.length - 1]?.content === '' && (
+          <div className="flex items-center gap-2 text-emerald-600 p-2 bg-white rounded-lg w-fit shadow-sm border border-slate-100">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span className="text-[10px] font-bold">Arogya is thinking...</span>
           </div>
         )}
 
-        {isTyping && (
-          <div className="flex items-center gap-2 text-emerald-600 p-2 bg-white rounded-lg w-fit shadow-sm border border-slate-100">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span className="text-[10px] font-bold">Arogya is checking...</span>
-          </div>
-        )}
         <div ref={scrollRef} />
       </div>
 
       {/* Suggestions */}
       <div className="px-4 py-2 bg-slate-50 border-t border-slate-100">
-        <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+        <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
           {SUGGESTIONS[language].map((text, i) => (
             <button
               key={i}
+              disabled={isStreaming}
               onClick={() => handleSend(text)}
-              className="flex-none bg-white border border-emerald-100 text-emerald-700 text-[11px] px-3 py-1.5 rounded-full shadow-sm hover:bg-emerald-50 active:scale-95 transition-all"
+              className="flex-none bg-white border border-emerald-100 text-emerald-700 text-[11px] px-3 py-1.5 rounded-full shadow-sm hover:bg-emerald-50 active:scale-95 transition-all disabled:opacity-40 whitespace-nowrap"
             >
-              <Zap className="w-3 h-3 text-amber-400 fill-amber-400" /> {text}
+              <Zap className="w-3 h-3 text-amber-400 fill-amber-400 inline mr-1" />{text}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Input Section */}
-      <div className="p-4 border-t bg-white shrink-0">
-        <div className="flex items-center gap-2 mb-4">
-          <input
-            type="text"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSend(inputText)}
-            placeholder={language === 'en-US' ? "Ask anything..." : "ചോദിക്കൂ..."}
-            className="flex-1 bg-slate-100 border-none rounded-full px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
-          />
-          <button 
-            onClick={() => handleSend(inputText)} 
-            className="p-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-700 transition-colors shadow-sm"
+      {/* Input + mic */}
+      <div className="p-4 border-t bg-white shrink-0 space-y-3">
+
+        {/* Text input row */}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              value={inputText}
+              onChange={e => {
+                setInputText(e.target.value);
+                // If the user edits the input manually while in voice mode,
+                // detach it from the transcript tracking so the next
+                // speech update doesn't overwrite their edit.
+                if (lastTranscriptRef.current) {
+                  lastTranscriptRef.current = '';
+                }
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !isStreaming) handleSend();
+              }}
+              placeholder={
+                listening
+                  ? (language === 'en-US' ? 'Listening...' : 'കേൾക്കുന്നു...')
+                  : (language === 'en-US' ? 'Ask anything...' : 'ചോദിക്കൂ...')
+              }
+              disabled={isStreaming}
+              className={`w-full rounded-full px-4 py-2 text-sm outline-none transition-all ${
+                listening
+                  ? 'bg-emerald-50 border-2 border-emerald-400 focus:ring-0 pr-8'
+                  : 'bg-slate-100 border-2 border-transparent focus:border-emerald-400'
+              } disabled:opacity-60`}
+            />
+            {/* Inline cancel button — appears when there is a voice transcript
+                pending in the input so the user can discard it cleanly */}
+            {isVoiceMode && inputText.length > 0 && (
+              <button
+                onClick={cancelVoice}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 transition-colors"
+                title="Discard voice input"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          <button
+            onClick={() => handleSend()}
+            disabled={isStreaming || !inputText.trim()}
+            className="p-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-700 transition-colors shadow-sm disabled:opacity-40"
           >
             <Send className="w-4 h-4" />
           </button>
         </div>
-        
-        <div className="flex flex-col items-center">
+
+        {/* Mic section */}
+        <div className="flex flex-col items-center gap-1">
           <button
             type="button"
             onClick={toggleMic}
-            className={`p-4 rounded-full transition-all transform active:scale-90 shadow-lg ${
-              listening 
-                ? 'bg-red-500 text-white animate-pulse ring-4 ring-red-100' 
+            disabled={isStreaming}
+            className={`p-4 rounded-full transition-all transform active:scale-90 shadow-lg disabled:opacity-40 ${
+              listening
+                ? 'bg-red-500 text-white ring-4 ring-red-100'
                 : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
             }`}
           >
             {listening ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
           </button>
-          <p className="text-[9px] uppercase tracking-widest text-slate-400 font-black mt-2">
-            {listening ? "Recording..." : (language === 'en-US' ? "Tap to speak" : "സംസാരിക്കുക")}
+
+          <p className="text-[9px] uppercase tracking-widest text-slate-400 font-black">
+            {listening
+              ? (language === 'en-US' ? 'Tap to stop' : 'നിർത്താൻ ടാപ്പ് ചെയ്യൂ')
+              : (language === 'en-US' ? 'Tap to speak' : 'സംസാരിക്കുക')}
           </p>
+
+          {/* Guidance note — shown while mic is active so the user understands
+              the new flow: voice fills input, they send manually */}
+          {listening && (
+            <p className="text-[10px] text-emerald-600 text-center leading-tight px-4">
+              {language === 'en-US'
+                ? 'Speak now. Your words appear above — edit if needed, then press Send.'
+                : 'സംസാരിക്കൂ. മുകളിൽ കാണുന്ന വാക്കുകൾ ആവശ്യമെങ്കിൽ തിരുത്തി Send അമർത്തൂ.'}
+            </p>
+          )}
         </div>
       </div>
     </div>

@@ -1,11 +1,12 @@
 import os
 import re
 import json
-import fitz  # PyMuPDF
+import fitz
 import logging
+import unicodedata
 from typing import List, Optional, AsyncGenerator
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 from openai import OpenAI, AsyncOpenAI
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
@@ -24,7 +25,6 @@ from app.availability import (
 )
 
 logger = logging.getLogger(__name__)
-
 router = APIRouter()
 
 _api_key = os.getenv("OPENAI_API_KEY")
@@ -34,16 +34,49 @@ if not _api_key:
 client = OpenAI(api_key=_api_key)
 async_client = AsyncOpenAI(api_key=_api_key)
 
-MAX_HISTORY_TURNS = 10
-PDF_CHUNK_SIZE = 800
-PDF_CHUNK_OVERLAP = 100
-
-DOCTOR_SECTION_MAX_CHARS    = 2_400
-KB_CHUNK_MAX_CHARS          = 500
-KB_SECTION_MAX_CHARS        = 1_500
-MAX_RELEVANT_DOCTORS        = 15
+MAX_HISTORY_TURNS        = 10
+PDF_CHUNK_SIZE           = 800
+PDF_CHUNK_OVERLAP        = 100
+DOCTOR_SECTION_MAX_CHARS = 2_400
+KB_CHUNK_MAX_CHARS       = 500
+KB_SECTION_MAX_CHARS     = 1_500
+MAX_RELEVANT_DOCTORS     = 15
 DEFAULT_DOCTORS_IF_NO_MATCH = 5
-SYSTEM_PROMPT_WARN_CHARS    = 12_000
+SYSTEM_PROMPT_WARN_CHARS = 12_000
+QUESTION_MIN_LENGTH      = 1
+QUESTION_MAX_LENGTH      = 500
+VALID_LANGUAGES          = {"en", "ml"}
+
+
+# =============================================================================
+# INJECTION DETECTION
+# =============================================================================
+
+_INJECTION_PATTERNS = [
+    re.compile(r"ignore\s+(all\s+)?(previous|prior|above|your)\s+(instructions?|prompt|rules?|guidelines?)", re.IGNORECASE),
+    re.compile(r"(disregard|forget|override|bypass|circumvent)\s+(your\s+)?(instructions?|guidelines?|rules?|prompt|training)", re.IGNORECASE),
+    re.compile(r"(your\s+new|new\s+instructions?\s+(are|is)|from\s+now\s+on\s+you)", re.IGNORECASE),
+    re.compile(r"\byou\s+are\s+now\b", re.IGNORECASE),
+    re.compile(r"\b(act|behave|pretend|roleplay|role-play|simulate)\s+(as|like)\b", re.IGNORECASE),
+    re.compile(r"\b(DAN|jailbreak|do\s+anything\s+now)\b", re.IGNORECASE),
+    re.compile(r"(^|\s)(system|assistant)\s*:", re.IGNORECASE | re.MULTILINE),
+    re.compile(r"(\[INST\]|<<SYS>>|<</SYS>>|\[/INST\])", re.IGNORECASE),
+    re.compile(r"(repeat|show|print|reveal|display|tell me|what (are|is))\s+(your\s+)?(system\s+)?(prompt|instructions?|guidelines?|rules?)", re.IGNORECASE),
+]
+
+def detect_prompt_injection(text: str) -> Optional[str]:
+    for pattern in _INJECTION_PATTERNS:
+        if pattern.search(text):
+            return (
+                "Your message contains patterns that cannot be processed. "
+                "Please ask a straightforward question about doctors, timings, or services."
+            )
+    return None
+
+def sanitise_question(text: str) -> str:
+    text = re.sub(r"\s+", " ", text.strip())
+    text = unicodedata.normalize("NFKC", text)
+    return text
 
 
 # =============================================================================
@@ -54,17 +87,73 @@ class IngestRequest(BaseModel):
     hospital_id: int
     text: str
 
+    @field_validator("hospital_id")
+    @classmethod
+    def hospital_id_positive(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError("hospital_id must be a positive integer")
+        return v
+
+    @field_validator("text")
+    @classmethod
+    def text_not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("text must not be empty or whitespace only")
+        return v
+
 
 class HistoryMessage(BaseModel):
     role: str
     content: str
 
+    @field_validator("role")
+    @classmethod
+    def role_valid(cls, v: str) -> str:
+        if v not in ("user", "assistant"):
+            raise ValueError("role must be 'user' or 'assistant'")
+        return v
+
+    @field_validator("content")
+    @classmethod
+    def content_not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("content must not be empty")
+        return v.strip()
+
 
 class ChatRequest(BaseModel):
-    question: str
-    hospital_id: int
-    language: Optional[str] = "en"
+    question: str = Field(..., min_length=QUESTION_MIN_LENGTH, max_length=QUESTION_MAX_LENGTH)
+    hospital_id: int = Field(..., gt=0)
+    language: str = Field(default="en")
     history: Optional[List[HistoryMessage]] = Field(default_factory=list)
+
+    @field_validator("language")
+    @classmethod
+    def language_valid(cls, v: str) -> str:
+        n = v.strip().lower()
+        if n not in VALID_LANGUAGES:
+            raise ValueError(f"language must be one of {sorted(VALID_LANGUAGES)}")
+        return n
+
+    @field_validator("question")
+    @classmethod
+    def question_not_whitespace(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("question must contain at least one non-whitespace character")
+        return v
+
+    @model_validator(mode="after")
+    def check_injection_and_sanitise(self) -> "ChatRequest":
+        sanitised = sanitise_question(self.question)
+        reason = detect_prompt_injection(sanitised)
+        if reason:
+            logger.warning(
+                "Prompt injection attempt for hospital_id=%s: %.100s",
+                self.hospital_id, self.question,
+            )
+            raise ValueError(reason)
+        self.question = sanitised
+        return self
 
 
 # =============================================================================
@@ -79,248 +168,165 @@ def normalize_name(text: str) -> str:
 
 
 def resolve_doctor_id(user_text: str, doctor_data: dict):
-    """Fuzzy-match a doctor name mentioned in the user's question."""
-    normalized_query = normalize_name(user_text)
+    nq = normalize_name(user_text)
     best_match, best_score = None, 0
-
-    for doctor_id, d in doctor_data.items():
+    for did, d in doctor_data.items():
         name = d.get("name", "") if isinstance(d, dict) else str(d)
-        norm_name = normalize_name(name)
-        query_tokens = set(normalized_query.split())
-        name_tokens = set(norm_name.split())
-        if not query_tokens or not name_tokens:
+        nn = normalize_name(name)
+        qt, nt = set(nq.split()), set(nn.split())
+        if not qt or not nt:
             continue
-        score = len(query_tokens & name_tokens) / len(name_tokens)
+        score = len(qt & nt) / len(nt)
         if score > best_score:
             best_score = score
-            best_match = (doctor_id, name)
-
+            best_match = (did, name)
     return best_match if best_score >= 0.5 else (None, None)
 
 
 def score_doctor_relevance(question: str, doctor: Doctor) -> float:
-    """Score how relevant a doctor record is to the patient's question."""
-    q_norm = normalize_name(question)
-    q_tokens = set(q_norm.split())
+    q_tokens = set(normalize_name(question).split())
     if not q_tokens:
         return 0.0
-
-    doctor_text = " ".join(filter(None, [
-        doctor.name or "",
-        doctor.department or "",
-        doctor.base_schedule or "",
-        doctor.doctor_id or "",
-    ]))
-    d_norm = normalize_name(doctor_text)
-    d_tokens = set(d_norm.split())
-
-    if not d_tokens:
-        return 0.0
-
-    return len(q_tokens & d_tokens) / len(q_tokens)
+    d_text = " ".join(filter(None, [doctor.name or "", doctor.department or "", doctor.base_schedule or ""]))
+    d_tokens = set(normalize_name(d_text).split())
+    return len(q_tokens & d_tokens) / len(q_tokens) if d_tokens else 0.0
 
 
 def build_doctor_context(question: str, doctors: List[Doctor]) -> tuple[str, int]:
-    """Relevance-filter and budget-cap the doctor directory section."""
     if not doctors:
         return "No doctors currently registered for this hospital.\n", 0
-
-    scored = sorted(
-        [(score_doctor_relevance(question, d), d) for d in doctors],
-        key=lambda x: x[0],
-        reverse=True,
-    )
-
+    scored = sorted([(score_doctor_relevance(question, d), d) for d in doctors], key=lambda x: x[0], reverse=True)
     top_score = scored[0][0] if scored else 0.0
     limit = MAX_RELEVANT_DOCTORS if top_score > 0.05 else DEFAULT_DOCTORS_IF_NO_MATCH
-    selected = [d for _, d in scored[:limit]]
-
-    lines = []
-    total_chars = 0
-    truncated = False
-
-    for doctor in selected:
-        line = (
-            f"- {doctor.name}"
-            f" ({doctor.department or 'General'})"
-            f": Schedule {doctor.base_schedule or 'Not specified'}\n"
-        )
+    lines, total_chars, truncated = [], 0, False
+    for _, doctor in scored[:limit]:
+        line = f"- {doctor.name} ({doctor.department or 'General'}): Schedule {doctor.base_schedule or 'Not specified'}\n"
         if total_chars + len(line) > DOCTOR_SECTION_MAX_CHARS:
             truncated = True
             break
         lines.append(line)
         total_chars += len(line)
-
     section = "RELEVANT DOCTORS FOR THIS QUERY:\n" + "".join(lines)
     if truncated:
-        section += f"(List truncated to fit context. Total doctors on file: {len(doctors)})\n"
-
+        section += f"(List truncated. Total doctors on file: {len(doctors)})\n"
     return section, len(lines)
 
 
 # =============================================================================
-# KB CONTEXT TRIMMING
+# KB CONTEXT
 # =============================================================================
 
 def build_kb_context(chunks: list) -> tuple[str, int]:
-    """Trim each KB chunk and the total section to their character budgets."""
     if not chunks:
         return "", 0
-
-    trimmed_chunks = []
-    total_chars = 0
-
+    trimmed, total = [], 0
     for chunk in chunks:
         text = chunk.content.strip()
         if len(text) > KB_CHUNK_MAX_CHARS:
             text = text[:KB_CHUNK_MAX_CHARS].rsplit(" ", 1)[0] + "…"
-        if total_chars + len(text) > KB_SECTION_MAX_CHARS:
+        if total + len(text) > KB_SECTION_MAX_CHARS:
             break
-        trimmed_chunks.append(text)
-        total_chars += len(text)
-
-    if not trimmed_chunks:
-        return "", 0
-
-    return "\n---\n".join(trimmed_chunks), len(trimmed_chunks)
+        trimmed.append(text)
+        total += len(text)
+    return ("\n---\n".join(trimmed), len(trimmed)) if trimmed else ("", 0)
 
 
 # =============================================================================
-# AVAILABILITY — with typed error handling
+# AVAILABILITY
 # =============================================================================
 
-def fetch_availability_context(
-    question: str,
-    sheet_id: str,
-    hospital_id: int,
-    today_str: str,
-) -> str:
-    """
-    Fetch live doctor availability from Google Sheets and return a
-    directive string for the system prompt.
-
-    Three possible outcomes:
-
-    1. SUCCESS — doctor matched and their status is known:
-       Returns either an "ABSENT TODAY" warning or an "Available today"
-       confirmation. The LLM uses this as authoritative ground truth.
-
-    2. STALE CACHE FALLBACK — the live fetch failed but we have a recent
-       cached result (from a successful fetch within the current process):
-       Returns availability from cache, flagged as possibly stale so the
-       LLM can qualify its answer appropriately.
-
-    3. FULLY OFFLINE — fetch failed and no cache exists:
-       Returns an explicit directive instructing the LLM NOT to guess
-       and to redirect the patient to call reception. This is the safe
-       default that prevents hallucinated availability information.
-
-    The distinction between outcomes 2 and 3 matters clinically:
-    stale-cache data from 4 minutes ago is usually still correct; a
-    completely empty response with no data at all should never allow
-    the model to invent an answer.
-    """
+def fetch_availability_context(question: str, sheet_id: str, hospital_id: int, today_str: str) -> str:
     try:
-        doctors_live_data = get_doctor_availability(sheet_id=sheet_id)
-
-        # Successful fetch — resolve any doctor mentioned in the question
-        doc_id, doc_name = resolve_doctor_id(question, doctors_live_data)
-
+        data = get_doctor_availability(sheet_id=sheet_id)
+        doc_id, doc_name = resolve_doctor_id(question, data)
         if not doc_id:
-            # No specific doctor mentioned — no availability context needed
             return ""
-
-        doc_info = doctors_live_data.get(doc_id, {})
-        absent_dates_raw = str(doc_info.get("absent_dates", ""))
-        absent_dates = [d.strip() for d in absent_dates_raw.split(",") if d.strip()]
-
-        if today_str in absent_dates:
-            return (
-                f"IMPORTANT LIVE STATUS: {doc_name} is ABSENT TODAY ({today_str}). "
-                "Tell the patient they are unavailable and suggest they contact "
-                "reception to reschedule or see another doctor."
-            )
-        else:
-            return (
-                f"LIVE STATUS: {doc_name} is available today ({today_str}) "
-                "according to the live schedule."
-            )
-
+        doc_info = data.get(doc_id, {})
+        absent = [d.strip() for d in str(doc_info.get("absent_dates", "")).split(",") if d.strip()]
+        if today_str in absent:
+            return (f"IMPORTANT LIVE STATUS: {doc_name} is ABSENT TODAY ({today_str}). "
+                    "Tell the patient they are unavailable and suggest calling reception.")
+        return f"LIVE STATUS: {doc_name} is available today ({today_str})."
     except AvailabilityError as e:
-        # Typed error from availability.py — log it properly so it surfaces
-        # in Render's log stream, then attempt a graceful stale-cache fallback.
-        logger.error(
-            "[Availability] Fetch failed for hospital_id=%s sheet_id=%s: %s",
-            hospital_id, sheet_id, str(e)
-        )
-
-        stale_data = get_cached_or_empty(sheet_id)
-
-        if stale_data:
-            # We have stale data — try to use it but flag it to the LLM
-            doc_id, doc_name = resolve_doctor_id(question, stale_data)
-
+        logger.error("[Availability] Fetch failed hospital_id=%s sheet_id=%s: %s", hospital_id, sheet_id, e)
+        stale = get_cached_or_empty(sheet_id)
+        if stale:
+            doc_id, doc_name = resolve_doctor_id(question, stale)
             if doc_id:
-                doc_info = stale_data.get(doc_id, {})
-                absent_dates_raw = str(doc_info.get("absent_dates", ""))
-                absent_dates = [d.strip() for d in absent_dates_raw.split(",") if d.strip()]
-
-                if today_str in absent_dates:
-                    return (
-                        f"AVAILABILITY DATA (may be up to 5 minutes old): "
-                        f"{doc_name} was marked ABSENT for today ({today_str}) "
-                        "in the last known schedule. Advise the patient to confirm "
-                        "by calling reception before visiting."
-                    )
-                else:
-                    return (
-                        f"AVAILABILITY DATA (may be up to 5 minutes old): "
-                        f"{doc_name} was marked as available today ({today_str}) "
-                        "in the last known schedule. Advise the patient to confirm "
-                        "by calling reception if time-sensitive."
-                    )
-
-            # Stale data exists but doctor not found in it — still offline
-            logger.info(
-                "[Availability] Stale cache exists for sheet_id=%s but "
-                "no doctor match found for question: %.80s",
-                sheet_id, question
-            )
-
-        # No stale data at all, or no doctor match in stale data —
-        # use the safe explicit directive so the LLM cannot guess.
-        logger.warning(
-            "[Availability] No usable data for hospital_id=%s. "
-            "Using safe offline fallback.",
-            hospital_id
-        )
-        return (
-            "SYSTEM NOTE: Live doctor availability data is currently unreachable. "
-            "You MUST NOT guess or fabricate whether any doctor is available. "
-            "If the patient asks about a specific doctor's availability, tell them "
-            "the live schedule is temporarily unavailable and ask them to call the "
-            "hospital reception directly to confirm."
-        )
-
+                doc_info = stale.get(doc_id, {})
+                absent = [d.strip() for d in str(doc_info.get("absent_dates", "")).split(",") if d.strip()]
+                qualifier = "ABSENT" if today_str in absent else "available"
+                return (f"AVAILABILITY DATA (may be up to 5 minutes old): "
+                        f"{doc_name} was marked {qualifier} for today ({today_str}). "
+                        "Advise the patient to confirm by calling reception.")
+        return ("SYSTEM NOTE: Live doctor availability data is currently unreachable. "
+                "You MUST NOT guess whether any doctor is available. "
+                "Tell the patient to call the hospital reception directly.")
     except Exception as e:
-        # Unexpected error — log it and use the safe fallback
-        logger.exception(
-            "[Availability] Unexpected error for hospital_id=%s: %s",
-            hospital_id, str(e)
-        )
-        return (
-            "SYSTEM NOTE: Live doctor availability data is currently unreachable. "
-            "You MUST NOT guess or fabricate whether any doctor is available. "
-            "Ask the patient to call reception directly to confirm."
-        )
+        logger.exception("[Availability] Unexpected error hospital_id=%s: %s", hospital_id, e)
+        return ("SYSTEM NOTE: Live availability unreachable. "
+                "You MUST NOT guess availability. Ask the patient to call reception.")
 
 
 # =============================================================================
-# SHARED CONTEXT BUILDER
+# SYSTEM PROMPT BUILDER
 # =============================================================================
+
+def build_malayalam_instruction(lang: str) -> str:
+    """
+    FIX: The original prompt had a contradiction:
+      - lang_instruction said: 'Respond ONLY in Malayalam script. Do NOT use English script.'
+      - behavior_guidelines said: 'Use Manglish style — English terms written in Malayalam script.'
+
+    'Do NOT use English script' told the model to avoid the Latin alphabet entirely.
+    'Manglish' requires mixing Malayalam script with English-origin words
+    (e.g. 'Cardiology' stays as 'കാർഡിയോളജി', which IS Malayalam script
+    but is an English loanword — this is fine and correct).
+
+    The real instruction the model needs:
+      - Write in Malayalam script (not Latin alphabet)
+      - Medical/technical terms that are English loanwords should be
+        transliterated into Malayalam script, NOT translated literally
+      - When the answer is not in context, say so in Malayalam, do not guess
+    """
+    if lang != "ml":
+        return "Respond in English only."
+
+    return """LANGUAGE: Respond entirely in Malayalam script (മലയാളം).
+
+STYLE RULES for Malayalam responses:
+1. Medical and technical terms that are English loanwords should be written
+   in Malayalam script as they are pronounced — do NOT invent pure Malayalam
+   translations for them.
+   CORRECT: കാർഡിയോളജി (Cardiology), ഫാർമസി (Pharmacy), ഓർത്തോപീഡിക്സ് (Orthopaedics)
+   WRONG:   ഹൃദ്രോഗ ശാസ്ത്രം (invented pure Malayalam — sounds unnatural and confusing)
+
+2. Doctor names, department names, and proper nouns: write them in Malayalam
+   script exactly as they are pronounced in spoken Malayalam.
+
+3. Tone: Like a friendly, professional hospital receptionist speaking to a patient.
+   Warm, clear, and direct.
+
+4. Length: Give complete answers. Do not cut a sentence short.
+   If listing doctors, list all that are relevant."""
+
+
+def build_fallback_instruction() -> str:
+    """
+    Explicit do-not-guess guardrail placed at the END of the system prompt
+    where it has the strongest recency effect on the model.
+    """
+    return """IMPORTANT — WHEN YOU DO NOT KNOW SOMETHING:
+If the patient asks about something not mentioned in the doctor list or knowledge
+above (e.g. pharmacy location, visiting hours, room numbers, fees) and you do not
+have that information:
+- English: Say clearly: "I don't have that information. Please ask at the reception desk."
+- Malayalam: Say: "എനിക്ക് ആ വിവരം ലഭ്യമല്ല. ദയവായി റിസപ്ഷൻ ഡെസ്കിൽ ചോദിക്കൂ."
+
+Do NOT make up answers. Do NOT say information that is not in your context above."""
+
 
 def build_context(request: ChatRequest, db: Session):
-    """Assemble the system prompt and full OpenAI message list."""
     hospital_id = request.hospital_id
     question = request.question
     target_lang = request.language
@@ -330,167 +336,175 @@ def build_context(request: ChatRequest, db: Session):
     if not hospital:
         raise HTTPException(status_code=404, detail="Hospital not found")
 
-    # 1. Doctor directory (relevance-filtered + budget-capped)
     all_doctors = db.query(Doctor).filter(Doctor.hospital_id == hospital_id).all()
     doctor_context, doctors_included = build_doctor_context(question, all_doctors)
 
-    # 2. Live availability — now with typed error handling and safe fallback
     availability_context = ""
     if hospital.google_sheet_id:
-        availability_context = fetch_availability_context(
-            question=question,
-            sheet_id=hospital.google_sheet_id,
-            hospital_id=hospital_id,
-            today_str=today_str,
-        )
+        availability_context = fetch_availability_context(question, hospital.google_sheet_id, hospital_id, today_str)
 
-    # 3. Vector search (pgvector RAG) — budget-trimmed
     embed_resp = client.embeddings.create(input=question, model="text-embedding-3-small")
     raw_results = (
         db.query(KnowledgeBase)
         .filter(KnowledgeBase.hospital_id == hospital_id)
         .order_by(KnowledgeBase.embedding.cosine_distance(embed_resp.data[0].embedding))
-        .limit(3)
-        .all()
+        .limit(3).all()
     )
     kb_context, chunks_included = build_kb_context(raw_results)
 
-    # 4. Language + behaviour
-    lang_instruction = (
-        "IMPORTANT: Respond ONLY in Malayalam script (മലയാളം). Do not use English script."
-        if target_lang == "ml"
-        else "Respond strictly in English."
-    )
+    lang_instruction = build_malayalam_instruction(target_lang)
+    fallback_instruction = build_fallback_instruction()
 
-    behavior_guidelines = """RESPONSE GUIDELINES:
-- Malayalam: Use Manglish style — English technical terms in Malayalam script.
-  e.g. 'കാർഡിയോളജി വിഭാഗം' not a literal translation.
-- Tone: Professional but conversational, like a hospital receptionist.
-- If information is not in your context, say so clearly — do not guess.
-- Keep responses concise (1–2 sentences) unless listing multiple items."""
-
-    # 5. Assemble system prompt
-    system_prompt_parts = [
+    parts = [
         f"You are Arogya, the AI Assistant for {hospital.name}.",
         f"Current Date: {today_str}",
         "",
         hospital.system_prompt or "",
-        lang_instruction,
         "",
-        behavior_guidelines,
+        lang_instruction,
         "",
         doctor_context,
     ]
 
     if availability_context:
-        system_prompt_parts.append(availability_context)
+        parts.append(availability_context)
 
     if kb_context:
-        system_prompt_parts.extend(["", "ADDITIONAL KNOWLEDGE:", kb_context])
+        parts.extend(["", "ADDITIONAL KNOWLEDGE BASE:", kb_context])
 
-    system_prompt_parts.append(
-        "\nRespond in the language used by the user. "
-        "You have memory of this conversation — give coherent, non-repetitive answers."
-    )
+    # Fallback instruction at the end — highest recency weight
+    parts.extend(["", fallback_instruction])
 
-    system_prompt = "\n".join(system_prompt_parts)
+    system_prompt = "\n".join(parts)
 
-    # 6. Budget telemetry
     prompt_chars = len(system_prompt)
-    approx_tokens = prompt_chars // 4
-
     if prompt_chars > SYSTEM_PROMPT_WARN_CHARS:
         logger.warning(
-            "System prompt exceeds soft limit for hospital_id=%s: "
-            "%d chars (~%d tokens). doctors=%d/%d kb_chunks=%d",
-            hospital_id, prompt_chars, approx_tokens,
-            doctors_included, len(all_doctors), chunks_included,
-        )
-    else:
-        logger.debug(
-            "System prompt for hospital_id=%s: %d chars (~%d tokens) "
-            "doctors=%d/%d kb_chunks=%d",
-            hospital_id, prompt_chars, approx_tokens,
-            doctors_included, len(all_doctors), chunks_included,
+            "System prompt over soft limit hospital_id=%s: %d chars (~%d tokens) doctors=%d/%d kb=%d",
+            hospital_id, prompt_chars, prompt_chars // 4, doctors_included, len(all_doctors), chunks_included,
         )
 
-    # 7. Full message list
     history_messages = build_history_messages(request.history or [])
     openai_messages = (
         [{"role": "system", "content": system_prompt}]
         + history_messages
         + [{"role": "user", "content": question}]
     )
-
     return system_prompt, openai_messages, hospital
 
 
 # =============================================================================
-# HISTORY HELPERS
+# HISTORY
 # =============================================================================
 
 def build_history_messages(history: List[HistoryMessage]) -> List[dict]:
     if not history:
         return []
-    max_messages = MAX_HISTORY_TURNS * 2
-    trimmed = history[-max_messages:]
+    trimmed = history[-(MAX_HISTORY_TURNS * 2):]
     if trimmed and trimmed[0].role != "user":
         trimmed = trimmed[1:]
-    return [{"role": msg.role, "content": msg.content} for msg in trimmed]
+    return [{"role": m.role, "content": m.content} for m in trimmed]
 
 
 # =============================================================================
-# PDF INGESTION HELPERS
+# PDF HELPERS
 # =============================================================================
 
 def extract_text_from_pdf(pdf_bytes: bytes) -> tuple[str, int]:
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     pages_text = []
-    for page_num, page in enumerate(doc):
-        page_text = page.get_text("text").strip()
-        if page_text:
-            pages_text.append(f"[Page {page_num + 1}]\n{page_text}")
-    page_count = len(doc)
+    for i, page in enumerate(doc):
+        text = page.get_text("text").strip()
+        if text:
+            pages_text.append(f"[Page {i + 1}]\n{text}")
+    count = len(doc)
     doc.close()
-    return "\n\n".join(pages_text), page_count
+    return "\n\n".join(pages_text), count
 
 
 def chunk_text(text: str) -> List[str]:
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=PDF_CHUNK_SIZE,
-        chunk_overlap=PDF_CHUNK_OVERLAP,
+        chunk_size=PDF_CHUNK_SIZE, chunk_overlap=PDF_CHUNK_OVERLAP,
         separators=["\n\n", "\n", ". ", " ", ""],
     )
-    raw_chunks = splitter.split_text(text)
-    return [c.strip() for c in raw_chunks if len(c.strip()) > 50]
+    return [c.strip() for c in splitter.split_text(text) if len(c.strip()) > 50]
 
 
 def embed_chunks_batch(chunks: List[str]) -> List[List[float]]:
-    embeddings = []
-    batch_size = 100
-    for i in range(0, len(chunks), batch_size):
-        batch = chunks[i:i + batch_size]
-        resp = client.embeddings.create(input=batch, model="text-embedding-3-small")
-        embeddings.extend([item.embedding for item in resp.data])
-    return embeddings
+    result = []
+    for i in range(0, len(chunks), 100):
+        resp = client.embeddings.create(input=chunks[i:i+100], model="text-embedding-3-small")
+        result.extend([item.embedding for item in resp.data])
+    return result
 
 
 # =============================================================================
 # ENDPOINTS
 # =============================================================================
 
+@router.get("/suggestions/{hospital_id}")
+async def get_suggestions(hospital_id: int, db: Session = Depends(get_db)):
+    """
+    Returns dynamic suggestion chips for the chat UI, based on what the
+    hospital has actually configured — doctors and KB content.
+
+    This replaces the hardcoded suggestions in Chat.tsx that pointed to
+    pharmacy locations and cardiologists the bot may know nothing about.
+
+    Response:
+    {
+      "en": ["Which doctors are available today?", ...],
+      "ml": ["ഇന്ന് ഏത് ഡോക്ടർ ഉണ്ട്?", ...]
+    }
+    """
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+
+    doctors = db.query(Doctor).filter(Doctor.hospital_id == hospital_id).limit(3).all()
+    has_kb = db.query(KnowledgeBase).filter(KnowledgeBase.hospital_id == hospital_id).first() is not None
+
+    en_suggestions = []
+    ml_suggestions = []
+
+    # Doctor-based suggestions — only shown if doctors are registered
+    if doctors:
+        # Show up to 2 department-specific suggestions
+        for doctor in doctors[:2]:
+            dept = doctor.department or "General"
+            en_suggestions.append(f"Who is the {dept} doctor?")
+            ml_suggestions.append(f"{dept} ഡോക്ടർ ആരാണ്?")
+
+        en_suggestions.append("Which doctors are available today?")
+        ml_suggestions.append("ഇന്ന് ഏത് ഡോക്ടർ ഉണ്ട്?")
+    else:
+        # No doctors yet — safe generic prompts
+        en_suggestions.append("What can Arogya help me with?")
+        ml_suggestions.append("ആരോഗ്യ എന്തൊക്കെ സഹായിക്കും?")
+
+    # KB-based suggestions — only shown if KB has content
+    if has_kb:
+        en_suggestions.append("What are the hospital timings?")
+        ml_suggestions.append("ആശുപത്രി സമയം എന്താണ്?")
+    else:
+        en_suggestions.append("How do I contact the hospital?")
+        ml_suggestions.append("ആശുപത്രിയിൽ എങ്ങനെ ബന്ധപ്പെടാം?")
+
+    # Always-safe last suggestion
+    en_suggestions.append("Tell me about this hospital")
+    ml_suggestions.append("ഈ ആശുപത്രിയെക്കുറിച്ച് പറയൂ")
+
+    return {"en": en_suggestions[:4], "ml": ml_suggestions[:4]}
+
+
 @router.post("/ingest")
-async def ingest_knowledge(
-    request: IngestRequest,
-    db: Session = Depends(get_db)
-):
+async def ingest_knowledge(request: IngestRequest, db: Session = Depends(get_db)):
     try:
         resp = client.embeddings.create(input=request.text, model="text-embedding-3-small")
-        embedding = resp.data[0].embedding
         db.add(KnowledgeBase(
             hospital_id=request.hospital_id,
             content=request.text,
-            embedding=embedding,
+            embedding=resp.data[0].embedding,
             created_at=datetime.utcnow()
         ))
         db.commit()
@@ -501,148 +515,89 @@ async def ingest_knowledge(
 
 
 @router.post("/upload-pdf")
-async def upload_pdf(
-    file: UploadFile = File(...),
-    hospital_id: int = Form(...),
-    db: Session = Depends(get_db)
-):
+async def upload_pdf(file: UploadFile = File(...), hospital_id: int = Form(...), db: Session = Depends(get_db)):
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=422, detail="Only PDF files are accepted.")
-
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
     if not hospital:
         raise HTTPException(status_code=404, detail="Hospital not found")
-
     pdf_bytes = await file.read()
     if not pdf_bytes:
-        raise HTTPException(status_code=422, detail="Uploaded file is empty.")
+        raise HTTPException(status_code=422, detail="Empty file.")
     if not pdf_bytes.startswith(b"%PDF"):
-        raise HTTPException(status_code=422, detail="File does not appear to be a valid PDF.")
-
+        raise HTTPException(status_code=422, detail="Not a valid PDF.")
     try:
         full_text, page_count = extract_text_from_pdf(pdf_bytes)
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Could not read PDF: {e}")
-
     if not full_text.strip():
-        raise HTTPException(
-            status_code=422,
-            detail="No readable text found. Scanned image-only PDFs are not supported."
-        )
-
+        raise HTTPException(status_code=422, detail="No readable text. Scanned PDFs are not supported.")
     chunks = chunk_text(full_text)
     if not chunks:
-        raise HTTPException(status_code=422, detail="PDF text was too short to produce knowledge chunks.")
-
+        raise HTTPException(status_code=422, detail="PDF too short to produce knowledge chunks.")
     try:
         embeddings = embed_chunks_batch(chunks)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Embedding failed: {e}")
-
     try:
-        for chunk_content, embedding in zip(chunks, embeddings):
-            db.add(KnowledgeBase(
-                hospital_id=hospital_id,
-                content=chunk_content,
-                embedding=embedding,
-                created_at=datetime.utcnow()
-            ))
+        for content, embedding in zip(chunks, embeddings):
+            db.add(KnowledgeBase(hospital_id=hospital_id, content=content, embedding=embedding, created_at=datetime.utcnow()))
         db.commit()
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
-
     return {
-        "status": "success",
-        "filename": file.filename,
-        "pages_processed": page_count,
-        "chunks_stored": len(chunks),
+        "status": "success", "filename": file.filename,
+        "pages_processed": page_count, "chunks_stored": len(chunks),
         "total_characters": sum(len(c) for c in chunks),
-        "message": (
-            f"'{file.filename}' processed successfully. "
-            f"{page_count} pages → {len(chunks)} knowledge chunks stored for {hospital.name}."
-        )
+        "message": f"'{file.filename}' → {len(chunks)} chunks stored for {hospital.name}."
     }
 
 
 @router.post("/chat")
-async def chat_with_arogya(
-    request: ChatRequest,
-    db: Session = Depends(get_db)
-):
+async def chat_with_arogya(request: ChatRequest, db: Session = Depends(get_db)):
     _, openai_messages, _ = build_context(request, db)
-
-    ai_response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=openai_messages
-    )
-
+    ai_response = client.chat.completions.create(model="gpt-4o-mini", messages=openai_messages)
     usage = ai_response.usage
     db.add(UsageLedger(
-        hospital_id=request.hospital_id,
-        endpoint="/chat",
-        prompt_tokens=usage.prompt_tokens,
-        completion_tokens=usage.completion_tokens,
-        total_tokens=usage.total_tokens,
-        estimated_cost=(usage.total_tokens / 1_000_000) * 0.15
+        hospital_id=request.hospital_id, endpoint="/chat",
+        prompt_tokens=usage.prompt_tokens, completion_tokens=usage.completion_tokens,
+        total_tokens=usage.total_tokens, estimated_cost=(usage.total_tokens / 1_000_000) * 0.15
     ))
     db.commit()
-
     return {"answer": ai_response.choices[0].message.content}
 
 
 @router.post("/chat-stream")
-async def chat_stream(
-    request: ChatRequest,
-    db: Session = Depends(get_db)
-):
+async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
     _, openai_messages, _ = build_context(request, db)
 
     async def event_generator() -> AsyncGenerator[str, None]:
-        prompt_tokens = 0
-        completion_tokens = 0
-        total_tokens = 0
-
+        pt = ct = tt = 0
         try:
             stream = await async_client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=openai_messages,
-                stream=True,
-                stream_options={"include_usage": True}
+                model="gpt-4o-mini", messages=openai_messages,
+                stream=True, stream_options={"include_usage": True}
             )
-
             async for chunk in stream:
                 delta = chunk.choices[0].delta if chunk.choices else None
                 token = delta.content if delta and delta.content else None
                 if token:
                     yield f"data: {json.dumps(token)}\n\n"
                 if chunk.usage:
-                    prompt_tokens = chunk.usage.prompt_tokens
-                    completion_tokens = chunk.usage.completion_tokens
-                    total_tokens = chunk.usage.total_tokens
-
+                    pt, ct, tt = chunk.usage.prompt_tokens, chunk.usage.completion_tokens, chunk.usage.total_tokens
             yield "data: [DONE]\n\n"
-
-            if total_tokens > 0:
+            if tt > 0:
                 db.add(UsageLedger(
-                    hospital_id=request.hospital_id,
-                    endpoint="/chat-stream",
-                    prompt_tokens=prompt_tokens,
-                    completion_tokens=completion_tokens,
-                    total_tokens=total_tokens,
-                    estimated_cost=(total_tokens / 1_000_000) * 0.15
+                    hospital_id=request.hospital_id, endpoint="/chat-stream",
+                    prompt_tokens=pt, completion_tokens=ct, total_tokens=tt,
+                    estimated_cost=(tt / 1_000_000) * 0.15
                 ))
                 db.commit()
-
         except Exception as e:
             yield f"data: [ERROR] {str(e)}\n\n"
 
     return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
-            "Connection": "keep-alive",
-        }
+        event_generator(), media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"}
     )

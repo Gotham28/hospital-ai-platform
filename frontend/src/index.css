@@ -1,1 +1,10 @@
 @import "tailwindcss";
+
+/* Hides scrollbar on the suggestion chips row while keeping scroll functionality */
+.no-scrollbar {
+  scrollbar-width: none;        /* Firefox */
+  -ms-overflow-style: none;     /* IE / Edge */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;                /* Chrome, Safari, Opera */
+}
