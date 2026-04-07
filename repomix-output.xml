@@ -75,6 +75,7 @@ backend/app/schemas/hospital.py
 backend/app/schemas/user.py
 backend/create_tables.py
 backend/google_credentials.json
+backend/repomix-output.xml
 backend/seed.py
 frontend/.gitignore
 frontend/eslint.config.js
@@ -118,6 +119,2027 @@ vite.config.ts
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path="backend/repomix-output.xml">
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+alembic.ini
+alembic/env.py
+alembic/README
+alembic/script.py.mako
+alembic/versions/1557c23751d2_clean_baseline.py
+alembic/versions/8e2627e5f8b9_reset_baseline.py
+app/api/__init__.py
+app/api/deps.py
+app/api/v1/endpoints/__init__.py
+app/api/v1/endpoints/ai.py
+app/api/v1/endpoints/auth.py
+app/api/v1/endpoints/hospitals.py
+app/api/v1/endpoints/usage.py
+app/availability.py
+app/core/__init__.py
+app/core/config.py
+app/crud/__init__.py
+app/crud/crud_hospital.py
+app/crud/crud_user.py
+app/db/base_class.py
+app/db/base.py
+app/db/session.py
+app/main.py
+app/models/__init__.py
+app/models/doctor.py
+app/models/hospital.py
+app/models/knowledge.py
+app/models/usage.py
+app/models/user.py
+app/schemas/__init__.py
+app/schemas/hospital.py
+app/schemas/user.py
+create_tables.py
+google_credentials.json
+seed.py
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="alembic.ini">
+# A generic, single database configuration.
+
+[alembic]
+# path to migration scripts.
+# this is typically a path given in POSIX (e.g. forward slashes)
+# format, relative to the token %(here)s which refers to the location of this
+# ini file
+script_location = %(here)s/alembic
+
+# template used to generate migration file names; The default value is %%(rev)s_%%(slug)s
+# Uncomment the line below if you want the files to be prepended with date and time
+# see https://alembic.sqlalchemy.org/en/latest/tutorial.html#editing-the-ini-file
+# for all available tokens
+# file_template = %%(year)d_%%(month).2d_%%(day).2d_%%(hour).2d%%(minute).2d-%%(rev)s_%%(slug)s
+
+# sys.path path, will be prepended to sys.path if present.
+# defaults to the current working directory.  for multiple paths, the path separator
+# is defined by "path_separator" below.
+prepend_sys_path = .
+
+
+# timezone to use when rendering the date within the migration file
+# as well as the filename.
+# If specified, requires the python>=3.9 or backports.zoneinfo library and tzdata library.
+# Any required deps can installed by adding `alembic[tz]` to the pip requirements
+# string value is passed to ZoneInfo()
+# leave blank for localtime
+# timezone =
+
+# max length of characters to apply to the "slug" field
+# truncate_slug_length = 40
+
+# set to 'true' to run the environment during
+# the 'revision' command, regardless of autogenerate
+# revision_environment = false
+
+# set to 'true' to allow .pyc and .pyo files without
+# a source .py file to be detected as revisions in the
+# versions/ directory
+# sourceless = false
+
+# version location specification; This defaults
+# to <script_location>/versions.  When using multiple version
+# directories, initial revisions must be specified with --version-path.
+# The path separator used here should be the separator specified by "path_separator"
+# below.
+# version_locations = %(here)s/bar:%(here)s/bat:%(here)s/alembic/versions
+
+# path_separator; This indicates what character is used to split lists of file
+# paths, including version_locations and prepend_sys_path within configparser
+# files such as alembic.ini.
+# The default rendered in new alembic.ini files is "os", which uses os.pathsep
+# to provide os-dependent path splitting.
+#
+# Note that in order to support legacy alembic.ini files, this default does NOT
+# take place if path_separator is not present in alembic.ini.  If this
+# option is omitted entirely, fallback logic is as follows:
+#
+# 1. Parsing of the version_locations option falls back to using the legacy
+#    "version_path_separator" key, which if absent then falls back to the legacy
+#    behavior of splitting on spaces and/or commas.
+# 2. Parsing of the prepend_sys_path option falls back to the legacy
+#    behavior of splitting on spaces, commas, or colons.
+#
+# Valid values for path_separator are:
+#
+# path_separator = :
+# path_separator = ;
+# path_separator = space
+# path_separator = newline
+#
+# Use os.pathsep. Default configuration used for new projects.
+path_separator = os
+
+# set to 'true' to search source files recursively
+# in each "version_locations" directory
+# new in Alembic version 1.10
+# recursive_version_locations = false
+
+# the output encoding used when revision files
+# are written from script.py.mako
+# output_encoding = utf-8
+
+# database URL.  This is consumed by the user-maintained env.py script only.
+# other means of configuring database URLs may be customized within the env.py
+# file.
+sqlalchemy.url = driver://user:pass@localhost/dbname
+
+
+[post_write_hooks]
+# post_write_hooks defines scripts or Python functions that are run
+# on newly generated revision scripts.  See the documentation for further
+# detail and examples
+
+# format using "black" - use the console_scripts runner, against the "black" entrypoint
+# hooks = black
+# black.type = console_scripts
+# black.entrypoint = black
+# black.options = -l 79 REVISION_SCRIPT_FILENAME
+
+# lint with attempts to fix using "ruff" - use the exec runner, execute a binary
+# hooks = ruff
+# ruff.type = exec
+# ruff.executable = %(here)s/.venv/bin/ruff
+# ruff.options = check --fix REVISION_SCRIPT_FILENAME
+
+# Logging configuration.  This is also consumed by the user-maintained
+# env.py script only.
+[loggers]
+keys = root,sqlalchemy,alembic
+
+[handlers]
+keys = console
+
+[formatters]
+keys = generic
+
+[logger_root]
+level = WARNING
+handlers = console
+qualname =
+
+[logger_sqlalchemy]
+level = WARNING
+handlers =
+qualname = sqlalchemy.engine
+
+[logger_alembic]
+level = INFO
+handlers =
+qualname = alembic
+
+[handler_console]
+class = StreamHandler
+args = (sys.stderr,)
+level = NOTSET
+formatter = generic
+
+[formatter_generic]
+format = %(levelname)-5.5s [%(name)s] %(message)s
+datefmt = %H:%M:%S
+</file>
+
+<file path="alembic/env.py">
+import os
+import sys
+from logging.config import fileConfig
+
+from sqlalchemy import engine_from_config
+from sqlalchemy import pool
+from alembic import context
+from dotenv import load_dotenv  # ### NEW: Import dotenv
+
+# ### NEW: Add the project root to the path so we can import 'app'
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
+# ### NEW: Load environment variables from .env
+load_dotenv()
+
+# ### NEW: Import your Base model so Alembic can see your tables!
+# Change 'app.db.base' to wherever your SQLAlchemy Base is defined.
+# If you don't have a Base yet, keep it as None, but you MUST update this later.
+try:
+    from app.db.base import Base
+    target_metadata = Base.metadata
+except ImportError:
+    target_metadata = None
+    print("WARNING: Could not import app.db.base.Base. Autogenerate will not work.")
+
+# this is the Alembic Config object
+config = context.config
+
+# ### NEW: Overwrite the sqlalchemy.url in the config with the one from .env
+# We use the SYNC driver (psycopg2) for migrations, not the ASYNC one.
+db_url = os.getenv("DATABASE_URL")
+if not db_url:
+    raise ValueError("DATABASE_URL not found in .env file!")
+config.set_main_option("sqlalchemy.url", db_url)
+
+
+# Interpret the config file for Python logging.
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name)
+
+
+def run_migrations_offline() -> None:
+    """Run migrations in 'offline' mode."""
+    url = config.get_main_option("sqlalchemy.url")
+    context.configure(
+        url=url,
+        target_metadata=target_metadata,
+        literal_binds=True,
+        dialect_opts={"paramstyle": "named"},
+    )
+
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+def run_migrations_online() -> None:
+    """Run migrations in 'online' mode."""
+    
+    # ### NEW: We must ensure the engine uses the config we just updated
+    connectable = engine_from_config(
+        config.get_section(config.config_ini_section, {}),
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+    )
+
+    with connectable.connect() as connection:
+        context.configure(
+            connection=connection, target_metadata=target_metadata
+        )
+
+        with context.begin_transaction():
+            context.run_migrations()
+
+
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    run_migrations_online()
+</file>
+
+<file path="alembic/README">
+Generic single-database configuration.
+</file>
+
+<file path="alembic/script.py.mako">
+"""${message}
+
+Revision ID: ${up_revision}
+Revises: ${down_revision | comma,n}
+Create Date: ${create_date}
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+${imports if imports else ""}
+
+# revision identifiers, used by Alembic.
+revision: str = ${repr(up_revision)}
+down_revision: Union[str, None] = ${repr(down_revision)}
+branch_labels: Union[str, Sequence[str], None] = ${repr(branch_labels)}
+depends_on: Union[str, Sequence[str], None] = ${repr(depends_on)}
+
+
+def upgrade() -> None:
+    """Upgrade schema."""
+    ${upgrades if upgrades else "pass"}
+
+
+def downgrade() -> None:
+    """Downgrade schema."""
+    ${downgrades if downgrades else "pass"}
+</file>
+
+<file path="alembic/versions/1557c23751d2_clean_baseline.py">
+"""clean_baseline
+
+Revision ID: 1557c23751d2
+Revises: 8e2627e5f8b9
+Create Date: 2026-03-15 12:20:14.818663
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+
+
+# revision identifiers, used by Alembic.
+revision: str = '1557c23751d2'
+down_revision: Union[str, None] = '8e2627e5f8b9'
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    """Upgrade schema."""
+    # ### commands auto generated by Alembic - please adjust! ###
+    pass
+    # ### end Alembic commands ###
+
+
+def downgrade() -> None:
+    """Downgrade schema."""
+    # ### commands auto generated by Alembic - please adjust! ###
+    pass
+    # ### end Alembic commands ###
+</file>
+
+<file path="alembic/versions/8e2627e5f8b9_reset_baseline.py">
+"""reset_baseline
+
+Revision ID: 8e2627e5f8b9
+Revises: 
+Create Date: 2026-03-15 12:11:35.352593
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+
+
+# revision identifiers, used by Alembic.
+revision: str = '8e2627e5f8b9'
+down_revision: Union[str, None] = None
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    """Upgrade schema."""
+    # ### commands auto generated by Alembic - please adjust! ###
+    pass
+    # ### end Alembic commands ###
+
+
+def downgrade() -> None:
+    """Downgrade schema."""
+    # ### commands auto generated by Alembic - please adjust! ###
+    pass
+    # ### end Alembic commands ###
+</file>
+
+<file path="app/api/__init__.py">
+
+</file>
+
+<file path="app/api/deps.py">
+import os
+from typing import Generator
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from jose import jwt, JWTError
+from app.db.session import SessionLocal
+
+# FIX #1: Load SECRET_KEY from environment, never hardcode it.
+# Set JWT_SECRET in your .env and Render environment variables.
+SECRET_KEY = os.getenv("JWT_SECRET", "dev-secret-key-change-in-production")
+ALGORITHM = "HS256"
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login")
+
+def get_db() -> Generator:
+    try:
+        db = SessionLocal()
+        yield db
+    finally:
+        db.close()
+
+def get_current_tenant(token: str = Depends(oauth2_scheme)) -> int:
+    """
+    The Magic Key: Extracts the hospital_id from the JWT.
+    If the token is invalid or missing the ID, it denies access.
+    """
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        hospital_id: int = payload.get("hospital_id")
+        if hospital_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication credentials: No tenant ID found",
+            )
+        return hospital_id
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+        )
+</file>
+
+<file path="app/api/v1/endpoints/__init__.py">
+# Location: D:\Hospital\hospital-ai-platform\backend\app\api\v1\endpoints\__init__.py
+
+from .hospitals import router as hospitals
+from .auth import router as auth
+from .ai import router as ai
+</file>
+
+<file path="app/api/v1/endpoints/ai.py">
+import os
+import re
+import json
+import fitz
+import logging
+import unicodedata
+from typing import List, Optional, AsyncGenerator
+from datetime import datetime
+from pydantic import BaseModel, Field, field_validator, model_validator
+from openai import OpenAI, AsyncOpenAI
+from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi.responses import StreamingResponse
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+from app.api.deps import get_db
+from app.models.hospital import Hospital
+from app.models.knowledge import KnowledgeBase
+from app.models.usage import UsageLedger
+from app.models.doctor import Doctor
+from app.availability import (
+    get_doctor_availability,
+    get_cached_or_empty,
+    AvailabilityError,
+)
+
+logger = logging.getLogger(__name__)
+router = APIRouter()
+
+_api_key = os.getenv("OPENAI_API_KEY")
+if not _api_key:
+    raise RuntimeError("OPENAI_API_KEY environment variable is not set.")
+
+client = OpenAI(api_key=_api_key)
+async_client = AsyncOpenAI(api_key=_api_key)
+
+MAX_HISTORY_TURNS        = 10
+PDF_CHUNK_SIZE           = 800
+PDF_CHUNK_OVERLAP        = 100
+DOCTOR_SECTION_MAX_CHARS = 2_400
+KB_CHUNK_MAX_CHARS       = 500
+KB_SECTION_MAX_CHARS     = 1_500
+MAX_RELEVANT_DOCTORS     = 15
+DEFAULT_DOCTORS_IF_NO_MATCH = 5
+SYSTEM_PROMPT_WARN_CHARS = 12_000
+QUESTION_MIN_LENGTH      = 1
+QUESTION_MAX_LENGTH      = 500
+VALID_LANGUAGES          = {"en", "ml"}
+
+
+# =============================================================================
+# INJECTION DETECTION
+# =============================================================================
+
+_INJECTION_PATTERNS = [
+    re.compile(r"ignore\s+(all\s+)?(previous|prior|above|your)\s+(instructions?|prompt|rules?|guidelines?)", re.IGNORECASE),
+    re.compile(r"(disregard|forget|override|bypass|circumvent)\s+(your\s+)?(instructions?|guidelines?|rules?|prompt|training)", re.IGNORECASE),
+    re.compile(r"(your\s+new|new\s+instructions?\s+(are|is)|from\s+now\s+on\s+you)", re.IGNORECASE),
+    re.compile(r"\byou\s+are\s+now\b", re.IGNORECASE),
+    re.compile(r"\b(act|behave|pretend|roleplay|role-play|simulate)\s+(as|like)\b", re.IGNORECASE),
+    re.compile(r"\b(DAN|jailbreak|do\s+anything\s+now)\b", re.IGNORECASE),
+    re.compile(r"(^|\s)(system|assistant)\s*:", re.IGNORECASE | re.MULTILINE),
+    re.compile(r"(\[INST\]|<<SYS>>|<</SYS>>|\[/INST\])", re.IGNORECASE),
+    re.compile(r"(repeat|show|print|reveal|display|tell me|what (are|is))\s+(your\s+)?(system\s+)?(prompt|instructions?|guidelines?|rules?)", re.IGNORECASE),
+]
+
+def detect_prompt_injection(text: str) -> Optional[str]:
+    for pattern in _INJECTION_PATTERNS:
+        if pattern.search(text):
+            return (
+                "Your message contains patterns that cannot be processed. "
+                "Please ask a straightforward question about doctors, timings, or services."
+            )
+    return None
+
+def sanitise_question(text: str) -> str:
+    text = re.sub(r"\s+", " ", text.strip())
+    text = unicodedata.normalize("NFKC", text)
+    return text
+
+
+# =============================================================================
+# MODELS
+# =============================================================================
+
+class IngestRequest(BaseModel):
+    hospital_id: int
+    text: str
+
+    @field_validator("hospital_id")
+    @classmethod
+    def hospital_id_positive(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError("hospital_id must be a positive integer")
+        return v
+
+    @field_validator("text")
+    @classmethod
+    def text_not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("text must not be empty or whitespace only")
+        return v
+
+
+class HistoryMessage(BaseModel):
+    role: str
+    content: str
+
+    @field_validator("role")
+    @classmethod
+    def role_valid(cls, v: str) -> str:
+        if v not in ("user", "assistant"):
+            raise ValueError("role must be 'user' or 'assistant'")
+        return v
+
+    @field_validator("content")
+    @classmethod
+    def content_not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("content must not be empty")
+        return v.strip()
+
+
+class ChatRequest(BaseModel):
+    question: str = Field(..., min_length=QUESTION_MIN_LENGTH, max_length=QUESTION_MAX_LENGTH)
+    hospital_id: int = Field(..., gt=0)
+    language: str = Field(default="en")
+    history: Optional[List[HistoryMessage]] = Field(default_factory=list)
+
+    @field_validator("language")
+    @classmethod
+    def language_valid(cls, v: str) -> str:
+        n = v.strip().lower()
+        if n not in VALID_LANGUAGES:
+            raise ValueError(f"language must be one of {sorted(VALID_LANGUAGES)}")
+        return n
+
+    @field_validator("question")
+    @classmethod
+    def question_not_whitespace(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("question must contain at least one non-whitespace character")
+        return v
+
+    @model_validator(mode="after")
+    def check_injection_and_sanitise(self) -> "ChatRequest":
+        sanitised = sanitise_question(self.question)
+        reason = detect_prompt_injection(sanitised)
+        if reason:
+            logger.warning(
+                "Prompt injection attempt for hospital_id=%s: %.100s",
+                self.hospital_id, self.question,
+            )
+            raise ValueError(reason)
+        self.question = sanitised
+        return self
+
+
+# =============================================================================
+# DOCTOR RELEVANCE FILTERING
+# =============================================================================
+
+def normalize_name(text: str) -> str:
+    text = text.lower()
+    text = re.sub(r"dr\.?", "", text)
+    text = re.sub(r"[^a-z\s]", "", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def resolve_doctor_id(user_text: str, doctor_data: dict):
+    nq = normalize_name(user_text)
+    best_match, best_score = None, 0
+    for did, d in doctor_data.items():
+        name = d.get("name", "") if isinstance(d, dict) else str(d)
+        nn = normalize_name(name)
+        qt, nt = set(nq.split()), set(nn.split())
+        if not qt or not nt:
+            continue
+        score = len(qt & nt) / len(nt)
+        if score > best_score:
+            best_score = score
+            best_match = (did, name)
+    return best_match if best_score >= 0.5 else (None, None)
+
+
+def score_doctor_relevance(question: str, doctor: Doctor) -> float:
+    q_tokens = set(normalize_name(question).split())
+    if not q_tokens:
+        return 0.0
+    d_text = " ".join(filter(None, [doctor.name or "", doctor.department or "", doctor.base_schedule or ""]))
+    d_tokens = set(normalize_name(d_text).split())
+    return len(q_tokens & d_tokens) / len(q_tokens) if d_tokens else 0.0
+
+
+def build_doctor_context(question: str, doctors: List[Doctor]) -> tuple[str, int]:
+    if not doctors:
+        return "No doctors currently registered for this hospital.\n", 0
+    scored = sorted([(score_doctor_relevance(question, d), d) for d in doctors], key=lambda x: x[0], reverse=True)
+    top_score = scored[0][0] if scored else 0.0
+    limit = MAX_RELEVANT_DOCTORS if top_score > 0.05 else DEFAULT_DOCTORS_IF_NO_MATCH
+    lines, total_chars, truncated = [], 0, False
+    for _, doctor in scored[:limit]:
+        line = f"- {doctor.name} ({doctor.department or 'General'}): Schedule {doctor.base_schedule or 'Not specified'}\n"
+        if total_chars + len(line) > DOCTOR_SECTION_MAX_CHARS:
+            truncated = True
+            break
+        lines.append(line)
+        total_chars += len(line)
+    section = "RELEVANT DOCTORS FOR THIS QUERY:\n" + "".join(lines)
+    if truncated:
+        section += f"(List truncated. Total doctors on file: {len(doctors)})\n"
+    return section, len(lines)
+
+
+# =============================================================================
+# KB CONTEXT
+# =============================================================================
+
+def build_kb_context(chunks: list) -> tuple[str, int]:
+    if not chunks:
+        return "", 0
+    trimmed, total = [], 0
+    for chunk in chunks:
+        text = chunk.content.strip()
+        if len(text) > KB_CHUNK_MAX_CHARS:
+            text = text[:KB_CHUNK_MAX_CHARS].rsplit(" ", 1)[0] + "…"
+        if total + len(text) > KB_SECTION_MAX_CHARS:
+            break
+        trimmed.append(text)
+        total += len(text)
+    return ("\n---\n".join(trimmed), len(trimmed)) if trimmed else ("", 0)
+
+
+# =============================================================================
+# AVAILABILITY
+# =============================================================================
+
+def fetch_availability_context(question: str, sheet_id: str, hospital_id: int, today_str: str) -> str:
+    try:
+        data = get_doctor_availability(sheet_id=sheet_id)
+        doc_id, doc_name = resolve_doctor_id(question, data)
+        if not doc_id:
+            return ""
+        doc_info = data.get(doc_id, {})
+        absent = [d.strip() for d in str(doc_info.get("absent_dates", "")).split(",") if d.strip()]
+        if today_str in absent:
+            return (f"IMPORTANT LIVE STATUS: {doc_name} is ABSENT TODAY ({today_str}). "
+                    "Tell the patient they are unavailable and suggest calling reception.")
+        return f"LIVE STATUS: {doc_name} is available today ({today_str})."
+    except AvailabilityError as e:
+        logger.error("[Availability] Fetch failed hospital_id=%s sheet_id=%s: %s", hospital_id, sheet_id, e)
+        stale = get_cached_or_empty(sheet_id)
+        if stale:
+            doc_id, doc_name = resolve_doctor_id(question, stale)
+            if doc_id:
+                doc_info = stale.get(doc_id, {})
+                absent = [d.strip() for d in str(doc_info.get("absent_dates", "")).split(",") if d.strip()]
+                qualifier = "ABSENT" if today_str in absent else "available"
+                return (f"AVAILABILITY DATA (may be up to 5 minutes old): "
+                        f"{doc_name} was marked {qualifier} for today ({today_str}). "
+                        "Advise the patient to confirm by calling reception.")
+        return ("SYSTEM NOTE: Live doctor availability data is currently unreachable. "
+                "You MUST NOT guess whether any doctor is available. "
+                "Tell the patient to call the hospital reception directly.")
+    except Exception as e:
+        logger.exception("[Availability] Unexpected error hospital_id=%s: %s", hospital_id, e)
+        return ("SYSTEM NOTE: Live availability unreachable. "
+                "You MUST NOT guess availability. Ask the patient to call reception.")
+
+
+# =============================================================================
+# SYSTEM PROMPT BUILDER
+# =============================================================================
+
+def build_malayalam_instruction(lang: str) -> str:
+    """
+    FIX: The original prompt had a contradiction:
+      - lang_instruction said: 'Respond ONLY in Malayalam script. Do NOT use English script.'
+      - behavior_guidelines said: 'Use Manglish style — English terms written in Malayalam script.'
+
+    'Do NOT use English script' told the model to avoid the Latin alphabet entirely.
+    'Manglish' requires mixing Malayalam script with English-origin words
+    (e.g. 'Cardiology' stays as 'കാർഡിയോളജി', which IS Malayalam script
+    but is an English loanword — this is fine and correct).
+
+    The real instruction the model needs:
+      - Write in Malayalam script (not Latin alphabet)
+      - Medical/technical terms that are English loanwords should be
+        transliterated into Malayalam script, NOT translated literally
+      - When the answer is not in context, say so in Malayalam, do not guess
+    """
+    if lang != "ml":
+        return "Respond in English only."
+
+    return """LANGUAGE: Respond entirely in Malayalam script (മലയാളം).
+
+STYLE RULES for Malayalam responses:
+1. Medical and technical terms that are English loanwords should be written
+   in Malayalam script as they are pronounced — do NOT invent pure Malayalam
+   translations for them.
+   CORRECT: കാർഡിയോളജി (Cardiology), ഫാർമസി (Pharmacy), ഓർത്തോപീഡിക്സ് (Orthopaedics)
+   WRONG:   ഹൃദ്രോഗ ശാസ്ത്രം (invented pure Malayalam — sounds unnatural and confusing)
+
+2. Doctor names, department names, and proper nouns: write them in Malayalam
+   script exactly as they are pronounced in spoken Malayalam.
+
+3. Tone: Like a friendly, professional hospital receptionist speaking to a patient.
+   Warm, clear, and direct.
+
+4. Length: Give complete answers. Do not cut a sentence short.
+   If listing doctors, list all that are relevant."""
+
+
+def build_fallback_instruction() -> str:
+    """
+    Explicit do-not-guess guardrail placed at the END of the system prompt
+    where it has the strongest recency effect on the model.
+    """
+    return """IMPORTANT — WHEN YOU DO NOT KNOW SOMETHING:
+If the patient asks about something not mentioned in the doctor list or knowledge
+above (e.g. pharmacy location, visiting hours, room numbers, fees) and you do not
+have that information:
+- English: Say clearly: "I don't have that information. Please ask at the reception desk."
+- Malayalam: Say: "എനിക്ക് ആ വിവരം ലഭ്യമല്ല. ദയവായി റിസപ്ഷൻ ഡെസ്കിൽ ചോദിക്കൂ."
+
+Do NOT make up answers. Do NOT say information that is not in your context above."""
+
+
+def build_context(request: ChatRequest, db: Session):
+    hospital_id = request.hospital_id
+    question = request.question
+    target_lang = request.language
+    today_str = datetime.now().strftime("%d-%m-%Y")
+
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+
+    all_doctors = db.query(Doctor).filter(Doctor.hospital_id == hospital_id).all()
+    doctor_context, doctors_included = build_doctor_context(question, all_doctors)
+
+    availability_context = ""
+    if hospital.google_sheet_id:
+        availability_context = fetch_availability_context(question, hospital.google_sheet_id, hospital_id, today_str)
+
+    embed_resp = client.embeddings.create(input=question, model="text-embedding-3-small")
+    raw_results = (
+        db.query(KnowledgeBase)
+        .filter(KnowledgeBase.hospital_id == hospital_id)
+        .order_by(KnowledgeBase.embedding.cosine_distance(embed_resp.data[0].embedding))
+        .limit(3).all()
+    )
+    kb_context, chunks_included = build_kb_context(raw_results)
+
+    lang_instruction = build_malayalam_instruction(target_lang)
+    fallback_instruction = build_fallback_instruction()
+
+    parts = [
+        f"You are Arogya, the AI Assistant for {hospital.name}.",
+        f"Current Date: {today_str}",
+        "",
+        hospital.system_prompt or "",
+        "",
+        lang_instruction,
+        "",
+        doctor_context,
+    ]
+
+    if availability_context:
+        parts.append(availability_context)
+
+    if kb_context:
+        parts.extend(["", "ADDITIONAL KNOWLEDGE BASE:", kb_context])
+
+    # Fallback instruction at the end — highest recency weight
+    parts.extend(["", fallback_instruction])
+
+    system_prompt = "\n".join(parts)
+
+    prompt_chars = len(system_prompt)
+    if prompt_chars > SYSTEM_PROMPT_WARN_CHARS:
+        logger.warning(
+            "System prompt over soft limit hospital_id=%s: %d chars (~%d tokens) doctors=%d/%d kb=%d",
+            hospital_id, prompt_chars, prompt_chars // 4, doctors_included, len(all_doctors), chunks_included,
+        )
+
+    history_messages = build_history_messages(request.history or [])
+    openai_messages = (
+        [{"role": "system", "content": system_prompt}]
+        + history_messages
+        + [{"role": "user", "content": question}]
+    )
+    return system_prompt, openai_messages, hospital
+
+
+# =============================================================================
+# HISTORY
+# =============================================================================
+
+def build_history_messages(history: List[HistoryMessage]) -> List[dict]:
+    if not history:
+        return []
+    trimmed = history[-(MAX_HISTORY_TURNS * 2):]
+    if trimmed and trimmed[0].role != "user":
+        trimmed = trimmed[1:]
+    return [{"role": m.role, "content": m.content} for m in trimmed]
+
+
+# =============================================================================
+# PDF HELPERS
+# =============================================================================
+
+def extract_text_from_pdf(pdf_bytes: bytes) -> tuple[str, int]:
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    pages_text = []
+    for i, page in enumerate(doc):
+        text = page.get_text("text").strip()
+        if text:
+            pages_text.append(f"[Page {i + 1}]\n{text}")
+    count = len(doc)
+    doc.close()
+    return "\n\n".join(pages_text), count
+
+
+def chunk_text(text: str) -> List[str]:
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=PDF_CHUNK_SIZE, chunk_overlap=PDF_CHUNK_OVERLAP,
+        separators=["\n\n", "\n", ". ", " ", ""],
+    )
+    return [c.strip() for c in splitter.split_text(text) if len(c.strip()) > 50]
+
+
+def embed_chunks_batch(chunks: List[str]) -> List[List[float]]:
+    result = []
+    for i in range(0, len(chunks), 100):
+        resp = client.embeddings.create(input=chunks[i:i+100], model="text-embedding-3-small")
+        result.extend([item.embedding for item in resp.data])
+    return result
+
+
+# =============================================================================
+# ENDPOINTS
+# =============================================================================
+
+@router.get("/suggestions/{hospital_id}")
+async def get_suggestions(hospital_id: int, db: Session = Depends(get_db)):
+    """
+    Returns dynamic suggestion chips for the chat UI, based on what the
+    hospital has actually configured — doctors and KB content.
+
+    This replaces the hardcoded suggestions in Chat.tsx that pointed to
+    pharmacy locations and cardiologists the bot may know nothing about.
+
+    Response:
+    {
+      "en": ["Which doctors are available today?", ...],
+      "ml": ["ഇന്ന് ഏത് ഡോക്ടർ ഉണ്ട്?", ...]
+    }
+    """
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+
+    doctors = db.query(Doctor).filter(Doctor.hospital_id == hospital_id).limit(3).all()
+    has_kb = db.query(KnowledgeBase).filter(KnowledgeBase.hospital_id == hospital_id).first() is not None
+
+    en_suggestions = []
+    ml_suggestions = []
+
+    # Doctor-based suggestions — only shown if doctors are registered
+    if doctors:
+        # Show up to 2 department-specific suggestions
+        for doctor in doctors[:2]:
+            dept = doctor.department or "General"
+            en_suggestions.append(f"Who is the {dept} doctor?")
+            ml_suggestions.append(f"{dept} ഡോക്ടർ ആരാണ്?")
+
+        en_suggestions.append("Which doctors are available today?")
+        ml_suggestions.append("ഇന്ന് ഏത് ഡോക്ടർ ഉണ്ട്?")
+    else:
+        # No doctors yet — safe generic prompts
+        en_suggestions.append("What can Arogya help me with?")
+        ml_suggestions.append("ആരോഗ്യ എന്തൊക്കെ സഹായിക്കും?")
+
+    # KB-based suggestions — only shown if KB has content
+    if has_kb:
+        en_suggestions.append("What are the hospital timings?")
+        ml_suggestions.append("ആശുപത്രി സമയം എന്താണ്?")
+    else:
+        en_suggestions.append("How do I contact the hospital?")
+        ml_suggestions.append("ആശുപത്രിയിൽ എങ്ങനെ ബന്ധപ്പെടാം?")
+
+    # Always-safe last suggestion
+    en_suggestions.append("Tell me about this hospital")
+    ml_suggestions.append("ഈ ആശുപത്രിയെക്കുറിച്ച് പറയൂ")
+
+    return {"en": en_suggestions[:4], "ml": ml_suggestions[:4]}
+
+
+@router.post("/ingest")
+async def ingest_knowledge(request: IngestRequest, db: Session = Depends(get_db)):
+    try:
+        resp = client.embeddings.create(input=request.text, model="text-embedding-3-small")
+        db.add(KnowledgeBase(
+            hospital_id=request.hospital_id,
+            content=request.text,
+            embedding=resp.data[0].embedding,
+            created_at=datetime.utcnow()
+        ))
+        db.commit()
+        return {"status": "success", "message": "Knowledge added to Arogya's brain"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/upload-pdf")
+async def upload_pdf(file: UploadFile = File(...), hospital_id: int = Form(...), db: Session = Depends(get_db)):
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=422, detail="Only PDF files are accepted.")
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+    pdf_bytes = await file.read()
+    if not pdf_bytes:
+        raise HTTPException(status_code=422, detail="Empty file.")
+    if not pdf_bytes.startswith(b"%PDF"):
+        raise HTTPException(status_code=422, detail="Not a valid PDF.")
+    try:
+        full_text, page_count = extract_text_from_pdf(pdf_bytes)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Could not read PDF: {e}")
+    if not full_text.strip():
+        raise HTTPException(status_code=422, detail="No readable text. Scanned PDFs are not supported.")
+    chunks = chunk_text(full_text)
+    if not chunks:
+        raise HTTPException(status_code=422, detail="PDF too short to produce knowledge chunks.")
+    try:
+        embeddings = embed_chunks_batch(chunks)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Embedding failed: {e}")
+    try:
+        for content, embedding in zip(chunks, embeddings):
+            db.add(KnowledgeBase(hospital_id=hospital_id, content=content, embedding=embedding, created_at=datetime.utcnow()))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+    return {
+        "status": "success", "filename": file.filename,
+        "pages_processed": page_count, "chunks_stored": len(chunks),
+        "total_characters": sum(len(c) for c in chunks),
+        "message": f"'{file.filename}' → {len(chunks)} chunks stored for {hospital.name}."
+    }
+
+
+@router.post("/chat")
+async def chat_with_arogya(request: ChatRequest, db: Session = Depends(get_db)):
+    _, openai_messages, _ = build_context(request, db)
+    ai_response = client.chat.completions.create(model="gpt-4o-mini", messages=openai_messages)
+    usage = ai_response.usage
+    db.add(UsageLedger(
+        hospital_id=request.hospital_id, endpoint="/chat",
+        prompt_tokens=usage.prompt_tokens, completion_tokens=usage.completion_tokens,
+        total_tokens=usage.total_tokens, estimated_cost=(usage.total_tokens / 1_000_000) * 0.15
+    ))
+    db.commit()
+    return {"answer": ai_response.choices[0].message.content}
+
+
+@router.post("/chat-stream")
+async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
+    _, openai_messages, _ = build_context(request, db)
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        pt = ct = tt = 0
+        try:
+            stream = await async_client.chat.completions.create(
+                model="gpt-4o-mini", messages=openai_messages,
+                stream=True, stream_options={"include_usage": True}
+            )
+            async for chunk in stream:
+                delta = chunk.choices[0].delta if chunk.choices else None
+                token = delta.content if delta and delta.content else None
+                if token:
+                    yield f"data: {json.dumps(token)}\n\n"
+                if chunk.usage:
+                    pt, ct, tt = chunk.usage.prompt_tokens, chunk.usage.completion_tokens, chunk.usage.total_tokens
+            yield "data: [DONE]\n\n"
+            if tt > 0:
+                db.add(UsageLedger(
+                    hospital_id=request.hospital_id, endpoint="/chat-stream",
+                    prompt_tokens=pt, completion_tokens=ct, total_tokens=tt,
+                    estimated_cost=(tt / 1_000_000) * 0.15
+                ))
+                db.commit()
+        except Exception as e:
+            yield f"data: [ERROR] {str(e)}\n\n"
+
+    return StreamingResponse(
+        event_generator(), media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"}
+    )
+</file>
+
+<file path="app/api/v1/endpoints/auth.py">
+import os
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
+from datetime import datetime, timedelta, timezone
+from jose import jwt
+from passlib.context import CryptContext
+from sqlalchemy.orm import Session
+from app.api.deps import get_db
+from app.models.user import User
+
+# FIX #1 (continued): Load SECRET_KEY from environment.
+# Must match the value in deps.py — both read from the same env var.
+SECRET_KEY = os.getenv("JWT_SECRET", "dev-secret-key-change-in-production")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+router = APIRouter(tags=["auth"])
+
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+@router.post("/login")
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == form_data.username).first()
+
+    if not user or not pwd_context.verify(form_data.password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Incorrect email or password")
+
+    # hospital_id is safely encoded inside the token
+    access_token = create_access_token(
+        data={"sub": user.email, "hospital_id": user.hospital_id}
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+</file>
+
+<file path="app/api/v1/endpoints/hospitals.py">
+import csv
+import io
+import uuid
+from sqlalchemy import func
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File
+from sqlalchemy.orm import Session
+from datetime import datetime
+from app import crud, schemas
+from app.api.deps import get_db, get_current_tenant
+from app.models.hospital import Hospital
+from app.models.doctor import Doctor
+from app.availability import get_sheet_client
+from app.models.usage import UsageLedger
+
+router = APIRouter()
+
+# =============================================================================
+# FIX #3: ROUTE ORDER — Static/named routes MUST come before /{hospital_id}.
+# FastAPI matches routes top-to-bottom. If /{hospital_id} is registered first,
+# it will intercept GET /me and GET /slug/arogya and try to cast the string as
+# an int, returning a 422 before the correct handler is ever reached.
+# =============================================================================
+
+
+# -------------------------------------------------
+# 1. STATIC NAMED ROUTES (must be first)
+# -------------------------------------------------
+
+@router.get("/me", response_model=schemas.hospital.Hospital)
+def get_my_hospital(
+    db: Session = Depends(get_db),
+    hospital_id: int = Depends(get_current_tenant)
+):
+    """Get hospital info based on the admin's login token."""
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+    return hospital
+
+@router.patch("/me")
+def update_my_hospital_settings(
+    payload: dict = Body(...),
+    db: Session = Depends(get_db),
+    hospital_id: int = Depends(get_current_tenant)
+):
+    """Update settings for the logged-in admin's hospital."""
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+    for key, value in payload.items():
+        if hasattr(hospital, key):
+            setattr(hospital, key, value)
+    db.commit()
+    db.refresh(hospital)
+    return {"status": "success", "message": f"Settings for {hospital.name} updated."}
+
+@router.get("/slug/{slug}")
+def get_hospital_by_slug(slug: str, db: Session = Depends(get_db)):
+    """Public endpoint: resolve a slug to hospital id + name for ThemeLoader."""
+    hospital = db.query(Hospital).filter(Hospital.slug == slug).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+    return {
+        "id": hospital.id,
+        "name": hospital.name,
+        "google_sheet_id": hospital.google_sheet_id
+    }
+
+
+# -------------------------------------------------
+# 2. COLLECTION ROUTES
+# -------------------------------------------------
+
+@router.post("/", response_model=schemas.hospital.Hospital)
+def create_hospital(
+    *,
+    db: Session = Depends(get_db),
+    hospital_in: schemas.hospital.HospitalCreate,
+):
+    """Create a new hospital tenant."""
+    hospital = crud.crud_hospital.get_hospital_by_slug(db, slug=hospital_in.slug)
+    if hospital:
+        raise HTTPException(
+            status_code=400,
+            detail="The hospital with this slug already exists in the system.",
+        )
+    return crud.crud_hospital.create_hospital(db=db, hospital=hospital_in)
+
+@router.get("/", response_model=List[schemas.hospital.Hospital])
+def read_hospitals(
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 100,
+):
+    """List all registered hospitals."""
+    return crud.crud_hospital.get_hospitals(db, skip=skip, limit=limit)
+
+
+# -------------------------------------------------
+# 3. PARAMETERISED ROUTES (must be last)
+# -------------------------------------------------
+
+@router.get("/{hospital_id}", response_model=schemas.hospital.Hospital)
+def get_hospital_by_id(
+    hospital_id: int,
+    db: Session = Depends(get_db)
+):
+    """Fetch specific hospital info."""
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+    return hospital
+
+@router.patch("/{hospital_id}")
+def update_specific_hospital(
+    hospital_id: int,
+    payload: dict = Body(...),
+    db: Session = Depends(get_db),
+    # FIX #4: Added auth guard. Without this, any unauthenticated caller
+    # knowing a sequential hospital_id could overwrite system_prompt or
+    # google_sheet_id. Now requires a valid JWT.
+    _current_tenant: int = Depends(get_current_tenant),
+):
+    """Update settings for a specific hospital (requires auth)."""
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+
+    for key, value in payload.items():
+        if hasattr(hospital, key):
+            setattr(hospital, key, value)
+
+    db.commit()
+    db.refresh(hospital)
+    return {"status": "success", "message": f"Settings for {hospital.name} updated."}
+
+@router.get("/{hospital_id}/doctors")
+def get_hospital_doctors(
+    hospital_id: int,
+    db: Session = Depends(get_db)
+):
+    """Fetch the staff directory for a specific hospital."""
+    return db.query(Doctor).filter(Doctor.hospital_id == hospital_id).all()
+
+@router.post("/{hospital_id}/doctors")
+def add_doctor(
+    hospital_id: int,
+    payload: dict = Body(...),
+    db: Session = Depends(get_db)
+):
+    """Add a single doctor manually."""
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+
+    new_doc = Doctor(
+        name=payload["name"],
+        doctor_id=payload["doctor_id"],
+        department=payload.get("department", "General Physician"),
+        hospital_id=hospital_id
+    )
+    db.add(new_doc)
+    db.commit()
+    db.refresh(new_doc)
+    return new_doc
+
+@router.post("/{hospital_id}/doctors/bulk-upload")
+async def bulk_upload_and_sync(
+    hospital_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital or not hospital.google_sheet_id:
+        raise HTTPException(status_code=400, detail="Google Sheet ID not configured")
+
+    content = await file.read()
+    stream = io.StringIO(content.decode("utf-8"))
+    reader = csv.DictReader(stream)
+
+    sheet_rows = []
+    for row in reader:
+        normalized_row = {k.strip().lower(): v for k, v in row.items()}
+        auto_id = f"H{hospital_id}-D-{uuid.uuid4().hex[:4].upper()}"
+        name = normalized_row.get('doctor name') or normalized_row.get('name') or 'Unknown'
+        dept = normalized_row.get('department') or 'General'
+        schedule = normalized_row.get('base schedule') or normalized_row.get('schedule') or 'Not Specified'
+
+        doctor = Doctor(
+            doctor_id=auto_id,
+            name=name,
+            department=dept,
+            base_schedule=schedule,
+            hospital_id=hospital_id
+        )
+        db.add(doctor)
+        sheet_rows.append([auto_id, name, dept, schedule, "", "Yes"])
+
+    try:
+        client = get_sheet_client()
+        sheet = client.open_by_key(hospital.google_sheet_id).sheet1
+        sheet.append_rows(sheet_rows)
+        db.commit()
+        return {"message": f"Successfully imported {len(sheet_rows)} doctors."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Google Sheet Sync Failed: {str(e)}")
+
+@router.get("/{hospital_id}/billing")
+async def get_hospital_billing(hospital_id: int, db: Session = Depends(get_db)):
+    first_day = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    stats = db.query(
+        func.sum(UsageLedger.total_tokens).label("tokens"),
+        func.sum(UsageLedger.estimated_cost).label("cost"),
+        func.count(UsageLedger.id).label("total_chats")
+    ).filter(
+        UsageLedger.hospital_id == hospital_id,
+        UsageLedger.created_at >= first_day
+    ).first()
+
+    raw_cost = stats.cost or 0.0
+    margin_multiplier = 5.0
+    platform_fee_inr = 2500.0
+    total_due_inr = round(platform_fee_inr + (raw_cost * 83 * margin_multiplier), 2)
+
+    # FIX #5: Reshaped response to match what HospitalStats.tsx actually reads.
+    # Frontend expects billing.invoice.total_due_inr and billing.invoice.platform_fee.
+    # Old backend returned estimated_invoice_inr at the top level — key mismatch.
+    return {
+        "period": first_day.strftime("%B %Y"),
+        "usage": {
+            "total_chats": stats.total_chats or 0,
+            "tokens_consumed": stats.tokens or 0,
+            "raw_cost_usd": round(raw_cost, 4),
+        },
+        "invoice": {
+            "total_due_inr": total_due_inr,
+            "platform_fee": platform_fee_inr,
+        }
+    }
+</file>
+
+<file path="app/api/v1/endpoints/usage.py">
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from sqlalchemy import func
+from app.api.deps import get_db, get_current_tenant
+from app.models.usage import UsageLedger # Import from the model file
+
+router = APIRouter(tags=["Usage"])
+
+@router.get("/summary")
+def get_usage_summary(
+    db: Session = Depends(get_db),
+    hospital_id: int = Depends(get_current_tenant) # The Magic Key
+):
+    stats = db.query(
+        func.sum(UsageLedger.total_tokens).label("total_tokens"),
+        func.sum(UsageLedger.estimated_cost).label("estimated_cost")
+    ).filter(UsageLedger.hospital_id == hospital_id).first()
+
+    return {
+        "total_tokens": stats.total_tokens or 0,
+        "estimated_cost": stats.estimated_cost or 0.0
+    }
+</file>
+
+<file path="app/availability.py">
+import logging
+from datetime import datetime
+from pathlib import Path
+
+import gspread
+from google.oauth2.service_account import Credentials
+
+logger = logging.getLogger(__name__)
+
+CREDENTIALS_PATH = Path(__file__).resolve().parent.parent / "google_credentials.json"
+
+_cache: dict = {}
+_cache_time: dict = {}
+
+# Cache TTL in seconds — 5 minutes is a good balance between freshness
+# and not hammering the Sheets API on every chat message.
+CACHE_TTL_SECONDS = 300
+
+
+class AvailabilityError(Exception):
+    """
+    Raised when the Google Sheets availability fetch fails for any reason:
+    missing credentials, network error, quota exceeded, invalid sheet ID,
+    or permission denied.
+
+    Callers (ai.py) catch this specifically to distinguish a real failure
+    from an intentionally empty sheet, and to set a safe, directive
+    fallback message in the system prompt rather than a vague string
+    the LLM might ignore.
+    """
+    pass
+
+
+def get_sheet_client() -> gspread.Client:
+    """
+    Authenticate and return a gspread client using the service account
+    credentials file.
+
+    Raises AvailabilityError if the credentials file is missing or
+    authentication fails, so the caller gets a typed exception rather
+    than a raw FileNotFoundError or google.auth exception.
+    """
+    if not CREDENTIALS_PATH.exists():
+        raise AvailabilityError(
+            f"Google credentials file not found at {CREDENTIALS_PATH}. "
+            "Download your service account key from Google Cloud Console "
+            "and place it at backend/google_credentials.json."
+        )
+
+    try:
+        scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+        creds = Credentials.from_service_account_file(
+            str(CREDENTIALS_PATH), scopes=scopes
+        )
+        return gspread.authorize(creds)
+    except Exception as e:
+        raise AvailabilityError(
+            f"Failed to authenticate with Google Sheets API: {e}"
+        ) from e
+
+
+def get_doctor_availability(
+    sheet_id: str,
+    force_refresh: bool = False
+) -> dict:
+    """
+    Fetch doctor availability data from a Google Sheet, with in-process
+    per-hospital caching (TTL: CACHE_TTL_SECONDS).
+
+    Returns a dict keyed by doctor_id:
+        {
+            "H1-D-A1B2": {
+                "id": "H1-D-A1B2",
+                "name": "Dr. Rajesh Kumar",
+                "department": "Cardiology",
+                "schedule": "Mon-Fri 9am-1pm",
+                "absent_dates": "22-03-2026,23-03-2026",
+            },
+            ...
+        }
+
+    Returns {} if sheet_id is falsy (no sheet configured for this hospital).
+
+    Raises AvailabilityError if the fetch fails for any reason so callers
+    can provide a safe, explicit fallback rather than silently getting
+    stale or empty data.
+
+    Cache behaviour:
+        - On a successful fetch, the result is cached and the timestamp updated.
+        - On a failed fetch, the exception is raised immediately — we do NOT
+          silently return stale cache. The caller decides whether to use stale
+          data or show a safe fallback message. Serving stale data for
+          availability is safer than hallucinating, but the caller should know
+          it's stale.
+    """
+    if not sheet_id:
+        return {}
+
+    now = datetime.now()
+    last_refresh = _cache_time.get(sheet_id)
+    cache_is_fresh = (
+        sheet_id in _cache
+        and last_refresh is not None
+        and (now - last_refresh).total_seconds() < CACHE_TTL_SECONDS
+    )
+
+    if not force_refresh and cache_is_fresh:
+        logger.debug(
+            "[Availability] Cache hit for sheet_id=%s (%d doctors)",
+            sheet_id, len(_cache[sheet_id])
+        )
+        return _cache[sheet_id]
+
+    # Cache is stale or missing — attempt a live fetch
+    logger.info("[Availability] Fetching sheet_id=%s from Google Sheets API", sheet_id)
+
+    try:
+        client = get_sheet_client()
+        sheet = client.open_by_key(sheet_id).sheet1
+        records = sheet.get_all_records()
+    except AvailabilityError:
+        # Re-raise typed errors from get_sheet_client() as-is
+        raise
+    except gspread.exceptions.SpreadsheetNotFound:
+        raise AvailabilityError(
+            f"Google Sheet not found (sheet_id={sheet_id}). "
+            "Check the Sheet ID in Settings and ensure the service account "
+            "has been granted Viewer access to this sheet."
+        )
+    except gspread.exceptions.APIError as e:
+        status = getattr(e.response, 'status_code', 'unknown')
+        raise AvailabilityError(
+            f"Google Sheets API error (HTTP {status}) for sheet_id={sheet_id}: {e}"
+        ) from e
+    except Exception as e:
+        raise AvailabilityError(
+            f"Unexpected error fetching sheet_id={sheet_id}: {type(e).__name__}: {e}"
+        ) from e
+
+    # Parse the sheet records into our internal format
+    doctors: dict = {}
+    skipped = 0
+
+    for row in records:
+        doctor_id = str(row.get("Doctor ID", "")).strip()
+        name = str(row.get("Doctor Name", "")).strip()
+
+        if not doctor_id or not name:
+            skipped += 1
+            continue
+
+        doctors[doctor_id] = {
+            "id": doctor_id,
+            "name": name,
+            "department": str(row.get("Department", "")).strip(),
+            "schedule": str(row.get("Base Schedule", "")).strip(),
+            "absent_dates": str(row.get("Absent Dates (comma-separated)", "")).strip(),
+        }
+
+    if skipped:
+        logger.warning(
+            "[Availability] Skipped %d rows with missing Doctor ID or Name "
+            "in sheet_id=%s",
+            skipped, sheet_id
+        )
+
+    # Update cache only after a successful parse
+    _cache[sheet_id] = doctors
+    _cache_time[sheet_id] = now
+
+    logger.info(
+        "[Availability] Loaded %d doctors from sheet_id=%s",
+        len(doctors), sheet_id
+    )
+
+    return doctors
+
+
+def get_cached_or_empty(sheet_id: str) -> dict:
+    """
+    Returns the last known good cache for this sheet_id, or {} if no
+    cache exists. Used by callers that want to gracefully degrade to
+    stale data rather than showing an error message to the patient.
+
+    The caller is responsible for logging that stale data is being used.
+    """
+    return _cache.get(sheet_id, {})
+</file>
+
+<file path="app/core/__init__.py">
+
+</file>
+
+<file path="app/core/config.py">
+from typing import Optional
+from pydantic_settings import BaseSettings
+
+class Settings(BaseSettings):
+    # Core
+    PROJECT_NAME: str = "Hospital AI Platform"
+    API_V1_STR: str = "/api/v1"
+    
+    # 1. ADD THIS LINE: This maps the Render environment variable to your code
+    DATABASE_URL: Optional[str] = None 
+
+    # Database Defaults (Keep these for local dev)
+    POSTGRES_SERVER: str = "localhost"
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "NewStrongPassword123!"
+    POSTGRES_DB: str = "hospital_ai"
+    POSTGRES_PORT: str = "5432"
+    
+    # Optional: If you want to override the full URL
+    SQLALCHEMY_DATABASE_URI: Optional[str] = None
+
+    # App Secrets
+    REDIS_URL: str = "redis://localhost:6379"
+    OPENAI_API_KEY: str = "sk-placeholder"
+    JWT_SECRET: str = "supersecret"
+
+    # Helper to build the URL dynamically
+    @property
+    def SQLALCHEMY_DATABASE_URL(self) -> str:
+        # Check Render's DATABASE_URL first
+        if self.DATABASE_URL:
+            # Render often gives 'postgres://', but SQLAlchemy needs 'postgresql://'
+            return self.DATABASE_URL.replace("postgres://", "postgresql://", 1)
+        
+        # Fallback to local construction
+        return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+
+settings = Settings()
+</file>
+
+<file path="app/crud/__init__.py">
+from .crud_hospital import create_hospital, get_hospital, get_hospital_by_slug, get_hospitals
+from .crud_user import create_user, get_user, get_user_by_email
+</file>
+
+<file path="app/crud/crud_hospital.py">
+from sqlalchemy.orm import Session
+from app.models.hospital import Hospital
+from app.schemas.hospital import HospitalCreate
+
+def get_hospital(db: Session, hospital_id: int):
+    return db.query(Hospital).filter(Hospital.id == hospital_id).first()
+
+def get_hospital_by_slug(db: Session, slug: str):
+    return db.query(Hospital).filter(Hospital.slug == slug).first()
+
+def get_hospitals(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(Hospital).offset(skip).limit(limit).all()
+
+def create_hospital(db: Session, hospital: HospitalCreate):
+    db_obj = Hospital(
+        name=hospital.name,
+        slug=hospital.slug,
+        address=hospital.address,
+        is_active=hospital.is_active,
+        # Ensure your HospitalCreate schema includes these, or add defaults here
+        system_prompt=getattr(hospital, 'system_prompt', "You are Arogya..."),
+        google_sheet_id=getattr(hospital, 'google_sheet_id', None)
+    )
+    db.add(db_obj)
+    db.commit()
+    db.refresh(db_obj)
+    return db_obj
+</file>
+
+<file path="app/crud/crud_user.py">
+from sqlalchemy.orm import Session
+from passlib.context import CryptContext
+from app.models.user import User
+from app.schemas.user import UserCreate
+
+# FIX #2: Use a real password hashing context, same as auth.py.
+# The old code used `user.password + "notreallyhashed"` — plaintext storage.
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def get_user(db: Session, user_id: int):
+    return db.query(User).filter(User.id == user_id).first()
+
+def get_user_by_email(db: Session, email: str):
+    return db.query(User).filter(User.email == email).first()
+
+def create_user(db: Session, user: UserCreate):
+    # FIX #2: Hash the password properly with bcrypt.
+    hashed_password = pwd_context.hash(user.password)
+
+    db_obj = User(
+        email=user.email,
+        hashed_password=hashed_password,
+        full_name=user.full_name,
+        hospital_id=user.hospital_id,
+        is_superuser=user.is_superuser,
+        is_active=user.is_active,
+    )
+    db.add(db_obj)
+    db.commit()
+    db.refresh(db_obj)
+    return db_obj
+</file>
+
+<file path="app/db/base_class.py">
+from typing import Any
+from sqlalchemy.ext.declarative import as_declarative, declared_attr
+
+@as_declarative()
+class Base:
+    id: Any
+    __name__: str
+
+    # Generate __tablename__ automatically from class name
+    # e.g., 'User' model -> 'user' table
+    @declared_attr
+    def __tablename__(cls) -> str:
+        return cls.__name__.lower()
+</file>
+
+<file path="app/db/base.py">
+from app.db.base_class import Base  # noqa
+from app.models.hospital import Hospital  # noqa
+from app.models.doctor import Doctor  # noqa
+from app.models.user import User  # noqa
+</file>
+
+<file path="app/db/session.py">
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from app.core.config import settings
+
+# Create the database engine with anti-disconnect safety measures
+engine = create_engine(
+    settings.SQLALCHEMY_DATABASE_URL,
+    pool_pre_ping=True,      # Tests the connection before using it (Fixes EOF errors)
+    pool_recycle=1800,       # Proactively recycles connections every 30 minutes
+)
+
+# Create a Session factory
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+</file>
+
+<file path="app/main.py">
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.db.base import Base
+# Import the router objects from your endpoint files
+from app.api.v1.endpoints.auth import router as auth_router
+from app.api.v1.endpoints.hospitals import router as hospitals_router
+from app.api.v1.endpoints.ai import router as ai_router
+from app.db.session import engine
+app = FastAPI(title="Hospital AI Platform")
+Base.metadata.create_all(bind=engine)
+# --- CORS Configuration ---
+# This allows both your local development and your live Vercel site to talk to this API
+origins = [
+    "https://hospital-ai-platform.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://hospital-ai-platform.vercel.app", "http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"], # Be explicit here
+    allow_headers=["*"],
+)
+# --- Include Routers ---
+# Note: The prefixes here combine with the @router paths in your endpoint files
+
+# 1. Auth Router (Handles Login and Token Generation)
+app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
+
+# 2. Hospitals Router (Handles Staff management and Hospital settings)
+app.include_router(hospitals_router, prefix="/api/v1/hospitals", tags=["hospitals"])
+
+# 3. AI Router (Handles /chat, /ingest, and /upload-pdf)
+# We use /api/v1/ai so that the frontend calls /api/v1/ai/chat
+app.include_router(ai_router, prefix="/api/v1/ai", tags=["AI"])
+
+@app.get("/")
+def read_root():
+    return {
+        "status": "online",
+        "message": "Welcome to the Hospital AI Platform API",
+        "version": "v1.0.0"
+    }
+</file>
+
+<file path="app/models/__init__.py">
+
+</file>
+
+<file path="app/models/doctor.py">
+from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy.orm import relationship
+from app.db.base_class import Base
+
+class Doctor(Base):
+    __tablename__ = "doctors"
+
+    id = Column(Integer, primary_key=True, index=True)
+    doctor_id = Column(String, index=True, nullable=False)
+    name = Column(String, nullable=False)
+    # Add these two missing columns:
+    department = Column(String, nullable=True) 
+    base_schedule = Column(String, nullable=True)
+    
+    hospital_id = Column(Integer, ForeignKey("hospital.id"), nullable=False)
+    hospital = relationship("Hospital", back_populates="doctors")
+</file>
+
+<file path="app/models/hospital.py">
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+from app.db.base_class import Base
+
+class Hospital(Base):
+    __tablename__ = "hospital"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, index=True)
+    slug = Column(String, unique=True, index=True, nullable=False) # e.g., "apollo-delhi" for URLs
+    address = Column(String, nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    system_prompt = Column(Text, default="You are Arogya, a helpful assistant for a specialty hospital.")
+    # Add this column to your existing Hospital class
+    google_sheet_id = Column(String, nullable=True)
+    # Relationship: One Hospital has many Users
+    users = relationship("User", back_populates="hospital")
+    # Inside your Hospital class in app/models/hospital.py
+    doctors = relationship("Doctor", back_populates="hospital", cascade="all, delete-orphan")
+</file>
+
+<file path="app/models/knowledge.py">
+from sqlalchemy import Column, Integer, Text, ForeignKey, DateTime
+from sqlalchemy.sql import func
+from pgvector.sqlalchemy import Vector
+from app.db.base_class import Base
+
+class KnowledgeBase(Base):
+    __tablename__ = "knowledge_base"
+
+    id = Column(Integer, primary_key=True, index=True)
+    hospital_id = Column(Integer, ForeignKey("hospital.id"), nullable=False)
+    content = Column(Text, nullable=False) # The actual text (e.g., Doctor timings)
+    
+    # Vector column: 1536 dimensions for OpenAI's text-embedding-3-small
+    embedding = Column(Vector(1536)) 
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+</file>
+
+<file path="app/models/usage.py">
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
+from datetime import datetime, timezone
+from app.db.base_class import Base
+
+class UsageLedger(Base):
+    __tablename__ = "usage_ledger"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    hospital_id = Column(Integer, ForeignKey("hospital.id"))
+    endpoint = Column(String)  # e.g., "/chat" or "/ingest"
+    prompt_tokens = Column(Integer)
+    completion_tokens = Column(Integer)
+    total_tokens = Column(Integer)
+    estimated_cost = Column(Float) 
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+</file>
+
+<file path="app/models/user.py">
+from sqlalchemy import Boolean, Column, Integer, String, ForeignKey # Added ForeignKey
+from sqlalchemy.orm import relationship # Added relationship
+from app.db.base_class import Base
+
+class User(Base):
+    id = Column(Integer, primary_key=True, index=True)
+    full_name = Column(String, index=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    is_active = Column(Boolean(), default=True)
+    is_superuser = Column(Boolean(), default=False)
+    
+    # --- NEW: Multi-Tenancy Link ---
+    hospital_id = Column(Integer, ForeignKey("hospital.id"), nullable=True) # Nullable for Superadmins
+    hospital = relationship("Hospital", back_populates="users")
+</file>
+
+<file path="app/schemas/__init__.py">
+from .hospital import Hospital, HospitalCreate, HospitalUpdate
+from .user import User, UserCreate, UserUpdate
+</file>
+
+<file path="app/schemas/hospital.py">
+from typing import Optional
+from datetime import datetime
+from pydantic import BaseModel
+
+class HospitalBase(BaseModel):
+    name: str
+    slug: str
+    address: Optional[str] = None
+    is_active: Optional[bool] = True
+    # YOU MUST ADD THESE TWO:
+    system_prompt: Optional[str] = "You are Arogya, a helpful assistant."
+    google_sheet_id: Optional[str] = None
+
+class HospitalCreate(HospitalBase):
+    pass
+
+class HospitalUpdate(HospitalBase):
+    name: Optional[str] = None
+    slug: Optional[str] = None
+
+class Hospital(HospitalBase):
+    id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+</file>
+
+<file path="app/schemas/user.py">
+from typing import Optional
+from pydantic import BaseModel, EmailStr
+
+# Shared properties
+class UserBase(BaseModel):
+    email: EmailStr
+    is_active: Optional[bool] = True
+    is_superuser: bool = False
+    full_name: Optional[str] = None
+    hospital_id: Optional[int] = None
+
+# Properties to receive on creation
+class UserCreate(UserBase):
+    password: str
+
+# Properties to receive on update
+class UserUpdate(UserBase):
+    password: Optional[str] = None
+
+# Properties to return to client
+class User(UserBase):
+    id: int
+    
+    class Config:
+        from_attributes = True
+</file>
+
+<file path="create_tables.py">
+from app.db.base import Base
+from app.db.session import engine
+# Import all your models here so SQLAlchemy knows they exist
+from app.models.hospital import Hospital
+from app.models.user import User
+from app.models.doctor import Doctor 
+
+print("Creating database tables...")
+Base.metadata.create_all(bind=engine)
+print("Tables created successfully!")
+</file>
+
+<file path="seed.py">
+from app.db.session import SessionLocal
+from app.models.hospital import Hospital
+from app.models.user import User
+from passlib.context import CryptContext
+# Add these lines to the top of seed.py
+from app.models.hospital import Hospital
+from app.models.user import User
+# Ensure the Doctor model is imported so SQLAlchemy can "see" it
+from app.models.doctor import Doctor
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+db = SessionLocal()
+
+def seed_data():
+    try:
+        # 1. Check if Hospital exists, if not, create it
+        hospital = db.query(Hospital).filter(Hospital.slug == "arogya-specialty").first()
+        
+        if not hospital:
+            hospital = Hospital(
+                name="Arogya Specialty Hospital",
+                slug="arogya-specialty",
+                is_active=True
+            )
+            db.add(hospital)
+            db.commit()
+            db.refresh(hospital)
+            print(f"Created new hospital: {hospital.name}")
+        else:
+            print(f"Hospital already exists: {hospital.name} (ID: {hospital.id})")
+
+        # 2. Check if Admin User exists, if not, create it
+        admin_email = "admin@arogya.com"
+        user = db.query(User).filter(User.email == admin_email).first()
+
+        if not user:
+            admin_user = User(
+                email=admin_email,
+                hashed_password=pwd_context.hash("admin123"),
+                hospital_id=hospital.id,
+                is_active=True
+            )
+            db.add(admin_user)
+            db.commit()
+            print(f"Created admin user: {admin_email}")
+        else:
+            # If user exists, let's update the password to be sure it's admin123
+            user.hashed_password = pwd_context.hash("admin123")
+            user.hospital_id = hospital.id
+            db.commit()
+            print(f"Updated existing admin user: {admin_email}")
+            
+        print("\n✅ Success! Log in with admin@arogya.com / admin123")
+        
+    except Exception as e:
+        print(f"❌ Error seeding data: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+if __name__ == "__main__":
+    seed_data()
+</file>
+
+</files>
+</file>
 
 <file path=".gitignore">
 # Python
@@ -533,18 +2555,6 @@ class Base:
     @declared_attr
     def __tablename__(cls) -> str:
         return cls.__name__.lower()
-</file>
-
-<file path="backend/app/db/session.py">
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from app.core.config import settings
-
-# Create the database engine
-engine = create_engine(settings.SQLALCHEMY_DATABASE_URL)
-
-# Create a Session factory
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 </file>
 
 <file path="backend/app/models/__init__.py">
@@ -1620,6 +3630,22 @@ from app.db.base_class import Base  # noqa
 from app.models.hospital import Hospital  # noqa
 from app.models.doctor import Doctor  # noqa
 from app.models.user import User  # noqa
+</file>
+
+<file path="backend/app/db/session.py">
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from app.core.config import settings
+
+# Create the database engine with anti-disconnect safety measures
+engine = create_engine(
+    settings.SQLALCHEMY_DATABASE_URL,
+    pool_pre_ping=True,      # Tests the connection before using it (Fixes EOF errors)
+    pool_recycle=1800,       # Proactively recycles connections every 30 minutes
+)
+
+# Create a Session factory
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 </file>
 
 <file path="backend/seed.py">

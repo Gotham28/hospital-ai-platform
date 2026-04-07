@@ -5,10 +5,17 @@ interface ChatMessageProps {
   role: 'user' | 'assistant';
   content: string;
   isStreaming?: boolean;
+  language?: 'en' | 'ml';
 }
 
-const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, isStreaming }) => {
+const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, isStreaming, language = 'en' }) => {
   const isUser = role === 'user';
+  const isMalayalam = language === 'ml';
+
+  // Apply Malayalam font when in Malayalam mode
+  const malayalamStyle = isMalayalam
+    ? { fontFamily: "'Noto Sans Malayalam', 'Manjari', 'Rachana', sans-serif", lineHeight: '1.9' }
+    : {};
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
@@ -22,9 +29,21 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, isStreaming })
         isUser
           ? 'bg-emerald-600 text-white rounded-tr-none'
           : 'bg-white border border-gray-100 text-gray-800 rounded-tl-none'
-      }`}>
-        <div className="prose prose-sm max-w-none prose-emerald">
-          <ReactMarkdown>{content}</ReactMarkdown>
+      }`} style={malayalamStyle}>
+        <div
+          className="prose prose-sm max-w-none prose-emerald"
+          style={malayalamStyle}
+        >
+          <ReactMarkdown
+            components={{
+              // Ensure paragraphs and list items also carry the font
+              p: ({ children }) => <p style={malayalamStyle}>{children}</p>,
+              li: ({ children }) => <li style={malayalamStyle}>{children}</li>,
+              strong: ({ children }) => <strong style={malayalamStyle}>{children}</strong>,
+            }}
+          >
+            {content}
+          </ReactMarkdown>
         </div>
 
         {isStreaming && !isUser && (
