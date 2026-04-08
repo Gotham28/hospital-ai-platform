@@ -13,11 +13,11 @@ interface Message {
 }
 
 // ─── Mic state machine ────────────────────────────────────────────────────────
-//   idle ──tap──▶ recording ──silence/tap──▶ review ──send──▶ idle
-//                                                    ──cancel──▶ idle
-type MicState = 'idle' | 'recording' | 'review';
+//   idle ──tap──▶ recording ──silence──▶ (auto-send) ──▶ idle
+//                           ──tap──▶ idle (cancel)
+type MicState = 'idle' | 'recording';
 
-// Silence detection: how long the transcript must be stable before auto-stop
+// Silence detection: how long the transcript must be stable before auto-send
 const SILENCE_THRESHOLD_MS = 1800;
 const SILENCE_CHECK_INTERVAL_MS = 300;
 
@@ -51,6 +51,8 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
   const lastTranscriptUpdateRef = useRef<number>(0);
   const transcriptRef = useRef<string>('');
   const silenceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Prevent re-entrant auto-sends
+  const autoSendingRef = useRef(false);
 
   const {
     transcript,
@@ -91,6 +93,9 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
     }
   }, []);
 
+  // Forward-declare handleSend so startSilenceDetection can call it
+  const handleSendRef = useRef<((text: string) => Promise<void>) | null>(null);
+
   const startSilenceDetection = useCallback(() => {
     stopSilenceDetection();
     lastTranscriptUpdateRef.current = Date.now();
@@ -99,9 +104,17 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
       const hasContent = transcriptRef.current.trim().length > 0;
       if (hasContent && silentFor >= SILENCE_THRESHOLD_MS) {
         stopSilenceDetection();
-        SpeechRecognition.stopListening();
-        setInputText(transcriptRef.current.trim());
-        setMicState('review');
+        if (!autoSendingRef.current) {
+          autoSendingRef.current = true;
+          const captured = transcriptRef.current.trim();
+          // Stop listening WITHOUT triggering the continuous restart cycle
+          SpeechRecognition.abortListening();
+          setMicState('idle');
+          // Auto-send immediately — no review step
+          if (handleSendRef.current) {
+            handleSendRef.current(captured);
+          }
+        }
       }
     }, SILENCE_CHECK_INTERVAL_MS);
   }, [stopSilenceDetection]);
@@ -115,7 +128,6 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
 
     if (micState === 'idle') {
       // Check microphone permission before trying to start
-      // navigator.permissions is not available in all browsers but we try gracefully
       if (navigator.permissions) {
         try {
           const result = await navigator.permissions.query({ name: 'microphone' as PermissionName });
@@ -136,13 +148,14 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
         resetTranscript();
         transcriptRef.current = '';
         lastTranscriptUpdateRef.current = Date.now();
+        autoSendingRef.current = false;
         setInputText('');
-        // SpeechRecognition.startListening uses the lang code format 'ml-IN' / 'en-US'
-        SpeechRecognition.startListening({ continuous: true, language: language === 'ml' ? 'ml-IN' : 'en-US' });
+        // Use continuous: false to avoid the browser's repeated start/stop sounds.
+        // We handle our own silence detection and restart if needed.
+        SpeechRecognition.startListening({ continuous: false, language: language === 'ml' ? 'ml-IN' : 'en-US' });
         setMicState('recording');
         startSilenceDetection();
       } catch (err) {
-        // Catches DOMException if browser blocks mic (e.g. user denied mid-session)
         setMicError(
           language === 'ml'
             ? 'മൈക്രോഫോൺ ആക്സസ് ലഭ്യമല്ല. ക്രോം ബ്രൗസർ ഉപയോഗിക്കൂ.'
@@ -151,32 +164,26 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
       }
 
     } else if (micState === 'recording') {
+      // User manually tapped to cancel
       stopSilenceDetection();
-      SpeechRecognition.stopListening();
-      const captured = transcriptRef.current.trim();
-      if (captured) {
-        setInputText(captured);
-        setMicState('review');
-      } else {
-        setMicState('idle');
-      }
-
-    } else if (micState === 'review') {
+      autoSendingRef.current = false;
+      SpeechRecognition.abortListening();
       resetTranscript();
       transcriptRef.current = '';
       setInputText('');
-      SpeechRecognition.startListening({ continuous: true, language: language === 'ml' ? 'ml-IN' : 'en-US' });
-      setMicState('recording');
-      startSilenceDetection();
+      setMicState('idle');
     }
   }, [micState, language, startSilenceDetection, stopSilenceDetection, resetTranscript]);
 
-  const cancelReview = useCallback(() => {
-    resetTranscript();
-    transcriptRef.current = '';
-    setInputText('');
-    setMicState('idle');
-  }, [resetTranscript]);
+  // ── Re-start listening if it stops mid-sentence (continuous: false ends on pause) ──
+  // When continuous=false the browser stops after each utterance; we restart it
+  // so the user can keep speaking. We stop only via silence detection or manual cancel.
+  useEffect(() => {
+    if (micState === 'recording' && !listening && !autoSendingRef.current) {
+      // Brief pause detected by browser — restart to keep listening
+      SpeechRecognition.startListening({ continuous: false, language: language === 'ml' ? 'ml-IN' : 'en-US' });
+    }
+  }, [listening, micState, language]);
 
   // ── Send (streaming) ──────────────────────────────────────────────────────
   const handleSend = useCallback(async (text: string) => {
@@ -187,9 +194,10 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
     abortRef.current = new AbortController();
 
     stopSilenceDetection();
-    SpeechRecognition.stopListening();
+    SpeechRecognition.abortListening();
     resetTranscript();
     transcriptRef.current = '';
+    autoSendingRef.current = false;
     setInputText('');
     setMicState('idle');
     setMicError(null);
@@ -257,6 +265,11 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
     }
   }, [messages, inputText, isStreaming, hospitalId, language, stopSilenceDetection, resetTranscript]);
 
+  // Keep the ref in sync so startSilenceDetection can call the latest handleSend
+  useEffect(() => {
+    handleSendRef.current = handleSend;
+  }, [handleSend]);
+
   // ── Welcome message ───────────────────────────────────────────────────────
   useEffect(() => {
     const welcome = language === 'ml'
@@ -264,7 +277,7 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
       : "👋 Hello! I am **Arogya**. How can I help you today?";
     setMessages([{ role: 'assistant', content: welcome, isWelcome: true }]);
     stopSilenceDetection();
-    SpeechRecognition.stopListening();
+    SpeechRecognition.abortListening();
     setMicState('idle');
     setInputText('');
     setMicError(null);
@@ -276,28 +289,23 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
   const micBtnClass = {
     idle:      'bg-emerald-50 text-emerald-600 hover:bg-emerald-100',
     recording: 'bg-red-500 text-white ring-4 ring-red-100 animate-pulse',
-    review:    'bg-emerald-500 text-white ring-4 ring-emerald-100',
   }[micState];
 
   const micLabel = {
     idle:      language === 'en' ? 'Tap to speak' : 'സംസാരിക്കുക',
-    recording: language === 'en' ? 'Listening… tap to stop' : 'കേൾക്കുന്നു… നിർത്താൻ ടാപ്പ് ചെയ്യൂ',
-    review:    language === 'en' ? 'Review & send' : 'പരിശോധിച്ച് അയക്കൂ',
+    recording: language === 'en' ? 'Listening… tap to cancel' : 'കേൾക്കുന്നു… റദ്ദാക്കാൻ ടാപ്പ് ചെയ്യൂ',
   }[micState];
 
-  // ── Browser not supported — better fallback than a broken red box ─────────
+  // ── Browser not supported ─────────────────────────────────────────────────
   if (!browserSupportsSpeechRecognition) {
     return (
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 flex flex-col">
-        {/* Header still shows so the widget doesn't look completely broken */}
         <div className="bg-emerald-600 p-4 text-white shrink-0">
           <h3 className="font-bold flex items-center gap-2"><Activity className="w-4 h-4" /> Ask Arogya</h3>
         </div>
-
-        {/* Welcome message area */}
         <div className="p-6 bg-slate-50 flex-1">
           <div className="bg-white rounded-xl p-4 border border-slate-100 shadow-sm mb-4">
-            <p className="text-sm text-gray-700">
+            <p className="text-sm text-gray-700" style={{ fontFamily: "'Noto Sans Malayalam', sans-serif" }}>
               {language === 'ml'
                 ? "👋 നമസ്കാരം! ഞാൻ ആരോഗ്യ. ടൈപ്പ് ചെയ്ത് ചോദ്യം ചോദിക്കൂ."
                 : "👋 Hello! I am Arogya. You can type your question below."}
@@ -317,8 +325,6 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
             </div>
           </div>
         </div>
-
-        {/* Text input still works even without speech recognition */}
         <div className="p-4 border-t bg-white">
           <div className="flex items-center gap-2">
             <input
@@ -328,6 +334,7 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
               onKeyDown={e => e.key === 'Enter' && handleSend(inputText)}
               placeholder={language === 'ml' ? "ചോദിക്കൂ..." : "Ask anything..."}
               className="flex-1 bg-slate-100 border-none rounded-full px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+              style={{ fontFamily: "'Noto Sans Malayalam', sans-serif" }}
             />
             <button
               onClick={() => handleSend(inputText)}
@@ -345,6 +352,15 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
   return (
     <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 flex flex-col h-[650px]">
 
+      {/* Load Noto Sans Malayalam for proper rendering */}
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Malayalam:wght@400;500;700&display=swap');
+        .ml-text {
+          font-family: 'Noto Sans Malayalam', 'Manjari', 'Rachana', sans-serif !important;
+        }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+      `}</style>
+
       {/* Header */}
       <div className="bg-emerald-600 p-4 text-white shrink-0 shadow-md">
         <div className="flex justify-between items-center">
@@ -354,7 +370,7 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
           <button
             onClick={() => setLanguage(l => l === 'en' ? 'ml' : 'en')}
             disabled={micState === 'recording'}
-            className="bg-emerald-700 px-3 py-1 rounded-md text-xs font-bold border border-white/20 disabled:opacity-50"
+            className="bg-emerald-700 px-3 py-1 rounded-md text-xs font-bold border border-white/20 disabled:opacity-50 ml-text"
           >
             {language === 'en' ? 'English' : 'മലയാളം'}
           </button>
@@ -364,12 +380,12 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
       {/* Chat area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
         {messages.map((msg, idx) => (
-          <ChatMessage key={idx} role={msg.role} content={msg.content} isStreaming={msg.isStreaming} />
+          <ChatMessage key={idx} role={msg.role} content={msg.content} isStreaming={msg.isStreaming} language={language} />
         ))}
 
         {micState === 'recording' && transcript && (
           <div className="flex justify-end">
-            <div className="bg-emerald-50 text-emerald-800 px-4 py-2 rounded-2xl rounded-tr-none text-sm italic border border-emerald-200 shadow-sm max-w-[85%]">
+            <div className="bg-emerald-50 text-emerald-800 px-4 py-2 rounded-2xl rounded-tr-none text-sm italic border border-emerald-200 shadow-sm max-w-[85%] ml-text">
               <span className="text-[10px] text-emerald-500 font-bold block mb-1 not-italic uppercase tracking-wider">
                 {language === 'en' ? 'Hearing…' : 'കേൾക്കുന്നു…'}
               </span>
@@ -381,7 +397,7 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
         {isStreaming && messages[messages.length - 1]?.content === '' && (
           <div className="flex items-center gap-2 text-emerald-600 p-2 bg-white rounded-lg w-fit shadow-sm border border-slate-100">
             <Loader2 className="w-4 h-4 animate-spin" />
-            <span className="text-[10px] font-bold">
+            <span className="text-[10px] font-bold ml-text">
               {language === 'ml' ? 'ആരോഗ്യ പരിശോധിക്കുന്നു...' : 'Arogya is checking...'}
             </span>
           </div>
@@ -398,7 +414,7 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
               key={i}
               disabled={isStreaming || micState === 'recording'}
               onClick={() => handleSend(text)}
-              className="flex-none bg-white border border-emerald-100 text-emerald-700 text-[11px] px-3 py-1.5 rounded-full shadow-sm hover:bg-emerald-50 active:scale-95 transition-all disabled:opacity-40 whitespace-nowrap"
+              className="flex-none bg-white border border-emerald-100 text-emerald-700 text-[11px] px-3 py-1.5 rounded-full shadow-sm hover:bg-emerald-50 active:scale-95 transition-all disabled:opacity-40 whitespace-nowrap ml-text"
             >
               <Zap className="w-3 h-3 text-amber-400 fill-amber-400 inline mr-1" />{text}
             </button>
@@ -413,7 +429,7 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
         {micError && (
           <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
             <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-            <p className="text-xs text-red-700">{micError}</p>
+            <p className="text-xs text-red-700 ml-text">{micError}</p>
           </div>
         )}
 
@@ -425,11 +441,11 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
             onKeyDown={e => e.key === 'Enter' && !isStreaming && handleSend(inputText)}
             placeholder={
               micState === 'recording' ? (language === 'en' ? 'Listening…' : 'കേൾക്കുന്നു…')
-              : micState === 'review'    ? (language === 'en' ? 'Review your message…' : 'സന്ദേശം പരിശോധിക്കൂ…')
-              :                            (language === 'en' ? 'Ask anything…' : 'ചോദിക്കൂ…')
+              :                           (language === 'en' ? 'Ask anything…' : 'ചോദിക്കൂ…')
             }
             disabled={isStreaming || micState === 'recording'}
-            className="flex-1 bg-slate-100 border-none rounded-full px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-60"
+            className="flex-1 bg-slate-100 border-none rounded-full px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-60 ml-text"
+            style={{ fontFamily: "'Noto Sans Malayalam', sans-serif" }}
           />
           <button
             onClick={() => handleSend(inputText)}
@@ -439,19 +455,6 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
             <Send className="w-4 h-4" />
           </button>
         </div>
-
-        {/* Review state hint */}
-        {micState === 'review' && (
-          <div className="flex items-center gap-2 px-1">
-            <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
-            <span className="text-xs text-slate-500 flex-1">
-              {language === 'en' ? 'Edit if needed, then send' : 'ആവശ്യമെങ്കിൽ തിരുത്തി അയക്കൂ'}
-            </span>
-            <button onClick={cancelReview} className="text-xs text-slate-400 hover:text-red-500 px-2 py-1">
-              {language === 'en' ? 'Cancel' : 'റദ്ദാക്കൂ'}
-            </button>
-          </div>
-        )}
 
         <div className="flex flex-col items-center">
           <button
@@ -463,7 +466,7 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
           >
             {micState === 'recording' ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
           </button>
-          <p className="text-[9px] uppercase tracking-widest text-slate-400 font-black mt-2 text-center">{micLabel}</p>
+          <p className="text-[9px] uppercase tracking-widest text-slate-400 font-black mt-2 text-center ml-text">{micLabel}</p>
         </div>
 
       </div>
