@@ -202,7 +202,7 @@ def build_doctor_context(question: str, all_doctors: list) -> tuple[str, int]:
     included = 0
 
     for doc in top_scored:
-        schedule = doc.schedule or "Schedule not specified"
+        schedule = doc.base_schedule or "Schedule not specified"
         line = f"- {doc.name} ({doc.department or 'General'}): {schedule}"
         if total_chars + len(line) > DOCTOR_SECTION_MAX_CHARS:
             break
