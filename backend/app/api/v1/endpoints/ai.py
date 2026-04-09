@@ -53,60 +53,35 @@ VALID_LANGUAGES          = {"en", "ml"}
 # =============================================================================
 # GOOGLE TRANSLATE BRIDGE
 # =============================================================================
-# Uses the free Google Translate endpoint (no API key needed).
-# This is the same endpoint the browser uses — it's reliable for Malayalam.
-# If it ever fails, we fall through gracefully (English answer is returned).
 
 _GTRANSLATE_URL = "https://translate.googleapis.com/translate_a/single"
 
 def _translate(text: str, source: str, target: str) -> str:
-    """
-    Translate text using the free Google Translate endpoint.
-    Returns the original text unchanged if translation fails.
-    """
     if not text or not text.strip():
         return text
     try:
-        params = {
-            "client": "gtx",
-            "sl": source,
-            "tl": target,
-            "dt": "t",
-            "q": text,
-        }
+        params = {"client": "gtx", "sl": source, "tl": target, "dt": "t", "q": text}
         resp = httpx.get(_GTRANSLATE_URL, params=params, timeout=8.0)
         resp.raise_for_status()
         data = resp.json()
-        # Response structure: [[[translated, original, ...], ...], ...]
-        translated_parts = [part[0] for part in data[0] if part[0]]
-        return "".join(translated_parts)
+        return "".join(part[0] for part in data[0] if part[0])
     except Exception as e:
-        logger.warning("Translation failed (%s→%s): %s", source, target, e)
-        return text  # Fall back to untranslated text
+        logger.warning("Translation failed (%s->%s): %s", source, target, e)
+        return text
 
 
 async def _translate_async(text: str, source: str, target: str) -> str:
-    """
-    Async version of _translate for use in streaming endpoint.
-    """
     if not text or not text.strip():
         return text
     try:
-        params = {
-            "client": "gtx",
-            "sl": source,
-            "tl": target,
-            "dt": "t",
-            "q": text,
-        }
+        params = {"client": "gtx", "sl": source, "tl": target, "dt": "t", "q": text}
         async with httpx.AsyncClient() as http:
             resp = await http.get(_GTRANSLATE_URL, params=params, timeout=8.0)
             resp.raise_for_status()
             data = resp.json()
-            translated_parts = [part[0] for part in data[0] if part[0]]
-            return "".join(translated_parts)
+            return "".join(part[0] for part in data[0] if part[0])
     except Exception as e:
-        logger.warning("Async translation failed (%s→%s): %s", source, target, e)
+        logger.warning("Async translation failed (%s->%s): %s", source, target, e)
         return text
 
 
@@ -173,61 +148,165 @@ class IngestRequest(BaseModel):
 
 
 # =============================================================================
-# DOCTOR CONTEXT
+# DOCTOR RELEVANCE FILTERING
 # =============================================================================
 
-def build_doctor_context(question: str, all_doctors: list) -> tuple[str, int]:
-    if not all_doctors:
-        return "DOCTORS: No doctors are currently registered for this hospital.", 0
+# Synonym map — variants for common department name spellings/abbreviations.
+# Both directions are listed so matching works regardless of which side uses
+# which spelling.
+_DEPT_SYNONYMS: dict[str, list[str]] = {
+    "orthopaedics":     ["orthopedics", "ortho", "orthopedic", "orthopaedic", "bone", "joint"],
+    "orthopedics":      ["orthopaedics", "ortho", "orthopedic", "orthopaedic", "bone", "joint"],
+    "cardiology":       ["cardiac", "heart", "cardio"],
+    "general medicine": ["general", "medicine", "physician", "gm"],
+    "gynaecology":      ["gynecology", "gynae", "obstetrics", "obgyn", "ob-gyn", "women"],
+    "gynecology":       ["gynaecology", "gynae", "obstetrics", "obgyn", "ob-gyn", "women"],
+    "paediatrics":      ["pediatrics", "paediatric", "pediatric", "child", "children"],
+    "pediatrics":       ["paediatrics", "paediatric", "pediatric", "child", "children"],
+    "dermatology":      ["derma", "skin"],
+    "neurology":        ["neuro", "brain", "nerve"],
+    "ophthalmology":    ["eye", "ophthal", "vision"],
+    "ent":              ["ear", "nose", "throat", "otolaryngology"],
+    "psychiatry":       ["mental health", "psychology", "psych"],
+    "oncology":         ["cancer", "tumor", "tumour"],
+    "urology":          ["urological", "kidney", "bladder"],
+    "nephrology":       ["kidney", "renal"],
+    "pulmonology":      ["lung", "chest", "respiratory", "pulmonary"],
+    "gastroenterology": ["gastro", "digestive", "stomach", "gut", "gi"],
+    "endocrinology":    ["diabetes", "thyroid", "hormones", "endocrine"],
+    "rheumatology":     ["arthritis", "rheumatic", "joints"],
+    "surgery":          ["surgical", "general surgery", "laparoscopy", "laproscopy"],
+    "dentistry":        ["dental", "teeth", "tooth"],
+    "physiotherapy":    ["physio", "rehabilitation", "rehab"],
+    "radiology":        ["xray", "x-ray", "imaging", "scan", "mri"],
+    "anesthesiology":   ["anaesthesia", "anesthesia", "anaesthesiology"],
+}
 
-    q_lower = question.lower()
-    scored = []
-    for doc in all_doctors:
-        score = 0
-        dept = (doc.department or "").lower()
-        name = (doc.name or "").lower()
-        if dept and dept in q_lower:
-            score += 3
-        if name and any(word in q_lower for word in name.split() if len(word) > 2):
-            score += 2
-        scored.append((score, doc))
+def _expand_with_synonyms(tokens: set) -> set:
+    """Expand a token set with department synonyms."""
+    expanded = set(tokens)
+    for token in tokens:
+        for canonical, variants in _DEPT_SYNONYMS.items():
+            if token == canonical or token in variants:
+                expanded.add(canonical)
+                expanded.update(variants)
+    return expanded
 
-    scored.sort(key=lambda x: -x[0])
-    top_scored = [d for s, d in scored if s > 0][:MAX_RELEVANT_DOCTORS]
-    if not top_scored:
-        top_scored = [d for _, d in scored[:DEFAULT_DOCTORS_IF_NO_MATCH]]
 
-    lines = ["DOCTORS AT THIS HOSPITAL:"]
-    total_chars = len(lines[0])
-    included = 0
+def normalize_name(text: str) -> str:
+    """Lowercase, strip Dr. prefix, keep only latin letters and spaces."""
+    text = text.lower()
+    text = re.sub(r"dr\.?\s*", "", text)
+    text = re.sub(r"[^a-z\s]", "", text)
+    return re.sub(r"\s+", " ", text).strip()
 
-    for doc in top_scored:
-        schedule = doc.base_schedule or "Schedule not specified"
-        line = f"- {doc.name} ({doc.department or 'General'}): {schedule}"
+
+def score_doctor_relevance(question: str, doctor: Doctor) -> float:
+    """
+    Score how relevant a doctor entry is to the (English) question.
+
+    Uses synonym expansion so spelling variants ("orthopedics" vs
+    "orthopaedics") and abbreviations ("ortho") all match correctly.
+    A substring fallback handles partial department names.
+    """
+    q_norm = normalize_name(question)
+    q_tokens = set(q_norm.split())
+    if not q_tokens:
+        return 0.0
+
+    dept  = normalize_name(doctor.department or "")
+    name  = normalize_name(doctor.name or "")
+    # Support both field names used across different versions of the model
+    sched = normalize_name(
+        getattr(doctor, "base_schedule", None)
+        or getattr(doctor, "schedule", None)
+        or ""
+    )
+
+    d_tokens = set((dept + " " + name + " " + sched).split())
+    if not d_tokens:
+        return 0.0
+
+    q_expanded = _expand_with_synonyms(q_tokens)
+    d_expanded = _expand_with_synonyms(d_tokens)
+
+    token_score = len(q_expanded & d_expanded) / len(q_expanded)
+
+    # Substring fallback: "ortho" in "orthopaedics"
+    substring_score = 0.0
+    for qt in q_tokens:
+        if len(qt) >= 4 and qt in dept:
+            substring_score = max(substring_score, 0.6)
+
+    return max(token_score, substring_score)
+
+
+def build_doctor_context(question: str, doctors: list) -> tuple[str, int]:
+    if not doctors:
+        return "No doctors currently registered for this hospital.\n", 0
+
+    scored = sorted(
+        [(score_doctor_relevance(question, d), d) for d in doctors],
+        key=lambda x: x[0], reverse=True
+    )
+    top_score = scored[0][0] if scored else 0.0
+    limit = MAX_RELEVANT_DOCTORS if top_score > 0.05 else DEFAULT_DOCTORS_IF_NO_MATCH
+
+    lines, total_chars, truncated = [], 0, False
+    for _, doctor in scored[:limit]:
+        schedule = (
+            getattr(doctor, "base_schedule", None)
+            or getattr(doctor, "schedule", None)
+            or "Not specified"
+        )
+        line = f"- {doctor.name} ({doctor.department or 'General'}): Schedule {schedule}\n"
         if total_chars + len(line) > DOCTOR_SECTION_MAX_CHARS:
+            truncated = True
             break
         lines.append(line)
         total_chars += len(line)
-        included += 1
 
-    return "\n".join(lines), included
+    section = "RELEVANT DOCTORS FOR THIS QUERY:\n" + "".join(lines)
+    if truncated:
+        section += f"(List truncated. Total doctors on file: {len(doctors)})\n"
+    return section, len(lines)
 
+
+def resolve_doctor_id(user_text: str, doctor_data: dict):
+    nq = normalize_name(user_text)
+    best_match, best_score = None, 0
+    for did, d in doctor_data.items():
+        name = d.get("name", "") if isinstance(d, dict) else str(d)
+        nn = normalize_name(name)
+        qt, nt = set(nq.split()), set(nn.split())
+        if not qt or not nt:
+            continue
+        score = len(qt & nt) / len(nt)
+        if score > best_score:
+            best_score = score
+            best_match = (did, name)
+    return best_match if best_score >= 0.5 else (None, None)
+
+
+# =============================================================================
+# KB CONTEXT
+# =============================================================================
 
 def build_kb_context(results: list) -> tuple[str, int]:
     if not results:
         return "", 0
-    chunks = []
-    total_chars = 0
+    trimmed, total = [], 0
     for row in results:
         text = (row.content or "").strip()
         if not text:
             continue
-        snippet = text[:KB_CHUNK_MAX_CHARS]
-        if total_chars + len(snippet) > KB_SECTION_MAX_CHARS:
+        if len(text) > KB_CHUNK_MAX_CHARS:
+            text = text[:KB_CHUNK_MAX_CHARS].rsplit(" ", 1)[0] + "..."
+        if total + len(text) > KB_SECTION_MAX_CHARS:
             break
-        chunks.append(snippet)
-        total_chars += len(snippet)
-    return "\n---\n".join(chunks), len(chunks)
+        trimmed.append(text)
+        total += len(text)
+    return ("\n---\n".join(trimmed), len(trimmed)) if trimmed else ("", 0)
 
 
 # =============================================================================
@@ -236,23 +315,19 @@ def build_kb_context(results: list) -> tuple[str, int]:
 
 def fetch_availability_context(question: str, sheet_id: str, hospital_id: int, today_str: str) -> str:
     try:
-        avail = get_cached_or_empty(hospital_id)
-        if not avail:
+        data = get_doctor_availability(sheet_id=sheet_id)
+        doc_id, doc_name = resolve_doctor_id(question, data)
+        if not doc_id:
             return ""
-        q_lower = question.lower()
-        for doc_name, info in avail.items():
-            if doc_name.lower() in q_lower or any(w in q_lower for w in doc_name.lower().split() if len(w) > 3):
-                qualifier = "available" if info.get("available") else "unavailable"
-                return (f"AVAILABILITY DATA (may be up to 5 minutes old): "
-                        f"{doc_name} was marked {qualifier} for today ({today_str}). "
-                        "Advise the patient to confirm by calling reception.")
-        return ("SYSTEM NOTE: Live doctor availability data is currently unreachable. "
-                "You MUST NOT guess whether any doctor is available. "
-                "Tell the patient to call the hospital reception directly.")
+        doc_info = data.get(doc_id, {})
+        absent = [d.strip() for d in str(doc_info.get("absent_dates", "")).split(",") if d.strip()]
+        if today_str in absent:
+            return (f"IMPORTANT LIVE STATUS: {doc_name} is ABSENT TODAY ({today_str}). "
+                    "Tell the patient they are unavailable and suggest calling reception.")
+        return f"LIVE STATUS: {doc_name} is available today ({today_str})."
     except Exception as e:
         logger.exception("[Availability] Unexpected error hospital_id=%s: %s", hospital_id, e)
-        return ("SYSTEM NOTE: Live availability unreachable. "
-                "You MUST NOT guess availability. Ask the patient to call reception.")
+        return ""
 
 
 # =============================================================================
@@ -260,15 +335,11 @@ def fetch_availability_context(question: str, sheet_id: str, hospital_id: int, t
 # =============================================================================
 
 def build_system_prompt_english() -> str:
-    """
-    When using the translation bridge, the LLM always reasons in English.
-    This prompt is clean, English-only, focused on accuracy.
-    """
     return "Respond in English only. Be clear, accurate, and concise."
 
 
 def build_fallback_instruction() -> str:
-    return """IMPORTANT — WHEN YOU DO NOT KNOW SOMETHING:
+    return """IMPORTANT - WHEN YOU DO NOT KNOW SOMETHING:
 If the patient asks about something not mentioned in the doctor list or knowledge
 above (e.g. pharmacy location, visiting hours, room numbers, fees) and you do not
 have that information:
@@ -278,16 +349,8 @@ Do NOT make up answers. Do NOT say information that is not in your context above
 
 
 def build_context(request: ChatRequest, db: Session, force_english: bool = False):
-    """
-    Build the system prompt and OpenAI messages.
-
-    When force_english=True (used by the translation bridge), the question
-    passed in is already translated to English, and we use an English-only
-    system prompt so the LLM never attempts to output Malayalam itself.
-    """
     hospital_id = request.hospital_id
     question = request.question
-    target_lang = request.language
     today_str = datetime.now().strftime("%d-%m-%Y")
 
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
@@ -310,7 +373,6 @@ def build_context(request: ChatRequest, db: Session, force_english: bool = False
     )
     kb_context, chunks_included = build_kb_context(raw_results)
 
-    # Always use English instructions when translation bridge is active
     lang_instruction = build_system_prompt_english()
     fallback_instruction = build_fallback_instruction()
 
@@ -400,6 +462,63 @@ def embed_chunks_batch(chunks: List[str]) -> List[List[float]]:
 # ENDPOINTS
 # =============================================================================
 
+@router.get("/welcome/{hospital_id}")
+async def get_welcome(hospital_id: int, db: Session = Depends(get_db)):
+    """
+    Returns a personalised welcome message for the chat UI.
+    Lists exactly what this hospital's bot can help with, based on
+    what is actually configured (doctors, KB, etc.).
+
+    Response: { "en": "...", "ml": "..." }
+    """
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+
+    doctors = db.query(Doctor).filter(Doctor.hospital_id == hospital_id).all()
+    has_kb = db.query(KnowledgeBase).filter(KnowledgeBase.hospital_id == hospital_id).first() is not None
+
+    dept_names = sorted({d.department for d in doctors if d.department})
+
+    en_caps, ml_caps = [], []
+
+    if doctors:
+        dept_list = ", ".join(dept_names) if dept_names else "General"
+        en_caps.append(f"🩺 Tell you about our doctors — {dept_list}")
+        ml_caps.append(f"🩺 ഞങ്ങളുടെ ഡോക്ടർമാരെ കുറിച്ച് പറയുക — {dept_list}")
+        en_caps.append("📅 Share doctor schedules and today's availability")
+        ml_caps.append("📅 ഡോക്ടറുടെ ഷെഡ്യൂളും ഇന്നത്തെ ലഭ്യതയും")
+
+    if has_kb:
+        en_caps.append("🏥 Answer questions about the hospital (timings, services, etc.)")
+        ml_caps.append("🏥 ആശുപത്രിയെ കുറിച്ചുള്ള ചോദ്യങ്ങൾക്ക് മറുപടി നൽകുക")
+
+    en_caps.append("📞 Guide you to the right department or contact")
+    ml_caps.append("📞 ശരിയായ വിഭാഗത്തിലേക്കോ ബന്ധപ്പെടുന്നതിന് നിർദ്ദേശം നൽകുക")
+
+    hospital_name = hospital.name or "this hospital"
+
+    en_msg = "\n".join([
+        f"👋 Hello! I am **Arogya**, the AI assistant for **{hospital_name}**.",
+        "",
+        "Here is what I can help you with:",
+        *[f"- {c}" for c in en_caps],
+        "",
+        "Just type or speak your question! 🎤",
+    ])
+
+    ml_msg = "\n".join([
+        f"👋 നമസ്കാരം! ഞാൻ **ആരോഗ്യ**, **{hospital_name}**-ന്റെ AI അസിസ്റ്റന്റ്.",
+        "",
+        "ഞാൻ ഇവ സഹായിക്കാം:",
+        *[f"- {c}" for c in ml_caps],
+        "",
+        "താഴെ ടൈപ്പ് ചെയ്യൂ അല്ലെങ്കിൽ സംസാരിക്കൂ! 🎤",
+    ])
+
+    return {"en": en_msg, "ml": ml_msg}
+
+
 @router.get("/suggestions/{hospital_id}")
 async def get_suggestions(hospital_id: int, db: Session = Depends(get_db)):
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
@@ -409,15 +528,13 @@ async def get_suggestions(hospital_id: int, db: Session = Depends(get_db)):
     doctors = db.query(Doctor).filter(Doctor.hospital_id == hospital_id).limit(3).all()
     has_kb = db.query(KnowledgeBase).filter(KnowledgeBase.hospital_id == hospital_id).first() is not None
 
-    en_suggestions = []
-    ml_suggestions = []
+    en_suggestions, ml_suggestions = [], []
 
     if doctors:
         for doctor in doctors[:2]:
             dept = doctor.department or "General"
             en_suggestions.append(f"Who is the {dept} doctor?")
             ml_suggestions.append(f"{dept} ഡോക്ടർ ആരാണ്?")
-
         en_suggestions.append("Which doctors are available today?")
         ml_suggestions.append("ഇന്ന് ഏത് ഡോക്ടർ ഉണ്ട്?")
     else:
@@ -490,7 +607,7 @@ async def upload_pdf(file: UploadFile = File(...), hospital_id: int = Form(...),
         "status": "success", "filename": file.filename,
         "pages_processed": page_count, "chunks_stored": len(chunks),
         "total_characters": sum(len(c) for c in chunks),
-        "message": f"'{file.filename}' → {len(chunks)} chunks stored for {hospital.name}."
+        "message": f"'{file.filename}' -> {len(chunks)} chunks stored for {hospital.name}."
     }
 
 
@@ -498,24 +615,20 @@ async def upload_pdf(file: UploadFile = File(...), hospital_id: int = Form(...),
 async def chat_with_arogya(request: ChatRequest, db: Session = Depends(get_db)):
     is_malayalam = request.language == "ml"
 
-    # ── Translation bridge: Malayalam → English ───────────────────────────────
     english_question = request.question
     if is_malayalam:
         english_question = _translate(request.question, source="ml", target="en")
-        logger.info("[Translation] ml→en: %r → %r", request.question[:80], english_question[:80])
+        logger.info("[Translation] ml->en: %r -> %r", request.question[:80], english_question[:80])
 
-    # Build context using the English question so RAG/embedding works correctly
     translated_request = request.model_copy(update={"question": english_question})
     _, openai_messages, _ = build_context(translated_request, db, force_english=True)
 
     ai_response = client.chat.completions.create(model="gpt-4o-mini", messages=openai_messages)
     english_answer = ai_response.choices[0].message.content or ""
 
-    # ── Translation bridge: English → Malayalam ───────────────────────────────
     final_answer = english_answer
     if is_malayalam:
         final_answer = _translate(english_answer, source="en", target="ml")
-        logger.info("[Translation] en→ml answer preview: %r", final_answer[:80])
 
     usage = ai_response.usage
     db.add(UsageLedger(
@@ -531,11 +644,10 @@ async def chat_with_arogya(request: ChatRequest, db: Session = Depends(get_db)):
 async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
     is_malayalam = request.language == "ml"
 
-    # ── Translation bridge: Malayalam → English ───────────────────────────────
     english_question = request.question
     if is_malayalam:
         english_question = await _translate_async(request.question, source="ml", target="en")
-        logger.info("[Translation] ml→en: %r → %r", request.question[:80], english_question[:80])
+        logger.info("[Translation] ml->en: %r -> %r", request.question[:80], english_question[:80])
 
     translated_request = request.model_copy(update={"question": english_question})
     _, openai_messages, _ = build_context(translated_request, db, force_english=True)
@@ -554,24 +666,16 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
                 token = delta.content if delta and delta.content else None
                 if token:
                     if is_malayalam:
-                        # Buffer tokens — we translate the full answer at the end
                         english_chunks.append(token)
                     else:
-                        # English: stream tokens directly as before
                         yield f"data: {json.dumps(token)}\n\n"
                 if chunk.usage:
                     pt, ct, tt = chunk.usage.prompt_tokens, chunk.usage.completion_tokens, chunk.usage.total_tokens
 
-            # ── Translation bridge: translate full English response → Malayalam ──
             if is_malayalam and english_chunks:
                 full_english = "".join(english_chunks)
-                logger.info("[Translation] en→ml full response (%d chars)", len(full_english))
                 full_malayalam = await _translate_async(full_english, source="en", target="ml")
-
-                # Stream the Malayalam response in sentence-sized chunks so
-                # the frontend typing cursor still animates naturally
-                import re as _re
-                sentences = _re.split(r'(?<=[.!?।\n])\s*', full_malayalam)
+                sentences = re.split(r'(?<=[.!?।\n])\s*', full_malayalam)
                 for sentence in sentences:
                     if sentence.strip():
                         yield f"data: {json.dumps(sentence + ' ')}\n\n"
