@@ -269,6 +269,11 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
   useEffect(() => {
     handleSendRef.current = handleSend;
   }, [handleSend]);
+  useEffect(() => {
+    if (micState === 'review' && inputText.trim()) {
+      handleSend(inputText);
+    }
+  }, [micState, inputText, handleSend]);
 
   // ── Welcome message ───────────────────────────────────────────────────────
   useEffect(() => {

@@ -273,42 +273,16 @@ def fetch_availability_context(question: str, sheet_id: str, hospital_id: int, t
 # =============================================================================
 
 def build_malayalam_instruction(lang: str) -> str:
-    """
-    FIX: The original prompt had a contradiction:
-      - lang_instruction said: 'Respond ONLY in Malayalam script. Do NOT use English script.'
-      - behavior_guidelines said: 'Use Manglish style — English terms written in Malayalam script.'
-
-    'Do NOT use English script' told the model to avoid the Latin alphabet entirely.
-    'Manglish' requires mixing Malayalam script with English-origin words
-    (e.g. 'Cardiology' stays as 'കാർഡിയോളജി', which IS Malayalam script
-    but is an English loanword — this is fine and correct).
-
-    The real instruction the model needs:
-      - Write in Malayalam script (not Latin alphabet)
-      - Medical/technical terms that are English loanwords should be
-        transliterated into Malayalam script, NOT translated literally
-      - When the answer is not in context, say so in Malayalam, do not guess
-    """
     if lang != "ml":
         return "Respond in English only."
 
-    return """LANGUAGE: Respond entirely in Malayalam script (മലയാളം).
+    return """LANGUAGE: Respond entirely in natural, fluent Malayalam script (മലയാളം).
 
 STYLE RULES for Malayalam responses:
-1. Medical and technical terms that are English loanwords should be written
-   in Malayalam script as they are pronounced — do NOT invent pure Malayalam
-   translations for them.
-   CORRECT: കാർഡിയോളജി (Cardiology), ഫാർമസി (Pharmacy), ഓർത്തോപീഡിക്സ് (Orthopaedics)
-   WRONG:   ഹൃദ്രോഗ ശാസ്ത്രം (invented pure Malayalam — sounds unnatural and confusing)
-
-2. Doctor names, department names, and proper nouns: write them in Malayalam
-   script exactly as they are pronounced in spoken Malayalam.
-
-3. Tone: Like a friendly, professional hospital receptionist speaking to a patient.
-   Warm, clear, and direct.
-
-4. Length: Give complete answers. Do not cut a sentence short.
-   If listing doctors, list all that are relevant."""
+1. Use proper, correct Malayalam grammar. Ensure the sentence structure is natural and easy to read.
+2. Keep the tone warm, clear, and professional, like a helpful hospital receptionist.
+3. For common medical terms (like Cardiology, Pharmacy, Orthopaedics, Doctor), write them directly in Malayalam script as loanwords as they are spoken (e.g., കാർഡിയോളജി, ഫാർമസി, ഡോക്ടർ). Do not translate them into highly complex Malayalam words.
+4. Provide complete, helpful sentences. Do not cut sentences short."""
 
 
 def build_fallback_instruction() -> str:
