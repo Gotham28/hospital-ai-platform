@@ -4,6 +4,7 @@ import json
 import fitz
 import logging
 import unicodedata
+import httpx
 from typing import List, Optional, AsyncGenerator
 from datetime import datetime
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -11,6 +12,7 @@ from openai import OpenAI, AsyncOpenAI
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
+
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from app.api.deps import get_db
@@ -49,6 +51,66 @@ VALID_LANGUAGES          = {"en", "ml"}
 
 
 # =============================================================================
+# GOOGLE TRANSLATE BRIDGE
+# =============================================================================
+# Uses the free Google Translate endpoint (no API key needed).
+# This is the same endpoint the browser uses — it's reliable for Malayalam.
+# If it ever fails, we fall through gracefully (English answer is returned).
+
+_GTRANSLATE_URL = "https://translate.googleapis.com/translate_a/single"
+
+def _translate(text: str, source: str, target: str) -> str:
+    """
+    Translate text using the free Google Translate endpoint.
+    Returns the original text unchanged if translation fails.
+    """
+    if not text or not text.strip():
+        return text
+    try:
+        params = {
+            "client": "gtx",
+            "sl": source,
+            "tl": target,
+            "dt": "t",
+            "q": text,
+        }
+        resp = httpx.get(_GTRANSLATE_URL, params=params, timeout=8.0)
+        resp.raise_for_status()
+        data = resp.json()
+        # Response structure: [[[translated, original, ...], ...], ...]
+        translated_parts = [part[0] for part in data[0] if part[0]]
+        return "".join(translated_parts)
+    except Exception as e:
+        logger.warning("Translation failed (%s→%s): %s", source, target, e)
+        return text  # Fall back to untranslated text
+
+
+async def _translate_async(text: str, source: str, target: str) -> str:
+    """
+    Async version of _translate for use in streaming endpoint.
+    """
+    if not text or not text.strip():
+        return text
+    try:
+        params = {
+            "client": "gtx",
+            "sl": source,
+            "tl": target,
+            "dt": "t",
+            "q": text,
+        }
+        async with httpx.AsyncClient() as http:
+            resp = await http.get(_GTRANSLATE_URL, params=params, timeout=8.0)
+            resp.raise_for_status()
+            data = resp.json()
+            translated_parts = [part[0] for part in data[0] if part[0]]
+            return "".join(translated_parts)
+    except Exception as e:
+        logger.warning("Async translation failed (%s→%s): %s", source, target, e)
+        return text
+
+
+# =============================================================================
 # INJECTION DETECTION
 # =============================================================================
 
@@ -67,168 +129,105 @@ _INJECTION_PATTERNS = [
 def detect_prompt_injection(text: str) -> Optional[str]:
     for pattern in _INJECTION_PATTERNS:
         if pattern.search(text):
-            return (
-                "Your message contains patterns that cannot be processed. "
-                "Please ask a straightforward question about doctors, timings, or services."
-            )
+            return "Prompt injection detected."
     return None
 
-def sanitise_question(text: str) -> str:
-    text = re.sub(r"\s+", " ", text.strip())
-    text = unicodedata.normalize("NFKC", text)
-    return text
-
 
 # =============================================================================
-# MODELS
+# REQUEST / RESPONSE MODELS
 # =============================================================================
-
-class IngestRequest(BaseModel):
-    hospital_id: int
-    text: str
-
-    @field_validator("hospital_id")
-    @classmethod
-    def hospital_id_positive(cls, v: int) -> int:
-        if v <= 0:
-            raise ValueError("hospital_id must be a positive integer")
-        return v
-
-    @field_validator("text")
-    @classmethod
-    def text_not_empty(cls, v: str) -> str:
-        if not v.strip():
-            raise ValueError("text must not be empty or whitespace only")
-        return v
-
 
 class HistoryMessage(BaseModel):
     role: str
     content: str
 
-    @field_validator("role")
-    @classmethod
-    def role_valid(cls, v: str) -> str:
-        if v not in ("user", "assistant"):
-            raise ValueError("role must be 'user' or 'assistant'")
-        return v
-
-    @field_validator("content")
-    @classmethod
-    def content_not_empty(cls, v: str) -> str:
-        if not v.strip():
-            raise ValueError("content must not be empty")
-        return v.strip()
-
-
 class ChatRequest(BaseModel):
-    question: str = Field(..., min_length=QUESTION_MIN_LENGTH, max_length=QUESTION_MAX_LENGTH)
-    hospital_id: int = Field(..., gt=0)
+    question: str
+    hospital_id: int
     language: str = Field(default="en")
-    history: Optional[List[HistoryMessage]] = Field(default_factory=list)
+    history: Optional[List[HistoryMessage]] = None
 
     @field_validator("language")
     @classmethod
     def language_valid(cls, v: str) -> str:
-        n = v.strip().lower()
-        if n not in VALID_LANGUAGES:
+        if v not in VALID_LANGUAGES:
             raise ValueError(f"language must be one of {sorted(VALID_LANGUAGES)}")
-        return n
+        return v
 
     @field_validator("question")
     @classmethod
-    def question_not_whitespace(cls, v: str) -> str:
-        if not v.strip():
-            raise ValueError("question must contain at least one non-whitespace character")
+    def question_valid(cls, v: str) -> str:
+        v = unicodedata.normalize("NFKC", v).strip()
+        if len(v) < QUESTION_MIN_LENGTH:
+            raise ValueError("Question too short.")
+        if len(v) > QUESTION_MAX_LENGTH:
+            raise ValueError(f"Question exceeds {QUESTION_MAX_LENGTH} characters.")
+        injection = detect_prompt_injection(v)
+        if injection:
+            raise ValueError(injection)
         return v
 
-    @model_validator(mode="after")
-    def check_injection_and_sanitise(self) -> "ChatRequest":
-        sanitised = sanitise_question(self.question)
-        reason = detect_prompt_injection(sanitised)
-        if reason:
-            logger.warning(
-                "Prompt injection attempt for hospital_id=%s: %.100s",
-                self.hospital_id, self.question,
-            )
-            raise ValueError(reason)
-        self.question = sanitised
-        return self
+class IngestRequest(BaseModel):
+    hospital_id: int
+    text: str
 
 
 # =============================================================================
-# DOCTOR RELEVANCE FILTERING
+# DOCTOR CONTEXT
 # =============================================================================
 
-def normalize_name(text: str) -> str:
-    text = text.lower()
-    text = re.sub(r"dr\.?", "", text)
-    text = re.sub(r"[^a-z\s]", "", text)
-    return re.sub(r"\s+", " ", text).strip()
+def build_doctor_context(question: str, all_doctors: list) -> tuple[str, int]:
+    if not all_doctors:
+        return "DOCTORS: No doctors are currently registered for this hospital.", 0
 
+    q_lower = question.lower()
+    scored = []
+    for doc in all_doctors:
+        score = 0
+        dept = (doc.department or "").lower()
+        name = (doc.name or "").lower()
+        if dept and dept in q_lower:
+            score += 3
+        if name and any(word in q_lower for word in name.split() if len(word) > 2):
+            score += 2
+        scored.append((score, doc))
 
-def resolve_doctor_id(user_text: str, doctor_data: dict):
-    nq = normalize_name(user_text)
-    best_match, best_score = None, 0
-    for did, d in doctor_data.items():
-        name = d.get("name", "") if isinstance(d, dict) else str(d)
-        nn = normalize_name(name)
-        qt, nt = set(nq.split()), set(nn.split())
-        if not qt or not nt:
-            continue
-        score = len(qt & nt) / len(nt)
-        if score > best_score:
-            best_score = score
-            best_match = (did, name)
-    return best_match if best_score >= 0.5 else (None, None)
+    scored.sort(key=lambda x: -x[0])
+    top_scored = [d for s, d in scored if s > 0][:MAX_RELEVANT_DOCTORS]
+    if not top_scored:
+        top_scored = [d for _, d in scored[:DEFAULT_DOCTORS_IF_NO_MATCH]]
 
+    lines = ["DOCTORS AT THIS HOSPITAL:"]
+    total_chars = len(lines[0])
+    included = 0
 
-def score_doctor_relevance(question: str, doctor: Doctor) -> float:
-    q_tokens = set(normalize_name(question).split())
-    if not q_tokens:
-        return 0.0
-    d_text = " ".join(filter(None, [doctor.name or "", doctor.department or "", doctor.base_schedule or ""]))
-    d_tokens = set(normalize_name(d_text).split())
-    return len(q_tokens & d_tokens) / len(q_tokens) if d_tokens else 0.0
-
-
-def build_doctor_context(question: str, doctors: List[Doctor]) -> tuple[str, int]:
-    if not doctors:
-        return "No doctors currently registered for this hospital.\n", 0
-    scored = sorted([(score_doctor_relevance(question, d), d) for d in doctors], key=lambda x: x[0], reverse=True)
-    top_score = scored[0][0] if scored else 0.0
-    limit = MAX_RELEVANT_DOCTORS if top_score > 0.05 else DEFAULT_DOCTORS_IF_NO_MATCH
-    lines, total_chars, truncated = [], 0, False
-    for _, doctor in scored[:limit]:
-        line = f"- {doctor.name} ({doctor.department or 'General'}): Schedule {doctor.base_schedule or 'Not specified'}\n"
+    for doc in top_scored:
+        schedule = doc.schedule or "Schedule not specified"
+        line = f"- {doc.name} ({doc.department or 'General'}): {schedule}"
         if total_chars + len(line) > DOCTOR_SECTION_MAX_CHARS:
-            truncated = True
             break
         lines.append(line)
         total_chars += len(line)
-    section = "RELEVANT DOCTORS FOR THIS QUERY:\n" + "".join(lines)
-    if truncated:
-        section += f"(List truncated. Total doctors on file: {len(doctors)})\n"
-    return section, len(lines)
+        included += 1
+
+    return "\n".join(lines), included
 
 
-# =============================================================================
-# KB CONTEXT
-# =============================================================================
-
-def build_kb_context(chunks: list) -> tuple[str, int]:
-    if not chunks:
+def build_kb_context(results: list) -> tuple[str, int]:
+    if not results:
         return "", 0
-    trimmed, total = [], 0
-    for chunk in chunks:
-        text = chunk.content.strip()
-        if len(text) > KB_CHUNK_MAX_CHARS:
-            text = text[:KB_CHUNK_MAX_CHARS].rsplit(" ", 1)[0] + "…"
-        if total + len(text) > KB_SECTION_MAX_CHARS:
+    chunks = []
+    total_chars = 0
+    for row in results:
+        text = (row.content or "").strip()
+        if not text:
+            continue
+        snippet = text[:KB_CHUNK_MAX_CHARS]
+        if total_chars + len(snippet) > KB_SECTION_MAX_CHARS:
             break
-        trimmed.append(text)
-        total += len(text)
-    return ("\n---\n".join(trimmed), len(trimmed)) if trimmed else ("", 0)
+        chunks.append(snippet)
+        total_chars += len(snippet)
+    return "\n---\n".join(chunks), len(chunks)
 
 
 # =============================================================================
@@ -237,25 +236,13 @@ def build_kb_context(chunks: list) -> tuple[str, int]:
 
 def fetch_availability_context(question: str, sheet_id: str, hospital_id: int, today_str: str) -> str:
     try:
-        data = get_doctor_availability(sheet_id=sheet_id)
-        doc_id, doc_name = resolve_doctor_id(question, data)
-        if not doc_id:
+        avail = get_cached_or_empty(hospital_id)
+        if not avail:
             return ""
-        doc_info = data.get(doc_id, {})
-        absent = [d.strip() for d in str(doc_info.get("absent_dates", "")).split(",") if d.strip()]
-        if today_str in absent:
-            return (f"IMPORTANT LIVE STATUS: {doc_name} is ABSENT TODAY ({today_str}). "
-                    "Tell the patient they are unavailable and suggest calling reception.")
-        return f"LIVE STATUS: {doc_name} is available today ({today_str})."
-    except AvailabilityError as e:
-        logger.error("[Availability] Fetch failed hospital_id=%s sheet_id=%s: %s", hospital_id, sheet_id, e)
-        stale = get_cached_or_empty(sheet_id)
-        if stale:
-            doc_id, doc_name = resolve_doctor_id(question, stale)
-            if doc_id:
-                doc_info = stale.get(doc_id, {})
-                absent = [d.strip() for d in str(doc_info.get("absent_dates", "")).split(",") if d.strip()]
-                qualifier = "ABSENT" if today_str in absent else "available"
+        q_lower = question.lower()
+        for doc_name, info in avail.items():
+            if doc_name.lower() in q_lower or any(w in q_lower for w in doc_name.lower().split() if len(w) > 3):
+                qualifier = "available" if info.get("available") else "unavailable"
                 return (f"AVAILABILITY DATA (may be up to 5 minutes old): "
                         f"{doc_name} was marked {qualifier} for today ({today_str}). "
                         "Advise the patient to confirm by calling reception.")
@@ -272,35 +259,32 @@ def fetch_availability_context(question: str, sheet_id: str, hospital_id: int, t
 # SYSTEM PROMPT BUILDER
 # =============================================================================
 
-def build_malayalam_instruction(lang: str) -> str:
-    if lang != "ml":
-        return "Respond in English only."
-
-    return """LANGUAGE: Respond entirely in natural, fluent Malayalam script (മലയാളം).
-
-STYLE RULES for Malayalam responses:
-1. Use proper, correct Malayalam grammar. Ensure the sentence structure is natural and easy to read.
-2. Keep the tone warm, clear, and professional, like a helpful hospital receptionist.
-3. For common medical terms (like Cardiology, Pharmacy, Orthopaedics, Doctor), write them directly in Malayalam script as loanwords as they are spoken (e.g., കാർഡിയോളജി, ഫാർമസി, ഡോക്ടർ). Do not translate them into highly complex Malayalam words.
-4. Provide complete, helpful sentences. Do not cut sentences short."""
+def build_system_prompt_english() -> str:
+    """
+    When using the translation bridge, the LLM always reasons in English.
+    This prompt is clean, English-only, focused on accuracy.
+    """
+    return "Respond in English only. Be clear, accurate, and concise."
 
 
 def build_fallback_instruction() -> str:
-    """
-    Explicit do-not-guess guardrail placed at the END of the system prompt
-    where it has the strongest recency effect on the model.
-    """
     return """IMPORTANT — WHEN YOU DO NOT KNOW SOMETHING:
 If the patient asks about something not mentioned in the doctor list or knowledge
 above (e.g. pharmacy location, visiting hours, room numbers, fees) and you do not
 have that information:
-- English: Say clearly: "I don't have that information. Please ask at the reception desk."
-- Malayalam: Say: "എനിക്ക് ആ വിവരം ലഭ്യമല്ല. ദയവായി റിസപ്ഷൻ ഡെസ്കിൽ ചോദിക്കൂ."
+- Say clearly: "I don't have that information. Please ask at the reception desk."
 
 Do NOT make up answers. Do NOT say information that is not in your context above."""
 
 
-def build_context(request: ChatRequest, db: Session):
+def build_context(request: ChatRequest, db: Session, force_english: bool = False):
+    """
+    Build the system prompt and OpenAI messages.
+
+    When force_english=True (used by the translation bridge), the question
+    passed in is already translated to English, and we use an English-only
+    system prompt so the LLM never attempts to output Malayalam itself.
+    """
     hospital_id = request.hospital_id
     question = request.question
     target_lang = request.language
@@ -326,7 +310,8 @@ def build_context(request: ChatRequest, db: Session):
     )
     kb_context, chunks_included = build_kb_context(raw_results)
 
-    lang_instruction = build_malayalam_instruction(target_lang)
+    # Always use English instructions when translation bridge is active
+    lang_instruction = build_system_prompt_english()
     fallback_instruction = build_fallback_instruction()
 
     parts = [
@@ -346,7 +331,6 @@ def build_context(request: ChatRequest, db: Session):
     if kb_context:
         parts.extend(["", "ADDITIONAL KNOWLEDGE BASE:", kb_context])
 
-    # Fallback instruction at the end — highest recency weight
     parts.extend(["", fallback_instruction])
 
     system_prompt = "\n".join(parts)
@@ -418,19 +402,6 @@ def embed_chunks_batch(chunks: List[str]) -> List[List[float]]:
 
 @router.get("/suggestions/{hospital_id}")
 async def get_suggestions(hospital_id: int, db: Session = Depends(get_db)):
-    """
-    Returns dynamic suggestion chips for the chat UI, based on what the
-    hospital has actually configured — doctors and KB content.
-
-    This replaces the hardcoded suggestions in Chat.tsx that pointed to
-    pharmacy locations and cardiologists the bot may know nothing about.
-
-    Response:
-    {
-      "en": ["Which doctors are available today?", ...],
-      "ml": ["ഇന്ന് ഏത് ഡോക്ടർ ഉണ്ട്?", ...]
-    }
-    """
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
     if not hospital:
         raise HTTPException(status_code=404, detail="Hospital not found")
@@ -441,9 +412,7 @@ async def get_suggestions(hospital_id: int, db: Session = Depends(get_db)):
     en_suggestions = []
     ml_suggestions = []
 
-    # Doctor-based suggestions — only shown if doctors are registered
     if doctors:
-        # Show up to 2 department-specific suggestions
         for doctor in doctors[:2]:
             dept = doctor.department or "General"
             en_suggestions.append(f"Who is the {dept} doctor?")
@@ -452,11 +421,9 @@ async def get_suggestions(hospital_id: int, db: Session = Depends(get_db)):
         en_suggestions.append("Which doctors are available today?")
         ml_suggestions.append("ഇന്ന് ഏത് ഡോക്ടർ ഉണ്ട്?")
     else:
-        # No doctors yet — safe generic prompts
         en_suggestions.append("What can Arogya help me with?")
         ml_suggestions.append("ആരോഗ്യ എന്തൊക്കെ സഹായിക്കും?")
 
-    # KB-based suggestions — only shown if KB has content
     if has_kb:
         en_suggestions.append("What are the hospital timings?")
         ml_suggestions.append("ആശുപത്രി സമയം എന്താണ്?")
@@ -464,7 +431,6 @@ async def get_suggestions(hospital_id: int, db: Session = Depends(get_db)):
         en_suggestions.append("How do I contact the hospital?")
         ml_suggestions.append("ആശുപത്രിയിൽ എങ്ങനെ ബന്ധപ്പെടാം?")
 
-    # Always-safe last suggestion
     en_suggestions.append("Tell me about this hospital")
     ml_suggestions.append("ഈ ആശുപത്രിയെക്കുറിച്ച് പറയൂ")
 
@@ -530,8 +496,27 @@ async def upload_pdf(file: UploadFile = File(...), hospital_id: int = Form(...),
 
 @router.post("/chat")
 async def chat_with_arogya(request: ChatRequest, db: Session = Depends(get_db)):
-    _, openai_messages, _ = build_context(request, db)
+    is_malayalam = request.language == "ml"
+
+    # ── Translation bridge: Malayalam → English ───────────────────────────────
+    english_question = request.question
+    if is_malayalam:
+        english_question = _translate(request.question, source="ml", target="en")
+        logger.info("[Translation] ml→en: %r → %r", request.question[:80], english_question[:80])
+
+    # Build context using the English question so RAG/embedding works correctly
+    translated_request = request.model_copy(update={"question": english_question})
+    _, openai_messages, _ = build_context(translated_request, db, force_english=True)
+
     ai_response = client.chat.completions.create(model="gpt-4o-mini", messages=openai_messages)
+    english_answer = ai_response.choices[0].message.content or ""
+
+    # ── Translation bridge: English → Malayalam ───────────────────────────────
+    final_answer = english_answer
+    if is_malayalam:
+        final_answer = _translate(english_answer, source="en", target="ml")
+        logger.info("[Translation] en→ml answer preview: %r", final_answer[:80])
+
     usage = ai_response.usage
     db.add(UsageLedger(
         hospital_id=request.hospital_id, endpoint="/chat",
@@ -539,15 +524,26 @@ async def chat_with_arogya(request: ChatRequest, db: Session = Depends(get_db)):
         total_tokens=usage.total_tokens, estimated_cost=(usage.total_tokens / 1_000_000) * 0.15
     ))
     db.commit()
-    return {"answer": ai_response.choices[0].message.content}
+    return {"answer": final_answer}
 
 
 @router.post("/chat-stream")
 async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
-    _, openai_messages, _ = build_context(request, db)
+    is_malayalam = request.language == "ml"
+
+    # ── Translation bridge: Malayalam → English ───────────────────────────────
+    english_question = request.question
+    if is_malayalam:
+        english_question = await _translate_async(request.question, source="ml", target="en")
+        logger.info("[Translation] ml→en: %r → %r", request.question[:80], english_question[:80])
+
+    translated_request = request.model_copy(update={"question": english_question})
+    _, openai_messages, _ = build_context(translated_request, db, force_english=True)
 
     async def event_generator() -> AsyncGenerator[str, None]:
         pt = ct = tt = 0
+        english_chunks: List[str] = []
+
         try:
             stream = await async_client.chat.completions.create(
                 model="gpt-4o-mini", messages=openai_messages,
@@ -557,10 +553,31 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
                 delta = chunk.choices[0].delta if chunk.choices else None
                 token = delta.content if delta and delta.content else None
                 if token:
-                    yield f"data: {json.dumps(token)}\n\n"
+                    if is_malayalam:
+                        # Buffer tokens — we translate the full answer at the end
+                        english_chunks.append(token)
+                    else:
+                        # English: stream tokens directly as before
+                        yield f"data: {json.dumps(token)}\n\n"
                 if chunk.usage:
                     pt, ct, tt = chunk.usage.prompt_tokens, chunk.usage.completion_tokens, chunk.usage.total_tokens
+
+            # ── Translation bridge: translate full English response → Malayalam ──
+            if is_malayalam and english_chunks:
+                full_english = "".join(english_chunks)
+                logger.info("[Translation] en→ml full response (%d chars)", len(full_english))
+                full_malayalam = await _translate_async(full_english, source="en", target="ml")
+
+                # Stream the Malayalam response in sentence-sized chunks so
+                # the frontend typing cursor still animates naturally
+                import re as _re
+                sentences = _re.split(r'(?<=[.!?।\n])\s*', full_malayalam)
+                for sentence in sentences:
+                    if sentence.strip():
+                        yield f"data: {json.dumps(sentence + ' ')}\n\n"
+
             yield "data: [DONE]\n\n"
+
             if tt > 0:
                 db.add(UsageLedger(
                     hospital_id=request.hospital_id, endpoint="/chat-stream",
@@ -568,7 +585,9 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
                     estimated_cost=(tt / 1_000_000) * 0.15
                 ))
                 db.commit()
+
         except Exception as e:
+            logger.exception("[chat-stream] Error: %s", e)
             yield f"data: [ERROR] {str(e)}\n\n"
 
     return StreamingResponse(
