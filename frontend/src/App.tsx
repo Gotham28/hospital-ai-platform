@@ -44,6 +44,12 @@ function HospitalList() {
 
             <div className="flex gap-2 border-t pt-4">
               <Link
+                to={`/hospitals/${h.id}/appointments`}
+                className="flex-1 text-center text-xs bg-emerald-600 text-white py-2 rounded-md font-medium hover:bg-emerald-700"
+              >
+                Appointments
+              </Link>
+              <Link
                 to={`/hospitals/${h.id}/training`}
                 className="flex-1 text-center text-xs bg-blue-600 text-white py-2 rounded-md font-medium hover:bg-blue-700"
               >
@@ -70,20 +76,12 @@ function HospitalList() {
 }
 
 export default function App() {
-  // FIX: Read from AuthContext (useState) instead of localStorage directly.
-  // The old code was: const isAuthenticated = !!localStorage.getItem('token')
-  // That's a plain const evaluated once at render time and never updated,
-  // so after login() set the token, App still saw isAuthenticated=false
-  // until a full page reload forced a re-evaluation. Using the context
-  // state means any call to login() or logout() triggers a re-render here
-  // automatically, with no reload required.
   const { isAuthenticated } = useAuth();
 
   return (
     <Routes>
       {/* Public patient-facing route */}
       <Route path="/p/:hospitalSlug" element={<ThemeLoader />} />
-      <Route path="/hospitals/:hospitalId/appointments" element={<AppointmentsTab hospitalId={...} />} />
 
       {/* Auth route — redirect to / if already logged in */}
       <Route
@@ -97,6 +95,9 @@ export default function App() {
         <Route path="/hospitals/:hospitalId/doctors" element={<DoctorsPage />} />
         <Route path="/hospitals/:hospitalId/training" element={<Dashboard />} />
         <Route path="/hospitals/:hospitalId/settings" element={<SettingsPage />} />
+        
+        {/* FIX: Moved inside the DashboardLayout block & removed the broken empty prop */}
+        <Route path="/hospitals/:hospitalId/appointments" element={<AppointmentsTab />} />
       </Route>
 
       {/* Catch-all */}

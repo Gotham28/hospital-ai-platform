@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
 import api from '../api/axios';
 import { CheckCircle, XCircle, Clock, Phone, User, Calendar, Stethoscope, RefreshCw } from 'lucide-react';
 
@@ -38,7 +39,8 @@ const TIME_LABELS: Record<string, string> = {
   evening:   '🌇 Evening',
 };
 
-export default function AppointmentsTab({ hospitalId }: { hospitalId: number }) {
+export default function AppointmentsTab() {
+  const { hospitalId } = useParams<{ hospitalId: string }>();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
   const [loading, setLoading] = useState(false);
@@ -49,6 +51,7 @@ export default function AppointmentsTab({ hospitalId }: { hospitalId: number }) 
   const [actionLoading, setActionLoading] = useState(false);
 
   const fetchAppointments = useCallback(async () => {
+    if (!hospitalId) return;
     setLoading(true);
     try {
       const params = filter !== 'all' ? `?status=${filter}` : '';
