@@ -1,4 +1,4 @@
-    """add appointments table and booking_config
+"""add appointments table and booking_config
 
 Revision ID: a1b2c3d4e5f6
 Revises: 8e2627e5f8b9
@@ -39,7 +39,7 @@ def upgrade() -> None:
         sa.Column('updated_at',       sa.DateTime(), nullable=True),
     )
 
-    # 3. Index for fast lookups
+    # 3. Indexes for fast lookups
     op.create_index('ix_appointments_hospital_id', 'appointments', ['hospital_id'])
     op.create_index('ix_appointments_status',      'appointments', ['status'])
     op.create_index('ix_appointments_doctor_date', 'appointments', ['doctor_id', 'preferred_date'])
