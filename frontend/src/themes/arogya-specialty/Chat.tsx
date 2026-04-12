@@ -46,6 +46,13 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
   const [micState, setMicState] = useState<MicState>('idle');
   const [micError, setMicError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<{ en: string[]; ml: string[] }>(FALLBACK_SUGGESTIONS);
+  const sessionToken = useRef<string>(
+  sessionStorage.getItem('bookingSessionToken') || (() => {
+    const t = crypto.randomUUID();
+    sessionStorage.setItem('bookingSessionToken', t);
+    return t;
+  })()
+);
   // Cache welcome messages so we don't re-fetch on every language toggle
   const welcomeCache = useRef<{ en: string; ml: string } | null>(null);
 
@@ -257,6 +264,7 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
           hospital_id: parseInt(hospitalId),
           language,
           history: historySnapshot,
+          session_token: sessionToken.current,
         }),
         signal: abortRef.current.signal,
       });

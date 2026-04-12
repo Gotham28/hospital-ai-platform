@@ -14,6 +14,7 @@ class Hospital(Base):
     system_prompt = Column(Text, default="You are Arogya, a helpful assistant for a specialty hospital.")
     # Add this column to your existing Hospital class
     google_sheet_id = Column(String, nullable=True)
+    booking_config = Column(Text, nullable=True)  # JSON string
     # Relationship: One Hospital has many Users
     users = relationship("User", back_populates="hospital")
     # Inside your Hospital class in app/models/hospital.py

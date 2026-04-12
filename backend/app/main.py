@@ -6,6 +6,9 @@ from app.api.v1.endpoints.auth import router as auth_router
 from app.api.v1.endpoints.hospitals import router as hospitals_router
 from app.api.v1.endpoints.ai import router as ai_router
 from app.db.session import engine
+from app.api.v1.endpoints.appointments import router as appointments_router
+from app.services.reminders import start_reminder_scheduler, stop_reminder_scheduler
+
 app = FastAPI(title="Hospital AI Platform")
 Base.metadata.create_all(bind=engine)
 # --- CORS Configuration ---
@@ -36,7 +39,14 @@ app.include_router(hospitals_router, prefix="/api/v1/hospitals", tags=["hospital
 # 3. AI Router (Handles /chat, /ingest, and /upload-pdf)
 # We use /api/v1/ai so that the frontend calls /api/v1/ai/chat
 app.include_router(ai_router, prefix="/api/v1/ai", tags=["AI"])
-
+app.include_router(appointments_router, prefix="/api/v1/appointments", tags=["Appointments"])
+@app.on_event("startup")
+def on_startup():
+    start_reminder_scheduler()
+    
+@app.on_event("shutdown")
+def on_shutdown():
+    stop_reminder_scheduler()
 @app.get("/")
 def read_root():
     return {

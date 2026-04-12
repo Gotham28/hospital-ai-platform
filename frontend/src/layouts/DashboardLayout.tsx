@@ -1,7 +1,7 @@
 import { Outlet, Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Users, Building2, Settings, LogOut, BrainCircuit } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-
+import { CalendarCheck } from 'lucide-react';
 export default function DashboardLayout() {
   const navigate = useNavigate();
   const { hospitalId } = useParams();
@@ -53,7 +53,10 @@ export default function DashboardLayout() {
               >
                 <BrainCircuit className="w-5 h-5 text-blue-500" /> AI Training
               </Link>
-
+              <Link to={`/hospitals/${hospitalId}/appointments`}
+              className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/appointments`) ? linkActive : linkIdle}`}>
+              <CalendarCheck className="w-5 h-5 text-blue-500" /> Appointments
+              </Link>
               <Link
                 to={`/hospitals/${hospitalId}/doctors`}
                 className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/doctors`) ? linkActive : linkIdle}`}

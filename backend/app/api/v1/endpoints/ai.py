@@ -25,7 +25,9 @@ from app.availability import (
     get_cached_or_empty,
     AvailabilityError,
 )
-
+import redis
+import uuid
+from app.models.appointment import Appointment
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
@@ -35,6 +37,9 @@ if not _api_key:
 
 client = OpenAI(api_key=_api_key)
 async_client = AsyncOpenAI(api_key=_api_key)
+_redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+_redis = redis.from_url(_redis_url, decode_responses=True)
+BOOKING_SESSION_TTL = 600
 
 MAX_HISTORY_TURNS        = 10
 PDF_CHUNK_SIZE           = 800
@@ -84,7 +89,318 @@ async def _translate_async(text: str, source: str, target: str) -> str:
         logger.warning("Async translation failed (%s->%s): %s", source, target, e)
         return text
 
+# =============================================================================
+# BOOKING SESSION STATE MACHINE
+# paste this block into ai.py, right after the GOOGLE TRANSLATE BRIDGE section
+# and before the INJECTION DETECTION section
+# =============================================================================
 
+# --- Add to imports at top of ai.py ---
+# import redis
+# import uuid
+# from app.models.appointment import Appointment  (add to existing model imports)
+
+# --- Redis client setup (add near client = OpenAI(...)) ---
+# _redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+# _redis = redis.from_url(_redis_url, decode_responses=True)
+# BOOKING_SESSION_TTL = 600  # 10 minutes — session expires if user goes idle
+
+# =============================================================================
+# Booking intent keywords (English — question is already translated before here)
+# =============================================================================
+_BOOKING_KEYWORDS = [
+    "book", "appointment", "schedule", "consult", "consultation",
+    "see a doctor", "visit", "reserve", "fix an appointment",
+    "make an appointment", "set appointment",
+]
+
+def detect_booking_intent(text: str) -> bool:
+    t = text.lower()
+    return any(kw in t for kw in _BOOKING_KEYWORDS)
+
+
+# =============================================================================
+# Session helpers
+# =============================================================================
+
+def _session_key(hospital_id: str, session_token: str) -> str:
+    return f"booking:{hospital_id}:{session_token}"
+
+
+def get_booking_session(hospital_id: str, session_token: str) -> dict | None:
+    raw = _redis.get(_session_key(hospital_id, session_token))
+    if not raw:
+        return None
+    import json as _json
+    return _json.loads(raw)
+
+
+def save_booking_session(hospital_id: str, session_token: str, session: dict) -> None:
+    import json as _json
+    _redis.setex(
+        _session_key(hospital_id, session_token),
+        BOOKING_SESSION_TTL,
+        _json.dumps(session)
+    )
+
+
+def clear_booking_session(hospital_id: str, session_token: str) -> None:
+    _redis.delete(_session_key(hospital_id, session_token))
+
+
+def new_booking_session() -> dict:
+    return {
+        "state": "collecting_doctor",
+        "doctor_id": None,
+        "doctor_name": None,
+        "preferred_date": None,
+        "time_of_day": None,
+        "patient_name": None,
+        "patient_age": None,
+        "patient_phone": None,
+    }
+
+
+# =============================================================================
+# State machine — one function per state, returns the bot reply and next state
+# =============================================================================
+
+def _booking_step(
+    user_message: str,
+    session: dict,
+    hospital_id: int,
+    language: str,
+    db,          # SQLAlchemy Session
+) -> tuple[str, dict, bool]:
+    """
+    Process one turn of the booking conversation.
+
+    Returns:
+        bot_reply   — what the bot should say (in English; translated upstream)
+        session     — updated session dict
+        done        — True if booking is complete or cancelled
+    """
+    from app.models.doctor import Doctor
+    from app.models.hospital import Hospital
+    from app.models.appointment import Appointment
+    from app.services.booking_rules import validate_booking, get_booking_config
+    from app.services.email import notify_staff_new_appointment
+    import uuid, re
+    from datetime import datetime, timedelta
+
+    msg = user_message.strip()
+    state = session["state"]
+
+    # Global cancel check
+    if msg.lower() in ("cancel", "stop", "nevermind", "never mind", "quit", "exit"):
+        return "Okay, I've cancelled the appointment booking. Is there anything else I can help you with?", session, True
+
+    # ── State: collecting_doctor ──────────────────────────────────────────────
+    if state == "collecting_doctor":
+        all_doctors = db.query(Doctor).filter(Doctor.hospital_id == hospital_id).all()
+        if not all_doctors:
+            return "I'm sorry, there are no doctors registered for online booking at this time. Please call reception.", session, True
+
+        # Try to match the user's text to a doctor name or department
+        from app.api.v1.endpoints.ai import score_doctor_relevance  # reuse existing function
+        scored = sorted(
+            [(score_doctor_relevance(msg, d), d) for d in all_doctors],
+            key=lambda x: x[0], reverse=True
+        )
+        best_score, best_doc = scored[0] if scored else (0, None)
+
+        if best_score >= 0.3 and best_doc:
+            session["doctor_id"]   = best_doc.id
+            session["doctor_name"] = best_doc.name
+            session["state"]       = "collecting_date"
+
+            # Build date options: next 7 days excluding today
+            today = datetime.now()
+            date_options = []
+            for i in range(1, 8):
+                d = today + timedelta(days=i)
+                date_options.append(d.strftime("%A, %B %d (%Y-%m-%d)"))
+
+            dates_text = "\n".join(f"  {i+1}. {d}" for i, d in enumerate(date_options))
+            return (
+                f"Great! I'll book you with **{best_doc.name}** ({best_doc.department}).\n\n"
+                f"Which date would you prefer? Please choose:\n{dates_text}\n\n"
+                "You can type the number or the date."
+            ), session, False
+        else:
+            # Show doctor list for them to choose
+            doctor_list = "\n".join(
+                f"  {i+1}. Dr. {d.name} — {d.department or 'General'}"
+                for i, (_, d) in enumerate(scored[:8])
+            )
+            return (
+                f"Which doctor would you like to book an appointment with?\n\n{doctor_list}\n\n"
+                "You can type the doctor's name, department, or number."
+            ), session, False
+
+    # ── State: collecting_date ────────────────────────────────────────────────
+    if state == "collecting_date":
+        today = datetime.now()
+        date_options = [(today + timedelta(days=i)) for i in range(1, 8)]
+
+        chosen_date = None
+
+        # Try number choice
+        if msg.isdigit():
+            idx = int(msg) - 1
+            if 0 <= idx < len(date_options):
+                chosen_date = date_options[idx].strftime("%Y-%m-%d")
+
+        # Try direct date parsing
+        if not chosen_date:
+            for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%B %d", "%b %d"):
+                try:
+                    parsed = datetime.strptime(msg, fmt)
+                    if parsed.year == 1900:
+                        parsed = parsed.replace(year=today.year)
+                    chosen_date = parsed.strftime("%Y-%m-%d")
+                    break
+                except ValueError:
+                    continue
+
+        # Try day name ("monday", "tuesday" etc)
+        if not chosen_date:
+            day_names = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
+            for dn in day_names:
+                if dn in msg.lower():
+                    for d in date_options:
+                        if d.strftime("%A").lower() == dn:
+                            chosen_date = d.strftime("%Y-%m-%d")
+                            break
+
+        if not chosen_date:
+            date_list = "\n".join(f"  {i+1}. {d.strftime('%A, %B %d')}" for i, d in enumerate(date_options))
+            return (
+                "I didn't catch that date. Please choose a number from the list:\n"
+                f"{date_list}"
+            ), session, False
+
+        session["preferred_date"] = chosen_date
+        session["state"] = "collecting_time_of_day"
+        return (
+            f"Got it — **{chosen_date}**.\n\n"
+            "What time of day works best for you?\n"
+            "  1. 🌅 Morning\n"
+            "  2. ☀️ Afternoon\n"
+            "  3. 🌇 Evening"
+        ), session, False
+
+    # ── State: collecting_time_of_day ─────────────────────────────────────────
+    if state == "collecting_time_of_day":
+        time_map = {
+            "1": "morning", "morning": "morning",
+            "2": "afternoon", "afternoon": "afternoon",
+            "3": "evening", "evening": "evening",
+        }
+        tod = time_map.get(msg.lower().strip())
+        if not tod:
+            return (
+                "Please choose:\n  1. Morning\n  2. Afternoon\n  3. Evening"
+            ), session, False
+
+        session["time_of_day"] = tod
+        session["state"] = "collecting_name"
+        return "What is the patient's full name?", session, False
+
+    # ── State: collecting_name ────────────────────────────────────────────────
+    if state == "collecting_name":
+        if len(msg) < 2:
+            return "Please enter a valid full name.", session, False
+        session["patient_name"] = msg.title()
+        session["state"] = "collecting_age"
+        return f"Thank you, {session['patient_name']}. What is the patient's age?", session, False
+
+    # ── State: collecting_age ─────────────────────────────────────────────────
+    if state == "collecting_age":
+        age = re.sub(r"[^\d]", "", msg)
+        if not age or not (1 <= int(age) <= 120):
+            return "Please enter a valid age (e.g. 32).", session, False
+        session["patient_age"] = age
+        session["state"] = "collecting_phone"
+        return "What is the best phone number to reach the patient?", session, False
+
+    # ── State: collecting_phone ───────────────────────────────────────────────
+    if state == "collecting_phone":
+        phone = re.sub(r"[\s\-\(\)]", "", msg)
+        if not re.match(r"^\+?\d{7,15}$", phone):
+            return "Please enter a valid phone number (e.g. 9876543210).", session, False
+        session["patient_phone"] = phone
+        session["state"] = "confirming"
+
+        # Build confirmation summary
+        return (
+            f"Please confirm your appointment request:\n\n"
+            f"👨‍⚕️ **Doctor:** {session['doctor_name']}\n"
+            f"📅 **Date:** {session['preferred_date']}\n"
+            f"🕐 **Time:** {session['time_of_day'].title()}\n"
+            f"👤 **Patient:** {session['patient_name']}\n"
+            f"🎂 **Age:** {session['patient_age']}\n"
+            f"📞 **Phone:** {session['patient_phone']}\n\n"
+            "Type **yes** to confirm or **no** to cancel."
+        ), session, False
+
+    # ── State: confirming ─────────────────────────────────────────────────────
+    if state == "confirming":
+        if msg.lower() in ("yes", "confirm", "ok", "okay", "sure", "proceed", "y"):
+            # Write to database
+            hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+            doctor   = db.query(Doctor).filter(Doctor.id == session["doctor_id"]).first()
+
+            # Validate booking rules one final time
+            from app.services.booking_rules import validate_booking, get_booking_config
+            ok, error = validate_booking(hospital, doctor, session["preferred_date"], db)
+            if not ok:
+                return error, session, True
+
+            appt = Appointment(
+                hospital_id=hospital_id,
+                doctor_id=session["doctor_id"],
+                patient_name=session["patient_name"],
+                patient_age=session["patient_age"],
+                patient_phone=session["patient_phone"],
+                preferred_date=session["preferred_date"],
+                time_of_day=session["time_of_day"],
+                status="pending",
+            )
+            db.add(appt)
+            db.commit()
+            db.refresh(appt)
+
+            # Fire staff email
+            config = get_booking_config(hospital)
+            staff_email = config.get("notification_email", "")
+            if staff_email:
+                notify_staff_new_appointment(
+                    staff_email=staff_email,
+                    hospital_name=hospital.name,
+                    reference=appt.reference_number,
+                    patient_name=appt.patient_name,
+                    patient_age=appt.patient_age,
+                    patient_phone=appt.patient_phone,
+                    doctor_name=doctor.name,
+                    preferred_date=appt.preferred_date,
+                    time_of_day=appt.time_of_day,
+                )
+
+            return (
+                f"✅ **Appointment Request Submitted!**\n\n"
+                f"Your reference number is: **{appt.reference_number}**\n\n"
+                f"The hospital will call you at **{appt.patient_phone}** to confirm your slot. "
+                f"You can also ask me 'what is my appointment status' at any time to check.\n\n"
+                f"Is there anything else I can help you with?"
+            ), session, True
+
+        elif msg.lower() in ("no", "cancel", "n"):
+            return "Booking cancelled. Is there anything else I can help you with?", session, True
+        else:
+            return "Please type **yes** to confirm or **no** to cancel.", session, False
+
+    return "Something went wrong. Please try again.", session, True
 # =============================================================================
 # INJECTION DETECTION
 # =============================================================================
@@ -121,6 +437,8 @@ class ChatRequest(BaseModel):
     hospital_id: int
     language: str = Field(default="en")
     history: Optional[List[HistoryMessage]] = None
+    session_token: str = Field(default="default")  # ← add this line
+
 
     @field_validator("language")
     @classmethod
@@ -651,6 +969,28 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
 
     translated_request = request.model_copy(update={"question": english_question})
     _, openai_messages, _ = build_context(translated_request, db, force_english=True)
+    # ── Booking session intercept ─────────────────────────────────────────────
+    session_token = request.session_token  # add this field to ChatRequest model
+    booking_session = get_booking_session(str(request.hospital_id), session_token)
+
+    if booking_session or detect_booking_intent(english_question):
+        if not booking_session:
+            booking_session = new_booking_session()
+        bot_reply, booking_session, done = _booking_step(
+            english_question, booking_session, request.hospital_id, request.language, db
+        )
+        if done:
+            clear_booking_session(str(request.hospital_id), session_token)
+        else:
+            save_booking_session(str(request.hospital_id), session_token, booking_session)
+        if request.language == "ml":
+            bot_reply = await _translate_async(bot_reply, "en", "ml")
+        async def booking_reply():
+            yield f"data: {json.dumps(bot_reply)}\n\n"
+            yield "data: [DONE]\n\n"
+        return StreamingResponse(booking_reply(), media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    # ── end booking intercept — normal chat continues below ───────────────────
 
     async def event_generator() -> AsyncGenerator[str, None]:
         pt = ct = tt = 0

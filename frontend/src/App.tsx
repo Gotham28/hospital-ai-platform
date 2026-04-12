@@ -10,6 +10,7 @@ import api from './api/axios';
 import { useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useAuth } from './context/AuthContext';
+import AppointmentsTab from './components/AppointmentsTab';
 
 function HospitalList() {
   const [hospitals, setHospitals] = useState<any[]>([]);
@@ -82,6 +83,7 @@ export default function App() {
     <Routes>
       {/* Public patient-facing route */}
       <Route path="/p/:hospitalSlug" element={<ThemeLoader />} />
+      <Route path="/hospitals/:hospitalId/appointments" element={<AppointmentsTab hospitalId={...} />} />
 
       {/* Auth route — redirect to / if already logged in */}
       <Route
