@@ -171,7 +171,7 @@ def list_appointments(
 @router.patch("/{appointment_id}/approve")
 def approve_appointment(
     appointment_id: int,
-    approve_payload: ApprovePayload,
+    body : ApprovePayload,
     db: Session = Depends(get_db),
     _tenant: int = Depends(get_current_tenant),
     payload: dict = Depends(get_token_payload) # Inject token data
@@ -194,7 +194,7 @@ def approve_appointment(
         raise HTTPException(status_code=400, detail=f"Appointment is already {appt.status}")
 
     appt.status = "approved"
-    appt.confirmed_time = approve_payload.confirmed_time
+    appt.confirmed_time = body.confirmed_time
     appt.updated_at = datetime.now(timezone.utc)
     db.commit()
 
@@ -212,11 +212,11 @@ def approve_appointment(
                 patient_name=appt.patient_name,
                 patient_phone=appt.patient_phone,
                 doctor_name=doctor.name if doctor else "Doctor",
-                confirmed_time=approve_payload.confirmed_time,
+                confirmed_time=body.confirmed_time,
                 preferred_date=appt.preferred_date,
             )
 
-    return {"status": "approved", "confirmed_time": approve_payload.confirmed_time}
+    return {"status": "approved", "confirmed_time": body.confirmed_time}
 
 
 # =============================================================================
@@ -226,7 +226,7 @@ def approve_appointment(
 @router.patch("/{appointment_id}/reject")
 def reject_appointment(
     appointment_id: int,
-    reject_payload: RejectPayload,
+    body : RejectPayload,
     db: Session = Depends(get_db),
     _tenant: int = Depends(get_current_tenant),
     payload: dict = Depends(get_token_payload) # Inject token data
@@ -249,11 +249,11 @@ def reject_appointment(
         raise HTTPException(status_code=400, detail=f"Appointment is already {appt.status}")
 
     appt.status = "rejected"
-    appt.rejection_reason = reject_payload.reason
+    appt.rejection_reason = body.reason
     appt.updated_at = datetime.now(timezone.utc)
     db.commit()
 
-    return {"status": "rejected", "reason": reject_payload.reason}
+    return {"status": "rejected", "reason": body.reason}
 
 
 # =============================================================================

@@ -183,10 +183,15 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
 
   // ── Restart listening when browser auto-stops (continuous: false) ─────────
   useEffect(() => {
-    if (micState === 'recording' && !listening && !autoSendingRef.current) {
-      SpeechRecognition.startListening({ continuous: false, language: language === 'ml' ? 'ml-IN' : 'en-US' });
+    if (micState === 'recording' && !listening && !autoSendingRef.current && !isStreaming) {
+      const timer = setTimeout(() => {
+        if (micState === 'recording' && !autoSendingRef.current) {
+          SpeechRecognition.startListening({ continuous: false, language: language === 'ml' ? 'ml-IN' : 'en-US' });
+        }
+      }, 150);
+      return () => clearTimeout(timer);
     }
-  }, [listening, micState, language]);
+  }, [listening, micState, language, isStreaming]);
 
   // ── Mic toggle ────────────────────────────────────────────────────────────
   const toggleMic = useCallback(async () => {

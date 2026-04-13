@@ -315,8 +315,32 @@ def _booking_step(
         if len(msg) < 2:
             return "Please enter a valid full name.", session, False
         
-        # Translators sometimes add punctuation to names, so we strip trailing periods
-        session["patient_name"] = msg.strip(".").title()
+        # Extract name only — stop at conjunctions the translation layer adds
+        # e.g. "Reetha and she is 50 years old" → "Reetha"
+        name_part = re.split(
+            r'\b(and|she|he|is|was|who|aged|age|years?|her|his|the)\b',
+            msg, flags=re.IGNORECASE
+        )[0]
+        name_clean = name_part.strip("., ").title()
+        
+        if len(name_clean) < 2:
+            return "Please enter a valid full name.", session, False
+        
+        # Check if the message also contains an age — if so, auto-capture it
+        age_match = re.search(r'\b(\d{1,3})\s*(years?(\s*old)?|yr)?\b', msg, re.IGNORECASE)
+        
+        session["patient_name"] = name_clean
+        
+        if age_match:
+            age_val = int(age_match.group(1))
+            if 1 <= age_val <= 120:
+                session["patient_age"] = str(age_val)
+                session["state"] = "collecting_phone"
+                return (
+                    f"Got it — **{name_clean}**, age **{age_val}**. "
+                    "What is the best phone number to reach the patient?"
+                ), session, False
+        
         session["state"] = "collecting_age"
         return f"Thank you, {session['patient_name']}. What is the patient's age?", session, False
 
@@ -330,10 +354,19 @@ def _booking_step(
         return "What is the best phone number to reach the patient?", session, False
 
     # ── State: collecting_phone ───────────────────────────────────────────────
+    
     if state == "collecting_phone":
-        phone = re.sub(r"[\s\-\(\)\.]", "", msg) # Strip periods too just in case
+        phone = re.sub(r"[\s\-\(\)\.]", "", msg)
+        # Indian numbers: 10 digits, optionally prefixed with +91 or 0
+        # General international: 7-15 digits
+        phone_digits = re.sub(r"^\+91|^91|^0", "", phone)  # strip country code for length check
         if not re.match(r"^\+?\d{7,15}$", phone):
             return "Please enter a valid phone number (e.g. 9876543210).", session, False
+        if len(phone_digits) not in (10, 11, 12) and not phone.startswith("+"):
+            return (
+                f"That number has {len(phone_digits)} digits — Indian mobile numbers should have 10 digits. "
+                "Please check and re-enter."
+            ), session, False
         session["patient_phone"] = phone
         session["state"] = "confirming"
 
@@ -351,6 +384,28 @@ def _booking_step(
 
     # ── State: confirming ─────────────────────────────────────────────────────
     if state == "confirming":
+        correction_map = {
+        "phone": "collecting_phone",
+        "number": "collecting_phone",
+        "mobile": "collecting_phone",
+        "name": "collecting_name",
+        "age": "collecting_age",
+        "date": "collecting_date",
+        "time": "collecting_time_of_day",
+        "doctor": "collecting_doctor",
+    }
+        for keyword, go_to_state in correction_map.items():
+            if f"change {keyword}" in msg_lower or f"wrong {keyword}" in msg_lower or f"edit {keyword}" in msg_lower or f"correct {keyword}" in msg_lower:
+                session["state"] = go_to_state
+                prompts = {
+                "collecting_phone": "Please enter the correct phone number.",
+                "collecting_name": "Please enter the correct patient name.",
+                "collecting_age": "Please enter the correct age.",
+                "collecting_date": "Please enter the correct date.",
+                "collecting_time_of_day": "Please choose the time: 1. Morning  2. Afternoon  3. Evening",
+                "collecting_doctor": "Which doctor would you like instead?",
+            }
+            return prompts[go_to_state], session, False
         # FIX: Fuzzy keyword matching for confirmation
         positive_words = ["yes", "confirm", "ok", "okay", "sure", "proceed", "y", "correct", "right", "exactly", "do it"]
         negative_words = ["no", "cancel", "n", "stop", "incorrect", "wrong", "wait"]
@@ -982,23 +1037,49 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
     session_token = request.session_token  # add this field to ChatRequest model
     booking_session = get_booking_session(str(request.hospital_id), session_token)
 
-    if booking_session or detect_booking_intent(english_question):
+    is_new_booking = not booking_session and detect_booking_intent(english_question)
+    if booking_session or is_new_booking:
         if not booking_session:
             booking_session = new_booking_session()
-        bot_reply, booking_session, done = _booking_step(
-            english_question, booking_session, request.hospital_id, request.language, db
-        )
-        if done:
-            clear_booking_session(str(request.hospital_id), session_token)
-        else:
-            save_booking_session(str(request.hospital_id), session_token, booking_session)
-        if request.language == "ml":
-            bot_reply = await _translate_async(bot_reply, "en", "ml")
-        async def booking_reply():
-            yield f"data: {json.dumps(bot_reply)}\n\n"
-            yield "data: [DONE]\n\n"
-        return StreamingResponse(booking_reply(), media_type="text/event-stream",
-            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+            # Pre-fill doctor from recent conversation history if detectable
+            if is_new_booking and request.history:
+                all_doctors = db.query(Doctor).filter(
+                    Doctor.hospital_id == request.hospital_id
+                ).all()
+                # Search last 4 messages for a doctor mention
+                recent_text = " ".join(
+                    m.content for m in (request.history or [])[-4:]
+                )
+                scored = sorted(
+                    [(score_doctor_relevance(recent_text, d), d) for d in all_doctors],
+                    key=lambda x: x[0], reverse=True
+                )
+                if scored and scored[0][0] >= 0.3:
+                    best = scored[0][1]
+                    booking_session["doctor_id"]   = best.id
+                    booking_session["doctor_name"] = best.name
+                    booking_session["state"]       = "collecting_date"
+                    # Build date list for immediate reply
+                    from datetime import timedelta
+                    today = datetime.now()
+                    date_options = [
+                        (today + timedelta(days=i)).strftime("%A, %B %d (%Y-%m-%d)")
+                        for i in range(1, 8)
+                    ]
+                    dates_text = "\n".join(f"  {i+1}. {d}" for i, d in enumerate(date_options))
+                    pre_reply = (
+                        f"Sure! I'll book you with **{best.name}** ({best.department}).\n\n"
+                        f"Which date would you prefer?\n{dates_text}\n\n"
+                        "You can type the number or the date."
+                    )
+                    if request.language == "ml":
+                        pre_reply = await _translate_async(pre_reply, "en", "ml")
+                    save_booking_session(str(request.hospital_id), session_token, booking_session)
+                    async def pre_booking_reply():
+                        yield f"data: {json.dumps(pre_reply)}\n\n"
+                        yield "data: [DONE]\n\n"
+                    return StreamingResponse(pre_booking_reply(), media_type="text/event-stream",
+                        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
     # ── end booking intercept — normal chat continues below ───────────────────
 
     async def event_generator() -> AsyncGenerator[str, None]:
