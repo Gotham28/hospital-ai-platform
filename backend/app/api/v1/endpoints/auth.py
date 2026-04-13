@@ -19,7 +19,6 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 router = APIRouter(tags=["auth"])
 
 def create_access_token(data: dict):
-    data={"sub": user.email, "hospital_id": user.hospital_id, "role": user.role}
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
@@ -32,8 +31,13 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     if not user or not pwd_context.verify(form_data.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect email or password")
 
-    # hospital_id is safely encoded inside the token
+    # FIX: Pass the role inside the data dictionary here, where 'user' actually exists!
+    # getattr() is a safety net in case a user record doesn't have a role yet.
     access_token = create_access_token(
-        data={"sub": user.email, "hospital_id": user.hospital_id}
+        data={
+            "sub": user.email, 
+            "hospital_id": user.hospital_id, 
+            "role": getattr(user, 'role', 'staff')
+        }
     )
     return {"access_token": access_token, "token_type": "bearer"}
