@@ -240,3 +240,29 @@ async def get_hospital_billing(hospital_id: int, db: Session = Depends(get_db)):
             "platform_fee": platform_fee_inr,
         }
     }
+
+@router.post("/{hospital_id}/staff")
+def create_staff_account(
+    hospital_id: int,
+    payload: dict = Body(...),
+    db: Session = Depends(get_db),
+    _: str = Depends(require_superadmin),   # only you can do this
+):
+    from app.models.user import User
+    from app.crud.crud_user import get_password_hash   # or however your hashing works
+    
+    existing = db.query(User).filter(User.email == payload["email"]).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    user = User(
+        full_name=payload["full_name"],
+        email=payload["email"],
+        hashed_password=get_password_hash(payload["password"]),
+        hospital_id=hospital_id,
+        role="staff",
+        is_active=True,
+    )
+    db.add(user)
+    db.commit()
+    return {"status": "success", "email": user.email}

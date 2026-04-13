@@ -2,38 +2,49 @@ import React, { createContext, useContext, useState, useCallback } from 'react';
 
 interface AuthContextValue {
   isAuthenticated: boolean;
-  // Call login(token) after a successful API response.
-  // Stores the token in localStorage AND updates React state
-  // in one atomic step — no reload needed.
+  role: string;
+  hospitalId: number | null;
   login: (token: string) => void;
-  // Call logout() to clear the token and flip state.
-  // React Router navigation happens in the caller (DashboardLayout)
-  // so the context stays navigation-library-agnostic.
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function decodeToken(token: string): { role: string; hospital_id: number | null } {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return { role: payload.role ?? 'staff', hospital_id: payload.hospital_id ?? null };
+  } catch {
+    return { role: 'staff', hospital_id: null };
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  // Initialise from localStorage so a page refresh restores the session.
-  // This is the only place we read localStorage for auth — everything else
-  // reads from this state, which eliminates the stale-read bug in App.tsx.
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(
-    () => !!localStorage.getItem('token')
-  );
+  const existingToken = localStorage.getItem('token');
+  const existingDecoded = existingToken ? decodeToken(existingToken) : null;
+
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!existingToken);
+  const [role, setRole] = useState<string>(existingDecoded?.role ?? 'staff');
+  const [hospitalId, setHospitalId] = useState<number | null>(existingDecoded?.hospital_id ?? null);
 
   const login = useCallback((token: string) => {
     localStorage.setItem('token', token);
+    const decoded = decodeToken(token);
+    
     setIsAuthenticated(true);
+    setRole(decoded.role);
+    setHospitalId(decoded.hospital_id);
   }, []);
 
   const logout = useCallback(() => {
     localStorage.removeItem('token');
     setIsAuthenticated(false);
+    setRole('staff');
+    setHospitalId(null);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, role, hospitalId, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

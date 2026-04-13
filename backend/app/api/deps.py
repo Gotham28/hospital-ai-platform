@@ -38,3 +38,13 @@ def get_current_tenant(token: str = Depends(oauth2_scheme)) -> int:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
         )
+def get_current_user_role(token: str = Depends(oauth2_scheme)) -> str:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload.get("role", "staff")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Could not validate credentials")
+
+def require_superadmin(role: str = Depends(get_current_user_role)):
+    if role != "superadmin":
+        raise HTTPException(status_code=403, detail="Access denied")

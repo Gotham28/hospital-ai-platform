@@ -9,7 +9,7 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean(), default=True)
     is_superuser = Column(Boolean(), default=False)
-    
+    role = Column(String, default="staff", nullable=False)
     # --- NEW: Multi-Tenancy Link ---
     hospital_id = Column(Integer, ForeignKey("hospital.id"), nullable=True) # Nullable for Superadmins
     hospital = relationship("Hospital", back_populates="users")
