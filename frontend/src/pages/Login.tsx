@@ -25,27 +25,16 @@ const Login = () => {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      // FIX: Call context.login() instead of localStorage.setItem() directly.
-      // login() does two things atomically:
-      //   1. Writes the token to localStorage (so page refreshes restore session)
-      //   2. Sets isAuthenticated = true in AuthContext state
-      // Step 2 causes App.tsx to re-render immediately, which switches the
-      // protected route from <Navigate to="/login"> to <DashboardLayout>,
-      // so navigate('/') lands on the hospital list correctly.
-      //
-      // REMOVED: window.location.reload()
-      // That was the workaround for the stale isAuthenticated const in App.tsx.
-      // With context-driven state it is not needed and was causing a white-flash
-      // on every login because the reload fired before React Router finished
-      // its own navigation.
-    const token = response.data.access_token;
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    login(token);
-    if (payload.role === 'staff') {
-      navigate(`/hospitals/${payload.hospital_id}/appointments`);
-    } else {
-      navigate('/');
-    }
+      const token = response.data.access_token;
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      login(token);
+      
+      // FIX: Staff now go directly to settings!
+      if (payload.role === 'staff') {
+        navigate(`/hospitals/${payload.hospital_id}/settings`);
+      } else {
+        navigate('/');
+      }
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Login failed. Check your credentials.');
     } finally {

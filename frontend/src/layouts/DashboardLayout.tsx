@@ -6,7 +6,7 @@ export default function DashboardLayout() {
   const navigate = useNavigate();
   const { hospitalId } = useParams();
   const location = useLocation();
-  const { logout, role } = useAuth(); // Cleanly destructured together
+  const { logout, role } = useAuth();
 
   const handleSignOut = () => {
     logout();
@@ -28,7 +28,6 @@ export default function DashboardLayout() {
         </div>
 
         <nav className="flex-1 p-4 space-y-2">
-          {/* Hospitals — Superadmin only */}
           {role === 'superadmin' && (
             <Link
               to="/"
@@ -44,7 +43,6 @@ export default function DashboardLayout() {
                 Management
               </div>
 
-              {/* Appointments — visible to all roles */}
               <Link
                 to={`/hospitals/${hospitalId}/appointments`}
                 className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/appointments`) ? linkActive : linkIdle}`}
@@ -52,7 +50,6 @@ export default function DashboardLayout() {
                 <CalendarCheck className="w-5 h-5 text-blue-500" /> Appointments
               </Link>
 
-              {/* Doctors — visible to all roles */}
               <Link
                 to={`/hospitals/${hospitalId}/doctors`}
                 className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/doctors`) ? linkActive : linkIdle}`}
@@ -60,23 +57,22 @@ export default function DashboardLayout() {
                 <Users className="w-5 h-5 text-blue-500" /> Doctors
               </Link>
 
-              {/* Superadmin only below */}
-              {role === 'superadmin' && (
-                <>
-                  <Link
-                    to={`/hospitals/${hospitalId}/training`}
-                    className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/training`) ? linkActive : linkIdle}`}
-                  >
-                    <BrainCircuit className="w-5 h-5 text-blue-500" /> AI Training
-                  </Link>
+              {/* Settings is now visible to all roles */}
+              <Link
+                to={`/hospitals/${hospitalId}/settings`}
+                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/settings`) ? linkActive : linkIdle}`}
+              >
+                <Settings className="w-5 h-5 text-blue-500" /> Settings
+              </Link>
 
-                  <Link
-                    to={`/hospitals/${hospitalId}/settings`}
-                    className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/settings`) ? linkActive : linkIdle}`}
-                  >
-                    <Settings className="w-5 h-5 text-blue-500" /> Settings
-                  </Link>
-                </>
+              {/* AI Training is Superadmin only */}
+              {role === 'superadmin' && (
+                <Link
+                  to={`/hospitals/${hospitalId}/training`}
+                  className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/training`) ? linkActive : linkIdle}`}
+                >
+                  <BrainCircuit className="w-5 h-5 text-blue-500" /> AI Training
+                </Link>
               )}
             </>
           )}

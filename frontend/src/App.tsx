@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, Link } from 'react-router-dom';
+import { Routes, Route, Navigate, Link, useParams } from 'react-router-dom';
 import DashboardLayout from './layouts/DashboardLayout';
 import CreateHospitalModal from './components/CreateHospitalModal';
 import Login from './pages/Login';
@@ -75,15 +75,33 @@ function HospitalList() {
   );
 }
 
+// ==========================================
+// NEW: Security Guard Component
+// ==========================================
+function StaffGuard({ children }: { children: React.ReactNode }) {
+  const { role, hospitalId } = useAuth();
+  const { hospitalId: routeHospitalId } = useParams();
+
+  // If staff tries to access a different hospital's URL, kick them back to their own
+  if (role === 'staff' && String(hospitalId) !== String(routeHospitalId)) {
+    return <Navigate to={`/hospitals/${hospitalId}/settings`} replace />;
+  }
+  
+  return <>{children}</>;
+}
+
+// ==========================================
+// MAIN APP ROUTER
+// ==========================================
 export default function App() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, role, hospitalId } = useAuth();
 
   return (
     <Routes>
       {/* Public patient-facing route */}
       <Route path="/p/:hospitalSlug" element={<ThemeLoader />} />
 
-      {/* Auth route — redirect to / if already logged in */}
+      {/* Auth route */}
       <Route
         path="/login"
         element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
@@ -91,16 +109,42 @@ export default function App() {
 
       {/* Protected admin routes */}
       <Route element={isAuthenticated ? <DashboardLayout /> : <Navigate to="/login" replace />}>
-        <Route path="/" element={<HospitalList />} />
-        <Route path="/hospitals/:hospitalId/doctors" element={<DoctorsPage />} />
-        <Route path="/hospitals/:hospitalId/training" element={<Dashboard />} />
-        <Route path="/hospitals/:hospitalId/settings" element={<SettingsPage />} />
         
-        {/* FIX: Moved inside the DashboardLayout block & removed the broken empty prop */}
-        <Route path="/hospitals/:hospitalId/appointments" element={<AppointmentsTab />} />
+        {/* Root Route: Redirect Staff directly to Settings, Show list to Superadmin */}
+        <Route 
+          path="/" 
+          element={
+            role === 'staff' && hospitalId ? (
+              <Navigate to={`/hospitals/${hospitalId}/settings`} replace />
+            ) : (
+              <HospitalList />
+            )
+          } 
+        />
+
+        {/* Common Routes (Secured by StaffGuard so they can't swap IDs) */}
+        <Route 
+          path="/hospitals/:hospitalId/appointments" 
+          element={<StaffGuard><AppointmentsTab /></StaffGuard>} 
+        />
+        <Route 
+          path="/hospitals/:hospitalId/doctors" 
+          element={<StaffGuard><DoctorsPage /></StaffGuard>} 
+        />
+        <Route 
+          path="/hospitals/:hospitalId/settings" 
+          element={<StaffGuard><SettingsPage /></StaffGuard>} 
+        />
+
+        {/* Superadmin Only Routes */}
+        <Route 
+          path="/hospitals/:hospitalId/training" 
+          element={role === 'superadmin' ? <Dashboard /> : <Navigate to="/" replace />} 
+        />
+
       </Route>
 
-      {/* Catch-all */}
+      {/* Catch-all redirects to root, which will cleanly re-route based on role */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
