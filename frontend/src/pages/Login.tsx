@@ -38,8 +38,14 @@ const Login = () => {
       // With context-driven state it is not needed and was causing a white-flash
       // on every login because the reload fired before React Router finished
       // its own navigation.
-      login(response.data.access_token);
+    const token = response.data.access_token;
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    login(token);
+    if (payload.role === 'staff') {
+      navigate(`/hospitals/${payload.hospital_id}/appointments`);
+    } else {
       navigate('/');
+    }
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Login failed. Check your credentials.');
     } finally {
