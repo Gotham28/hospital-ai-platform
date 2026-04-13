@@ -189,10 +189,11 @@ def _booking_step(
     from datetime import datetime, timedelta
 
     msg = user_message.strip()
+    msg_lower = msg.lower() # Pre-compute lowercase for fuzzy matching
     state = session["state"]
 
-    # Global cancel check
-    if msg.lower() in ("cancel", "stop", "nevermind", "never mind", "quit", "exit"):
+    # Global cancel check (Fuzzy match)
+    if any(w in msg_lower for w in ["cancel", "stop", "nevermind", "never mind", "quit", "exit"]):
         return "Okay, I've cancelled the appointment booking. Is there anything else I can help you with?", session, True
 
     # ── State: collecting_doctor ──────────────────────────────────────────────
@@ -245,9 +246,10 @@ def _booking_step(
 
         chosen_date = None
 
-        # Try number choice
-        if msg.isdigit():
-            idx = int(msg) - 1
+        # Try number choice (Fuzzy match: strips out periods or text added by translator like "Option 1.")
+        digits_only = re.sub(r"[^\d]", "", msg)
+        if digits_only:
+            idx = int(digits_only) - 1
             if 0 <= idx < len(date_options):
                 chosen_date = date_options[idx].strftime("%Y-%m-%d")
 
@@ -267,7 +269,7 @@ def _booking_step(
         if not chosen_date:
             day_names = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
             for dn in day_names:
-                if dn in msg.lower():
+                if dn in msg_lower:
                     for d in date_options:
                         if d.strftime("%A").lower() == dn:
                             chosen_date = d.strftime("%Y-%m-%d")
@@ -292,13 +294,14 @@ def _booking_step(
 
     # ── State: collecting_time_of_day ─────────────────────────────────────────
     if state == "collecting_time_of_day":
-        time_map = {
-            "1": "morning", "morning": "morning",
-            "2": "afternoon", "afternoon": "afternoon",
-            "3": "evening", "evening": "evening",
-        }
-        tod = time_map.get(msg.lower().strip())
-        if not tod:
+        # FIX: Fuzzy keyword matching instead of exact dictionary lookup
+        if any(w in msg_lower for w in ["1", "morning", "am", "early"]):
+            tod = "morning"
+        elif any(w in msg_lower for w in ["2", "afternoon", "noon", "midday"]):
+            tod = "afternoon"
+        elif any(w in msg_lower for w in ["3", "evening", "pm", "night", "late"]):
+            tod = "evening"
+        else:
             return (
                 "Please choose:\n  1. Morning\n  2. Afternoon\n  3. Evening"
             ), session, False
@@ -311,7 +314,9 @@ def _booking_step(
     if state == "collecting_name":
         if len(msg) < 2:
             return "Please enter a valid full name.", session, False
-        session["patient_name"] = msg.title()
+        
+        # Translators sometimes add punctuation to names, so we strip trailing periods
+        session["patient_name"] = msg.strip(".").title()
         session["state"] = "collecting_age"
         return f"Thank you, {session['patient_name']}. What is the patient's age?", session, False
 
@@ -326,7 +331,7 @@ def _booking_step(
 
     # ── State: collecting_phone ───────────────────────────────────────────────
     if state == "collecting_phone":
-        phone = re.sub(r"[\s\-\(\)]", "", msg)
+        phone = re.sub(r"[\s\-\(\)\.]", "", msg) # Strip periods too just in case
         if not re.match(r"^\+?\d{7,15}$", phone):
             return "Please enter a valid phone number (e.g. 9876543210).", session, False
         session["patient_phone"] = phone
@@ -346,7 +351,11 @@ def _booking_step(
 
     # ── State: confirming ─────────────────────────────────────────────────────
     if state == "confirming":
-        if msg.lower() in ("yes", "confirm", "ok", "okay", "sure", "proceed", "y"):
+        # FIX: Fuzzy keyword matching for confirmation
+        positive_words = ["yes", "confirm", "ok", "okay", "sure", "proceed", "y", "correct", "right", "exactly", "do it"]
+        negative_words = ["no", "cancel", "n", "stop", "incorrect", "wrong", "wait"]
+
+        if any(w in msg_lower for w in positive_words):
             # Write to database
             hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
             doctor   = db.query(Doctor).filter(Doctor.id == session["doctor_id"]).first()
@@ -395,7 +404,7 @@ def _booking_step(
                 f"Is there anything else I can help you with?"
             ), session, True
 
-        elif msg.lower() in ("no", "cancel", "n"):
+        elif any(w in msg_lower for w in negative_words):
             return "Booking cancelled. Is there anything else I can help you with?", session, True
         else:
             return "Please type **yes** to confirm or **no** to cancel.", session, False
