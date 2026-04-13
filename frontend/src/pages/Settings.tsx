@@ -1,91 +1,129 @@
-import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom'; 
+import React, { useState } from 'react';
+import { useParams } from 'react-router-dom';
 import api from '../api/axios';
-import { Save } from 'lucide-react';
-// 1. IMPORT the component here
-import HospitalStats from '../components/HospitalStats'; 
+import { UserPlus, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 
-const Settings = () => {
-  const { hospitalId } = useParams(); 
+export default function SettingsPage() {
+  const { hospitalId } = useParams();
   
-  const [settings, setSettings] = useState({ 
-    name: '', 
-    address: '', 
-    system_prompt: '', 
-    google_sheet_id: '' 
-  });
+  // Form State
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  
+  // Status State
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
-  useEffect(() => {
-    api.get(`/hospitals/${hospitalId}`)
-      .then(res => setSettings(res.data))
-      .catch(err => console.error("Could not load hospital settings", err));
-  }, [hospitalId]);
+  const handleCreateStaff = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess('');
 
-  const handleSave = async () => {
     try {
-      await api.patch(`/hospitals/${hospitalId}`, settings);
-      alert("Settings updated successfully!");
-    } catch (err) {
-      alert("Failed to update settings.");
+      // Calls your backend to create a staff user linked to this specific hospital
+      await api.post(`/hospitals/${hospitalId}/staff`, {
+        full_name: fullName,
+        email: email,
+        password: password
+      });
+
+      setSuccess(`Staff account for ${fullName} created successfully!`);
+      setFullName('');
+      setEmail('');
+      setPassword('');
+    } catch (err: any) {
+      console.error(err);
+      setError(err.response?.data?.detail || 'Failed to create staff account. Check the email format or try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="p-8 max-w-4xl space-y-8">
-      <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100">
-        <h2 className="text-2xl font-bold text-gray-800 mb-6">Hospital Configuration</h2>
+    <div className="max-w-3xl space-y-8">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Hospital Settings</h2>
+        <p className="text-sm text-gray-500 mt-1">Manage configuration and staff access for this hospital.</p>
+      </div>
 
-        {/* 2. PLACED STATS AT THE TOP */}
-        <div className="mb-8 border-b pb-8">
-          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Current Usage & Billing</h3>
-          {/* Note: We use Number(hospitalId) to match the prop type */}
-          <HospitalStats hospitalId={Number(hospitalId)} /> 
+      {/* Staff Creation Section */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="border-b border-gray-200 bg-gray-50 px-6 py-4">
+          <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <UserPlus className="w-5 h-5 text-blue-600" /> Add Staff Member
+          </h3>
+          <p className="text-sm text-gray-500 mt-1">
+            Create credentials for receptionists or admins to manage appointments. They will only have access to this hospital.
+          </p>
         </div>
 
-        <div className="grid gap-6">
+        <form onSubmit={handleCreateStaff} className="p-6 space-y-4">
+          {error && (
+            <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm flex items-center gap-2 border border-red-100">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" /> {error}
+            </div>
+          )}
+          
+          {success && (
+            <div className="p-3 bg-emerald-50 text-emerald-700 rounded-lg text-sm flex items-center gap-2 border border-emerald-100">
+              <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> {success}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+              <input 
+                type="text" 
+                required
+                value={fullName}
+                onChange={e => setFullName(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                placeholder="e.g. Front Desk"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+              <input 
+                type="email" 
+                required
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                placeholder="staff@hospital.com"
+              />
+            </div>
+          </div>
+
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Hospital Name</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Temporary Password</label>
             <input 
-              className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" 
-              value={settings.name} 
-              onChange={(e) => setSettings({...settings, name: e.target.value})}
+              type="password" 
+              required
+              minLength={6}
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              placeholder="Minimum 6 characters"
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Google Sheet ID (Live Availability)</label>
-            <input 
-              className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm" 
-              placeholder="e.g. 1aBCdEfgHijkLmNoPqRsTuVwXyZ"
-              value={settings.google_sheet_id || ''} 
-              onChange={(e) => setSettings({...settings, google_sheet_id: e.target.value})}
-            />
-            <p className="text-xs text-gray-400 mt-2">
-              Tip: Share your sheet with: <span className="text-blue-600 font-medium">arogya-bot@arogya-483613.iam.gserviceaccount.com</span>
-            </p>
+          <div className="pt-2">
+            <button 
+              type="submit" 
+              disabled={loading || !fullName || !email || !password}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+              Create Account
+            </button>
           </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">AI System Prompt</label>
-            <textarea 
-              className="w-full p-3 border border-gray-200 rounded-lg h-32 focus:ring-2 focus:ring-blue-500 outline-none" 
-              value={settings.system_prompt} 
-              onChange={(e) => setSettings({...settings, system_prompt: e.target.value})}
-            />
-          </div>
-        </div>
-
-        <div className="mt-8">
-          <button 
-            onClick={handleSave} 
-            className="flex items-center gap-2 bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 font-bold transition-all shadow-md active:scale-95"
-          >
-            <Save className="w-5 h-5" /> Save Configuration
-          </button>
-        </div>
+        </form>
       </div>
     </div>
   );
-};
-
-export default Settings;
+}
