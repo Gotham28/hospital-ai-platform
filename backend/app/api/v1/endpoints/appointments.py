@@ -15,7 +15,8 @@ from fastapi import APIRouter, Depends, HTTPException, Body
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, get_current_tenant
+# FIX: Imported get_token_payload to enforce Tenant Isolation
+from app.api.deps import get_db, get_current_tenant, get_token_payload
 from app.models.appointment import Appointment
 from app.models.doctor import Doctor
 from app.models.hospital import Hospital
@@ -57,7 +58,7 @@ class BookingConfigPayload(BaseModel):
 
 
 # =============================================================================
-# CREATE — called by the chatbot after patient confirms
+# CREATE — called by the chatbot after patient confirms (Public)
 # =============================================================================
 
 @router.post("/")
@@ -116,7 +117,7 @@ def create_appointment(payload: AppointmentCreate, db: Session = Depends(get_db)
 
 
 # =============================================================================
-# LIST — admin dashboard
+# LIST — admin dashboard (Secured)
 # =============================================================================
 
 @router.get("/hospital/{hospital_id}")
@@ -125,7 +126,18 @@ def list_appointments(
     status: Optional[str] = None,   # filter: pending | approved | rejected
     db: Session = Depends(get_db),
     _tenant: int = Depends(get_current_tenant),
+    payload: dict = Depends(get_token_payload) # Inject token data
 ):
+    # ==========================================
+    # THE BOUNCER: Security Check
+    # ==========================================
+    user_role = payload.get("role")
+    user_hospital = payload.get("hospital_id")
+
+    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied. You can only view data for your assigned hospital.")
+    # ==========================================
+
     q = db.query(Appointment).filter(Appointment.hospital_id == hospital_id)
     if status:
         q = q.filter(Appointment.status == status)
@@ -153,24 +165,36 @@ def list_appointments(
 
 
 # =============================================================================
-# APPROVE
+# APPROVE (Secured)
 # =============================================================================
 
 @router.patch("/{appointment_id}/approve")
 def approve_appointment(
     appointment_id: int,
-    payload: ApprovePayload,
+    approve_payload: ApprovePayload,
     db: Session = Depends(get_db),
     _tenant: int = Depends(get_current_tenant),
+    payload: dict = Depends(get_token_payload) # Inject token data
 ):
     appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
     if not appt:
         raise HTTPException(status_code=404, detail="Appointment not found")
+
+    # ==========================================
+    # THE BOUNCER: Security Check
+    # ==========================================
+    user_role = payload.get("role")
+    user_hospital = payload.get("hospital_id")
+
+    if user_role != "superadmin" and str(user_hospital) != str(appt.hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied. You can only approve appointments for your assigned hospital.")
+    # ==========================================
+
     if appt.status != "pending":
         raise HTTPException(status_code=400, detail=f"Appointment is already {appt.status}")
 
     appt.status = "approved"
-    appt.confirmed_time = payload.confirmed_time
+    appt.confirmed_time = approve_payload.confirmed_time
     appt.updated_at = datetime.now(timezone.utc)
     db.commit()
 
@@ -188,40 +212,52 @@ def approve_appointment(
                 patient_name=appt.patient_name,
                 patient_phone=appt.patient_phone,
                 doctor_name=doctor.name if doctor else "Doctor",
-                confirmed_time=payload.confirmed_time,
+                confirmed_time=approve_payload.confirmed_time,
                 preferred_date=appt.preferred_date,
             )
 
-    return {"status": "approved", "confirmed_time": payload.confirmed_time}
+    return {"status": "approved", "confirmed_time": approve_payload.confirmed_time}
 
 
 # =============================================================================
-# REJECT
+# REJECT (Secured)
 # =============================================================================
 
 @router.patch("/{appointment_id}/reject")
 def reject_appointment(
     appointment_id: int,
-    payload: RejectPayload,
+    reject_payload: RejectPayload,
     db: Session = Depends(get_db),
     _tenant: int = Depends(get_current_tenant),
+    payload: dict = Depends(get_token_payload) # Inject token data
 ):
     appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
     if not appt:
         raise HTTPException(status_code=404, detail="Appointment not found")
+
+    # ==========================================
+    # THE BOUNCER: Security Check
+    # ==========================================
+    user_role = payload.get("role")
+    user_hospital = payload.get("hospital_id")
+
+    if user_role != "superadmin" and str(user_hospital) != str(appt.hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied. You can only reject appointments for your assigned hospital.")
+    # ==========================================
+
     if appt.status != "pending":
         raise HTTPException(status_code=400, detail=f"Appointment is already {appt.status}")
 
     appt.status = "rejected"
-    appt.rejection_reason = payload.reason
+    appt.rejection_reason = reject_payload.reason
     appt.updated_at = datetime.now(timezone.utc)
     db.commit()
 
-    return {"status": "rejected", "reason": payload.reason}
+    return {"status": "rejected", "reason": reject_payload.reason}
 
 
 # =============================================================================
-# STATUS CHECK — patient checks via bot using phone + hospital
+# STATUS CHECK — patient checks via bot using phone + hospital (Public)
 # =============================================================================
 
 @router.get("/status/{hospital_id}/{phone}")
@@ -260,7 +296,7 @@ def get_appointment_status(
 
 
 # =============================================================================
-# BOOKING CONFIG — per-hospital rules (admin only)
+# BOOKING CONFIG — per-hospital rules (Secured admin only)
 # =============================================================================
 
 @router.get("/config/{hospital_id}")
@@ -268,7 +304,18 @@ def get_booking_config_endpoint(
     hospital_id: int,
     db: Session = Depends(get_db),
     _tenant: int = Depends(get_current_tenant),
+    payload: dict = Depends(get_token_payload) # Inject token data
 ):
+    # ==========================================
+    # THE BOUNCER: Security Check
+    # ==========================================
+    user_role = payload.get("role")
+    user_hospital = payload.get("hospital_id")
+
+    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied.")
+    # ==========================================
+
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
     if not hospital:
         raise HTTPException(status_code=404, detail="Hospital not found")
@@ -278,13 +325,24 @@ def get_booking_config_endpoint(
 @router.patch("/config/{hospital_id}")
 def update_booking_config(
     hospital_id: int,
-    payload: BookingConfigPayload,
+    config_payload: BookingConfigPayload,
     db: Session = Depends(get_db),
     _tenant: int = Depends(get_current_tenant),
+    payload: dict = Depends(get_token_payload) # Inject token data
 ):
+    # ==========================================
+    # THE BOUNCER: Security Check
+    # ==========================================
+    user_role = payload.get("role")
+    user_hospital = payload.get("hospital_id")
+
+    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied.")
+    # ==========================================
+
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
     if not hospital:
         raise HTTPException(status_code=404, detail="Hospital not found")
-    hospital.booking_config = json.dumps(payload.model_dump())
+    hospital.booking_config = json.dumps(config_payload.model_dump())
     db.commit()
-    return {"status": "success", "config": payload.model_dump()}
+    return {"status": "success", "config": config_payload.model_dump()}

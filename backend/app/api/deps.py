@@ -48,3 +48,17 @@ def get_current_user_role(token: str = Depends(oauth2_scheme)) -> str:
 def require_superadmin(role: str = Depends(get_current_user_role)):
     if role != "superadmin":
         raise HTTPException(status_code=403, detail="Access denied")
+    
+def get_token_payload(token: str = Depends(oauth2_scheme)) -> dict:
+    """
+    Decodes the JWT and returns the payload (role, hospital_id, sub) 
+    so routes can verify permissions.
+    """
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+        )
