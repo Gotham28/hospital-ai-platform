@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File
 from sqlalchemy.orm import Session
 from datetime import datetime
 from app import crud, schemas
-from app.api.deps import get_db, get_current_tenant
+from app.api.deps import get_db, get_current_tenant, require_superadmin
 from app.models.hospital import Hospital
 from app.models.doctor import Doctor
 from app.availability import get_sheet_client
