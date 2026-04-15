@@ -24,7 +24,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://hospital-ai-platform.vercel.app", "http://localhost:5173"],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"], # Be explicit here
+    allow_methods=["*"], # Be explicit here
     allow_headers=["*"],
 )
 # --- Include Routers ---
