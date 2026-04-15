@@ -61,6 +61,7 @@ VALID_LANGUAGES          = {"en", "ml"}
 
 _GTRANSLATE_URL = "https://translate.googleapis.com/translate_a/single"
 
+
 def _translate(text: str, source: str, target: str) -> str:
     if not text or not text.strip():
         return text
@@ -1063,7 +1064,41 @@ async def chat_with_arogya(request: ChatRequest, db: Session = Depends(get_db)):
     db.commit()
     return {"answer": final_answer}
 
+async def classify_user_intent(user_message: str) -> str:
+    """
+    Uses a fast LLM to semantically classify the user's intent.
+    Returns exactly one of: "STATUS", "BOOKING", "CANCEL", or "OTHER"
+    """
+    system_prompt = """
+    You are an intent classification engine for a hospital chatbot. 
+    Read the user's message and classify their intent into exactly ONE of the following categories. 
+    Respond with ONLY the category name, nothing else.
 
+    Categories:
+    STATUS  - User wants to know if their appointment is approved, pending, rejected, or wants to check its status.
+    BOOKING - User wants to schedule, book, or make a new appointment.
+    CANCEL  - User wants to cancel or stop an ongoing process or appointment.
+    OTHER   - General questions, greetings, or anything else.
+    """
+
+    try:
+        resp = await async_client.chat.completions.create(
+            model="gpt-4o-mini",
+            temperature=0.0, # Zero creativity, maximum strictness
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message}
+            ]
+        )
+        intent = resp.choices[0].message.content.strip().upper()
+        
+        if intent not in ["STATUS", "BOOKING", "CANCEL", "OTHER"]:
+            return "OTHER"
+        return intent
+    except Exception as e:
+        logger.warning(f"Intent classification failed: {e}")
+        return "OTHER"
+    
 @router.post("/chat-stream")
 async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
     is_malayalam = request.language == "ml"
@@ -1079,6 +1114,32 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
 # ── Booking & Status session intercept ────────────────────────────────────
     session_token = request.session_token  # add this field to ChatRequest model
     booking_session = get_booking_session(str(request.hospital_id), session_token)
+
+    # 🚀 THE FIX: Use the semantic router instead of hardcoded keywords
+    intent = await classify_user_intent(english_question)
+    
+    is_status_intent = (intent == "STATUS")
+    is_booking_intent = (intent == "BOOKING")
+    is_cancel_intent = (intent == "CANCEL")
+
+    is_new_session = not booking_session and (is_booking_intent or is_status_intent)
+
+    if booking_session or is_new_session:
+        # Catch global cancellations mid-session gracefully
+        if booking_session and is_cancel_intent:
+            clear_booking_session(str(request.hospital_id), session_token)
+            yield "data: \"Okay, I've cancelled that. Is there anything else I can help you with?\"\n\n"
+            yield "data: [DONE]\n\n"
+            return
+            
+        if not booking_session:
+            # If they just want status, jump to the status checking state
+            if is_status_intent:
+                booking_session = {"state": "checking_status_phone"}
+                
+            # Otherwise, initialize a normal booking session
+            elif is_booking_intent:
+                booking_session = new_booking_session()
 
     # Detect intents
     is_status_intent = any(w in english_question.lower() for w in ["status", "accepted", "confirmed", "check appointment", "my appointment"])
