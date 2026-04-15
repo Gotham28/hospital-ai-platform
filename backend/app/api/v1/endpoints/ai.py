@@ -769,6 +769,7 @@ def build_context(request: ChatRequest, db: Session, force_english: bool = False
     hospital_id = request.hospital_id
     question = request.question
     today_str = datetime.now().strftime("%d-%m-%Y")
+    prompt_date_str = datetime.now().strftime("%A, %B %d, %Y")
 
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
     if not hospital:
@@ -795,7 +796,7 @@ def build_context(request: ChatRequest, db: Session, force_english: bool = False
 
     parts = [
         f"You are Arogya, the AI Assistant for {hospital.name}.",
-        f"Current Date: {today_str}",
+        f"Current Date: {prompt_date_str}",
         "",
         hospital.system_prompt or "",
         "",
