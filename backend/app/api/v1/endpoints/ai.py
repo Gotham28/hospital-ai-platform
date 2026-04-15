@@ -195,7 +195,49 @@ def _booking_step(
     # Global cancel check (Fuzzy match)
     if any(w in msg_lower for w in ["cancel", "stop", "nevermind", "never mind", "quit", "exit"]):
         return "Okay, I've cancelled the appointment booking. Is there anything else I can help you with?", session, True
+    # ── State: checking_status_phone ──────────────────────────────────────────
+    if state == "checking_status_phone":
+        # Smart Check: Did they already include their phone number in their first message?
+        phone_match = re.search(r"\+?\d{7,15}", msg)
+        if phone_match:
+            msg = phone_match.group(0)
+            state = "fetching_status" # Fall through to the next block automatically
+        else:
+            session["state"] = "fetching_status"
+            return "I can check that for you! Please enter the phone number you used to book the appointment.", session, False
 
+    # ── State: fetching_status ────────────────────────────────────────────────
+    if state == "fetching_status":
+        phone = re.sub(r"[\s\-\(\)\.]", "", msg)
+        if not re.match(r"^\+?\d{7,15}$", phone):
+            return "Please enter a valid phone number (e.g. 9876543210).", session, False
+            
+        appts = db.query(Appointment).filter(
+            Appointment.hospital_id == hospital_id,
+            Appointment.patient_phone == phone
+        ).order_by(Appointment.created_at.desc()).limit(3).all()
+        
+        if not appts:
+            return "I couldn't find any recent appointments linked to that phone number. Please check the number and try again, or type **cancel**.", session, False
+            
+        reply = "Here is the status of your recent appointments:\n\n"
+        for a in appts:
+            doc = db.query(Doctor).filter(Doctor.id == a.doctor_id).first()
+            doc_name = doc.name if doc else "Unknown Doctor"
+            
+            # Format the status nicely
+            if a.status == "pending":
+                stat_msg = "⏳ **Pending** (Waiting for hospital approval)"
+            elif a.status == "approved":
+                stat_msg = f"✅ **Approved** (Confirmed for {a.confirmed_time})"
+            else:
+                stat_msg = f"❌ **Rejected** (Reason: {a.rejection_reason})"
+                
+            reply += f"👨‍⚕️ **Dr. {doc_name}** on {a.preferred_date}\n"
+            reply += f"   Status: {stat_msg}\n"
+            reply += f"   Ref: {a.reference_number}\n\n"
+            
+        return reply + "Is there anything else I can help you with?", session, True
     # ── State: collecting_doctor ──────────────────────────────────────────────
     if state == "collecting_doctor":
         all_doctors = db.query(Doctor).filter(Doctor.hospital_id == hospital_id).all()
@@ -1034,52 +1076,89 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
     translated_request = request.model_copy(update={"question": english_question})
     _, openai_messages, _ = build_context(translated_request, db, force_english=True)
     # ── Booking session intercept ─────────────────────────────────────────────
+# ── Booking & Status session intercept ────────────────────────────────────
     session_token = request.session_token  # add this field to ChatRequest model
     booking_session = get_booking_session(str(request.hospital_id), session_token)
 
-    is_new_booking = not booking_session and detect_booking_intent(english_question)
-    if booking_session or is_new_booking:
+    # Detect intents
+    is_status_intent = any(w in english_question.lower() for w in ["status", "accepted", "confirmed", "check appointment", "my appointment"])
+    is_booking_intent = detect_booking_intent(english_question)
+    
+    is_new_session = not booking_session and (is_booking_intent or is_status_intent)
+
+    if booking_session or is_new_session:
         if not booking_session:
-            booking_session = new_booking_session()
-            # Pre-fill doctor from recent conversation history if detectable
-            if is_new_booking and request.history:
-                all_doctors = db.query(Doctor).filter(
-                    Doctor.hospital_id == request.hospital_id
-                ).all()
-                # Search last 4 messages for a doctor mention
-                recent_text = " ".join(
-                    m.content for m in (request.history or [])[-4:]
-                )
-                scored = sorted(
-                    [(score_doctor_relevance(recent_text, d), d) for d in all_doctors],
-                    key=lambda x: x[0], reverse=True
-                )
-                if scored and scored[0][0] >= 0.3:
-                    best = scored[0][1]
-                    booking_session["doctor_id"]   = best.id
-                    booking_session["doctor_name"] = best.name
-                    booking_session["state"]       = "collecting_date"
-                    # Build date list for immediate reply
-                    from datetime import timedelta
-                    today = datetime.now()
-                    date_options = [
-                        (today + timedelta(days=i)).strftime("%A, %B %d (%Y-%m-%d)")
-                        for i in range(1, 8)
-                    ]
-                    dates_text = "\n".join(f"  {i+1}. {d}" for i, d in enumerate(date_options))
-                    pre_reply = (
-                        f"Sure! I'll book you with **{best.name}** ({best.department}).\n\n"
-                        f"Which date would you prefer?\n{dates_text}\n\n"
-                        "You can type the number or the date."
+            # If they just want status, jump to the status checking state
+            if is_status_intent and not is_booking_intent:
+                booking_session = {"state": "checking_status_phone"}
+            
+            # Otherwise, initialize a normal booking session and try to pre-fill the doctor
+            else:
+                booking_session = new_booking_session()
+                
+                # Pre-fill doctor from recent conversation history if detectable
+                if request.history:
+                    all_doctors = db.query(Doctor).filter(
+                        Doctor.hospital_id == request.hospital_id
+                    ).all()
+                    # Search last 4 messages for a doctor mention
+                    recent_text = " ".join(
+                        m.content for m in (request.history or [])[-4:]
                     )
-                    if request.language == "ml":
-                        pre_reply = await _translate_async(pre_reply, "en", "ml")
-                    save_booking_session(str(request.hospital_id), session_token, booking_session)
-                    async def pre_booking_reply():
-                        yield f"data: {json.dumps(pre_reply)}\n\n"
-                        yield "data: [DONE]\n\n"
-                    return StreamingResponse(pre_booking_reply(), media_type="text/event-stream",
-                        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+                    scored = sorted(
+                        [(score_doctor_relevance(recent_text, d), d) for d in all_doctors],
+                        key=lambda x: x[0], reverse=True
+                    )
+                    if scored and scored[0][0] >= 0.3:
+                        best = scored[0][1]
+                        booking_session["doctor_id"]   = best.id
+                        booking_session["doctor_name"] = best.name
+                        booking_session["state"]       = "collecting_date"
+                        
+                        # Build date list for immediate reply
+                        from datetime import timedelta
+                        today = datetime.now()
+                        date_options = [
+                            (today + timedelta(days=i)).strftime("%A, %B %d (%Y-%m-%d)")
+                            for i in range(1, 8)
+                        ]
+                        dates_text = "\n".join(f"  {i+1}. {d}" for i, d in enumerate(date_options))
+                        pre_reply = (
+                            f"Sure! I'll book you with **{best.name}** ({best.department}).\n\n"
+                            f"Which date would you prefer?\n{dates_text}\n\n"
+                            "You can type the number or the date."
+                        )
+                        if request.language == "ml":
+                            pre_reply = await _translate_async(pre_reply, "en", "ml")
+                            
+                        save_booking_session(str(request.hospital_id), session_token, booking_session)
+                        
+                        async def pre_booking_reply():
+                            yield f"data: {json.dumps(pre_reply)}\n\n"
+                            yield "data: [DONE]\n\n"
+                        return StreamingResponse(pre_booking_reply(), media_type="text/event-stream",
+                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+                        
+        # Normal fall-through for active sessions, status checks, or un-pre-filled bookings
+        bot_reply, booking_session, done = _booking_step(
+            english_question, booking_session, request.hospital_id, request.language, db
+        )
+        
+        if done:
+            clear_booking_session(str(request.hospital_id), session_token)
+        else:
+            save_booking_session(str(request.hospital_id), session_token, booking_session)
+            
+        if request.language == "ml":
+            bot_reply = await _translate_async(bot_reply, "en", "ml")
+            
+        async def booking_reply():
+            yield f"data: {json.dumps(bot_reply)}\n\n"
+            yield "data: [DONE]\n\n"
+            
+        return StreamingResponse(booking_reply(), media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    # ── end intercept — normal chat continues below ───────────────────────────
     # ── end booking intercept — normal chat continues below ───────────────────
 
     async def event_generator() -> AsyncGenerator[str, None]:
