@@ -2333,357 +2333,6 @@ from .ai import router as ai
 from .appointments import router as appointments
 </file>
 
-<file path="backend/app/api/v1/endpoints/appointments.py">
-"""
-app/api/v1/endpoints/appointments.py
-
-All appointment-related REST endpoints consumed by:
-  - The admin dashboard (list, approve, reject, config)
-  - The chat bot via ai.py (create, status check)
-"""
-
-import json
-import logging
-from datetime import datetime, timezone
-from typing import Optional
-
-from fastapi import APIRouter, Depends, HTTPException, Body
-from pydantic import BaseModel
-from sqlalchemy.orm import Session
-
-# FIX: Imported get_token_payload to enforce Tenant Isolation
-from app.api.deps import get_db, get_current_tenant, get_token_payload
-from app.models.appointment import Appointment
-from app.models.doctor import Doctor
-from app.models.hospital import Hospital
-from app.services.booking_rules import validate_booking, get_booking_config
-from app.services.email import notify_staff_new_appointment, notify_patient_approved
-
-logger = logging.getLogger(__name__)
-router = APIRouter()
-
-
-# =============================================================================
-# SCHEMAS
-# =============================================================================
-
-class AppointmentCreate(BaseModel):
-    hospital_id: int
-    doctor_id: int
-    patient_name: str
-    patient_age: str
-    patient_phone: str
-    preferred_date: str   # "YYYY-MM-DD"
-    time_of_day: str      # "morning" | "afternoon" | "evening"
-
-
-class ApprovePayload(BaseModel):
-    confirmed_time: str   # e.g. "10:30 AM"
-
-
-class RejectPayload(BaseModel):
-    reason: str
-
-
-class BookingConfigPayload(BaseModel):
-    bookable_departments: list[str] = []
-    min_advance_hours: int = 2
-    max_per_doctor_per_day: int = 20
-    notification_email: str = ""
-    reminder_hours_before: int = 24
-
-
-# =============================================================================
-# CREATE — called by the chatbot after patient confirms (Public)
-# =============================================================================
-
-@router.post("/")
-def create_appointment(payload: AppointmentCreate, db: Session = Depends(get_db)):
-    hospital = db.query(Hospital).filter(Hospital.id == payload.hospital_id).first()
-    if not hospital:
-        raise HTTPException(status_code=404, detail="Hospital not found")
-
-    doctor = db.query(Doctor).filter(
-        Doctor.id == payload.doctor_id,
-        Doctor.hospital_id == payload.hospital_id
-    ).first()
-    if not doctor:
-        raise HTTPException(status_code=404, detail="Doctor not found")
-
-    # Validate against per-hospital booking rules
-    ok, error = validate_booking(hospital, doctor, payload.preferred_date, db)
-    if not ok:
-        raise HTTPException(status_code=400, detail=error)
-
-    appt = Appointment(
-        hospital_id=payload.hospital_id,
-        doctor_id=payload.doctor_id,
-        patient_name=payload.patient_name,
-        patient_age=payload.patient_age,
-        patient_phone=payload.patient_phone,
-        preferred_date=payload.preferred_date,
-        time_of_day=payload.time_of_day,
-        status="pending",
-    )
-    db.add(appt)
-    db.commit()
-    db.refresh(appt)
-
-    # Fire staff notification email (non-blocking — failure doesn't break booking)
-    config = get_booking_config(hospital)
-    staff_email = config.get("notification_email", "")
-    if staff_email:
-        notify_staff_new_appointment(
-            staff_email=staff_email,
-            hospital_name=hospital.name,
-            reference=appt.reference_number,
-            patient_name=appt.patient_name,
-            patient_age=appt.patient_age,
-            patient_phone=appt.patient_phone,
-            doctor_name=doctor.name,
-            preferred_date=appt.preferred_date,
-            time_of_day=appt.time_of_day,
-        )
-
-    return {
-        "reference_number": appt.reference_number,
-        "status": appt.status,
-        "message": "Appointment request submitted. The hospital will call you to confirm.",
-    }
-
-
-# =============================================================================
-# LIST — admin dashboard (Secured)
-# =============================================================================
-
-@router.get("/hospital/{hospital_id}")
-def list_appointments(
-    hospital_id: int,
-    status: Optional[str] = None,   # filter: pending | approved | rejected
-    db: Session = Depends(get_db),
-    _tenant: int = Depends(get_current_tenant),
-    payload: dict = Depends(get_token_payload) # Inject token data
-):
-    # ==========================================
-    # THE BOUNCER: Security Check
-    # ==========================================
-    user_role = payload.get("role")
-    user_hospital = payload.get("hospital_id")
-
-    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
-        raise HTTPException(status_code=403, detail="Access denied. You can only view data for your assigned hospital.")
-    # ==========================================
-
-    q = db.query(Appointment).filter(Appointment.hospital_id == hospital_id)
-    if status:
-        q = q.filter(Appointment.status == status)
-    appts = q.order_by(Appointment.created_at.desc()).all()
-
-    results = []
-    for a in appts:
-        doctor = db.query(Doctor).filter(Doctor.id == a.doctor_id).first()
-        results.append({
-            "id": a.id,
-            "reference_number": a.reference_number,
-            "patient_name": a.patient_name,
-            "patient_age": a.patient_age,
-            "patient_phone": a.patient_phone,
-            "doctor_name": doctor.name if doctor else "Unknown",
-            "doctor_department": doctor.department if doctor else "",
-            "preferred_date": a.preferred_date,
-            "time_of_day": a.time_of_day,
-            "status": a.status,
-            "confirmed_time": a.confirmed_time,
-            "rejection_reason": a.rejection_reason,
-            "created_at": a.created_at.isoformat() if a.created_at else None,
-        })
-    return results
-
-
-# =============================================================================
-# APPROVE (Secured)
-# =============================================================================
-
-@router.patch("/{appointment_id}/approve")
-def approve_appointment(
-    appointment_id: int,
-    approve_payload: ApprovePayload,
-    db: Session = Depends(get_db),
-    _tenant: int = Depends(get_current_tenant),
-    payload: dict = Depends(get_token_payload) # Inject token data
-):
-    appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
-    if not appt:
-        raise HTTPException(status_code=404, detail="Appointment not found")
-
-    # ==========================================
-    # THE BOUNCER: Security Check
-    # ==========================================
-    user_role = payload.get("role")
-    user_hospital = payload.get("hospital_id")
-
-    if user_role != "superadmin" and str(user_hospital) != str(appt.hospital_id):
-        raise HTTPException(status_code=403, detail="Access denied. You can only approve appointments for your assigned hospital.")
-    # ==========================================
-
-    if appt.status != "pending":
-        raise HTTPException(status_code=400, detail=f"Appointment is already {appt.status}")
-
-    appt.status = "approved"
-    appt.confirmed_time = approve_payload.confirmed_time
-    appt.updated_at = datetime.now(timezone.utc)
-    db.commit()
-
-    # Email staff to call patient
-    hospital = db.query(Hospital).filter(Hospital.id == appt.hospital_id).first()
-    doctor   = db.query(Doctor).filter(Doctor.id == appt.doctor_id).first()
-    if hospital:
-        config = get_booking_config(hospital)
-        staff_email = config.get("notification_email", "")
-        if staff_email:
-            notify_patient_approved(
-                staff_email=staff_email,
-                hospital_name=hospital.name,
-                reference=appt.reference_number,
-                patient_name=appt.patient_name,
-                patient_phone=appt.patient_phone,
-                doctor_name=doctor.name if doctor else "Doctor",
-                confirmed_time=approve_payload.confirmed_time,
-                preferred_date=appt.preferred_date,
-            )
-
-    return {"status": "approved", "confirmed_time": approve_payload.confirmed_time}
-
-
-# =============================================================================
-# REJECT (Secured)
-# =============================================================================
-
-@router.patch("/{appointment_id}/reject")
-def reject_appointment(
-    appointment_id: int,
-    reject_payload: RejectPayload,
-    db: Session = Depends(get_db),
-    _tenant: int = Depends(get_current_tenant),
-    payload: dict = Depends(get_token_payload) # Inject token data
-):
-    appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
-    if not appt:
-        raise HTTPException(status_code=404, detail="Appointment not found")
-
-    # ==========================================
-    # THE BOUNCER: Security Check
-    # ==========================================
-    user_role = payload.get("role")
-    user_hospital = payload.get("hospital_id")
-
-    if user_role != "superadmin" and str(user_hospital) != str(appt.hospital_id):
-        raise HTTPException(status_code=403, detail="Access denied. You can only reject appointments for your assigned hospital.")
-    # ==========================================
-
-    if appt.status != "pending":
-        raise HTTPException(status_code=400, detail=f"Appointment is already {appt.status}")
-
-    appt.status = "rejected"
-    appt.rejection_reason = reject_payload.reason
-    appt.updated_at = datetime.now(timezone.utc)
-    db.commit()
-
-    return {"status": "rejected", "reason": reject_payload.reason}
-
-
-# =============================================================================
-# STATUS CHECK — patient checks via bot using phone + hospital (Public)
-# =============================================================================
-
-@router.get("/status/{hospital_id}/{phone}")
-def get_appointment_status(
-    hospital_id: int,
-    phone: str,
-    db: Session = Depends(get_db),
-):
-    appts = (
-        db.query(Appointment)
-        .filter(
-            Appointment.hospital_id == hospital_id,
-            Appointment.patient_phone == phone,
-        )
-        .order_by(Appointment.created_at.desc())
-        .limit(3)
-        .all()
-    )
-    if not appts:
-        return {"found": False, "message": "No appointments found for this phone number."}
-
-    results = []
-    for a in appts:
-        doctor = db.query(Doctor).filter(Doctor.id == a.doctor_id).first()
-        results.append({
-            "reference_number": a.reference_number,
-            "doctor_name": doctor.name if doctor else "Unknown",
-            "preferred_date": a.preferred_date,
-            "time_of_day": a.time_of_day,
-            "status": a.status,
-            "confirmed_time": a.confirmed_time,
-            "rejection_reason": a.rejection_reason,
-        })
-
-    return {"found": True, "appointments": results}
-
-
-# =============================================================================
-# BOOKING CONFIG — per-hospital rules (Secured admin only)
-# =============================================================================
-
-@router.get("/config/{hospital_id}")
-def get_booking_config_endpoint(
-    hospital_id: int,
-    db: Session = Depends(get_db),
-    _tenant: int = Depends(get_current_tenant),
-    payload: dict = Depends(get_token_payload) # Inject token data
-):
-    # ==========================================
-    # THE BOUNCER: Security Check
-    # ==========================================
-    user_role = payload.get("role")
-    user_hospital = payload.get("hospital_id")
-
-    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
-        raise HTTPException(status_code=403, detail="Access denied.")
-    # ==========================================
-
-    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
-    if not hospital:
-        raise HTTPException(status_code=404, detail="Hospital not found")
-    return get_booking_config(hospital)
-
-
-@router.patch("/config/{hospital_id}")
-def update_booking_config(
-    hospital_id: int,
-    config_payload: BookingConfigPayload,
-    db: Session = Depends(get_db),
-    _tenant: int = Depends(get_current_tenant),
-    payload: dict = Depends(get_token_payload) # Inject token data
-):
-    # ==========================================
-    # THE BOUNCER: Security Check
-    # ==========================================
-    user_role = payload.get("role")
-    user_hospital = payload.get("hospital_id")
-
-    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
-        raise HTTPException(status_code=403, detail="Access denied.")
-    # ==========================================
-
-    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
-    if not hospital:
-        raise HTTPException(status_code=404, detail="Hospital not found")
-    hospital.booking_config = json.dumps(config_payload.model_dump())
-    db.commit()
-    return {"status": "success", "config": config_payload.model_dump()}
-</file>
-
 <file path="backend/app/crud/crud_hospital.py">
 from sqlalchemy.orm import Session
 from app.models.hospital import Hospital
@@ -3371,6 +3020,357 @@ export function useAuth(): AuthContextValue {
 .no-scrollbar::-webkit-scrollbar {
   display: none;                /* Chrome, Safari, Opera */
 }
+</file>
+
+<file path="backend/app/api/v1/endpoints/appointments.py">
+"""
+app/api/v1/endpoints/appointments.py
+
+All appointment-related REST endpoints consumed by:
+  - The admin dashboard (list, approve, reject, config)
+  - The chat bot via ai.py (create, status check)
+"""
+
+import json
+import logging
+from datetime import datetime, timezone
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Body
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+# FIX: Imported get_token_payload to enforce Tenant Isolation
+from app.api.deps import get_db, get_current_tenant, get_token_payload
+from app.models.appointment import Appointment
+from app.models.doctor import Doctor
+from app.models.hospital import Hospital
+from app.services.booking_rules import validate_booking, get_booking_config
+from app.services.email import notify_staff_new_appointment, notify_patient_approved
+
+logger = logging.getLogger(__name__)
+router = APIRouter()
+
+
+# =============================================================================
+# SCHEMAS
+# =============================================================================
+
+class AppointmentCreate(BaseModel):
+    hospital_id: int
+    doctor_id: int
+    patient_name: str
+    patient_age: str
+    patient_phone: str
+    preferred_date: str   # "YYYY-MM-DD"
+    time_of_day: str      # "morning" | "afternoon" | "evening"
+
+
+class ApprovePayload(BaseModel):
+    confirmed_time: str   # e.g. "10:30 AM"
+
+
+class RejectPayload(BaseModel):
+    reason: str
+
+
+class BookingConfigPayload(BaseModel):
+    bookable_departments: list[str] = []
+    min_advance_hours: int = 2
+    max_per_doctor_per_day: int = 20
+    notification_email: str = ""
+    reminder_hours_before: int = 24
+
+
+# =============================================================================
+# CREATE — called by the chatbot after patient confirms (Public)
+# =============================================================================
+
+@router.post("/")
+def create_appointment(payload: AppointmentCreate, db: Session = Depends(get_db)):
+    hospital = db.query(Hospital).filter(Hospital.id == payload.hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+
+    doctor = db.query(Doctor).filter(
+        Doctor.id == payload.doctor_id,
+        Doctor.hospital_id == payload.hospital_id
+    ).first()
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+
+    # Validate against per-hospital booking rules
+    ok, error = validate_booking(hospital, doctor, payload.preferred_date, db)
+    if not ok:
+        raise HTTPException(status_code=400, detail=error)
+
+    appt = Appointment(
+        hospital_id=payload.hospital_id,
+        doctor_id=payload.doctor_id,
+        patient_name=payload.patient_name,
+        patient_age=payload.patient_age,
+        patient_phone=payload.patient_phone,
+        preferred_date=payload.preferred_date,
+        time_of_day=payload.time_of_day,
+        status="pending",
+    )
+    db.add(appt)
+    db.commit()
+    db.refresh(appt)
+
+    # Fire staff notification email (non-blocking — failure doesn't break booking)
+    config = get_booking_config(hospital)
+    staff_email = config.get("notification_email", "")
+    if staff_email:
+        notify_staff_new_appointment(
+            staff_email=staff_email,
+            hospital_name=hospital.name,
+            reference=appt.reference_number,
+            patient_name=appt.patient_name,
+            patient_age=appt.patient_age,
+            patient_phone=appt.patient_phone,
+            doctor_name=doctor.name,
+            preferred_date=appt.preferred_date,
+            time_of_day=appt.time_of_day,
+        )
+
+    return {
+        "reference_number": appt.reference_number,
+        "status": appt.status,
+        "message": "Appointment request submitted. The hospital will call you to confirm.",
+    }
+
+
+# =============================================================================
+# LIST — admin dashboard (Secured)
+# =============================================================================
+
+@router.get("/hospital/{hospital_id}")
+def list_appointments(
+    hospital_id: int,
+    status: Optional[str] = None,   # filter: pending | approved | rejected
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant),
+    payload: dict = Depends(get_token_payload) # Inject token data
+):
+    # ==========================================
+    # THE BOUNCER: Security Check
+    # ==========================================
+    user_role = payload.get("role")
+    user_hospital = payload.get("hospital_id")
+
+    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied. You can only view data for your assigned hospital.")
+    # ==========================================
+
+    q = db.query(Appointment).filter(Appointment.hospital_id == hospital_id)
+    if status:
+        q = q.filter(Appointment.status == status)
+    appts = q.order_by(Appointment.created_at.desc()).all()
+
+    results = []
+    for a in appts:
+        doctor = db.query(Doctor).filter(Doctor.id == a.doctor_id).first()
+        results.append({
+            "id": a.id,
+            "reference_number": a.reference_number,
+            "patient_name": a.patient_name,
+            "patient_age": a.patient_age,
+            "patient_phone": a.patient_phone,
+            "doctor_name": doctor.name if doctor else "Unknown",
+            "doctor_department": doctor.department if doctor else "",
+            "preferred_date": a.preferred_date,
+            "time_of_day": a.time_of_day,
+            "status": a.status,
+            "confirmed_time": a.confirmed_time,
+            "rejection_reason": a.rejection_reason,
+            "created_at": a.created_at.isoformat() if a.created_at else None,
+        })
+    return results
+
+
+# =============================================================================
+# APPROVE (Secured)
+# =============================================================================
+
+@router.patch("/{appointment_id}/approve")
+def approve_appointment(
+    appointment_id: int,
+    body : ApprovePayload,
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant),
+    payload: dict = Depends(get_token_payload) # Inject token data
+):
+    appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    if not appt:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+
+    # ==========================================
+    # THE BOUNCER: Security Check
+    # ==========================================
+    user_role = payload.get("role")
+    user_hospital = payload.get("hospital_id")
+
+    if user_role != "superadmin" and str(user_hospital) != str(appt.hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied. You can only approve appointments for your assigned hospital.")
+    # ==========================================
+
+    if appt.status != "pending":
+        raise HTTPException(status_code=400, detail=f"Appointment is already {appt.status}")
+
+    appt.status = "approved"
+    appt.confirmed_time = body.confirmed_time
+    appt.updated_at = datetime.now(timezone.utc)
+    db.commit()
+
+    # Email staff to call patient
+    hospital = db.query(Hospital).filter(Hospital.id == appt.hospital_id).first()
+    doctor   = db.query(Doctor).filter(Doctor.id == appt.doctor_id).first()
+    if hospital:
+        config = get_booking_config(hospital)
+        staff_email = config.get("notification_email", "")
+        if staff_email:
+            notify_patient_approved(
+                staff_email=staff_email,
+                hospital_name=hospital.name,
+                reference=appt.reference_number,
+                patient_name=appt.patient_name,
+                patient_phone=appt.patient_phone,
+                doctor_name=doctor.name if doctor else "Doctor",
+                confirmed_time=body.confirmed_time,
+                preferred_date=appt.preferred_date,
+            )
+
+    return {"status": "approved", "confirmed_time": body.confirmed_time}
+
+
+# =============================================================================
+# REJECT (Secured)
+# =============================================================================
+
+@router.patch("/{appointment_id}/reject")
+def reject_appointment(
+    appointment_id: int,
+    body : RejectPayload,
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant),
+    payload: dict = Depends(get_token_payload) # Inject token data
+):
+    appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    if not appt:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+
+    # ==========================================
+    # THE BOUNCER: Security Check
+    # ==========================================
+    user_role = payload.get("role")
+    user_hospital = payload.get("hospital_id")
+
+    if user_role != "superadmin" and str(user_hospital) != str(appt.hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied. You can only reject appointments for your assigned hospital.")
+    # ==========================================
+
+    if appt.status != "pending":
+        raise HTTPException(status_code=400, detail=f"Appointment is already {appt.status}")
+
+    appt.status = "rejected"
+    appt.rejection_reason = body.reason
+    appt.updated_at = datetime.now(timezone.utc)
+    db.commit()
+
+    return {"status": "rejected", "reason": body.reason}
+
+
+# =============================================================================
+# STATUS CHECK — patient checks via bot using phone + hospital (Public)
+# =============================================================================
+
+@router.get("/status/{hospital_id}/{phone}")
+def get_appointment_status(
+    hospital_id: int,
+    phone: str,
+    db: Session = Depends(get_db),
+):
+    appts = (
+        db.query(Appointment)
+        .filter(
+            Appointment.hospital_id == hospital_id,
+            Appointment.patient_phone == phone,
+        )
+        .order_by(Appointment.created_at.desc())
+        .limit(3)
+        .all()
+    )
+    if not appts:
+        return {"found": False, "message": "No appointments found for this phone number."}
+
+    results = []
+    for a in appts:
+        doctor = db.query(Doctor).filter(Doctor.id == a.doctor_id).first()
+        results.append({
+            "reference_number": a.reference_number,
+            "doctor_name": doctor.name if doctor else "Unknown",
+            "preferred_date": a.preferred_date,
+            "time_of_day": a.time_of_day,
+            "status": a.status,
+            "confirmed_time": a.confirmed_time,
+            "rejection_reason": a.rejection_reason,
+        })
+
+    return {"found": True, "appointments": results}
+
+
+# =============================================================================
+# BOOKING CONFIG — per-hospital rules (Secured admin only)
+# =============================================================================
+
+@router.get("/config/{hospital_id}")
+def get_booking_config_endpoint(
+    hospital_id: int,
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant),
+    payload: dict = Depends(get_token_payload) # Inject token data
+):
+    # ==========================================
+    # THE BOUNCER: Security Check
+    # ==========================================
+    user_role = payload.get("role")
+    user_hospital = payload.get("hospital_id")
+
+    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied.")
+    # ==========================================
+
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+    return get_booking_config(hospital)
+
+
+@router.patch("/config/{hospital_id}")
+def update_booking_config(
+    hospital_id: int,
+    config_payload: BookingConfigPayload,
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant),
+    payload: dict = Depends(get_token_payload) # Inject token data
+):
+    # ==========================================
+    # THE BOUNCER: Security Check
+    # ==========================================
+    user_role = payload.get("role")
+    user_hospital = payload.get("hospital_id")
+
+    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied.")
+    # ==========================================
+
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+    hospital.booking_config = json.dumps(config_payload.model_dump())
+    db.commit()
+    return {"status": "success", "config": config_payload.model_dump()}
 </file>
 
 <file path="backend/app/availability.py">
@@ -5207,7 +5207,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://hospital-ai-platform.vercel.app", "http://localhost:5173"],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"], # Be explicit here
+    allow_methods=["*"], # Be explicit here
     allow_headers=["*"],
 )
 # --- Include Routers ---
@@ -5303,6 +5303,7 @@ VALID_LANGUAGES          = {"en", "ml"}
 
 _GTRANSLATE_URL = "https://translate.googleapis.com/translate_a/single"
 
+
 def _translate(text: str, source: str, target: str) -> str:
     if not text or not text.strip():
         return text
@@ -5350,15 +5351,7 @@ async def _translate_async(text: str, source: str, target: str) -> str:
 # =============================================================================
 # Booking intent keywords (English — question is already translated before here)
 # =============================================================================
-_BOOKING_KEYWORDS = [
-    "book", "appointment", "schedule", "consult", "consultation",
-    "see a doctor", "visit", "reserve", "fix an appointment",
-    "make an appointment", "set appointment",
-]
 
-def detect_booking_intent(text: str) -> bool:
-    t = text.lower()
-    return any(kw in t for kw in _BOOKING_KEYWORDS)
 
 
 # =============================================================================
@@ -5437,7 +5430,49 @@ def _booking_step(
     # Global cancel check (Fuzzy match)
     if any(w in msg_lower for w in ["cancel", "stop", "nevermind", "never mind", "quit", "exit"]):
         return "Okay, I've cancelled the appointment booking. Is there anything else I can help you with?", session, True
+    # ── State: checking_status_phone ──────────────────────────────────────────
+    if state == "checking_status_phone":
+        # Smart Check: Did they already include their phone number in their first message?
+        phone_match = re.search(r"\+?\d{7,15}", msg)
+        if phone_match:
+            msg = phone_match.group(0)
+            state = "fetching_status" # Fall through to the next block automatically
+        else:
+            session["state"] = "fetching_status"
+            return "I can check that for you! Please enter the phone number you used to book the appointment.", session, False
 
+    # ── State: fetching_status ────────────────────────────────────────────────
+    if state == "fetching_status":
+        phone = re.sub(r"[\s\-\(\)\.]", "", msg)
+        if not re.match(r"^\+?\d{7,15}$", phone):
+            return "Please enter a valid phone number (e.g. 9876543210).", session, False
+            
+        appts = db.query(Appointment).filter(
+            Appointment.hospital_id == hospital_id,
+            Appointment.patient_phone == phone
+        ).order_by(Appointment.created_at.desc()).limit(3).all()
+        
+        if not appts:
+            return "I couldn't find any recent appointments linked to that phone number. Please check the number and try again, or type **cancel**.", session, False
+            
+        reply = "Here is the status of your recent appointments:\n\n"
+        for a in appts:
+            doc = db.query(Doctor).filter(Doctor.id == a.doctor_id).first()
+            doc_name = doc.name if doc else "Unknown Doctor"
+            
+            # Format the status nicely
+            if a.status == "pending":
+                stat_msg = "⏳ **Pending** (Waiting for hospital approval)"
+            elif a.status == "approved":
+                stat_msg = f"✅ **Approved** (Confirmed for {a.confirmed_time})"
+            else:
+                stat_msg = f"❌ **Rejected** (Reason: {a.rejection_reason})"
+                
+            reply += f"👨‍⚕️ **Dr. {doc_name}** on {a.preferred_date}\n"
+            reply += f"   Status: {stat_msg}\n"
+            reply += f"   Ref: {a.reference_number}\n\n"
+            
+        return reply + "Is there anything else I can help you with?", session, True
     # ── State: collecting_doctor ──────────────────────────────────────────────
     if state == "collecting_doctor":
         all_doctors = db.query(Doctor).filter(Doctor.hospital_id == hospital_id).all()
@@ -5557,8 +5592,32 @@ def _booking_step(
         if len(msg) < 2:
             return "Please enter a valid full name.", session, False
         
-        # Translators sometimes add punctuation to names, so we strip trailing periods
-        session["patient_name"] = msg.strip(".").title()
+        # Extract name only — stop at conjunctions the translation layer adds
+        # e.g. "Reetha and she is 50 years old" → "Reetha"
+        name_part = re.split(
+            r'\b(and|she|he|is|was|who|aged|age|years?|her|his|the)\b',
+            msg, flags=re.IGNORECASE
+        )[0]
+        name_clean = name_part.strip("., ").title()
+        
+        if len(name_clean) < 2:
+            return "Please enter a valid full name.", session, False
+        
+        # Check if the message also contains an age — if so, auto-capture it
+        age_match = re.search(r'\b(\d{1,3})\s*(years?(\s*old)?|yr)?\b', msg, re.IGNORECASE)
+        
+        session["patient_name"] = name_clean
+        
+        if age_match:
+            age_val = int(age_match.group(1))
+            if 1 <= age_val <= 120:
+                session["patient_age"] = str(age_val)
+                session["state"] = "collecting_phone"
+                return (
+                    f"Got it — **{name_clean}**, age **{age_val}**. "
+                    "What is the best phone number to reach the patient?"
+                ), session, False
+        
         session["state"] = "collecting_age"
         return f"Thank you, {session['patient_name']}. What is the patient's age?", session, False
 
@@ -5572,10 +5631,19 @@ def _booking_step(
         return "What is the best phone number to reach the patient?", session, False
 
     # ── State: collecting_phone ───────────────────────────────────────────────
+    
     if state == "collecting_phone":
-        phone = re.sub(r"[\s\-\(\)\.]", "", msg) # Strip periods too just in case
+        phone = re.sub(r"[\s\-\(\)\.]", "", msg)
+        # Indian numbers: 10 digits, optionally prefixed with +91 or 0
+        # General international: 7-15 digits
+        phone_digits = re.sub(r"^\+91|^91|^0", "", phone)  # strip country code for length check
         if not re.match(r"^\+?\d{7,15}$", phone):
             return "Please enter a valid phone number (e.g. 9876543210).", session, False
+        if len(phone_digits) not in (10, 11, 12) and not phone.startswith("+"):
+            return (
+                f"That number has {len(phone_digits)} digits — Indian mobile numbers should have 10 digits. "
+                "Please check and re-enter."
+            ), session, False
         session["patient_phone"] = phone
         session["state"] = "confirming"
 
@@ -5593,6 +5661,28 @@ def _booking_step(
 
     # ── State: confirming ─────────────────────────────────────────────────────
     if state == "confirming":
+        correction_map = {
+        "phone": "collecting_phone",
+        "number": "collecting_phone",
+        "mobile": "collecting_phone",
+        "name": "collecting_name",
+        "age": "collecting_age",
+        "date": "collecting_date",
+        "time": "collecting_time_of_day",
+        "doctor": "collecting_doctor",
+    }
+        for keyword, go_to_state in correction_map.items():
+            if f"change {keyword}" in msg_lower or f"wrong {keyword}" in msg_lower or f"edit {keyword}" in msg_lower or f"correct {keyword}" in msg_lower:
+                session["state"] = go_to_state
+                prompts = {
+                "collecting_phone": "Please enter the correct phone number.",
+                "collecting_name": "Please enter the correct patient name.",
+                "collecting_age": "Please enter the correct age.",
+                "collecting_date": "Please enter the correct date.",
+                "collecting_time_of_day": "Please choose the time: 1. Morning  2. Afternoon  3. Evening",
+                "collecting_doctor": "Which doctor would you like instead?",
+            }
+            return prompts[go_to_state], session, False
         # FIX: Fuzzy keyword matching for confirmation
         positive_words = ["yes", "confirm", "ok", "okay", "sure", "proceed", "y", "correct", "right", "exactly", "do it"]
         negative_words = ["no", "cancel", "n", "stop", "incorrect", "wrong", "wait"]
@@ -6208,7 +6298,41 @@ async def chat_with_arogya(request: ChatRequest, db: Session = Depends(get_db)):
     db.commit()
     return {"answer": final_answer}
 
+async def classify_user_intent(user_message: str) -> str:
+    """
+    Uses a fast LLM to semantically classify the user's intent.
+    Returns exactly one of: "STATUS", "BOOKING", "CANCEL", or "OTHER"
+    """
+    system_prompt = """
+    You are an intent classification engine for a hospital chatbot. 
+    Read the user's message and classify their intent into exactly ONE of the following categories. 
+    Respond with ONLY the category name, nothing else.
 
+    Categories:
+    STATUS  - User wants to know if their appointment is approved, pending, rejected, or wants to check its status.
+    BOOKING - User wants to schedule, book, or make a new appointment.
+    CANCEL  - User wants to cancel or stop an ongoing process or appointment.
+    OTHER   - General questions, greetings, or anything else.
+    """
+
+    try:
+        resp = await async_client.chat.completions.create(
+            model="gpt-4o-mini",
+            temperature=0.0, # Zero creativity, maximum strictness
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message}
+            ]
+        )
+        intent = resp.choices[0].message.content.strip().upper()
+        
+        if intent not in ["STATUS", "BOOKING", "CANCEL", "OTHER"]:
+            return "OTHER"
+        return intent
+    except Exception as e:
+        logger.warning(f"Intent classification failed: {e}")
+        return "OTHER"
+    
 @router.post("/chat-stream")
 async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
     is_malayalam = request.language == "ml"
@@ -6221,26 +6345,114 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
     translated_request = request.model_copy(update={"question": english_question})
     _, openai_messages, _ = build_context(translated_request, db, force_english=True)
     # ── Booking session intercept ─────────────────────────────────────────────
+# ── Booking & Status session intercept ────────────────────────────────────
     session_token = request.session_token  # add this field to ChatRequest model
     booking_session = get_booking_session(str(request.hospital_id), session_token)
 
-    if booking_session or detect_booking_intent(english_question):
+    # 🚀 THE FIX: Use the semantic router instead of hardcoded keywords
+    intent = await classify_user_intent(english_question)
+    
+    is_status_intent = (intent == "STATUS")
+    is_booking_intent = (intent == "BOOKING")
+    is_cancel_intent = (intent == "CANCEL")
+
+    is_new_session = not booking_session and (is_booking_intent or is_status_intent)
+
+    if booking_session or is_new_session:
+        # Catch global cancellations mid-session gracefully
+        if booking_session and is_cancel_intent:
+            clear_booking_session(str(request.hospital_id), session_token)
+            yield "data: \"Okay, I've cancelled that. Is there anything else I can help you with?\"\n\n"
+            yield "data: [DONE]\n\n"
+            return
+            
         if not booking_session:
-            booking_session = new_booking_session()
+            # If they just want status, jump to the status checking state
+            if is_status_intent:
+                booking_session = {"state": "checking_status_phone"}
+                
+            # Otherwise, initialize a normal booking session
+            elif is_booking_intent:
+                booking_session = new_booking_session()
+
+    # Detect intents
+
+    
+    is_new_session = not booking_session and (is_booking_intent or is_status_intent)
+
+    if booking_session or is_new_session:
+        if not booking_session:
+            # If they just want status, jump to the status checking state
+            if is_status_intent and not is_booking_intent:
+                booking_session = {"state": "checking_status_phone"}
+            
+            # Otherwise, initialize a normal booking session and try to pre-fill the doctor
+            else:
+                booking_session = new_booking_session()
+                
+                # Pre-fill doctor from recent conversation history if detectable
+                if request.history:
+                    all_doctors = db.query(Doctor).filter(
+                        Doctor.hospital_id == request.hospital_id
+                    ).all()
+                    # Search last 4 messages for a doctor mention
+                    recent_text = " ".join(
+                        m.content for m in (request.history or [])[-4:]
+                    )
+                    scored = sorted(
+                        [(score_doctor_relevance(recent_text, d), d) for d in all_doctors],
+                        key=lambda x: x[0], reverse=True
+                    )
+                    if scored and scored[0][0] >= 0.3:
+                        best = scored[0][1]
+                        booking_session["doctor_id"]   = best.id
+                        booking_session["doctor_name"] = best.name
+                        booking_session["state"]       = "collecting_date"
+                        
+                        # Build date list for immediate reply
+                        from datetime import timedelta
+                        today = datetime.now()
+                        date_options = [
+                            (today + timedelta(days=i)).strftime("%A, %B %d (%Y-%m-%d)")
+                            for i in range(1, 8)
+                        ]
+                        dates_text = "\n".join(f"  {i+1}. {d}" for i, d in enumerate(date_options))
+                        pre_reply = (
+                            f"Sure! I'll book you with **{best.name}** ({best.department}).\n\n"
+                            f"Which date would you prefer?\n{dates_text}\n\n"
+                            "You can type the number or the date."
+                        )
+                        if request.language == "ml":
+                            pre_reply = await _translate_async(pre_reply, "en", "ml")
+                            
+                        save_booking_session(str(request.hospital_id), session_token, booking_session)
+                        
+                        async def pre_booking_reply():
+                            yield f"data: {json.dumps(pre_reply)}\n\n"
+                            yield "data: [DONE]\n\n"
+                        return StreamingResponse(pre_booking_reply(), media_type="text/event-stream",
+                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+                        
+        # Normal fall-through for active sessions, status checks, or un-pre-filled bookings
         bot_reply, booking_session, done = _booking_step(
             english_question, booking_session, request.hospital_id, request.language, db
         )
+        
         if done:
             clear_booking_session(str(request.hospital_id), session_token)
         else:
             save_booking_session(str(request.hospital_id), session_token, booking_session)
+            
         if request.language == "ml":
             bot_reply = await _translate_async(bot_reply, "en", "ml")
+            
         async def booking_reply():
             yield f"data: {json.dumps(bot_reply)}\n\n"
             yield "data: [DONE]\n\n"
+            
         return StreamingResponse(booking_reply(), media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    # ── end intercept — normal chat continues below ───────────────────────────
     # ── end booking intercept — normal chat continues below ───────────────────
 
     async def event_generator() -> AsyncGenerator[str, None]:
@@ -6477,10 +6689,15 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
 
   // ── Restart listening when browser auto-stops (continuous: false) ─────────
   useEffect(() => {
-    if (micState === 'recording' && !listening && !autoSendingRef.current) {
-      SpeechRecognition.startListening({ continuous: false, language: language === 'ml' ? 'ml-IN' : 'en-US' });
+    if (micState === 'recording' && !listening && !autoSendingRef.current && !isStreaming) {
+      const timer = setTimeout(() => {
+        if (micState === 'recording' && !autoSendingRef.current) {
+          SpeechRecognition.startListening({ continuous: false, language: language === 'ml' ? 'ml-IN' : 'en-US' });
+        }
+      }, 150);
+      return () => clearTimeout(timer);
     }
-  }, [listening, micState, language]);
+  }, [listening, micState, language, isStreaming]);
 
   // ── Mic toggle ────────────────────────────────────────────────────────────
   const toggleMic = useCallback(async () => {

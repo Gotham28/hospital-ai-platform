@@ -109,15 +109,7 @@ async def _translate_async(text: str, source: str, target: str) -> str:
 # =============================================================================
 # Booking intent keywords (English — question is already translated before here)
 # =============================================================================
-_BOOKING_KEYWORDS = [
-    "book", "appointment", "schedule", "consult", "consultation",
-    "see a doctor", "visit", "reserve", "fix an appointment",
-    "make an appointment", "set appointment",
-]
 
-def detect_booking_intent(text: str) -> bool:
-    t = text.lower()
-    return any(kw in t for kw in _BOOKING_KEYWORDS)
 
 
 # =============================================================================
@@ -1128,10 +1120,19 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
         # Catch global cancellations mid-session gracefully
         if booking_session and is_cancel_intent:
             clear_booking_session(str(request.hospital_id), session_token)
-            yield "data: \"Okay, I've cancelled that. Is there anything else I can help you with?\"\n\n"
-            yield "data: [DONE]\n\n"
-            return
             
+            async def cancel_reply():
+                cancel_msg = "Okay, I've cancelled that. Is there anything else I can help you with?"
+                if request.language == "ml":
+                    cancel_msg = await _translate_async(cancel_msg, "en", "ml")
+                yield f"data: {json.dumps(cancel_msg)}\n\n"
+                yield "data: [DONE]\n\n"
+                
+            return StreamingResponse(
+                cancel_reply(), 
+                media_type="text/event-stream",
+                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+            )
         if not booking_session:
             # If they just want status, jump to the status checking state
             if is_status_intent:
@@ -1142,8 +1143,7 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
                 booking_session = new_booking_session()
 
     # Detect intents
-    is_status_intent = any(w in english_question.lower() for w in ["status", "accepted", "confirmed", "check appointment", "my appointment"])
-    is_booking_intent = detect_booking_intent(english_question)
+
     
     is_new_session = not booking_session and (is_booking_intent or is_status_intent)
 
