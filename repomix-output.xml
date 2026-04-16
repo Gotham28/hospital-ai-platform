@@ -6011,6 +6011,7 @@ def build_context(request: ChatRequest, db: Session, force_english: bool = False
     hospital_id = request.hospital_id
     question = request.question
     today_str = datetime.now().strftime("%d-%m-%Y")
+    prompt_date_str = datetime.now().strftime("%A, %B %d, %Y")
 
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
     if not hospital:
@@ -6037,7 +6038,7 @@ def build_context(request: ChatRequest, db: Session, force_english: bool = False
 
     parts = [
         f"You are Arogya, the AI Assistant for {hospital.name}.",
-        f"Current Date: {today_str}",
+        f"Current Date: {prompt_date_str}",
         "",
         hospital.system_prompt or "",
         "",
@@ -6362,10 +6363,19 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
         # Catch global cancellations mid-session gracefully
         if booking_session and is_cancel_intent:
             clear_booking_session(str(request.hospital_id), session_token)
-            yield "data: \"Okay, I've cancelled that. Is there anything else I can help you with?\"\n\n"
-            yield "data: [DONE]\n\n"
-            return
             
+            async def cancel_reply():
+                cancel_msg = "Okay, I've cancelled that. Is there anything else I can help you with?"
+                if request.language == "ml":
+                    cancel_msg = await _translate_async(cancel_msg, "en", "ml")
+                yield f"data: {json.dumps(cancel_msg)}\n\n"
+                yield "data: [DONE]\n\n"
+                
+            return StreamingResponse(
+                cancel_reply(), 
+                media_type="text/event-stream",
+                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+            )
         if not booking_session:
             # If they just want status, jump to the status checking state
             if is_status_intent:

@@ -90,25 +90,6 @@ async def _translate_async(text: str, source: str, target: str) -> str:
         logger.warning("Async translation failed (%s->%s): %s", source, target, e)
         return text
 
-# =============================================================================
-# BOOKING SESSION STATE MACHINE
-# paste this block into ai.py, right after the GOOGLE TRANSLATE BRIDGE section
-# and before the INJECTION DETECTION section
-# =============================================================================
-
-# --- Add to imports at top of ai.py ---
-# import redis
-# import uuid
-# from app.models.appointment import Appointment  (add to existing model imports)
-
-# --- Redis client setup (add near client = OpenAI(...)) ---
-# _redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
-# _redis = redis.from_url(_redis_url, decode_responses=True)
-# BOOKING_SESSION_TTL = 600  # 10 minutes — session expires if user goes idle
-
-# =============================================================================
-# Booking intent keywords (English — question is already translated before here)
-# =============================================================================
 
 
 
@@ -120,386 +101,6 @@ def _session_key(hospital_id: str, session_token: str) -> str:
     return f"booking:{hospital_id}:{session_token}"
 
 
-def get_booking_session(hospital_id: str, session_token: str) -> dict | None:
-    raw = _redis.get(_session_key(hospital_id, session_token))
-    if not raw:
-        return None
-    import json as _json
-    return _json.loads(raw)
-
-
-def save_booking_session(hospital_id: str, session_token: str, session: dict) -> None:
-    import json as _json
-    _redis.setex(
-        _session_key(hospital_id, session_token),
-        BOOKING_SESSION_TTL,
-        _json.dumps(session)
-    )
-
-
-def clear_booking_session(hospital_id: str, session_token: str) -> None:
-    _redis.delete(_session_key(hospital_id, session_token))
-
-
-def new_booking_session() -> dict:
-    return {
-        "state": "collecting_doctor",
-        "doctor_id": None,
-        "doctor_name": None,
-        "preferred_date": None,
-        "time_of_day": None,
-        "patient_name": None,
-        "patient_age": None,
-        "patient_phone": None,
-    }
-
-
-# =============================================================================
-# State machine — one function per state, returns the bot reply and next state
-# =============================================================================
-
-def _booking_step(
-    user_message: str,
-    session: dict,
-    hospital_id: int,
-    language: str,
-    db,          # SQLAlchemy Session
-) -> tuple[str, dict, bool]:
-    """
-    Process one turn of the booking conversation.
-
-    Returns:
-        bot_reply   — what the bot should say (in English; translated upstream)
-        session     — updated session dict
-        done        — True if booking is complete or cancelled
-    """
-    from app.models.doctor import Doctor
-    from app.models.hospital import Hospital
-    from app.models.appointment import Appointment
-    from app.services.booking_rules import validate_booking, get_booking_config
-    from app.services.email import notify_staff_new_appointment
-    import uuid, re
-    from datetime import datetime, timedelta
-
-    msg = user_message.strip()
-    msg_lower = msg.lower() # Pre-compute lowercase for fuzzy matching
-    state = session["state"]
-
-    # Global cancel check (Fuzzy match)
-    if any(w in msg_lower for w in ["cancel", "stop", "nevermind", "never mind", "quit", "exit"]):
-        return "Okay, I've cancelled the appointment booking. Is there anything else I can help you with?", session, True
-    # ── State: checking_status_phone ──────────────────────────────────────────
-    if state == "checking_status_phone":
-        # Smart Check: Did they already include their phone number in their first message?
-        phone_match = re.search(r"\+?\d{7,15}", msg)
-        if phone_match:
-            msg = phone_match.group(0)
-            state = "fetching_status" # Fall through to the next block automatically
-        else:
-            session["state"] = "fetching_status"
-            return "I can check that for you! Please enter the phone number you used to book the appointment.", session, False
-
-    # ── State: fetching_status ────────────────────────────────────────────────
-    if state == "fetching_status":
-        phone = re.sub(r"[\s\-\(\)\.]", "", msg)
-        if not re.match(r"^\+?\d{7,15}$", phone):
-            return "Please enter a valid phone number (e.g. 9876543210).", session, False
-            
-        appts = db.query(Appointment).filter(
-            Appointment.hospital_id == hospital_id,
-            Appointment.patient_phone == phone
-        ).order_by(Appointment.created_at.desc()).limit(3).all()
-        
-        if not appts:
-            return "I couldn't find any recent appointments linked to that phone number. Please check the number and try again, or type **cancel**.", session, False
-            
-        reply = "Here is the status of your recent appointments:\n\n"
-        for a in appts:
-            doc = db.query(Doctor).filter(Doctor.id == a.doctor_id).first()
-            doc_name = doc.name if doc else "Unknown Doctor"
-            
-            # Format the status nicely
-            if a.status == "pending":
-                stat_msg = "⏳ **Pending** (Waiting for hospital approval)"
-            elif a.status == "approved":
-                stat_msg = f"✅ **Approved** (Confirmed for {a.confirmed_time})"
-            else:
-                stat_msg = f"❌ **Rejected** (Reason: {a.rejection_reason})"
-                
-            reply += f"👨‍⚕️ **Dr. {doc_name}** on {a.preferred_date}\n"
-            reply += f"   Status: {stat_msg}\n"
-            reply += f"   Ref: {a.reference_number}\n\n"
-            
-        return reply + "Is there anything else I can help you with?", session, True
-    # ── State: collecting_doctor ──────────────────────────────────────────────
-    if state == "collecting_doctor":
-        all_doctors = db.query(Doctor).filter(Doctor.hospital_id == hospital_id).all()
-        if not all_doctors:
-            return "I'm sorry, there are no doctors registered for online booking at this time. Please call reception.", session, True
-
-        # Try to match the user's text to a doctor name or department
-        from app.api.v1.endpoints.ai import score_doctor_relevance  # reuse existing function
-        scored = sorted(
-            [(score_doctor_relevance(msg, d), d) for d in all_doctors],
-            key=lambda x: x[0], reverse=True
-        )
-        best_score, best_doc = scored[0] if scored else (0, None)
-
-        if best_score >= 0.3 and best_doc:
-            session["doctor_id"]   = best_doc.id
-            session["doctor_name"] = best_doc.name
-            session["state"]       = "collecting_date"
-
-            # Build date options: next 7 days excluding today
-            today = datetime.now()
-            date_options = []
-            for i in range(1, 8):
-                d = today + timedelta(days=i)
-                date_options.append(d.strftime("%A, %B %d (%Y-%m-%d)"))
-
-            dates_text = "\n".join(f"  {i+1}. {d}" for i, d in enumerate(date_options))
-            return (
-                f"Great! I'll book you with **{best_doc.name}** ({best_doc.department}).\n\n"
-                f"Which date would you prefer? Please choose:\n{dates_text}\n\n"
-                "You can type the number or the date."
-            ), session, False
-        else:
-            # Show doctor list for them to choose
-            doctor_list = "\n".join(
-                f"  {i+1}. Dr. {d.name} — {d.department or 'General'}"
-                for i, (_, d) in enumerate(scored[:8])
-            )
-            return (
-                f"Which doctor would you like to book an appointment with?\n\n{doctor_list}\n\n"
-                "You can type the doctor's name, department, or number."
-            ), session, False
-
-    # ── State: collecting_date ────────────────────────────────────────────────
-    if state == "collecting_date":
-        today = datetime.now()
-        date_options = [(today + timedelta(days=i)) for i in range(1, 8)]
-
-        chosen_date = None
-
-        # Try number choice (Fuzzy match: strips out periods or text added by translator like "Option 1.")
-        digits_only = re.sub(r"[^\d]", "", msg)
-        if digits_only:
-            idx = int(digits_only) - 1
-            if 0 <= idx < len(date_options):
-                chosen_date = date_options[idx].strftime("%Y-%m-%d")
-
-        # Try direct date parsing
-        if not chosen_date:
-            for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%B %d", "%b %d"):
-                try:
-                    parsed = datetime.strptime(msg, fmt)
-                    if parsed.year == 1900:
-                        parsed = parsed.replace(year=today.year)
-                    chosen_date = parsed.strftime("%Y-%m-%d")
-                    break
-                except ValueError:
-                    continue
-
-        # Try day name ("monday", "tuesday" etc)
-        if not chosen_date:
-            day_names = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
-            for dn in day_names:
-                if dn in msg_lower:
-                    for d in date_options:
-                        if d.strftime("%A").lower() == dn:
-                            chosen_date = d.strftime("%Y-%m-%d")
-                            break
-
-        if not chosen_date:
-            date_list = "\n".join(f"  {i+1}. {d.strftime('%A, %B %d')}" for i, d in enumerate(date_options))
-            return (
-                "I didn't catch that date. Please choose a number from the list:\n"
-                f"{date_list}"
-            ), session, False
-
-        session["preferred_date"] = chosen_date
-        session["state"] = "collecting_time_of_day"
-        return (
-            f"Got it — **{chosen_date}**.\n\n"
-            "What time of day works best for you?\n"
-            "  1. 🌅 Morning\n"
-            "  2. ☀️ Afternoon\n"
-            "  3. 🌇 Evening"
-        ), session, False
-
-    # ── State: collecting_time_of_day ─────────────────────────────────────────
-    if state == "collecting_time_of_day":
-        # FIX: Fuzzy keyword matching instead of exact dictionary lookup
-        if any(w in msg_lower for w in ["1", "morning", "am", "early"]):
-            tod = "morning"
-        elif any(w in msg_lower for w in ["2", "afternoon", "noon", "midday"]):
-            tod = "afternoon"
-        elif any(w in msg_lower for w in ["3", "evening", "pm", "night", "late"]):
-            tod = "evening"
-        else:
-            return (
-                "Please choose:\n  1. Morning\n  2. Afternoon\n  3. Evening"
-            ), session, False
-
-        session["time_of_day"] = tod
-        session["state"] = "collecting_name"
-        return "What is the patient's full name?", session, False
-
-    # ── State: collecting_name ────────────────────────────────────────────────
-    if state == "collecting_name":
-        if len(msg) < 2:
-            return "Please enter a valid full name.", session, False
-        
-        # Extract name only — stop at conjunctions the translation layer adds
-        # e.g. "Reetha and she is 50 years old" → "Reetha"
-        name_part = re.split(
-            r'\b(and|she|he|is|was|who|aged|age|years?|her|his|the)\b',
-            msg, flags=re.IGNORECASE
-        )[0]
-        name_clean = name_part.strip("., ").title()
-        
-        if len(name_clean) < 2:
-            return "Please enter a valid full name.", session, False
-        
-        # Check if the message also contains an age — if so, auto-capture it
-        age_match = re.search(r'\b(\d{1,3})\s*(years?(\s*old)?|yr)?\b', msg, re.IGNORECASE)
-        
-        session["patient_name"] = name_clean
-        
-        if age_match:
-            age_val = int(age_match.group(1))
-            if 1 <= age_val <= 120:
-                session["patient_age"] = str(age_val)
-                session["state"] = "collecting_phone"
-                return (
-                    f"Got it — **{name_clean}**, age **{age_val}**. "
-                    "What is the best phone number to reach the patient?"
-                ), session, False
-        
-        session["state"] = "collecting_age"
-        return f"Thank you, {session['patient_name']}. What is the patient's age?", session, False
-
-    # ── State: collecting_age ─────────────────────────────────────────────────
-    if state == "collecting_age":
-        age = re.sub(r"[^\d]", "", msg)
-        if not age or not (1 <= int(age) <= 120):
-            return "Please enter a valid age (e.g. 32).", session, False
-        session["patient_age"] = age
-        session["state"] = "collecting_phone"
-        return "What is the best phone number to reach the patient?", session, False
-
-    # ── State: collecting_phone ───────────────────────────────────────────────
-    
-    if state == "collecting_phone":
-        phone = re.sub(r"[\s\-\(\)\.]", "", msg)
-        # Indian numbers: 10 digits, optionally prefixed with +91 or 0
-        # General international: 7-15 digits
-        phone_digits = re.sub(r"^\+91|^91|^0", "", phone)  # strip country code for length check
-        if not re.match(r"^\+?\d{7,15}$", phone):
-            return "Please enter a valid phone number (e.g. 9876543210).", session, False
-        if len(phone_digits) not in (10, 11, 12) and not phone.startswith("+"):
-            return (
-                f"That number has {len(phone_digits)} digits — Indian mobile numbers should have 10 digits. "
-                "Please check and re-enter."
-            ), session, False
-        session["patient_phone"] = phone
-        session["state"] = "confirming"
-
-        # Build confirmation summary
-        return (
-            f"Please confirm your appointment request:\n\n"
-            f"👨‍⚕️ **Doctor:** {session['doctor_name']}\n"
-            f"📅 **Date:** {session['preferred_date']}\n"
-            f"🕐 **Time:** {session['time_of_day'].title()}\n"
-            f"👤 **Patient:** {session['patient_name']}\n"
-            f"🎂 **Age:** {session['patient_age']}\n"
-            f"📞 **Phone:** {session['patient_phone']}\n\n"
-            "Type **yes** to confirm or **no** to cancel."
-        ), session, False
-
-    # ── State: confirming ─────────────────────────────────────────────────────
-    if state == "confirming":
-        correction_map = {
-        "phone": "collecting_phone",
-        "number": "collecting_phone",
-        "mobile": "collecting_phone",
-        "name": "collecting_name",
-        "age": "collecting_age",
-        "date": "collecting_date",
-        "time": "collecting_time_of_day",
-        "doctor": "collecting_doctor",
-    }
-        for keyword, go_to_state in correction_map.items():
-            if f"change {keyword}" in msg_lower or f"wrong {keyword}" in msg_lower or f"edit {keyword}" in msg_lower or f"correct {keyword}" in msg_lower:
-                session["state"] = go_to_state
-                prompts = {
-                "collecting_phone": "Please enter the correct phone number.",
-                "collecting_name": "Please enter the correct patient name.",
-                "collecting_age": "Please enter the correct age.",
-                "collecting_date": "Please enter the correct date.",
-                "collecting_time_of_day": "Please choose the time: 1. Morning  2. Afternoon  3. Evening",
-                "collecting_doctor": "Which doctor would you like instead?",
-            }
-            return prompts[go_to_state], session, False
-        # FIX: Fuzzy keyword matching for confirmation
-        positive_words = ["yes", "confirm", "ok", "okay", "sure", "proceed", "y", "correct", "right", "exactly", "do it"]
-        negative_words = ["no", "cancel", "n", "stop", "incorrect", "wrong", "wait"]
-
-        if any(w in msg_lower for w in positive_words):
-            # Write to database
-            hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
-            doctor   = db.query(Doctor).filter(Doctor.id == session["doctor_id"]).first()
-
-            # Validate booking rules one final time
-            from app.services.booking_rules import validate_booking, get_booking_config
-            ok, error = validate_booking(hospital, doctor, session["preferred_date"], db)
-            if not ok:
-                return error, session, True
-
-            appt = Appointment(
-                hospital_id=hospital_id,
-                doctor_id=session["doctor_id"],
-                patient_name=session["patient_name"],
-                patient_age=session["patient_age"],
-                patient_phone=session["patient_phone"],
-                preferred_date=session["preferred_date"],
-                time_of_day=session["time_of_day"],
-                status="pending",
-            )
-            db.add(appt)
-            db.commit()
-            db.refresh(appt)
-
-            # Fire staff email
-            config = get_booking_config(hospital)
-            staff_email = config.get("notification_email", "")
-            if staff_email:
-                notify_staff_new_appointment(
-                    staff_email=staff_email,
-                    hospital_name=hospital.name,
-                    reference=appt.reference_number,
-                    patient_name=appt.patient_name,
-                    patient_age=appt.patient_age,
-                    patient_phone=appt.patient_phone,
-                    doctor_name=doctor.name,
-                    preferred_date=appt.preferred_date,
-                    time_of_day=appt.time_of_day,
-                )
-
-            return (
-                f"✅ **Appointment Request Submitted!**\n\n"
-                f"Your reference number is: **{appt.reference_number}**\n\n"
-                f"The hospital will call you at **{appt.patient_phone}** to confirm your slot. "
-                f"You can also ask me 'what is my appointment status' at any time to check.\n\n"
-                f"Is there anything else I can help you with?"
-            ), session, True
-
-        elif any(w in msg_lower for w in negative_words):
-            return "Booking cancelled. Is there anything else I can help you with?", session, True
-        else:
-            return "Please type **yes** to confirm or **no** to cancel.", session, False
-
-    return "Something went wrong. Please try again.", session, True
 # =============================================================================
 # INJECTION DETECTION
 # =============================================================================
@@ -676,7 +277,9 @@ def build_doctor_context(question: str, doctors: list) -> tuple[str, int]:
             or getattr(doctor, "schedule", None)
             or "Not specified"
         )
-        line = f"- {doctor.name} ({doctor.department or 'General'}): Schedule {schedule}\n"
+        # 🚀 FIX: Add [ID: X] to the text so the AI can learn the ID!
+        line = f"- [ID: {doctor.id}] Dr. {doctor.name} ({doctor.department or 'General'}): Schedule {schedule}\n"
+        
         if total_chars + len(line) > DOCTOR_SECTION_MAX_CHARS:
             truncated = True
             break
@@ -1062,13 +665,13 @@ async def classify_user_intent(user_message: str) -> str:
     Uses a fast LLM to semantically classify the user's intent.
     Returns exactly one of: "STATUS", "BOOKING", "CANCEL", or "OTHER"
     """
-    system_prompt = """
+    system_prompt ="""
     You are an intent classification engine for a hospital chatbot. 
     Read the user's message and classify their intent into exactly ONE of the following categories. 
     Respond with ONLY the category name, nothing else.
 
     Categories:
-    STATUS  - User wants to know if their appointment is approved, pending, rejected, or wants to check its status.
+    STATUS  - User wants to check appointment status, OR is providing a phone number to check a status.
     BOOKING - User wants to schedule, book, or make a new appointment.
     CANCEL  - User wants to cancel or stop an ongoing process or appointment.
     OTHER   - General questions, greetings, or anything else.
@@ -1095,177 +698,204 @@ async def classify_user_intent(user_message: str) -> str:
 @router.post("/chat-stream")
 async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
     is_malayalam = request.language == "ml"
-
+    
     english_question = request.question
     if is_malayalam:
-        english_question = await _translate_async(request.question, source="ml", target="en")
-        logger.info("[Translation] ml->en: %r -> %r", request.question[:80], english_question[:80])
+        english_question = await _translate_async(request.question, "ml", "en")
 
-    translated_request = request.model_copy(update={"question": english_question})
-    _, openai_messages, _ = build_context(translated_request, db, force_english=True)
-    # ── Booking session intercept ─────────────────────────────────────────────
-# ── Booking & Status session intercept ────────────────────────────────────
-    session_token = request.session_token  # add this field to ChatRequest model
-    booking_session = get_booking_session(str(request.hospital_id), session_token)
-
-    # 🚀 THE FIX: Use the semantic router instead of hardcoded keywords
+    # 1. THE GATEKEEPER (Fast LLM Router)
     intent = await classify_user_intent(english_question)
-    
-    is_status_intent = (intent == "STATUS")
-    is_booking_intent = (intent == "BOOKING")
-    is_cancel_intent = (intent == "CANCEL")
-
-    is_new_session = not booking_session and (is_booking_intent or is_status_intent)
-
-    if booking_session or is_new_session:
-        # Catch global cancellations mid-session gracefully
-        if booking_session and is_cancel_intent:
-            clear_booking_session(str(request.hospital_id), session_token)
-            
-            async def cancel_reply():
-                cancel_msg = "Okay, I've cancelled that. Is there anything else I can help you with?"
-                if request.language == "ml":
-                    cancel_msg = await _translate_async(cancel_msg, "en", "ml")
-                yield f"data: {json.dumps(cancel_msg)}\n\n"
-                yield "data: [DONE]\n\n"
-                
-            return StreamingResponse(
-                cancel_reply(), 
-                media_type="text/event-stream",
-                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
-            )
-        if not booking_session:
-            # If they just want status, jump to the status checking state
-            if is_status_intent:
-                booking_session = {"state": "checking_status_phone"}
-                
-            # Otherwise, initialize a normal booking session
-            elif is_booking_intent:
-                booking_session = new_booking_session()
-
-    # Detect intents
-
-    
-    is_new_session = not booking_session and (is_booking_intent or is_status_intent)
-
-    if booking_session or is_new_session:
-        if not booking_session:
-            # If they just want status, jump to the status checking state
-            if is_status_intent and not is_booking_intent:
-                booking_session = {"state": "checking_status_phone"}
-            
-            # Otherwise, initialize a normal booking session and try to pre-fill the doctor
-            else:
-                booking_session = new_booking_session()
-                
-                # Pre-fill doctor from recent conversation history if detectable
-                if request.history:
-                    all_doctors = db.query(Doctor).filter(
-                        Doctor.hospital_id == request.hospital_id
-                    ).all()
-                    # Search last 4 messages for a doctor mention
-                    recent_text = " ".join(
-                        m.content for m in (request.history or [])[-4:]
-                    )
-                    scored = sorted(
-                        [(score_doctor_relevance(recent_text, d), d) for d in all_doctors],
-                        key=lambda x: x[0], reverse=True
-                    )
-                    if scored and scored[0][0] >= 0.3:
-                        best = scored[0][1]
-                        booking_session["doctor_id"]   = best.id
-                        booking_session["doctor_name"] = best.name
-                        booking_session["state"]       = "collecting_date"
-                        
-                        # Build date list for immediate reply
-                        from datetime import timedelta
-                        today = datetime.now()
-                        date_options = [
-                            (today + timedelta(days=i)).strftime("%A, %B %d (%Y-%m-%d)")
-                            for i in range(1, 8)
-                        ]
-                        dates_text = "\n".join(f"  {i+1}. {d}" for i, d in enumerate(date_options))
-                        pre_reply = (
-                            f"Sure! I'll book you with **{best.name}** ({best.department}).\n\n"
-                            f"Which date would you prefer?\n{dates_text}\n\n"
-                            "You can type the number or the date."
-                        )
-                        if request.language == "ml":
-                            pre_reply = await _translate_async(pre_reply, "en", "ml")
-                            
-                        save_booking_session(str(request.hospital_id), session_token, booking_session)
-                        
-                        async def pre_booking_reply():
-                            yield f"data: {json.dumps(pre_reply)}\n\n"
-                            yield "data: [DONE]\n\n"
-                        return StreamingResponse(pre_booking_reply(), media_type="text/event-stream",
-                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-                        
-        # Normal fall-through for active sessions, status checks, or un-pre-filled bookings
-        bot_reply, booking_session, done = _booking_step(
-            english_question, booking_session, request.hospital_id, request.language, db
-        )
-        
-        if done:
-            clear_booking_session(str(request.hospital_id), session_token)
-        else:
-            save_booking_session(str(request.hospital_id), session_token, booking_session)
-            
-        if request.language == "ml":
-            bot_reply = await _translate_async(bot_reply, "en", "ml")
-            
-        async def booking_reply():
-            yield f"data: {json.dumps(bot_reply)}\n\n"
-            yield "data: [DONE]\n\n"
-            
-        return StreamingResponse(booking_reply(), media_type="text/event-stream",
-            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-    # ── end intercept — normal chat continues below ───────────────────────────
-    # ── end booking intercept — normal chat continues below ───────────────────
 
     async def event_generator() -> AsyncGenerator[str, None]:
-        pt = ct = tt = 0
-        english_chunks: List[str] = []
+        # ==========================================
+        # FAST PATH: CANCELLATIONS
+        # ==========================================
+        if intent == "CANCEL":
+            msg = "Okay, I've cancelled any active requests. How else can I help?"
+            if is_malayalam: msg = await _translate_async(msg, "en", "ml")
+            yield f"data: {json.dumps(msg)}\n\n"
+            yield "data: [DONE]\n\n"
+            return
 
-        try:
-            stream = await async_client.chat.completions.create(
-                model="gpt-4o-mini", messages=openai_messages,
-                stream=True, stream_options={"include_usage": True}
-            )
-            async for chunk in stream:
-                delta = chunk.choices[0].delta if chunk.choices else None
-                token = delta.content if delta and delta.content else None
-                if token:
-                    if is_malayalam:
-                        english_chunks.append(token)
-                    else:
-                        yield f"data: {json.dumps(token)}\n\n"
-                if chunk.usage:
-                    pt, ct, tt = chunk.usage.prompt_tokens, chunk.usage.completion_tokens, chunk.usage.total_tokens
+        # ==========================================
+        # FAST PATH: STATUS CHECKS
+        # ==========================================
+        if intent == "STATUS":
+            # Scan current message AND recent history for a phone number
+            history_text = " ".join([m.content for m in request.history[-4:]]) if request.history else ""
+            combined_text = english_question + " " + history_text
+            phone_match = re.search(r"\+?\d{7,15}", re.sub(r"[\s\-\(\)\.]", "", combined_text))
 
+            if not phone_match:
+                msg = "I can check your appointment status! Please reply with the 10-digit phone number you used to book."
+                if is_malayalam: msg = await _translate_async(msg, "en", "ml")
+                yield f"data: {json.dumps(msg)}\n\n"
+                yield "data: [DONE]\n\n"
+                return
+
+            # We have a phone number! Check the DB instantly.
+            extracted_phone = phone_match.group(0)
+            appts = db.query(Appointment).filter(
+                Appointment.hospital_id == request.hospital_id,
+                Appointment.patient_phone == extracted_phone
+            ).order_by(Appointment.created_at.desc()).limit(3).all()
+
+            if not appts:
+                msg = "I couldn't find any recent appointments for that number. Is there anything else I can help with?"
+                if is_malayalam: msg = await _translate_async(msg, "en", "ml")
+                yield f"data: {json.dumps(msg)}\n\n"
+                yield "data: [DONE]\n\n"
+                return
+
+            # Format the status response
+            reply = "Here is the status of your recent appointments:\n\n"
+            for a in appts:
+                doc = db.query(Doctor).filter(Doctor.id == a.doctor_id).first()
+                stat_msg = {"pending": "⏳ Pending", "approved": f"✅ Confirmed for {a.confirmed_time}", "rejected": f"❌ Rejected ({a.rejection_reason})"}.get(a.status, a.status)
+                reply += f"👨‍⚕️ **Dr. {doc.name if doc else 'Unknown'}** on {a.preferred_date}\n   Status: {stat_msg}\n   Ref: {a.reference_number}\n\n"
+            
+            if is_malayalam: reply = await _translate_async(reply, "en", "ml")
+            yield f"data: {json.dumps(reply)}\n\n"
+            yield "data: [DONE]\n\n"
+            return
+
+
+        # ==========================================
+        # SMART PATH: BOOKING & GENERAL CHAT
+        # ==========================================
+        translated_request = request.model_copy(update={"question": english_question})
+        system_prompt, openai_messages, hospital = build_context(translated_request, db, force_english=True)
+
+        # Give the AI its secret Agent Instructions
+        agent_instructions = """
+        You are authorized to book appointments. To book, you MUST naturally collect:
+        1. Doctor ID (Find this in the [ID: X] tags next to the doctor names)
+        2. Date (Format: YYYY-MM-DD)
+        3. Time (morning, afternoon, or evening)
+        4. Patient Full Name
+        5. Patient Age
+        6. Phone Number (10 digits)
+
+        Chat naturally. Answer questions using the knowledge base if they ask.
+        If they want to book, ask for the missing details one by one.
+        Once you have ALL 6 details, trigger the 'book_appointment' tool. DO NOT trigger it early!
+        """
+        openai_messages[0]["content"] += f"\n\n{agent_instructions}"
+
+        # Define the Tool Schema
+        tools = [{
+            "type": "function",
+            "function": {
+                "name": "book_appointment",
+                "description": "Trigger this ONLY when you have gathered all 6 details from the user to finalize the booking.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "doctor_id": {"type": "integer"},
+                        "preferred_date": {"type": "string", "description": "YYYY-MM-DD"},
+                        "time_of_day": {"type": "string", "enum": ["morning", "afternoon", "evening"]},
+                        "patient_name": {"type": "string"},
+                        "patient_age": {"type": "string"},
+                        "patient_phone": {"type": "string"}
+                    },
+                    "required": ["doctor_id", "preferred_date", "time_of_day", "patient_name", "patient_age", "patient_phone"]
+                }
+            }
+        }]
+
+        # Call the AI
+        stream = await async_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=openai_messages,
+            tools=tools,
+            stream=True
+        )
+
+        tool_call_name = ""
+        tool_call_args = ""
+        is_tool_call = False
+        english_chunks = []
+
+        # Read the stream
+        async for chunk in stream:
+            delta = chunk.choices[0].delta if chunk.choices else None
+            if not delta: continue
+
+            if delta.tool_calls:
+                is_tool_call = True
+                tc = delta.tool_calls[0]
+                if tc.function.name: tool_call_name += tc.function.name
+                if tc.function.arguments: tool_call_args += tc.function.arguments
+            elif delta.content and not is_tool_call:
+                token = delta.content
+                if is_malayalam: english_chunks.append(token)
+                else: yield f"data: {json.dumps(token)}\n\n"
+
+        # If the AI decided to trigger the tool!
+        if is_tool_call and tool_call_name == "book_appointment":
+            try:
+                from app.services.booking_rules import validate_booking, get_booking_config
+                from app.services.email import notify_staff_new_appointment
+                
+                args = json.loads(tool_call_args)
+                doctor = db.query(Doctor).filter(Doctor.id == args["doctor_id"]).first()
+                
+                # Verify booking rules
+                ok, error_msg = validate_booking(hospital, doctor, args["preferred_date"], db)
+                if not ok:
+                    if is_malayalam: error_msg = await _translate_async(error_msg, "en", "ml")
+                    yield f"data: {json.dumps(error_msg)}\n\n"
+                else:
+                    # Save to database
+                    appt = Appointment(
+                        hospital_id=request.hospital_id,
+                        doctor_id=args["doctor_id"],
+                        patient_name=args["patient_name"],
+                        patient_age=args["patient_age"],
+                        patient_phone=args["patient_phone"],
+                        preferred_date=args["preferred_date"],
+                        time_of_day=args["time_of_day"].lower(),
+                        status="pending"
+                    )
+                    db.add(appt)
+                    db.commit()
+                    db.refresh(appt)
+
+                    # Send Email Notification
+                    config = get_booking_config(hospital)
+                    staff_email = config.get("notification_email", "")
+                    if staff_email:
+                        notify_staff_new_appointment(
+                            staff_email=staff_email, hospital_name=hospital.name,
+                            reference=appt.reference_number, patient_name=appt.patient_name,
+                            patient_age=appt.patient_age, patient_phone=appt.patient_phone,
+                            doctor_name=doctor.name if doctor else "Unknown",
+                            preferred_date=appt.preferred_date, time_of_day=appt.time_of_day,
+                        )
+
+                    success_msg = f"✅ **Appointment Request Submitted!**\n\nYour reference number is: **{appt.reference_number}**\nThe hospital will call you to confirm your slot."
+                    if is_malayalam: success_msg = await _translate_async(success_msg, "en", "ml")
+                    yield f"data: {json.dumps(success_msg)}\n\n"
+                    
+            except Exception as e:
+                logger.error(f"Tool execution failed: {e}")
+                err = "Sorry, there was a technical error booking your appointment. Please try again."
+                if is_malayalam: err = await _translate_async(err, "en", "ml")
+                yield f"data: {json.dumps(err)}\n\n"
+                
+        else:
+            # If the AI is just chatting naturally
             if is_malayalam and english_chunks:
                 full_english = "".join(english_chunks)
-                full_malayalam = await _translate_async(full_english, source="en", target="ml")
+                full_malayalam = await _translate_async(full_english, "en", "ml")
                 sentences = re.split(r'(?<=[.!?।\n])\s*', full_malayalam)
                 for sentence in sentences:
                     if sentence.strip():
                         yield f"data: {json.dumps(sentence + ' ')}\n\n"
 
-            yield "data: [DONE]\n\n"
-
-            if tt > 0:
-                db.add(UsageLedger(
-                    hospital_id=request.hospital_id, endpoint="/chat-stream",
-                    prompt_tokens=pt, completion_tokens=ct, total_tokens=tt,
-                    estimated_cost=(tt / 1_000_000) * 0.15
-                ))
-                db.commit()
-
-        except Exception as e:
-            logger.exception("[chat-stream] Error: %s", e)
-            yield f"data: [ERROR] {str(e)}\n\n"
+        yield "data: [DONE]\n\n"
 
     return StreamingResponse(
         event_generator(), media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"}
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
     )
