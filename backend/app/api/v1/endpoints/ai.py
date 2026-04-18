@@ -660,34 +660,47 @@ async def chat_with_arogya(request: ChatRequest, db: Session = Depends(get_db)):
     db.commit()
     return {"answer": final_answer}
 
-async def classify_user_intent(user_message: str) -> str:
+async def classify_user_intent(user_message: str, history: list = []) -> str:
     """
     Uses a fast LLM to semantically classify the user's intent.
     Returns exactly one of: "STATUS", "BOOKING", "CANCEL", or "OTHER"
     """
-    system_prompt ="""
+    # Build a short history snippet for context (last 4 messages)
+    history_snippet = ""
+    if history:
+        recent = history[-4:]
+        history_snippet = "\n".join(
+            f"{'Assistant' if m.role == 'assistant' else 'User'}: {m.content}"
+            for m in recent
+        )
+
+    system_prompt = """
     You are an intent classification engine for a hospital chatbot. 
-    Read the user's message and classify their intent into exactly ONE of the following categories. 
+    Read the conversation history and the latest user message, then classify the intent into exactly ONE category.
     Respond with ONLY the category name, nothing else.
 
     Categories:
-    STATUS  - User wants to check appointment status, OR is providing a phone number to check a status.
-    BOOKING - User wants to schedule, book, or make a new appointment.
-    CANCEL  - User wants to cancel or stop an ongoing process or appointment.
+    STATUS  - User is explicitly asking to CHECK or SEE an existing appointment status, unprompted by the assistant asking for booking details.
+    BOOKING - User wants to book an appointment, OR the assistant is currently collecting booking details (name, age, phone, date, doctor) and the user is providing those details.
+    CANCEL  - User wants to cancel or stop an ongoing process.
     OTHER   - General questions, greetings, or anything else.
+
+    IMPORTANT: If the assistant's last message was asking for booking information (like phone number, name, age, date),
+    and the user replies with that information, classify as BOOKING — not STATUS.
     """
+
+    context = f"Conversation so far:\n{history_snippet}\n\nLatest user message: {user_message}" if history_snippet else f"User message: {user_message}"
 
     try:
         resp = await async_client.chat.completions.create(
             model="gpt-4o-mini",
-            temperature=0.0, # Zero creativity, maximum strictness
+            temperature=0.0,
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message}
+                {"role": "user", "content": context}
             ]
         )
         intent = resp.choices[0].message.content.strip().upper()
-        
         if intent not in ["STATUS", "BOOKING", "CANCEL", "OTHER"]:
             return "OTHER"
         return intent
@@ -704,7 +717,8 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
         english_question = await _translate_async(request.question, "ml", "en")
 
     # 1. THE GATEKEEPER (Fast LLM Router)
-    intent = await classify_user_intent(english_question)
+    # 1. THE GATEKEEPER (Fast LLM Router)
+    intent = await classify_user_intent(english_question, request.history or [])
 
     async def event_generator() -> AsyncGenerator[str, None]:
         # ==========================================
