@@ -28,10 +28,10 @@ const Login = () => {
       const token = response.data.access_token;
       const payload = JSON.parse(atob(token.split('.')[1]));
       login(token);
-      
-      // FIX: Staff now go directly to settings!
+
+      // Staff go directly to their hospital's appointments page
       if (payload.role === 'staff') {
-        navigate(`/hospitals/${payload.hospital_id}/settings`);
+        navigate(`/hospitals/${payload.hospital_id}/appointments`);
       } else {
         navigate('/');
       }

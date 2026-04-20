@@ -40,7 +40,8 @@ async_client = AsyncOpenAI(api_key=_api_key)
 _redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
 _redis = redis.from_url(_redis_url, decode_responses=True)
 BOOKING_SESSION_TTL = 600
-
+OPENAI_MODEL        = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_COST_PER_MTok = float(os.getenv("OPENAI_COST_PER_MTok", "0.15"))
 MAX_HISTORY_TURNS        = 10
 PDF_CHUNK_SIZE           = 800
 PDF_CHUNK_OVERLAP        = 100
@@ -644,7 +645,7 @@ async def chat_with_arogya(request: ChatRequest, db: Session = Depends(get_db)):
     translated_request = request.model_copy(update={"question": english_question})
     _, openai_messages, _ = build_context(translated_request, db, force_english=True)
 
-    ai_response = client.chat.completions.create(model="gpt-4o-mini", messages=openai_messages)
+    ai_response = client.chat.completions.create(model=OPENAI_MODEL * 0.15* OPENAI_COST_PER_MTok, messages=openai_messages)
     english_answer = ai_response.choices[0].message.content or ""
 
     final_answer = english_answer
@@ -660,245 +661,373 @@ async def chat_with_arogya(request: ChatRequest, db: Session = Depends(get_db)):
     db.commit()
     return {"answer": final_answer}
 
+# =============================================================================
+# COMPLETE REPLACEMENT for the chat_stream endpoint and classify_user_intent
+# in backend/app/api/v1/endpoints/ai.py
+#
+# Replace everything from:
+#   async def classify_user_intent(...)
+# through to the end of the file.
+# =============================================================================
+
 async def classify_user_intent(user_message: str, history: list = []) -> str:
     """
-    Uses a fast LLM to semantically classify the user's intent.
+    Uses a fast LLM call to semantically classify the user's intent.
     Returns exactly one of: "STATUS", "BOOKING", "CANCEL", or "OTHER"
+    
+    This runs BEFORE build_context so we skip the expensive embedding
+    call entirely when the user is booking or cancelling.
     """
-    # Build a short history snippet for context (last 4 messages)
     history_snippet = ""
     if history:
         recent = history[-4:]
         history_snippet = "\n".join(
-            f"{'Assistant' if m.role == 'assistant' else 'User'}: {m.content}"
+            f"{'Assistant' if m.role == 'assistant' else 'User'}: {m.content[:200]}"
             for m in recent
         )
 
-    system_prompt = """
-    You are an intent classification engine for a hospital chatbot. 
-    Read the conversation history and the latest user message, then classify the intent into exactly ONE category.
-    Respond with ONLY the category name, nothing else.
+    system_prompt = """You are an intent classification engine for a hospital chatbot.
+Read the conversation and the latest user message, then output exactly ONE word.
 
-    Categories:
-    STATUS  - User is explicitly asking to CHECK or SEE an existing appointment status, unprompted by the assistant asking for booking details.
-    BOOKING - User wants to book an appointment, OR the assistant is currently collecting booking details (name, age, phone, date, doctor) and the user is providing those details.
-    CANCEL  - User wants to cancel or stop an ongoing process.
-    OTHER   - General questions, greetings, or anything else.
+Categories:
+STATUS  - User is asking to CHECK an existing appointment status or reference number.
+BOOKING - User wants to book/schedule an appointment, OR the assistant just asked for booking
+          details (name, age, phone, date, doctor) and the user is providing those details.
+CANCEL  - User wants to cancel or stop an ongoing booking process.
+OTHER   - General hospital questions, greetings, doctor info, or anything else.
 
-    IMPORTANT: If the assistant's last message was asking for booking information (like phone number, name, age, date),
-    and the user replies with that information, classify as BOOKING — not STATUS.
-    """
+RULES:
+- If the assistant's last message was collecting booking info, reply: BOOKING
+- Only output the single category word, nothing else."""
 
-    context = f"Conversation so far:\n{history_snippet}\n\nLatest user message: {user_message}" if history_snippet else f"User message: {user_message}"
+    context = (
+        f"Conversation:\n{history_snippet}\n\nLatest message: {user_message}"
+        if history_snippet
+        else f"Message: {user_message}"
+    )
 
     try:
         resp = await async_client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=OPENAI_MODEL,
             temperature=0.0,
+            max_tokens=5,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": context}
             ]
         )
         intent = resp.choices[0].message.content.strip().upper()
-        if intent not in ["STATUS", "BOOKING", "CANCEL", "OTHER"]:
-            return "OTHER"
-        return intent
+        # Defensive: only accept known intents
+        return intent if intent in {"STATUS", "BOOKING", "CANCEL", "OTHER"} else "OTHER"
     except Exception as e:
-        logger.warning(f"Intent classification failed: {e}")
+        logger.warning("Intent classification failed: %s", e)
         return "OTHER"
-    
+
+
 @router.post("/chat-stream")
 async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
     is_malayalam = request.language == "ml"
-    
+
+    # Step 1: Translate input if Malayalam
     english_question = request.question
     if is_malayalam:
         english_question = await _translate_async(request.question, "ml", "en")
+        logger.info("[Translation] ml->en: %r -> %r", request.question[:60], english_question[:60])
 
-    # 1. THE GATEKEEPER (Fast LLM Router)
-    # 1. THE GATEKEEPER (Fast LLM Router)
+    # Step 2: Classify intent BEFORE any expensive DB/embedding calls
     intent = await classify_user_intent(english_question, request.history or [])
+    logger.info("[Intent] %s -> %s", english_question[:60], intent)
 
     async def event_generator() -> AsyncGenerator[str, None]:
-        # ==========================================
-        # FAST PATH: CANCELLATIONS
-        # ==========================================
+        pt = ct = tt = 0
+
+        # ── CANCEL ───────────────────────────────────────────────────────────
         if intent == "CANCEL":
-            msg = "Okay, I've cancelled any active requests. How else can I help?"
-            if is_malayalam: msg = await _translate_async(msg, "en", "ml")
+            msg = "Okay, I've cancelled any active requests. How else can I help you?"
+            if is_malayalam:
+                msg = await _translate_async(msg, "en", "ml")
             yield f"data: {json.dumps(msg)}\n\n"
             yield "data: [DONE]\n\n"
             return
 
-        # ==========================================
-        # FAST PATH: STATUS CHECKS
-        # ==========================================
+        # ── STATUS CHECK ─────────────────────────────────────────────────────
         if intent == "STATUS":
-            # Scan current message AND recent history for a phone number
-            history_text = " ".join([m.content for m in request.history[-4:]]) if request.history else ""
-            combined_text = english_question + " " + history_text
-            phone_match = re.search(r"\+?\d{7,15}", re.sub(r"[\s\-\(\)\.]", "", combined_text))
+            # Look for a phone number across current message + recent history
+            history_text = " ".join(
+                m.content for m in (request.history or [])[-6:]
+            )
+            combined = re.sub(r"[\s\-\(\)\.]", "", english_question + " " + history_text)
+            phone_match = re.search(r"\+?\d{10,15}", combined)
 
             if not phone_match:
-                msg = "I can check your appointment status! Please reply with the 10-digit phone number you used to book."
-                if is_malayalam: msg = await _translate_async(msg, "en", "ml")
+                msg = (
+                    "I can check your appointment status! "
+                    "Please share the 10-digit phone number you used when booking."
+                )
+                if is_malayalam:
+                    msg = await _translate_async(msg, "en", "ml")
                 yield f"data: {json.dumps(msg)}\n\n"
                 yield "data: [DONE]\n\n"
                 return
 
-            # We have a phone number! Check the DB instantly.
             extracted_phone = phone_match.group(0)
-            appts = db.query(Appointment).filter(
-                Appointment.hospital_id == request.hospital_id,
-                Appointment.patient_phone == extracted_phone
-            ).order_by(Appointment.created_at.desc()).limit(3).all()
+            appts = (
+                db.query(Appointment)
+                .filter(
+                    Appointment.hospital_id == request.hospital_id,
+                    Appointment.patient_phone == extracted_phone
+                )
+                .order_by(Appointment.created_at.desc())
+                .limit(3)
+                .all()
+            )
 
             if not appts:
-                msg = "I couldn't find any recent appointments for that number. Is there anything else I can help with?"
-                if is_malayalam: msg = await _translate_async(msg, "en", "ml")
+                msg = (
+                    f"I couldn't find any appointments for the number {extracted_phone}. "
+                    "Please double-check the number or contact the reception desk."
+                )
+                if is_malayalam:
+                    msg = await _translate_async(msg, "en", "ml")
                 yield f"data: {json.dumps(msg)}\n\n"
                 yield "data: [DONE]\n\n"
                 return
 
-            # Format the status response
-            reply = "Here is the status of your recent appointments:\n\n"
+            reply_lines = ["Here is the status of your recent appointments:\n"]
             for a in appts:
                 doc = db.query(Doctor).filter(Doctor.id == a.doctor_id).first()
-                stat_msg = {"pending": "⏳ Pending", "approved": f"✅ Confirmed for {a.confirmed_time}", "rejected": f"❌ Rejected ({a.rejection_reason})"}.get(a.status, a.status)
-                reply += f"👨‍⚕️ **Dr. {doc.name if doc else 'Unknown'}** on {a.preferred_date}\n   Status: {stat_msg}\n   Ref: {a.reference_number}\n\n"
-            
-            if is_malayalam: reply = await _translate_async(reply, "en", "ml")
+                doc_name = doc.name if doc else "Unknown"
+                status_str = {
+                    "pending":  "⏳ Pending — hospital will call to confirm",
+                    "approved": f"✅ Confirmed for **{a.confirmed_time}**",
+                    "rejected": f"❌ Rejected ({a.rejection_reason or 'no reason given'})"
+                }.get(a.status, a.status)
+                reply_lines.append(
+                    f"👨‍⚕️ **Dr. {doc_name}** — {a.preferred_date} ({a.time_of_day})\n"
+                    f"   Status: {status_str}\n"
+                    f"   Reference: `{a.reference_number}`\n"
+                )
+
+            reply = "\n".join(reply_lines)
+            if is_malayalam:
+                reply = await _translate_async(reply, "en", "ml")
             yield f"data: {json.dumps(reply)}\n\n"
             yield "data: [DONE]\n\n"
             return
 
-
-        # ==========================================
-        # SMART PATH: BOOKING & GENERAL CHAT
-        # ==========================================
+        # ── BOOKING & GENERAL CHAT (BOOKING or OTHER) ─────────────────────────
         translated_request = request.model_copy(update={"question": english_question})
-        system_prompt, openai_messages, hospital = build_context(translated_request, db, force_english=True)
+        system_prompt, openai_messages, hospital = build_context(
+            translated_request, db, force_english=True
+        )
 
-        # Give the AI its secret Agent Instructions
+        # Agent instructions injected into the system prompt
         agent_instructions = """
-        You are authorized to book appointments. To book, you MUST naturally collect:
-        1. Doctor ID (Find this in the [ID: X] tags next to the doctor names)
-        2. Date (Format: YYYY-MM-DD)
-        3. Time (morning, afternoon, or evening)
-        4. Patient Full Name
-        5. Patient Age
-        6. Phone Number (10 digits)
+APPOINTMENT BOOKING CAPABILITY:
+You can book appointments for patients. Collect these details naturally, one at a time:
+1. Doctor (use the [ID: X] from the doctor list above to identify them)
+2. Preferred date (ask for a specific date like "April 20" or "next Monday")
+3. Time of day (morning, afternoon, or evening)
+4. Patient's full name (name only — do not accept extra words)
+5. Patient's age (number only, 1-120)
+6. Phone number (must be exactly 10 digits for Indian numbers)
 
-        Chat naturally. Answer questions using the knowledge base if they ask.
-        If they want to book, ask for the missing details one by one.
-        Once you have ALL 6 details, trigger the 'book_appointment' tool. DO NOT trigger it early!
-        """
+VALIDATION RULES:
+- Phone: exactly 10 digits (or up to 15 with country code). If wrong length, ask again.
+- Age: numbers 1-120 only.
+- Name: extract only the name part; ignore extra words like "and she is 30 years old".
+- Date: must be a future date.
+
+IMPORTANT:
+- Answer general questions normally using the knowledge base.
+- Only trigger 'book_appointment' once you have confirmed ALL 6 details with the patient.
+- Before triggering, show a confirmation summary and ask the patient to say 'yes' or 'no'.
+- If they say no or want to change something, ask which detail to correct.
+"""
         openai_messages[0]["content"] += f"\n\n{agent_instructions}"
 
-        # Define the Tool Schema
         tools = [{
             "type": "function",
             "function": {
                 "name": "book_appointment",
-                "description": "Trigger this ONLY when you have gathered all 6 details from the user to finalize the booking.",
+                "description": (
+                    "Trigger ONLY when the patient has confirmed all 6 details "
+                    "(doctor_id, date, time, name, age, phone). "
+                    "Do NOT trigger if any detail is missing or unconfirmed."
+                ),
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "doctor_id": {"type": "integer"},
-                        "preferred_date": {"type": "string", "description": "YYYY-MM-DD"},
-                        "time_of_day": {"type": "string", "enum": ["morning", "afternoon", "evening"]},
-                        "patient_name": {"type": "string"},
-                        "patient_age": {"type": "string"},
-                        "patient_phone": {"type": "string"}
+                        "doctor_id":      {"type": "integer", "description": "The numeric ID from [ID: X] in the doctor list"},
+                        "preferred_date": {"type": "string",  "description": "Date in YYYY-MM-DD format"},
+                        "time_of_day":    {"type": "string",  "enum": ["morning", "afternoon", "evening"]},
+                        "patient_name":   {"type": "string",  "description": "Patient's full name only"},
+                        "patient_age":    {"type": "string",  "description": "Patient's age as a number"},
+                        "patient_phone":  {"type": "string",  "description": "10-digit phone number, digits only"}
                     },
-                    "required": ["doctor_id", "preferred_date", "time_of_day", "patient_name", "patient_age", "patient_phone"]
+                    "required": ["doctor_id", "preferred_date", "time_of_day",
+                                 "patient_name", "patient_age", "patient_phone"]
                 }
             }
         }]
 
-        # Call the AI
-        stream = await async_client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=openai_messages,
-            tools=tools,
-            stream=True
-        )
+        try:
+            stream = await async_client.chat.completions.create(
+                model=OPENAI_MODEL,
+                messages=openai_messages,
+                tools=tools,
+                stream=True,
+                stream_options={"include_usage": True}
+            )
+        except Exception as e:
+            logger.exception("[chat-stream] OpenAI call failed: %s", e)
+            err = "Sorry, I'm having trouble connecting right now. Please try again."
+            if is_malayalam:
+                err = await _translate_async(err, "en", "ml")
+            yield f"data: {json.dumps(err)}\n\n"
+            yield "data: [DONE]\n\n"
+            return
 
         tool_call_name = ""
         tool_call_args = ""
         is_tool_call = False
-        english_chunks = []
+        english_chunks: List[str] = []
 
-        # Read the stream
         async for chunk in stream:
+            if chunk.usage:
+                pt = chunk.usage.prompt_tokens
+                ct = chunk.usage.completion_tokens
+                tt = chunk.usage.total_tokens
+
             delta = chunk.choices[0].delta if chunk.choices else None
-            if not delta: continue
+            if not delta:
+                continue
 
             if delta.tool_calls:
                 is_tool_call = True
                 tc = delta.tool_calls[0]
-                if tc.function.name: tool_call_name += tc.function.name
-                if tc.function.arguments: tool_call_args += tc.function.arguments
+                if tc.function.name:
+                    tool_call_name += tc.function.name
+                if tc.function.arguments:
+                    tool_call_args += tc.function.arguments
             elif delta.content and not is_tool_call:
                 token = delta.content
-                if is_malayalam: english_chunks.append(token)
-                else: yield f"data: {json.dumps(token)}\n\n"
+                if is_malayalam:
+                    english_chunks.append(token)
+                else:
+                    yield f"data: {json.dumps(token)}\n\n"
 
-        # If the AI decided to trigger the tool!
+        # ── Handle tool call (booking) ────────────────────────────────────────
         if is_tool_call and tool_call_name == "book_appointment":
             try:
                 from app.services.booking_rules import validate_booking, get_booking_config
                 from app.services.email import notify_staff_new_appointment
-                
+
                 args = json.loads(tool_call_args)
-                doctor = db.query(Doctor).filter(Doctor.id == args["doctor_id"]).first()
-                
-                # Verify booking rules
+
+                # Validate phone length
+                phone_digits = re.sub(r"\D", "", args.get("patient_phone", ""))
+                if len(phone_digits) < 7 or len(phone_digits) > 15:
+                    err = (
+                        f"The phone number '{args.get('patient_phone')}' doesn't look right. "
+                        "Please ask the patient to provide their 10-digit mobile number again."
+                    )
+                    if is_malayalam:
+                        err = await _translate_async(err, "en", "ml")
+                    yield f"data: {json.dumps(err)}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+
+                # Validate age
+                age_str = re.sub(r"\D", "", str(args.get("patient_age", "")))
+                if not age_str or not (1 <= int(age_str) <= 120):
+                    err = "The age doesn't look right. Please ask the patient to confirm their age."
+                    if is_malayalam:
+                        err = await _translate_async(err, "en", "ml")
+                    yield f"data: {json.dumps(err)}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+
+                doctor = db.query(Doctor).filter(
+                    Doctor.id == args["doctor_id"],
+                    Doctor.hospital_id == request.hospital_id
+                ).first()
+
+                if not doctor:
+                    err = (
+                        "I couldn't find that doctor in the system. "
+                        "Please ask the patient which doctor they'd like to see."
+                    )
+                    if is_malayalam:
+                        err = await _translate_async(err, "en", "ml")
+                    yield f"data: {json.dumps(err)}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+
                 ok, error_msg = validate_booking(hospital, doctor, args["preferred_date"], db)
                 if not ok:
-                    if is_malayalam: error_msg = await _translate_async(error_msg, "en", "ml")
+                    if is_malayalam:
+                        error_msg = await _translate_async(error_msg, "en", "ml")
                     yield f"data: {json.dumps(error_msg)}\n\n"
-                else:
-                    # Save to database
-                    appt = Appointment(
-                        hospital_id=request.hospital_id,
-                        doctor_id=args["doctor_id"],
-                        patient_name=args["patient_name"],
-                        patient_age=args["patient_age"],
-                        patient_phone=args["patient_phone"],
-                        preferred_date=args["preferred_date"],
-                        time_of_day=args["time_of_day"].lower(),
-                        status="pending"
+                    yield "data: [DONE]\n\n"
+                    return
+
+                appt = Appointment(
+                    hospital_id=request.hospital_id,
+                    doctor_id=args["doctor_id"],
+                    patient_name=args["patient_name"].strip(),
+                    patient_age=age_str,
+                    patient_phone=phone_digits,
+                    preferred_date=args["preferred_date"],
+                    time_of_day=args["time_of_day"].lower(),
+                    status="pending"
+                )
+                db.add(appt)
+                db.commit()
+                db.refresh(appt)
+
+                config = get_booking_config(hospital)
+                staff_email = config.get("notification_email", "")
+                if staff_email:
+                    notify_staff_new_appointment(
+                        staff_email=staff_email,
+                        hospital_name=hospital.name,
+                        reference=appt.reference_number,
+                        patient_name=appt.patient_name,
+                        patient_age=appt.patient_age,
+                        patient_phone=appt.patient_phone,
+                        doctor_name=doctor.name,
+                        preferred_date=appt.preferred_date,
+                        time_of_day=appt.time_of_day,
                     )
-                    db.add(appt)
-                    db.commit()
-                    db.refresh(appt)
 
-                    # Send Email Notification
-                    config = get_booking_config(hospital)
-                    staff_email = config.get("notification_email", "")
-                    if staff_email:
-                        notify_staff_new_appointment(
-                            staff_email=staff_email, hospital_name=hospital.name,
-                            reference=appt.reference_number, patient_name=appt.patient_name,
-                            patient_age=appt.patient_age, patient_phone=appt.patient_phone,
-                            doctor_name=doctor.name if doctor else "Unknown",
-                            preferred_date=appt.preferred_date, time_of_day=appt.time_of_day,
-                        )
+                success_msg = (
+                    f"✅ **Appointment Request Submitted!**\n\n"
+                    f"Reference: **{appt.reference_number}**\n"
+                    f"Doctor: {doctor.name} ({doctor.department})\n"
+                    f"Date: {appt.preferred_date} — {appt.time_of_day.title()}\n"
+                    f"Patient: {appt.patient_name}, age {appt.patient_age}\n\n"
+                    f"The hospital will call **{appt.patient_phone}** to confirm your slot."
+                )
+                if is_malayalam:
+                    success_msg = await _translate_async(success_msg, "en", "ml")
+                yield f"data: {json.dumps(success_msg)}\n\n"
 
-                    success_msg = f"✅ **Appointment Request Submitted!**\n\nYour reference number is: **{appt.reference_number}**\nThe hospital will call you to confirm your slot."
-                    if is_malayalam: success_msg = await _translate_async(success_msg, "en", "ml")
-                    yield f"data: {json.dumps(success_msg)}\n\n"
-                    
-            except Exception as e:
-                logger.error(f"Tool execution failed: {e}")
-                err = "Sorry, there was a technical error booking your appointment. Please try again."
-                if is_malayalam: err = await _translate_async(err, "en", "ml")
+            except json.JSONDecodeError:
+                logger.error("[chat-stream] Failed to parse tool args: %r", tool_call_args)
+                err = "Something went wrong while booking. Please try again."
+                if is_malayalam:
+                    err = await _translate_async(err, "en", "ml")
                 yield f"data: {json.dumps(err)}\n\n"
-                
+            except Exception as e:
+                logger.exception("[chat-stream] Tool execution error: %s", e)
+                err = "Sorry, there was a technical error. Please try again."
+                if is_malayalam:
+                    err = await _translate_async(err, "en", "ml")
+                yield f"data: {json.dumps(err)}\n\n"
+
         else:
-            # If the AI is just chatting naturally
+            # Normal chat response — translate if needed
             if is_malayalam and english_chunks:
                 full_english = "".join(english_chunks)
                 full_malayalam = await _translate_async(full_english, "en", "ml")
@@ -909,7 +1038,23 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
 
         yield "data: [DONE]\n\n"
 
+        # Log usage
+        if tt > 0:
+            try:
+                db.add(UsageLedger(
+                    hospital_id=request.hospital_id,
+                    endpoint="/chat-stream",
+                    prompt_tokens=pt,
+                    completion_tokens=ct,
+                    total_tokens=tt,
+                    estimated_cost=(tt / 1_000_000) * OPENAI_COST_PER_MTok
+                ))
+                db.commit()
+            except Exception as e:
+                logger.warning("[chat-stream] Usage logging failed: %s", e)
+
     return StreamingResponse(
-        event_generator(), media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"}
     )
