@@ -669,7 +669,76 @@ async def chat_with_arogya(request: ChatRequest, db: Session = Depends(get_db)):
 #   async def classify_user_intent(...)
 # through to the end of the file.
 # =============================================================================
+async def normalise_booking_input(
+    raw_message: str,
+    current_field: str,
+    conversation_context: str = ""
+) -> dict:
+    """
+    Uses the LLM to intelligently interpret and normalise a user's message
+    in the context of what field is currently being collected.
 
+    Returns a dict:
+    {
+        "intent": "provide" | "correct" | "cancel" | "unclear",
+        "field_to_correct": "phone" | "name" | "age" | "date" | "time" | "doctor" | null,
+        "normalised_value": "cleaned value ready to use" | null,
+        "reason": "brief explanation if unclear or correction"
+    }
+    """
+    system_prompt = f"""You are a data extraction assistant for a hospital booking system.
+
+The assistant is currently collecting: {current_field}
+Recent conversation:
+{conversation_context}
+
+The user just said: "{raw_message}"
+
+Your job is to interpret what the user means and return a JSON object with these fields:
+- "intent": one of "provide" (giving the requested info), "correct" (wants to change something already given), "cancel" (wants to stop entirely), "unclear" (genuinely ambiguous)
+- "field_to_correct": if intent is "correct", which field they want to change. One of: phone, name, age, date, time, doctor. Otherwise null.
+- "normalised_value": if intent is "provide", the cleaned value ready to use. For phone numbers, return only digits. For names, return only the name part (strip "and she is X years old" etc). For age, return only the number. Otherwise null.
+- "reason": brief note if intent is "unclear" or "correct"
+
+CRITICAL RULES for normalisation:
+- Phone numbers: Convert spoken/spaced digits to a single string of digits. "94 67 48 74 48" → "9467487448". "nine four six seven..." → "9467487448". Remove all spaces, dashes, brackets.
+- Names: Extract only the person's name. "Reetha and she is 50 years old" → "Reetha". "My name is John" → "John".
+- Ages: Extract only the number. "I am 45 years old" → "45". "forty five" → "45".
+- Corrections: "no my number is wrong" → intent=correct, field_to_correct=phone. "actually my name is..." → intent=correct, field_to_correct=name.
+- True cancellations: "I don't want to book anymore" → intent=cancel. "stop everything" → intent=cancel.
+- "no" alone during confirmation step: treat as intent=correct (patient wants to change something), NOT cancel.
+
+Return ONLY valid JSON, no markdown, no explanation."""
+
+    try:
+        resp = await async_client.chat.completions.create(
+            model=OPENAI_MODEL,
+            temperature=0.0,
+            max_tokens=150,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": raw_message}
+            ]
+        )
+        result = json.loads(resp.choices[0].message.content)
+        # Ensure all expected keys exist
+        return {
+            "intent": result.get("intent", "unclear"),
+            "field_to_correct": result.get("field_to_correct"),
+            "normalised_value": result.get("normalised_value"),
+            "reason": result.get("reason", "")
+        }
+    except Exception as e:
+        logger.warning("normalise_booking_input failed: %s", e)
+        # Safe fallback: treat as a raw provide with the original message
+        return {
+            "intent": "provide",
+            "field_to_correct": None,
+            "normalised_value": raw_message,
+            "reason": ""
+        }
+    
 async def classify_user_intent(user_message: str, history: list = []) -> str:
     """
     Uses a fast LLM call to semantically classify the user's intent.
@@ -740,7 +809,7 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
 
     async def event_generator() -> AsyncGenerator[str, None]:
         pt = ct = tt = 0
-
+        
         # ── CANCEL ───────────────────────────────────────────────────────────
         if intent == "CANCEL":
             msg = "Okay, I've cancelled any active requests. How else can I help you?"
@@ -820,6 +889,63 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
         system_prompt, openai_messages, hospital = build_context(
             translated_request, db, force_english=True
         )
+        booking_field_keywords = {
+            "phone": ["phone", "number", "mobile", "contact"],
+            "name":  ["name", "patient's full name", "full name"],
+            "age":   ["age", "how old", "date of birth"],
+            "date":  ["date", "prefer", "which day"],
+            "time":  ["morning", "afternoon", "evening", "time of day"],
+            "doctor":["doctor", "which doctor", "department"],
+        }
+        current_field = None
+        if request.history:
+            last_assistant = next(
+                (m.content.lower() for m in reversed(request.history) if m.role == "assistant"),
+                ""
+            )
+            for field, keywords in booking_field_keywords.items():
+                if any(kw in last_assistant for kw in keywords):
+                    current_field = field
+                    break
+
+        processed_question = english_question
+        if current_field and intent == "BOOKING":
+            context_snippet = "\n".join(
+                f"{'Bot' if m.role == 'assistant' else 'Patient'}: {m.content}"
+                for m in (request.history or [])[-4:]
+            )
+            normalised = await normalise_booking_input(
+                english_question, current_field, context_snippet
+            )
+            logger.info("[Normalise] field=%s intent=%s value=%r",
+                        current_field, normalised["intent"], normalised["normalised_value"])
+
+            if normalised["intent"] == "cancel":
+                msg = "Okay, I've cancelled the booking process. Is there anything else I can help you with?"
+                if is_malayalam: msg = await _translate_async(msg, "en", "ml")
+                yield f"data: {json.dumps(msg)}\n\n"
+                yield "data: [DONE]\n\n"
+                return
+
+            if normalised["intent"] == "correct":
+                field = normalised.get("field_to_correct", current_field)
+                prompts = {
+                    "phone":  "Of course! Please provide the correct phone number.",
+                    "name":   "Of course! What is the correct patient name?",
+                    "age":    "Of course! What is the correct age?",
+                    "date":   "Of course! Which date would you prefer?",
+                    "time":   "Of course! Morning, afternoon, or evening?",
+                    "doctor": "Of course! Which doctor would you like to see?",
+                }
+                msg = prompts.get(field, "Of course! Please provide the correct information.")
+                if is_malayalam: msg = await _translate_async(msg, "en", "ml")
+                yield f"data: {json.dumps(msg)}\n\n"
+                yield "data: [DONE]\n\n"
+                return
+
+            if normalised["intent"] == "provide" and normalised["normalised_value"]:
+                processed_question = normalised["normalised_value"]
+                openai_messages[-1]["content"] = processed_question
 
         # Agent instructions injected into the system prompt
         agent_instructions = """
