@@ -220,9 +220,15 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
 
   // ── Keep transcriptRef in sync ────────────────────────────────────────────
   useEffect(() => {
-    if (transcript !== transcriptRef.current) {
-      transcriptRef.current = transcript;
-      lastTranscriptUpdateRef.current = Date.now();
+if (transcript !== transcriptRef.current) {
+  // Only overwrite if new transcript has content, OR if we have nothing yet.
+  // Never let an empty reset from a new browser session wipe existing captured speech.
+  if (transcript.trim() || !transcriptRef.current.trim()) {
+    transcriptRef.current = transcript;
+  }
+  if (transcript.trim()) {
+    lastTranscriptUpdateRef.current = Date.now();
+  }
       // Clear the no-speech hint as soon as they start speaking
       if (transcript.trim()) clearNoSpeechTimer();
     }
