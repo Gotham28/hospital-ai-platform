@@ -260,30 +260,23 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
   // ── Restart listening when browser session ends (continuous: false) ───────
   // This is the core loop that keeps listening active between utterances.
   useEffect(() => {
-    if (!shouldBeListeningRef.current) return;
-    if (autoSendingRef.current) return;
-    if (isStreaming) return;
-    if (listening) return; // already listening, nothing to do
+  if (autoSendingRef.current) return;
+  if (isStreaming) return;
+  if (listening) return;
 
-    // Browser stopped — restart after a short delay
-    // The delay is intentional: if we restart too fast we can get into a loop
-    // on some Android versions where startListening throws and the error
-    // is swallowed. 250ms is the sweet spot found through testing.
-    const timer = setTimeout(() => {
-        if (shouldBeListeningRef.current && !autoSendingRef.current) {
-    // Snapshot the transcript before restarting — some browsers clear it on new session
-    const savedTranscript = transcriptRef.current;
-    startListeningNow();
-    // Restore if the restart wiped it
-    if (savedTranscript && !transcriptRef.current) {
-      transcriptRef.current = savedTranscript;
-      lastTranscriptUpdateRef.current = Date.now();
+  const timer = setTimeout(() => {
+    if (shouldBeListeningRef.current && !autoSendingRef.current) {
+      const savedTranscript = transcriptRef.current;
+      startListeningNow();
+      if (savedTranscript && !transcriptRef.current) {
+        transcriptRef.current = savedTranscript;
+        lastTranscriptUpdateRef.current = Date.now();
+      }
     }
-  }
-}, 250);
+  }, 250);
 
-    return () => clearTimeout(timer);
-  }, [listening, isStreaming, startListeningNow]);
+  return () => clearTimeout(timer);
+}, [listening, isStreaming, startListeningNow]);
 
   // ── Cleanup on unmount ────────────────────────────────────────────────────
   useEffect(() => () => {
