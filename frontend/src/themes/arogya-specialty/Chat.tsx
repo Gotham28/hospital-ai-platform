@@ -240,7 +240,7 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
     stopSilenceDetection();
     lastTranscriptUpdateRef.current = Date.now();
     silenceIntervalRef.current = setInterval(() => {
-      if (!shouldBeListeningRef.current || autoSendingRef.current) return;
+      if (autoSendingRef.current) return;
       const silentFor = Date.now() - lastTranscriptUpdateRef.current;
       const hasContent = transcriptRef.current.trim().length > 0;
       if (hasContent && silentFor >= SILENCE_THRESHOLD_MS) {
@@ -270,10 +270,18 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
     // on some Android versions where startListening throws and the error
     // is swallowed. 250ms is the sweet spot found through testing.
     const timer = setTimeout(() => {
-      if (shouldBeListeningRef.current && !autoSendingRef.current) {
-        startListeningNow();
-      }
-    }, 250);
+        if (shouldBeListeningRef.current && !autoSendingRef.current) {
+    // Snapshot the transcript before restarting — some browsers clear it on new session
+    const savedTranscript = transcriptRef.current;
+    startListeningNow();
+    // Restore if the restart wiped it
+    if (savedTranscript && !transcriptRef.current) {
+      transcriptRef.current = savedTranscript;
+      lastTranscriptUpdateRef.current = Date.now();
+    }
+  }
+}, 250);
+
     return () => clearTimeout(timer);
   }, [listening, isStreaming, startListeningNow]);
 
