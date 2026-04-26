@@ -74,10 +74,6 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_doctor_schedules_doctor_id'), 'doctor_schedules', ['doctor_id'], unique=False)
     op.create_index(op.f('ix_doctor_schedules_id'), 'doctor_schedules', ['id'], unique=False)
-    op.drop_table('knowledge_base')
-    op.drop_index(op.f('ix_usage_ledger_id'), table_name='usage_ledger')
-    op.drop_table('usage_ledger')
-    op.drop_index(op.f('ix_appointments_doctor_date'), table_name='appointments')
     op.create_index(op.f('ix_appointments_doctor_id'), 'appointments', ['doctor_id'], unique=False)
     # ### end Alembic commands ###
 
