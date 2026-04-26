@@ -10,7 +10,6 @@ from app import crud, schemas
 from app.api.deps import get_db, get_current_tenant, require_superadmin
 from app.models.hospital import Hospital
 from app.models.doctor import Doctor
-from app.availability import get_sheet_client
 from app.models.usage import UsageLedger
 
 router = APIRouter()
@@ -172,14 +171,14 @@ async def bulk_upload_and_sync(
     db: Session = Depends(get_db)
 ):
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
-    if not hospital or not hospital.google_sheet_id:
-        raise HTTPException(status_code=400, detail="Google Sheet ID not configured")
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
 
     content = await file.read()
     stream = io.StringIO(content.decode("utf-8"))
     reader = csv.DictReader(stream)
 
-    sheet_rows = []
+    count = 0
     for row in reader:
         normalized_row = {k.strip().lower(): v for k, v in row.items()}
         auto_id = f"H{hospital_id}-D-{uuid.uuid4().hex[:4].upper()}"
@@ -195,17 +194,14 @@ async def bulk_upload_and_sync(
             hospital_id=hospital_id
         )
         db.add(doctor)
-        sheet_rows.append([auto_id, name, dept, schedule, "", "Yes"])
+        count += 1
 
     try:
-        client = get_sheet_client()
-        sheet = client.open_by_key(hospital.google_sheet_id).sheet1
-        sheet.append_rows(sheet_rows)
         db.commit()
-        return {"message": f"Successfully imported {len(sheet_rows)} doctors."}
+        return {"message": f"Successfully imported {count} doctors."}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Google Sheet Sync Failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database Sync Failed: {str(e)}")
 
 @router.get("/{hospital_id}/billing")
 async def get_hospital_billing(hospital_id: int, db: Session = Depends(get_db)):
