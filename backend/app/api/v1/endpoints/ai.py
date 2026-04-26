@@ -20,11 +20,9 @@ from app.models.hospital import Hospital
 from app.models.knowledge import KnowledgeBase
 from app.models.usage import UsageLedger
 from app.models.doctor import Doctor
-from app.availability import (
-    get_doctor_availability,
-    get_cached_or_empty,
-    AvailabilityError,
-)
+from app.models.medicine import Medicine
+from app.models.lab_test import LabTest
+from app.models.doctor_availability import DoctorSchedule, DoctorLeave
 import redis
 import uuid
 from app.models.appointment import Appointment
@@ -260,7 +258,30 @@ def score_doctor_relevance(question: str, doctor: Doctor) -> float:
     return max(token_score, substring_score)
 
 
-def build_doctor_context(question: str, doctors: list) -> tuple[str, int]:
+def check_doctor_availability_db(doctor: Doctor, db: Session, target_date: datetime) -> str:
+    """Queries PostgreSQL to find out if the doctor is working today."""
+    # 1. Check for leaves first
+    leave = db.query(DoctorLeave).filter(
+        DoctorLeave.doctor_id == doctor.id,
+        DoctorLeave.date == target_date.date()
+    ).first()
+    if leave:
+        reason = f" ({leave.reason})" if leave.reason else ""
+        return f"ABSENT TODAY{reason}"
+
+    # 2. Check regular schedule
+    day_of_week = target_date.weekday() # 0=Monday, 6=Sunday
+    schedule = db.query(DoctorSchedule).filter(
+        DoctorSchedule.doctor_id == doctor.id,
+        DoctorSchedule.day_of_week == day_of_week,
+        DoctorSchedule.is_active == True
+    ).first()
+
+    if schedule:
+        return f"Available today from {schedule.start_time} to {schedule.end_time}"
+    return "Not scheduled to work today"
+
+def build_doctor_context(question: str, doctors: list, db: Session) -> tuple[str, int]:
     if not doctors:
         return "No doctors currently registered for this hospital.\n", 0
 
@@ -272,14 +293,12 @@ def build_doctor_context(question: str, doctors: list) -> tuple[str, int]:
     limit = MAX_RELEVANT_DOCTORS if top_score > 0.05 else DEFAULT_DOCTORS_IF_NO_MATCH
 
     lines, total_chars, truncated = [], 0, False
+    today = datetime.now()
+    
     for _, doctor in scored[:limit]:
-        schedule = (
-            getattr(doctor, "base_schedule", None)
-            or getattr(doctor, "schedule", None)
-            or "Not specified"
-        )
-        # 🚀 FIX: Add [ID: X] to the text so the AI can learn the ID!
-        line = f"- [ID: {doctor.id}] Dr. {doctor.name} ({doctor.department or 'General'}): Schedule {schedule}\n"
+        # Fetch live availability directly from the DB!
+        status = check_doctor_availability_db(doctor, db, today)
+        line = f"- [ID: {doctor.id}] Dr. {doctor.name} ({doctor.department or 'General'}): LIVE STATUS: {status}\n"
         
         if total_chars + len(line) > DOCTOR_SECTION_MAX_CHARS:
             truncated = True
@@ -287,11 +306,61 @@ def build_doctor_context(question: str, doctors: list) -> tuple[str, int]:
         lines.append(line)
         total_chars += len(line)
 
-    section = "RELEVANT DOCTORS FOR THIS QUERY:\n" + "".join(lines)
+    section = "RELEVANT DOCTORS AND AVAILABILITY:\n" + "".join(lines)
     if truncated:
         section += f"(List truncated. Total doctors on file: {len(doctors)})\n"
     return section, len(lines)
 
+def build_pharmacy_context(question: str, medicines: list) -> str:
+    """Matches user questions against the medicine database."""
+    nq = normalize_name(question)
+    q_tokens = set(nq.split())
+    if not q_tokens or not medicines: return ""
+
+    scored = []
+    for m in medicines:
+        m_text = normalize_name(f"{m.name} {m.brand_name or ''} {m.category or ''}")
+        m_tokens = set(m_text.split())
+        score = len(q_tokens & m_tokens)
+        if score > 0:
+            scored.append((score, m))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    if not scored: return ""
+
+    lines = ["RELEVANT PHARMACY ITEMS:"]
+    for _, m in scored[:5]: # Top 5 closest matches
+        req_rx = "Prescription Required" if m.requires_prescription else "Over-the-counter"
+        status = (m.stock_status or "in_stock").replace("_", " ").title()
+        lines.append(f"- {m.name} ({m.brand_name or 'Generic'}): Status: {status}, Price: ${m.price or 'N/A'}, {req_rx}")
+
+    return "\n".join(lines) + "\n"
+
+def build_lab_tests_context(question: str, tests: list) -> str:
+    """Matches user questions against lab test prerequisites."""
+    nq = normalize_name(question)
+    q_tokens = set(nq.split())
+    if not q_tokens or not tests: return ""
+
+    scored = []
+    for t in tests:
+        t_text = normalize_name(f"{t.name} {t.category or ''}")
+        t_tokens = set(t_text.split())
+        score = len(q_tokens & t_tokens)
+        if score > 0:
+            scored.append((score, t))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    if not scored: return ""
+
+    lines = ["RELEVANT LAB TESTS:"]
+    for _, t in scored[:5]:
+        loc = "In-house" if t.is_inhouse else "External Partner"
+        lines.append(f"- {t.name} ({t.category or 'General'}): Price: ${t.price or 'N/A'}, Turnaround: {t.turnaround_time or 'N/A'}, Location: {loc}")
+        if t.prerequisites:
+            lines.append(f"  Preparation/Prerequisites: {t.prerequisites}")
+
+    return "\n".join(lines) + "\n"
 
 def resolve_doctor_id(user_text: str, doctor_data: dict):
     nq = normalize_name(user_text)
@@ -379,12 +448,15 @@ def build_context(request: ChatRequest, db: Session, force_english: bool = False
     if not hospital:
         raise HTTPException(status_code=404, detail="Hospital not found")
 
+# Fetch all structured data from the DB
     all_doctors = db.query(Doctor).filter(Doctor.hospital_id == hospital_id).all()
-    doctor_context, doctors_included = build_doctor_context(question, all_doctors)
+    all_medicines = db.query(Medicine).filter(Medicine.hospital_id == hospital_id).all()
+    all_tests = db.query(LabTest).filter(LabTest.hospital_id == hospital_id).all()
 
-    availability_context = ""
-    if hospital.google_sheet_id:
-        availability_context = fetch_availability_context(question, hospital.google_sheet_id, hospital_id, today_str)
+    # Build the context strings
+    doctor_context, doctors_included = build_doctor_context(question, all_doctors, db)
+    pharmacy_context = build_pharmacy_context(question, all_medicines)
+    lab_tests_context = build_lab_tests_context(question, all_tests)
 
     embed_resp = client.embeddings.create(input=question, model="text-embedding-3-small")
     raw_results = (
@@ -408,9 +480,11 @@ def build_context(request: ChatRequest, db: Session, force_english: bool = False
         "",
         doctor_context,
     ]
-
-    if availability_context:
-        parts.append(availability_context)
+    if pharmacy_context:
+        parts.extend(["", pharmacy_context])
+        
+    if lab_tests_context:
+        parts.extend(["", lab_tests_context])
 
     if kb_context:
         parts.extend(["", "ADDITIONAL KNOWLEDGE BASE:", kb_context])

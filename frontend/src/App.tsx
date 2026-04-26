@@ -11,6 +11,8 @@ import { useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useAuth } from './context/AuthContext';
 import AppointmentsTab from './components/AppointmentsTab';
+import PharmacyPage from './pages/Pharmacy';
+import LabTestsPage from './pages/LabTests';
 
 function HospitalList() {
   const [hospitals, setHospitals] = useState<any[]>([]);
@@ -134,6 +136,14 @@ export default function App() {
         <Route 
           path="/hospitals/:hospitalId/settings" 
           element={<StaffGuard><SettingsPage /></StaffGuard>} 
+        />
+        <Route 
+          path="/hospitals/:hospitalId/pharmacy" 
+          element={<StaffGuard><PharmacyPage /></StaffGuard>} 
+        />
+        <Route 
+          path="/hospitals/:hospitalId/lab-tests" 
+          element={<StaffGuard><LabTestsPage /></StaffGuard>} 
         />
 
         {/* Superadmin Only Routes */}

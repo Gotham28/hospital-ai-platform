@@ -14,3 +14,5 @@ class Doctor(Base):
     
     hospital_id = Column(Integer, ForeignKey("hospital.id"), nullable=False)
     hospital = relationship("Hospital", back_populates="doctors")
+    schedules = relationship("DoctorSchedule", back_populates="doctor", cascade="all, delete-orphan")
+    leaves = relationship("DoctorLeave", back_populates="doctor", cascade="all, delete-orphan")

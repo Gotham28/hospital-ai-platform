@@ -1,7 +1,6 @@
 import { Outlet, Link, useNavigate, useParams, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Building2, Settings, LogOut, BrainCircuit, CalendarCheck } from 'lucide-react';
+import { LayoutDashboard, Users, Building2, Settings, LogOut, BrainCircuit, CalendarCheck, Pill, TestTube } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-
 export default function DashboardLayout() {
   const navigate = useNavigate();
   const { hospitalId } = useParams();
@@ -63,6 +62,19 @@ export default function DashboardLayout() {
                 className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/settings`) ? linkActive : linkIdle}`}
               >
                 <Settings className="w-5 h-5 text-blue-500" /> Settings
+              </Link>
+              <Link
+                to={`/hospitals/${hospitalId}/pharmacy`}
+                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/pharmacy`) ? linkActive : linkIdle}`}
+              >
+                <Pill className="w-5 h-5 text-blue-500" /> Pharmacy
+              </Link>
+
+              <Link
+                to={`/hospitals/${hospitalId}/lab-tests`}
+                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/lab-tests`) ? linkActive : linkIdle}`}
+              >
+                <TestTube className="w-5 h-5 text-purple-500" /> Lab Tests
               </Link>
 
               {/* AI Training is Superadmin only */}

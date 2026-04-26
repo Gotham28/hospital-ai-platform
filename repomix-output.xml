@@ -1305,286 +1305,6 @@ export default defineConfig([
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="35.93" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 228"><path fill="#00D8FF" d="M210.483 73.824a171.49 171.49 0 0 0-8.24-2.597c.465-1.9.893-3.777 1.273-5.621c6.238-30.281 2.16-54.676-11.769-62.708c-13.355-7.7-35.196.329-57.254 19.526a171.23 171.23 0 0 0-6.375 5.848a155.866 155.866 0 0 0-4.241-3.917C100.759 3.829 77.587-4.822 63.673 3.233C50.33 10.957 46.379 33.89 51.995 62.588a170.974 170.974 0 0 0 1.892 8.48c-3.28.932-6.445 1.924-9.474 2.98C17.309 83.498 0 98.307 0 113.668c0 15.865 18.582 31.778 46.812 41.427a145.52 145.52 0 0 0 6.921 2.165a167.467 167.467 0 0 0-2.01 9.138c-5.354 28.2-1.173 50.591 12.134 58.266c13.744 7.926 36.812-.22 59.273-19.855a145.567 145.567 0 0 0 5.342-4.923a168.064 168.064 0 0 0 6.92 6.314c21.758 18.722 43.246 26.282 56.54 18.586c13.731-7.949 18.194-32.003 12.4-61.268a145.016 145.016 0 0 0-1.535-6.842c1.62-.48 3.21-.974 4.76-1.488c29.348-9.723 48.443-25.443 48.443-41.52c0-15.417-17.868-30.326-45.517-39.844Zm-6.365 70.984c-1.4.463-2.836.91-4.3 1.345c-3.24-10.257-7.612-21.163-12.963-32.432c5.106-11 9.31-21.767 12.459-31.957c2.619.758 5.16 1.557 7.61 2.4c23.69 8.156 38.14 20.213 38.14 29.504c0 9.896-15.606 22.743-40.946 31.14Zm-10.514 20.834c2.562 12.94 2.927 24.64 1.23 33.787c-1.524 8.219-4.59 13.698-8.382 15.893c-8.067 4.67-25.32-1.4-43.927-17.412a156.726 156.726 0 0 1-6.437-5.87c7.214-7.889 14.423-17.06 21.459-27.246c12.376-1.098 24.068-2.894 34.671-5.345a134.17 134.17 0 0 1 1.386 6.193ZM87.276 214.515c-7.882 2.783-14.16 2.863-17.955.675c-8.075-4.657-11.432-22.636-6.853-46.752a156.923 156.923 0 0 1 1.869-8.499c10.486 2.32 22.093 3.988 34.498 4.994c7.084 9.967 14.501 19.128 21.976 27.15a134.668 134.668 0 0 1-4.877 4.492c-9.933 8.682-19.886 14.842-28.658 17.94ZM50.35 144.747c-12.483-4.267-22.792-9.812-29.858-15.863c-6.35-5.437-9.555-10.836-9.555-15.216c0-9.322 13.897-21.212 37.076-29.293c2.813-.98 5.757-1.905 8.812-2.773c3.204 10.42 7.406 21.315 12.477 32.332c-5.137 11.18-9.399 22.249-12.634 32.792a134.718 134.718 0 0 1-6.318-1.979Zm12.378-84.26c-4.811-24.587-1.616-43.134 6.425-47.789c8.564-4.958 27.502 2.111 47.463 19.835a144.318 144.318 0 0 1 3.841 3.545c-7.438 7.987-14.787 17.08-21.808 26.988c-12.04 1.116-23.565 2.908-34.161 5.309a160.342 160.342 0 0 1-1.76-7.887Zm110.427 27.268a347.8 347.8 0 0 0-7.785-12.803c8.168 1.033 15.994 2.404 23.343 4.08c-2.206 7.072-4.956 14.465-8.193 22.045a381.151 381.151 0 0 0-7.365-13.322Zm-45.032-43.861c5.044 5.465 10.096 11.566 15.065 18.186a322.04 322.04 0 0 0-30.257-.006c4.974-6.559 10.069-12.652 15.192-18.18ZM82.802 87.83a323.167 323.167 0 0 0-7.227 13.238c-3.184-7.553-5.909-14.98-8.134-22.152c7.304-1.634 15.093-2.97 23.209-3.984a321.524 321.524 0 0 0-7.848 12.897Zm8.081 65.352c-8.385-.936-16.291-2.203-23.593-3.793c2.26-7.3 5.045-14.885 8.298-22.6a321.187 321.187 0 0 0 7.257 13.246c2.594 4.48 5.28 8.868 8.038 13.147Zm37.542 31.03c-5.184-5.592-10.354-11.779-15.403-18.433c4.902.192 9.899.29 14.978.29c5.218 0 10.376-.117 15.453-.343c-4.985 6.774-10.018 12.97-15.028 18.486Zm52.198-57.817c3.422 7.8 6.306 15.345 8.596 22.52c-7.422 1.694-15.436 3.058-23.88 4.071a382.417 382.417 0 0 0 7.859-13.026a347.403 347.403 0 0 0 7.425-13.565Zm-16.898 8.101a358.557 358.557 0 0 1-12.281 19.815a329.4 329.4 0 0 1-23.444.823c-7.967 0-15.716-.248-23.178-.732a310.202 310.202 0 0 1-12.513-19.846h.001a307.41 307.41 0 0 1-10.923-20.627a310.278 310.278 0 0 1 10.89-20.637l-.001.001a307.318 307.318 0 0 1 12.413-19.761c7.613-.576 15.42-.876 23.31-.876H128c7.926 0 15.743.303 23.354.883a329.357 329.357 0 0 1 12.335 19.695a358.489 358.489 0 0 1 11.036 20.54a329.472 329.472 0 0 1-11 20.722Zm22.56-122.124c8.572 4.944 11.906 24.881 6.52 51.026c-.344 1.668-.73 3.367-1.15 5.09c-10.622-2.452-22.155-4.275-34.23-5.408c-7.034-10.017-14.323-19.124-21.64-27.008a160.789 160.789 0 0 1 5.888-5.4c18.9-16.447 36.564-22.941 44.612-18.3ZM128 90.808c12.625 0 22.86 10.235 22.86 22.86s-10.235 22.86-22.86 22.86s-22.86-10.235-22.86-22.86s10.235-22.86 22.86-22.86Z"></path></svg>
 </file>
 
-<file path="frontend/src/components/AppointmentsTab.tsx">
-import React, { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
-import api from '../api/axios';
-import { CheckCircle, XCircle, Clock, Phone, User, Calendar, Stethoscope, RefreshCw } from 'lucide-react';
-
-interface Appointment {
-  id: number;
-  reference_number: string;
-  patient_name: string;
-  patient_age: string;
-  patient_phone: string;
-  doctor_name: string;
-  doctor_department: string;
-  preferred_date: string;
-  time_of_day: string;
-  status: 'pending' | 'approved' | 'rejected';
-  confirmed_time: string | null;
-  rejection_reason: string | null;
-  created_at: string;
-}
-
-const REJECTION_REASONS = [
-  'Doctor on leave',
-  'No slots available on this date',
-  'Please call reception to book',
-  'Outside working hours',
-  'Department not available',
-];
-
-const STATUS_STYLES = {
-  pending:  'bg-amber-100 text-amber-700 border-amber-200',
-  approved: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  rejected: 'bg-red-100 text-red-700 border-red-200',
-};
-
-const TIME_LABELS: Record<string, string> = {
-  morning:   '🌅 Morning',
-  afternoon: '☀️ Afternoon',
-  evening:   '🌇 Evening',
-};
-
-export default function AppointmentsTab() {
-  const { hospitalId } = useParams<{ hospitalId: string }>();
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
-  const [loading, setLoading] = useState(false);
-  const [approveModal, setApproveModal] = useState<Appointment | null>(null);
-  const [rejectModal, setRejectModal]   = useState<Appointment | null>(null);
-  const [confirmedTime, setConfirmedTime]   = useState('');
-  const [rejectionReason, setRejectionReason] = useState(REJECTION_REASONS[0]);
-  const [actionLoading, setActionLoading] = useState(false);
-
-  const fetchAppointments = useCallback(async () => {
-    if (!hospitalId) return;
-    setLoading(true);
-    try {
-      const params = filter !== 'all' ? `?status=${filter}` : '';
-      const res = await api.get(`/appointments/hospital/${hospitalId}${params}`);
-      setAppointments(res.data);
-    } catch (e) {
-      console.error('Failed to fetch appointments', e);
-    } finally {
-      setLoading(false);
-    }
-  }, [hospitalId, filter]);
-
-  useEffect(() => {
-    fetchAppointments();
-    // Poll every 30 seconds for new requests
-    const interval = setInterval(fetchAppointments, 30_000);
-    return () => clearInterval(interval);
-  }, [fetchAppointments]);
-
-  const handleApprove = async () => {
-    if (!approveModal || !confirmedTime.trim()) return;
-    setActionLoading(true);
-    try {
-      await api.patch(`/appointments/${approveModal.id}/approve`, { confirmed_time: confirmedTime });
-      setApproveModal(null);
-      setConfirmedTime('');
-      fetchAppointments();
-    } catch (e) {
-      console.error('Approve failed', e);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleReject = async () => {
-    if (!rejectModal) return;
-    setActionLoading(true);
-    try {
-      await api.patch(`/appointments/${rejectModal.id}/reject`, { reason: rejectionReason });
-      setRejectModal(null);
-      fetchAppointments();
-    } catch (e) {
-      console.error('Reject failed', e);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const pendingCount = appointments.filter(a => a.status === 'pending').length;
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Appointments</h2>
-          {pendingCount > 0 && (
-            <p className="text-sm text-amber-600 font-medium mt-1">
-              ⚠️ {pendingCount} pending request{pendingCount > 1 ? 's' : ''} need attention
-            </p>
-          )}
-        </div>
-        <button onClick={fetchAppointments}
-          className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 border rounded-lg hover:bg-gray-50">
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
-        </button>
-      </div>
-
-      {/* Filter tabs */}
-      <div className="flex gap-2 border-b">
-        {(['pending', 'approved', 'rejected', 'all'] as const).map(f => (
-          <button key={f} onClick={() => setFilter(f)}
-            className={`px-4 py-2 text-sm font-medium capitalize border-b-2 transition-colors ${
-              filter === f ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}>
-            {f}
-          </button>
-        ))}
-      </div>
-
-      {/* Table */}
-      {loading ? (
-        <div className="text-center py-12 text-gray-400">Loading…</div>
-      ) : appointments.length === 0 ? (
-        <div className="text-center py-12 text-gray-400">No {filter} appointments.</div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-xs uppercase text-gray-500 font-semibold border-b">
-              <tr>
-                <th className="p-4 text-left">Reference</th>
-                <th className="p-4 text-left">Patient</th>
-                <th className="p-4 text-left">Doctor</th>
-                <th className="p-4 text-left">Date & Time</th>
-                <th className="p-4 text-left">Status</th>
-                <th className="p-4 text-left">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {appointments.map(appt => (
-                <tr key={appt.id} className="hover:bg-gray-50">
-                  <td className="p-4 font-mono text-xs text-blue-600">{appt.reference_number}</td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-2">
-                      <User className="w-4 h-4 text-gray-400" />
-                      <div>
-                        <p className="font-medium text-gray-900">{appt.patient_name}</p>
-                        <p className="text-xs text-gray-500">Age: {appt.patient_age}</p>
-                        <p className="text-xs text-gray-500 flex items-center gap-1">
-                          <Phone className="w-3 h-3" />{appt.patient_phone}
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-2">
-                      <Stethoscope className="w-4 h-4 text-gray-400" />
-                      <div>
-                        <p className="font-medium text-gray-900">{appt.doctor_name}</p>
-                        <p className="text-xs text-gray-500">{appt.doctor_department}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-gray-400" />
-                      <div>
-                        <p className="font-medium">{appt.preferred_date}</p>
-                        <p className="text-xs text-gray-500">{TIME_LABELS[appt.time_of_day] || appt.time_of_day}</p>
-                        {appt.confirmed_time && (
-                          <p className="text-xs text-emerald-600 font-medium">✓ {appt.confirmed_time}</p>
-                        )}
-                        {appt.rejection_reason && (
-                          <p className="text-xs text-red-500">{appt.rejection_reason}</p>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border capitalize ${STATUS_STYLES[appt.status]}`}>
-                      {appt.status === 'pending'  && <Clock className="w-3 h-3" />}
-                      {appt.status === 'approved' && <CheckCircle className="w-3 h-3" />}
-                      {appt.status === 'rejected' && <XCircle className="w-3 h-3" />}
-                      {appt.status}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    {appt.status === 'pending' && (
-                      <div className="flex gap-2">
-                        <button onClick={() => { setApproveModal(appt); setConfirmedTime(''); }}
-                          className="px-3 py-1 text-xs bg-emerald-600 text-white rounded-md hover:bg-emerald-700">
-                          Approve
-                        </button>
-                        <button onClick={() => { setRejectModal(appt); setRejectionReason(REJECTION_REASONS[0]); }}
-                          className="px-3 py-1 text-xs border border-red-300 text-red-600 rounded-md hover:bg-red-50">
-                          Reject
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Approve Modal */}
-      {approveModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
-            <h3 className="text-lg font-bold text-gray-900">Approve Appointment</h3>
-            <p className="text-sm text-gray-600">
-              Approving <strong>{approveModal.reference_number}</strong> for <strong>{approveModal.patient_name}</strong> with <strong>{approveModal.doctor_name}</strong> on <strong>{approveModal.preferred_date}</strong>.
-            </p>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Confirmed Time</label>
-              <input type="text" value={confirmedTime} onChange={e => setConfirmedTime(e.target.value)}
-                placeholder="e.g. 10:30 AM"
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-              <p className="text-xs text-gray-400 mt-1">Staff will be reminded to call the patient at {approveModal.patient_phone}</p>
-            </div>
-            <div className="flex gap-3 justify-end">
-              <button onClick={() => setApproveModal(null)}
-                className="px-4 py-2 text-sm text-gray-600 border rounded-lg hover:bg-gray-50">Cancel</button>
-              <button onClick={handleApprove} disabled={!confirmedTime.trim() || actionLoading}
-                className="px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-40">
-                {actionLoading ? 'Saving…' : 'Confirm Approval'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Reject Modal */}
-      {rejectModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
-            <h3 className="text-lg font-bold text-gray-900">Reject Appointment</h3>
-            <p className="text-sm text-gray-600">
-              Rejecting <strong>{rejectModal.reference_number}</strong> for <strong>{rejectModal.patient_name}</strong>.
-            </p>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Reason</label>
-              <select value={rejectionReason} onChange={e => setRejectionReason(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400">
-                {REJECTION_REASONS.map(r => <option key={r}>{r}</option>)}
-              </select>
-            </div>
-            <div className="flex gap-3 justify-end">
-              <button onClick={() => setRejectModal(null)}
-                className="px-4 py-2 text-sm text-gray-600 border rounded-lg hover:bg-gray-50">Cancel</button>
-              <button onClick={handleReject} disabled={actionLoading}
-                className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-40">
-                {actionLoading ? 'Saving…' : 'Confirm Rejection'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-</file>
-
 <file path="frontend/src/components/BookingConfigPanel.tsx">
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
@@ -2504,6 +2224,308 @@ if __name__ == "__main__":
     "typescript-eslint": "^8.48.0",
     "vite": "^7.3.1"
   }
+}
+</file>
+
+<file path="frontend/src/components/AppointmentsTab.tsx">
+import React, { useState, useEffect, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
+import api from '../api/axios';
+import { CheckCircle, XCircle, Clock, Phone, User, Calendar, Stethoscope, RefreshCw } from 'lucide-react';
+
+interface Appointment {
+  id: number;
+  reference_number: string;
+  patient_name: string;
+  patient_age: string;
+  patient_phone: string;
+  doctor_name: string;
+  doctor_department: string;
+  preferred_date: string;
+  time_of_day: string;
+  status: 'pending' | 'approved' | 'rejected';
+  confirmed_time: string | null;
+  rejection_reason: string | null;
+  created_at: string;
+}
+
+const REJECTION_REASONS = [
+  'Doctor on leave',
+  'No slots available on this date',
+  'Please call reception to book',
+  'Outside working hours',
+  'Department not available',
+];
+
+const STATUS_STYLES = {
+  pending:  'bg-amber-100 text-amber-700 border-amber-200',
+  approved: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  rejected: 'bg-red-100 text-red-700 border-red-200',
+};
+
+const TIME_LABELS: Record<string, string> = {
+  morning:   '🌅 Morning',
+  afternoon: '☀️ Afternoon',
+  evening:   '🌇 Evening',
+};
+
+export default function AppointmentsTab() {
+  const { hospitalId } = useParams<{ hospitalId: string }>();
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
+  // Start true so there's no flash of "No appointments" before data loads
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [approveModal, setApproveModal] = useState<Appointment | null>(null);
+  const [rejectModal, setRejectModal]   = useState<Appointment | null>(null);
+  const [confirmedTime, setConfirmedTime] = useState('');
+  const [rejectionReason, setRejectionReason] = useState(REJECTION_REASONS[0]);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const fetchAppointments = useCallback(async () => {
+    if (!hospitalId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const params = filter !== 'all' ? `?status=${filter}` : '';
+      const res = await api.get(`/appointments/hospital/${hospitalId}${params}`);
+      setAppointments(res.data);
+    } catch (e: any) {
+      setError(e.response?.data?.detail || 'Failed to load appointments.');
+    } finally {
+      setLoading(false);
+    }
+  }, [hospitalId, filter]);
+
+  useEffect(() => {
+    fetchAppointments();
+    const interval = setInterval(fetchAppointments, 30_000);
+    return () => clearInterval(interval);
+  }, [fetchAppointments]);
+
+  const handleApprove = async () => {
+    if (!approveModal || !confirmedTime.trim()) return;
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      await api.patch(`/appointments/${approveModal.id}/approve`, { confirmed_time: confirmedTime });
+      setApproveModal(null);
+      setConfirmedTime('');
+      fetchAppointments();
+    } catch (e: any) {
+      setActionError(e.response?.data?.detail || 'Approve failed. Please try again.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleReject = async () => {
+    if (!rejectModal) return;
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      await api.patch(`/appointments/${rejectModal.id}/reject`, { reason: rejectionReason });
+      setRejectModal(null);
+      fetchAppointments();
+    } catch (e: any) {
+      setActionError(e.response?.data?.detail || 'Reject failed. Please try again.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const pendingCount = appointments.filter(a => a.status === 'pending').length;
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Appointments</h2>
+          {pendingCount > 0 && (
+            <p className="text-sm text-amber-600 font-medium mt-1">
+              ⚠️ {pendingCount} pending request{pendingCount > 1 ? 's' : ''} need attention
+            </p>
+          )}
+        </div>
+        <button onClick={fetchAppointments}
+          className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 border rounded-lg hover:bg-gray-50">
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
+        </button>
+      </div>
+
+      {/* Filter tabs */}
+      <div className="flex gap-2 border-b">
+        {(['pending', 'approved', 'rejected', 'all'] as const).map(f => (
+          <button key={f} onClick={() => setFilter(f)}
+            className={`px-4 py-2 text-sm font-medium capitalize border-b-2 transition-colors ${
+              filter === f ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}>
+            {f}
+          </button>
+        ))}
+      </div>
+
+      {/* Error state */}
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
+      )}
+
+      {/* Table */}
+      {loading ? (
+        <div className="text-center py-12 text-gray-400">
+          <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" />
+          Loading appointments…
+        </div>
+      ) : appointments.length === 0 ? (
+        <div className="text-center py-12 text-gray-400">No {filter === 'all' ? '' : filter} appointments found.</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-xs uppercase text-gray-500 font-semibold border-b">
+              <tr>
+                <th className="p-4 text-left">Reference</th>
+                <th className="p-4 text-left">Patient</th>
+                <th className="p-4 text-left">Doctor</th>
+                <th className="p-4 text-left">Date & Time</th>
+                <th className="p-4 text-left">Status</th>
+                <th className="p-4 text-left">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {appointments.map(appt => (
+                <tr key={appt.id} className="hover:bg-gray-50">
+                  <td className="p-4 font-mono text-xs text-blue-600">{appt.reference_number}</td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4 text-gray-400 shrink-0" />
+                      <div>
+                        <p className="font-medium text-gray-900">{appt.patient_name}</p>
+                        <p className="text-xs text-gray-500">Age: {appt.patient_age}</p>
+                        <p className="text-xs text-gray-500 flex items-center gap-1">
+                          <Phone className="w-3 h-3" />{appt.patient_phone}
+                        </p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-2">
+                      <Stethoscope className="w-4 h-4 text-gray-400 shrink-0" />
+                      <div>
+                        <p className="font-medium text-gray-900">{appt.doctor_name}</p>
+                        <p className="text-xs text-gray-500">{appt.doctor_department}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
+                      <div>
+                        <p className="font-medium">{appt.preferred_date}</p>
+                        <p className="text-xs text-gray-500">{TIME_LABELS[appt.time_of_day] || appt.time_of_day}</p>
+                        {appt.confirmed_time && (
+                          <p className="text-xs text-emerald-600 font-medium">✓ {appt.confirmed_time}</p>
+                        )}
+                        {appt.rejection_reason && (
+                          <p className="text-xs text-red-500">{appt.rejection_reason}</p>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="p-4">
+                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border capitalize ${STATUS_STYLES[appt.status]}`}>
+                      {appt.status === 'pending'  && <Clock className="w-3 h-3" />}
+                      {appt.status === 'approved' && <CheckCircle className="w-3 h-3" />}
+                      {appt.status === 'rejected' && <XCircle className="w-3 h-3" />}
+                      {appt.status}
+                    </span>
+                  </td>
+                  <td className="p-4">
+                    {appt.status === 'pending' && (
+                      <div className="flex gap-2">
+                        <button onClick={() => { setApproveModal(appt); setConfirmedTime(''); setActionError(null); }}
+                          className="px-3 py-1 text-xs bg-emerald-600 text-white rounded-md hover:bg-emerald-700">
+                          Approve
+                        </button>
+                        <button onClick={() => { setRejectModal(appt); setRejectionReason(REJECTION_REASONS[0]); setActionError(null); }}
+                          className="px-3 py-1 text-xs border border-red-300 text-red-600 rounded-md hover:bg-red-50">
+                          Reject
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Approve Modal */}
+      {approveModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+            <h3 className="text-lg font-bold text-gray-900">Approve Appointment</h3>
+            <p className="text-sm text-gray-600">
+              Approving <strong>{approveModal.reference_number}</strong> for <strong>{approveModal.patient_name}</strong>{' '}
+              with <strong>{approveModal.doctor_name}</strong> on <strong>{approveModal.preferred_date}</strong>.
+            </p>
+            {actionError && (
+              <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{actionError}</p>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Confirmed Time *</label>
+              <input type="text" value={confirmedTime} onChange={e => setConfirmedTime(e.target.value)}
+                placeholder="e.g. 10:30 AM"
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+              <p className="text-xs text-gray-400 mt-1">
+                Staff will be reminded to call {approveModal.patient_name} at {approveModal.patient_phone}
+              </p>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => { setApproveModal(null); setActionError(null); }}
+                className="px-4 py-2 text-sm text-gray-600 border rounded-lg hover:bg-gray-50">Cancel</button>
+              <button onClick={handleApprove} disabled={!confirmedTime.trim() || actionLoading}
+                className="px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-40">
+                {actionLoading ? 'Saving…' : 'Confirm Approval'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Modal */}
+      {rejectModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+            <h3 className="text-lg font-bold text-gray-900">Reject Appointment</h3>
+            <p className="text-sm text-gray-600">
+              Rejecting <strong>{rejectModal.reference_number}</strong> for <strong>{rejectModal.patient_name}</strong>.
+            </p>
+            {actionError && (
+              <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{actionError}</p>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Reason</label>
+              <select value={rejectionReason} onChange={e => setRejectionReason(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400">
+                {REJECTION_REASONS.map(r => <option key={r}>{r}</option>)}
+              </select>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => { setRejectModal(null); setActionError(null); }}
+                className="px-4 py-2 text-sm text-gray-600 border rounded-lg hover:bg-gray-50">Cancel</button>
+              <button onClick={handleReject} disabled={actionLoading}
+                className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-40">
+                {actionLoading ? 'Saving…' : 'Confirm Rejection'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 </file>
 
@@ -4213,105 +4235,6 @@ class Hospital(HospitalBase):
         from_attributes = True
 </file>
 
-<file path="frontend/src/pages/Login.tsx">
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import api from '../api/axios';
-import { useAuth } from '../context/AuthContext';
-
-const Login = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
-  const { login } = useAuth();
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-
-    try {
-      const formData = new FormData();
-      formData.append('username', email);
-      formData.append('password', password);
-
-      const response = await api.post('/auth/login', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
-      const token = response.data.access_token;
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      login(token);
-      
-      // FIX: Staff now go directly to settings!
-      if (payload.role === 'staff') {
-        navigate(`/hospitals/${payload.hospital_id}/settings`);
-      } else {
-        navigate('/');
-      }
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Login failed. Check your credentials.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <form onSubmit={handleLogin} className="p-8 bg-white shadow-lg rounded-xl w-96">
-        <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">
-          Hospital Admin Portal
-        </h2>
-
-        {error && (
-          <p className="text-red-500 text-sm mb-4 p-3 bg-red-50 rounded-lg border border-red-100">
-            {error}
-          </p>
-        )}
-
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700">Email</label>
-          <input
-            type="email"
-            className="w-full p-2 border rounded mt-1 outline-none focus:ring-2 focus:ring-blue-500"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            required
-            disabled={loading}
-            autoComplete="email"
-          />
-        </div>
-
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700">Password</label>
-          <input
-            type="password"
-            className="w-full p-2 border rounded mt-1 outline-none focus:ring-2 focus:ring-blue-500"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            required
-            disabled={loading}
-            autoComplete="current-password"
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          {loading ? 'Signing in...' : 'Sign In'}
-        </button>
-      </form>
-    </div>
-  );
-};
-
-export default Login;
-</file>
-
 <file path="frontend/src/pages/Settings.tsx">
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
@@ -4698,6 +4621,105 @@ export default function DashboardLayout() {
     </div>
   );
 }
+</file>
+
+<file path="frontend/src/pages/Login.tsx">
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import api from '../api/axios';
+import { useAuth } from '../context/AuthContext';
+
+const Login = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const { login } = useAuth();
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('username', email);
+      formData.append('password', password);
+
+      const response = await api.post('/auth/login', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      const token = response.data.access_token;
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      login(token);
+
+      // Staff go directly to their hospital's appointments page
+      if (payload.role === 'staff') {
+        navigate(`/hospitals/${payload.hospital_id}/appointments`);
+      } else {
+        navigate('/');
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Login failed. Check your credentials.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-gray-100">
+      <form onSubmit={handleLogin} className="p-8 bg-white shadow-lg rounded-xl w-96">
+        <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">
+          Hospital Admin Portal
+        </h2>
+
+        {error && (
+          <p className="text-red-500 text-sm mb-4 p-3 bg-red-50 rounded-lg border border-red-100">
+            {error}
+          </p>
+        )}
+
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700">Email</label>
+          <input
+            type="email"
+            className="w-full p-2 border rounded mt-1 outline-none focus:ring-2 focus:ring-blue-500"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            required
+            disabled={loading}
+            autoComplete="email"
+          />
+        </div>
+
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700">Password</label>
+          <input
+            type="password"
+            className="w-full p-2 border rounded mt-1 outline-none focus:ring-2 focus:ring-blue-500"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            required
+            disabled={loading}
+            autoComplete="current-password"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {loading ? 'Signing in...' : 'Sign In'}
+        </button>
+      </form>
+    </div>
+  );
+};
+
+export default Login;
 </file>
 
 <file path="frontend/src/themes/arogya-specialty/ChatMessage.tsx">
@@ -5128,49 +5150,31 @@ def create_staff_account(
 <file path="frontend/src/api/axios.ts">
 import axios from 'axios';
 
-/**
- * Hospital AI Platform - Axios Configuration
- * * This instance handles the 'Magic Key' (JWT) injection automatically.
- * It ensures every request to the backend includes the hospital_id 
- * encoded in the bearer token.
- */
-const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? 'http://localhost:8000/api/v1'
-  : 'https://hospital-ai-platform.onrender.com/api/v1';
+const baseURL = import.meta.env.VITE_API_URL
+  || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:8000/api/v1'
+    : 'https://hospital-ai-platform.onrender.com/api/v1');
 
 const api = axios.create({
   baseURL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: { 'Content-Type': 'application/json' },
 });
 
-// Add this temporary log to see what the browser is actually using
-console.log("Current API BaseURL:", import.meta.env.VITE_API_URL);
-// Request Interceptor: Attaches the JWT to every outgoing call
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
-    
-    if (token) {
-      // Every request now carries the 'Magic Key' verification
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    
+    if (token) config.headers.Authorization = `Bearer ${token}`;
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Response Interceptor: Handles global errors (like expired tokens)
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
-      // If the Magic Key is invalid or expired, boot to login
+    if (error.response?.status === 401) {
       localStorage.removeItem('token');
+      sessionStorage.removeItem('bookingSessionToken');
       window.location.href = '/login';
     }
     return Promise.reject(error);
@@ -5184,52 +5188,46 @@ export default api;
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.base import Base
-# Import the router objects from your endpoint files
 from app.api.v1.endpoints.auth import router as auth_router
 from app.api.v1.endpoints.hospitals import router as hospitals_router
 from app.api.v1.endpoints.ai import router as ai_router
 from app.db.session import engine
 from app.api.v1.endpoints.appointments import router as appointments_router
 from app.services.reminders import start_reminder_scheduler, stop_reminder_scheduler
+import os
 
 app = FastAPI(title="Hospital AI Platform")
 Base.metadata.create_all(bind=engine)
-# --- CORS Configuration ---
-# This allows both your local development and your live Vercel site to talk to this API
-origins = [
-    "https://hospital-ai-platform.vercel.app",
-    "http://localhost:3000",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
+
+# Single source of truth for allowed origins
+ALLOWED_ORIGINS = [
+    o.strip() for o in os.getenv(
+        "ALLOWED_ORIGINS",
+        "https://hospital-ai-platform.vercel.app,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
+    ).split(",") if o.strip()
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://hospital-ai-platform.vercel.app", "http://localhost:5173"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"], # Be explicit here
+    allow_methods=["*"],
     allow_headers=["*"],
 )
-# --- Include Routers ---
-# Note: The prefixes here combine with the @router paths in your endpoint files
 
-# 1. Auth Router (Handles Login and Token Generation)
-app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
-
-# 2. Hospitals Router (Handles Staff management and Hospital settings)
-app.include_router(hospitals_router, prefix="/api/v1/hospitals", tags=["hospitals"])
-
-# 3. AI Router (Handles /chat, /ingest, and /upload-pdf)
-# We use /api/v1/ai so that the frontend calls /api/v1/ai/chat
-app.include_router(ai_router, prefix="/api/v1/ai", tags=["AI"])
+app.include_router(auth_router,         prefix="/api/v1/auth",         tags=["auth"])
+app.include_router(hospitals_router,    prefix="/api/v1/hospitals",    tags=["hospitals"])
+app.include_router(ai_router,           prefix="/api/v1/ai",           tags=["AI"])
 app.include_router(appointments_router, prefix="/api/v1/appointments", tags=["Appointments"])
+
 @app.on_event("startup")
 def on_startup():
     start_reminder_scheduler()
-    
+
 @app.on_event("shutdown")
 def on_shutdown():
     stop_reminder_scheduler()
+
 @app.get("/")
 def read_root():
     return {
@@ -5282,7 +5280,8 @@ async_client = AsyncOpenAI(api_key=_api_key)
 _redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
 _redis = redis.from_url(_redis_url, decode_responses=True)
 BOOKING_SESSION_TTL = 600
-
+OPENAI_MODEL        = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_COST_PER_MTok = float(os.getenv("OPENAI_COST_PER_MTok", "0.15"))
 MAX_HISTORY_TURNS        = 10
 PDF_CHUNK_SIZE           = 800
 PDF_CHUNK_OVERLAP        = 100
@@ -5886,7 +5885,7 @@ async def chat_with_arogya(request: ChatRequest, db: Session = Depends(get_db)):
     translated_request = request.model_copy(update={"question": english_question})
     _, openai_messages, _ = build_context(translated_request, db, force_english=True)
 
-    ai_response = client.chat.completions.create(model="gpt-4o-mini", messages=openai_messages)
+    ai_response = client.chat.completions.create(model=OPENAI_MODEL * 0.15* OPENAI_COST_PER_MTok, messages=openai_messages)
     english_answer = ai_response.choices[0].message.content or ""
 
     final_answer = english_answer
@@ -5902,245 +5901,499 @@ async def chat_with_arogya(request: ChatRequest, db: Session = Depends(get_db)):
     db.commit()
     return {"answer": final_answer}
 
+# =============================================================================
+# COMPLETE REPLACEMENT for the chat_stream endpoint and classify_user_intent
+# in backend/app/api/v1/endpoints/ai.py
+#
+# Replace everything from:
+#   async def classify_user_intent(...)
+# through to the end of the file.
+# =============================================================================
+async def normalise_booking_input(
+    raw_message: str,
+    current_field: str,
+    conversation_context: str = ""
+) -> dict:
+    """
+    Uses the LLM to intelligently interpret and normalise a user's message
+    in the context of what field is currently being collected.
+
+    Returns a dict:
+    {
+        "intent": "provide" | "correct" | "cancel" | "unclear",
+        "field_to_correct": "phone" | "name" | "age" | "date" | "time" | "doctor" | null,
+        "normalised_value": "cleaned value ready to use" | null,
+        "reason": "brief explanation if unclear or correction"
+    }
+    """
+    system_prompt = f"""You are a data extraction assistant for a hospital booking system.
+
+The assistant is currently collecting: {current_field}
+Recent conversation:
+{conversation_context}
+
+The user just said: "{raw_message}"
+
+Your job is to interpret what the user means and return a JSON object with these fields:
+- "intent": one of "provide" (giving the requested info), "correct" (wants to change something already given), "cancel" (wants to stop entirely), "unclear" (genuinely ambiguous)
+- "field_to_correct": if intent is "correct", which field they want to change. One of: phone, name, age, date, time, doctor. Otherwise null.
+- "normalised_value": if intent is "provide", the cleaned value ready to use. For phone numbers, return only digits. For names, return only the name part (strip "and she is X years old" etc). For age, return only the number. Otherwise null.
+- "reason": brief note if intent is "unclear" or "correct"
+
+CRITICAL RULES for normalisation:
+- Phone numbers: Convert spoken/spaced digits to a single string of digits. "94 67 48 74 48" → "9467487448". "nine four six seven..." → "9467487448". Remove all spaces, dashes, brackets.
+- Names: Extract only the person's name. "Reetha and she is 50 years old" → "Reetha". "My name is John" → "John".
+- Ages: Extract only the number. "I am 45 years old" → "45". "forty five" → "45".
+- Corrections: "no my number is wrong" → intent=correct, field_to_correct=phone. "actually my name is..." → intent=correct, field_to_correct=name.
+- True cancellations: "I don't want to book anymore" → intent=cancel. "stop everything" → intent=cancel.
+- "no" alone during confirmation step: treat as intent=correct (patient wants to change something), NOT cancel.
+
+Return ONLY valid JSON, no markdown, no explanation."""
+
+    try:
+        resp = await async_client.chat.completions.create(
+            model=OPENAI_MODEL,
+            temperature=0.0,
+            max_tokens=150,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": raw_message}
+            ]
+        )
+        result = json.loads(resp.choices[0].message.content)
+        # Ensure all expected keys exist
+        return {
+            "intent": result.get("intent", "unclear"),
+            "field_to_correct": result.get("field_to_correct"),
+            "normalised_value": result.get("normalised_value"),
+            "reason": result.get("reason", "")
+        }
+    except Exception as e:
+        logger.warning("normalise_booking_input failed: %s", e)
+        # Safe fallback: treat as a raw provide with the original message
+        return {
+            "intent": "provide",
+            "field_to_correct": None,
+            "normalised_value": raw_message,
+            "reason": ""
+        }
+    
 async def classify_user_intent(user_message: str, history: list = []) -> str:
     """
-    Uses a fast LLM to semantically classify the user's intent.
+    Uses a fast LLM call to semantically classify the user's intent.
     Returns exactly one of: "STATUS", "BOOKING", "CANCEL", or "OTHER"
+    
+    This runs BEFORE build_context so we skip the expensive embedding
+    call entirely when the user is booking or cancelling.
     """
-    # Build a short history snippet for context (last 4 messages)
     history_snippet = ""
     if history:
         recent = history[-4:]
         history_snippet = "\n".join(
-            f"{'Assistant' if m.role == 'assistant' else 'User'}: {m.content}"
+            f"{'Assistant' if m.role == 'assistant' else 'User'}: {m.content[:200]}"
             for m in recent
         )
 
-    system_prompt = """
-    You are an intent classification engine for a hospital chatbot. 
-    Read the conversation history and the latest user message, then classify the intent into exactly ONE category.
-    Respond with ONLY the category name, nothing else.
+    system_prompt = """You are an intent classification engine for a hospital chatbot.
+Read the conversation and the latest user message, then output exactly ONE word.
 
-    Categories:
-    STATUS  - User is explicitly asking to CHECK or SEE an existing appointment status, unprompted by the assistant asking for booking details.
-    BOOKING - User wants to book an appointment, OR the assistant is currently collecting booking details (name, age, phone, date, doctor) and the user is providing those details.
-    CANCEL  - User wants to cancel or stop an ongoing process.
-    OTHER   - General questions, greetings, or anything else.
+Categories:
+STATUS  - User is asking to CHECK an existing appointment status or reference number.
+BOOKING - User wants to book/schedule an appointment, OR the assistant just asked for booking
+          details (name, age, phone, date, doctor) and the user is providing those details.
+CANCEL  - User wants to cancel or stop an ongoing booking process.
+OTHER   - General hospital questions, greetings, doctor info, or anything else.
 
-    IMPORTANT: If the assistant's last message was asking for booking information (like phone number, name, age, date),
-    and the user replies with that information, classify as BOOKING — not STATUS.
-    """
+RULES:
+- If the assistant's last message was collecting booking info, reply: BOOKING
+- Only output the single category word, nothing else."""
 
-    context = f"Conversation so far:\n{history_snippet}\n\nLatest user message: {user_message}" if history_snippet else f"User message: {user_message}"
+    context = (
+        f"Conversation:\n{history_snippet}\n\nLatest message: {user_message}"
+        if history_snippet
+        else f"Message: {user_message}"
+    )
 
     try:
         resp = await async_client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=OPENAI_MODEL,
             temperature=0.0,
+            max_tokens=5,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": context}
             ]
         )
         intent = resp.choices[0].message.content.strip().upper()
-        if intent not in ["STATUS", "BOOKING", "CANCEL", "OTHER"]:
-            return "OTHER"
-        return intent
+        # Defensive: only accept known intents
+        return intent if intent in {"STATUS", "BOOKING", "CANCEL", "OTHER"} else "OTHER"
     except Exception as e:
-        logger.warning(f"Intent classification failed: {e}")
+        logger.warning("Intent classification failed: %s", e)
         return "OTHER"
-    
+
+
 @router.post("/chat-stream")
 async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
     is_malayalam = request.language == "ml"
-    
+
+    # Step 1: Translate input if Malayalam
     english_question = request.question
     if is_malayalam:
         english_question = await _translate_async(request.question, "ml", "en")
+        logger.info("[Translation] ml->en: %r -> %r", request.question[:60], english_question[:60])
 
-    # 1. THE GATEKEEPER (Fast LLM Router)
-    # 1. THE GATEKEEPER (Fast LLM Router)
+    # Step 2: Classify intent BEFORE any expensive DB/embedding calls
     intent = await classify_user_intent(english_question, request.history or [])
+    logger.info("[Intent] %s -> %s", english_question[:60], intent)
 
     async def event_generator() -> AsyncGenerator[str, None]:
-        # ==========================================
-        # FAST PATH: CANCELLATIONS
-        # ==========================================
+        pt = ct = tt = 0
+        
+        # ── CANCEL ───────────────────────────────────────────────────────────
         if intent == "CANCEL":
-            msg = "Okay, I've cancelled any active requests. How else can I help?"
-            if is_malayalam: msg = await _translate_async(msg, "en", "ml")
+            msg = "Okay, I've cancelled any active requests. How else can I help you?"
+            if is_malayalam:
+                msg = await _translate_async(msg, "en", "ml")
             yield f"data: {json.dumps(msg)}\n\n"
             yield "data: [DONE]\n\n"
             return
 
-        # ==========================================
-        # FAST PATH: STATUS CHECKS
-        # ==========================================
+        # ── STATUS CHECK ─────────────────────────────────────────────────────
         if intent == "STATUS":
-            # Scan current message AND recent history for a phone number
-            history_text = " ".join([m.content for m in request.history[-4:]]) if request.history else ""
-            combined_text = english_question + " " + history_text
-            phone_match = re.search(r"\+?\d{7,15}", re.sub(r"[\s\-\(\)\.]", "", combined_text))
+            # Look for a phone number across current message + recent history
+            history_text = " ".join(
+                m.content for m in (request.history or [])[-6:]
+            )
+            combined = re.sub(r"[\s\-\(\)\.]", "", english_question + " " + history_text)
+            phone_match = re.search(r"\+?\d{10,15}", combined)
 
             if not phone_match:
-                msg = "I can check your appointment status! Please reply with the 10-digit phone number you used to book."
-                if is_malayalam: msg = await _translate_async(msg, "en", "ml")
+                msg = (
+                    "I can check your appointment status! "
+                    "Please share the 10-digit phone number you used when booking."
+                )
+                if is_malayalam:
+                    msg = await _translate_async(msg, "en", "ml")
                 yield f"data: {json.dumps(msg)}\n\n"
                 yield "data: [DONE]\n\n"
                 return
 
-            # We have a phone number! Check the DB instantly.
             extracted_phone = phone_match.group(0)
-            appts = db.query(Appointment).filter(
-                Appointment.hospital_id == request.hospital_id,
-                Appointment.patient_phone == extracted_phone
-            ).order_by(Appointment.created_at.desc()).limit(3).all()
+            appts = (
+                db.query(Appointment)
+                .filter(
+                    Appointment.hospital_id == request.hospital_id,
+                    Appointment.patient_phone == extracted_phone
+                )
+                .order_by(Appointment.created_at.desc())
+                .limit(3)
+                .all()
+            )
 
             if not appts:
-                msg = "I couldn't find any recent appointments for that number. Is there anything else I can help with?"
-                if is_malayalam: msg = await _translate_async(msg, "en", "ml")
+                msg = (
+                    f"I couldn't find any appointments for the number {extracted_phone}. "
+                    "Please double-check the number or contact the reception desk."
+                )
+                if is_malayalam:
+                    msg = await _translate_async(msg, "en", "ml")
                 yield f"data: {json.dumps(msg)}\n\n"
                 yield "data: [DONE]\n\n"
                 return
 
-            # Format the status response
-            reply = "Here is the status of your recent appointments:\n\n"
+            reply_lines = ["Here is the status of your recent appointments:\n"]
             for a in appts:
                 doc = db.query(Doctor).filter(Doctor.id == a.doctor_id).first()
-                stat_msg = {"pending": "⏳ Pending", "approved": f"✅ Confirmed for {a.confirmed_time}", "rejected": f"❌ Rejected ({a.rejection_reason})"}.get(a.status, a.status)
-                reply += f"👨‍⚕️ **Dr. {doc.name if doc else 'Unknown'}** on {a.preferred_date}\n   Status: {stat_msg}\n   Ref: {a.reference_number}\n\n"
-            
-            if is_malayalam: reply = await _translate_async(reply, "en", "ml")
+                doc_name = doc.name if doc else "Unknown"
+                status_str = {
+                    "pending":  "⏳ Pending — hospital will call to confirm",
+                    "approved": f"✅ Confirmed for **{a.confirmed_time}**",
+                    "rejected": f"❌ Rejected ({a.rejection_reason or 'no reason given'})"
+                }.get(a.status, a.status)
+                reply_lines.append(
+                    f"👨‍⚕️ **Dr. {doc_name}** — {a.preferred_date} ({a.time_of_day})\n"
+                    f"   Status: {status_str}\n"
+                    f"   Reference: `{a.reference_number}`\n"
+                )
+
+            reply = "\n".join(reply_lines)
+            if is_malayalam:
+                reply = await _translate_async(reply, "en", "ml")
             yield f"data: {json.dumps(reply)}\n\n"
             yield "data: [DONE]\n\n"
             return
 
-
-        # ==========================================
-        # SMART PATH: BOOKING & GENERAL CHAT
-        # ==========================================
+        # ── BOOKING & GENERAL CHAT (BOOKING or OTHER) ─────────────────────────
         translated_request = request.model_copy(update={"question": english_question})
-        system_prompt, openai_messages, hospital = build_context(translated_request, db, force_english=True)
+        system_prompt, openai_messages, hospital = build_context(
+            translated_request, db, force_english=True
+        )
+        booking_field_keywords = {
+            "phone": ["phone", "number", "mobile", "contact"],
+            "name":  ["name", "patient's full name", "full name"],
+            "age":   ["age", "how old", "date of birth"],
+            "date":  ["date", "prefer", "which day"],
+            "time":  ["morning", "afternoon", "evening", "time of day"],
+            "doctor":["doctor", "which doctor", "department"],
+        }
+        current_field = None
+        if request.history:
+            last_assistant = next(
+                (m.content.lower() for m in reversed(request.history) if m.role == "assistant"),
+                ""
+            )
+            for field, keywords in booking_field_keywords.items():
+                if any(kw in last_assistant for kw in keywords):
+                    current_field = field
+                    break
 
-        # Give the AI its secret Agent Instructions
+        processed_question = english_question
+        if current_field and intent == "BOOKING":
+            context_snippet = "\n".join(
+                f"{'Bot' if m.role == 'assistant' else 'Patient'}: {m.content}"
+                for m in (request.history or [])[-4:]
+            )
+            normalised = await normalise_booking_input(
+                english_question, current_field, context_snippet
+            )
+            logger.info("[Normalise] field=%s intent=%s value=%r",
+                        current_field, normalised["intent"], normalised["normalised_value"])
+
+            if normalised["intent"] == "cancel":
+                msg = "Okay, I've cancelled the booking process. Is there anything else I can help you with?"
+                if is_malayalam: msg = await _translate_async(msg, "en", "ml")
+                yield f"data: {json.dumps(msg)}\n\n"
+                yield "data: [DONE]\n\n"
+                return
+
+            if normalised["intent"] == "correct":
+                field = normalised.get("field_to_correct", current_field)
+                prompts = {
+                    "phone":  "Of course! Please provide the correct phone number.",
+                    "name":   "Of course! What is the correct patient name?",
+                    "age":    "Of course! What is the correct age?",
+                    "date":   "Of course! Which date would you prefer?",
+                    "time":   "Of course! Morning, afternoon, or evening?",
+                    "doctor": "Of course! Which doctor would you like to see?",
+                }
+                msg = prompts.get(field, "Of course! Please provide the correct information.")
+                if is_malayalam: msg = await _translate_async(msg, "en", "ml")
+                yield f"data: {json.dumps(msg)}\n\n"
+                yield "data: [DONE]\n\n"
+                return
+
+            if normalised["intent"] == "provide" and normalised["normalised_value"]:
+                processed_question = normalised["normalised_value"]
+                openai_messages[-1]["content"] = processed_question
+
+        # Agent instructions injected into the system prompt
         agent_instructions = """
-        You are authorized to book appointments. To book, you MUST naturally collect:
-        1. Doctor ID (Find this in the [ID: X] tags next to the doctor names)
-        2. Date (Format: YYYY-MM-DD)
-        3. Time (morning, afternoon, or evening)
-        4. Patient Full Name
-        5. Patient Age
-        6. Phone Number (10 digits)
+APPOINTMENT BOOKING CAPABILITY:
+You can book appointments for patients. Collect these details naturally, one at a time:
+1. Doctor (use the [ID: X] from the doctor list above to identify them)
+2. Preferred date (ask for a specific date like "April 20" or "next Monday")
+3. Time of day (morning, afternoon, or evening)
+4. Patient's full name (name only — do not accept extra words)
+5. Patient's age (number only, 1-120)
+6. Phone number (must be exactly 10 digits for Indian numbers)
 
-        Chat naturally. Answer questions using the knowledge base if they ask.
-        If they want to book, ask for the missing details one by one.
-        Once you have ALL 6 details, trigger the 'book_appointment' tool. DO NOT trigger it early!
-        """
+VALIDATION RULES:
+- Phone: exactly 10 digits (or up to 15 with country code). If wrong length, ask again.
+- Age: numbers 1-120 only.
+- Name: extract only the name part; ignore extra words like "and she is 30 years old".
+- Date: must be a future date.
+
+IMPORTANT:
+- Answer general questions normally using the knowledge base.
+- Only trigger 'book_appointment' once you have confirmed ALL 6 details with the patient.
+- Before triggering, show a confirmation summary and ask the patient to say 'yes' or 'no'.
+- If they say no or want to change something, ask which detail to correct.
+"""
         openai_messages[0]["content"] += f"\n\n{agent_instructions}"
 
-        # Define the Tool Schema
         tools = [{
             "type": "function",
             "function": {
                 "name": "book_appointment",
-                "description": "Trigger this ONLY when you have gathered all 6 details from the user to finalize the booking.",
+                "description": (
+                    "Trigger ONLY when the patient has confirmed all 6 details "
+                    "(doctor_id, date, time, name, age, phone). "
+                    "Do NOT trigger if any detail is missing or unconfirmed."
+                ),
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "doctor_id": {"type": "integer"},
-                        "preferred_date": {"type": "string", "description": "YYYY-MM-DD"},
-                        "time_of_day": {"type": "string", "enum": ["morning", "afternoon", "evening"]},
-                        "patient_name": {"type": "string"},
-                        "patient_age": {"type": "string"},
-                        "patient_phone": {"type": "string"}
+                        "doctor_id":      {"type": "integer", "description": "The numeric ID from [ID: X] in the doctor list"},
+                        "preferred_date": {"type": "string",  "description": "Date in YYYY-MM-DD format"},
+                        "time_of_day":    {"type": "string",  "enum": ["morning", "afternoon", "evening"]},
+                        "patient_name":   {"type": "string",  "description": "Patient's full name only"},
+                        "patient_age":    {"type": "string",  "description": "Patient's age as a number"},
+                        "patient_phone":  {"type": "string",  "description": "10-digit phone number, digits only"}
                     },
-                    "required": ["doctor_id", "preferred_date", "time_of_day", "patient_name", "patient_age", "patient_phone"]
+                    "required": ["doctor_id", "preferred_date", "time_of_day",
+                                 "patient_name", "patient_age", "patient_phone"]
                 }
             }
         }]
 
-        # Call the AI
-        stream = await async_client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=openai_messages,
-            tools=tools,
-            stream=True
-        )
+        try:
+            stream = await async_client.chat.completions.create(
+                model=OPENAI_MODEL,
+                messages=openai_messages,
+                tools=tools,
+                stream=True,
+                stream_options={"include_usage": True}
+            )
+        except Exception as e:
+            logger.exception("[chat-stream] OpenAI call failed: %s", e)
+            err = "Sorry, I'm having trouble connecting right now. Please try again."
+            if is_malayalam:
+                err = await _translate_async(err, "en", "ml")
+            yield f"data: {json.dumps(err)}\n\n"
+            yield "data: [DONE]\n\n"
+            return
 
         tool_call_name = ""
         tool_call_args = ""
         is_tool_call = False
-        english_chunks = []
+        english_chunks: List[str] = []
 
-        # Read the stream
         async for chunk in stream:
+            if chunk.usage:
+                pt = chunk.usage.prompt_tokens
+                ct = chunk.usage.completion_tokens
+                tt = chunk.usage.total_tokens
+
             delta = chunk.choices[0].delta if chunk.choices else None
-            if not delta: continue
+            if not delta:
+                continue
 
             if delta.tool_calls:
                 is_tool_call = True
                 tc = delta.tool_calls[0]
-                if tc.function.name: tool_call_name += tc.function.name
-                if tc.function.arguments: tool_call_args += tc.function.arguments
+                if tc.function.name:
+                    tool_call_name += tc.function.name
+                if tc.function.arguments:
+                    tool_call_args += tc.function.arguments
             elif delta.content and not is_tool_call:
                 token = delta.content
-                if is_malayalam: english_chunks.append(token)
-                else: yield f"data: {json.dumps(token)}\n\n"
+                if is_malayalam:
+                    english_chunks.append(token)
+                else:
+                    yield f"data: {json.dumps(token)}\n\n"
 
-        # If the AI decided to trigger the tool!
+        # ── Handle tool call (booking) ────────────────────────────────────────
         if is_tool_call and tool_call_name == "book_appointment":
             try:
                 from app.services.booking_rules import validate_booking, get_booking_config
                 from app.services.email import notify_staff_new_appointment
-                
+
                 args = json.loads(tool_call_args)
-                doctor = db.query(Doctor).filter(Doctor.id == args["doctor_id"]).first()
-                
-                # Verify booking rules
+
+                # Validate phone length
+                phone_digits = re.sub(r"\D", "", args.get("patient_phone", ""))
+                if len(phone_digits) < 7 or len(phone_digits) > 15:
+                    err = (
+                        f"The phone number '{args.get('patient_phone')}' doesn't look right. "
+                        "Please ask the patient to provide their 10-digit mobile number again."
+                    )
+                    if is_malayalam:
+                        err = await _translate_async(err, "en", "ml")
+                    yield f"data: {json.dumps(err)}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+
+                # Validate age
+                age_str = re.sub(r"\D", "", str(args.get("patient_age", "")))
+                if not age_str or not (1 <= int(age_str) <= 120):
+                    err = "The age doesn't look right. Please ask the patient to confirm their age."
+                    if is_malayalam:
+                        err = await _translate_async(err, "en", "ml")
+                    yield f"data: {json.dumps(err)}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+
+                doctor = db.query(Doctor).filter(
+                    Doctor.id == args["doctor_id"],
+                    Doctor.hospital_id == request.hospital_id
+                ).first()
+
+                if not doctor:
+                    err = (
+                        "I couldn't find that doctor in the system. "
+                        "Please ask the patient which doctor they'd like to see."
+                    )
+                    if is_malayalam:
+                        err = await _translate_async(err, "en", "ml")
+                    yield f"data: {json.dumps(err)}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+
                 ok, error_msg = validate_booking(hospital, doctor, args["preferred_date"], db)
                 if not ok:
-                    if is_malayalam: error_msg = await _translate_async(error_msg, "en", "ml")
+                    if is_malayalam:
+                        error_msg = await _translate_async(error_msg, "en", "ml")
                     yield f"data: {json.dumps(error_msg)}\n\n"
-                else:
-                    # Save to database
-                    appt = Appointment(
-                        hospital_id=request.hospital_id,
-                        doctor_id=args["doctor_id"],
-                        patient_name=args["patient_name"],
-                        patient_age=args["patient_age"],
-                        patient_phone=args["patient_phone"],
-                        preferred_date=args["preferred_date"],
-                        time_of_day=args["time_of_day"].lower(),
-                        status="pending"
+                    yield "data: [DONE]\n\n"
+                    return
+
+                appt = Appointment(
+                    hospital_id=request.hospital_id,
+                    doctor_id=args["doctor_id"],
+                    patient_name=args["patient_name"].strip(),
+                    patient_age=age_str,
+                    patient_phone=phone_digits,
+                    preferred_date=args["preferred_date"],
+                    time_of_day=args["time_of_day"].lower(),
+                    status="pending"
+                )
+                db.add(appt)
+                db.commit()
+                db.refresh(appt)
+
+                config = get_booking_config(hospital)
+                staff_email = config.get("notification_email", "")
+                if staff_email:
+                    notify_staff_new_appointment(
+                        staff_email=staff_email,
+                        hospital_name=hospital.name,
+                        reference=appt.reference_number,
+                        patient_name=appt.patient_name,
+                        patient_age=appt.patient_age,
+                        patient_phone=appt.patient_phone,
+                        doctor_name=doctor.name,
+                        preferred_date=appt.preferred_date,
+                        time_of_day=appt.time_of_day,
                     )
-                    db.add(appt)
-                    db.commit()
-                    db.refresh(appt)
 
-                    # Send Email Notification
-                    config = get_booking_config(hospital)
-                    staff_email = config.get("notification_email", "")
-                    if staff_email:
-                        notify_staff_new_appointment(
-                            staff_email=staff_email, hospital_name=hospital.name,
-                            reference=appt.reference_number, patient_name=appt.patient_name,
-                            patient_age=appt.patient_age, patient_phone=appt.patient_phone,
-                            doctor_name=doctor.name if doctor else "Unknown",
-                            preferred_date=appt.preferred_date, time_of_day=appt.time_of_day,
-                        )
+                success_msg = (
+                    f"✅ **Appointment Request Submitted!**\n\n"
+                    f"Reference: **{appt.reference_number}**\n"
+                    f"Doctor: {doctor.name} ({doctor.department})\n"
+                    f"Date: {appt.preferred_date} — {appt.time_of_day.title()}\n"
+                    f"Patient: {appt.patient_name}, age {appt.patient_age}\n\n"
+                    f"The hospital will call **{appt.patient_phone}** to confirm your slot."
+                )
+                if is_malayalam:
+                    success_msg = await _translate_async(success_msg, "en", "ml")
+                yield f"data: {json.dumps(success_msg)}\n\n"
 
-                    success_msg = f"✅ **Appointment Request Submitted!**\n\nYour reference number is: **{appt.reference_number}**\nThe hospital will call you to confirm your slot."
-                    if is_malayalam: success_msg = await _translate_async(success_msg, "en", "ml")
-                    yield f"data: {json.dumps(success_msg)}\n\n"
-                    
-            except Exception as e:
-                logger.error(f"Tool execution failed: {e}")
-                err = "Sorry, there was a technical error booking your appointment. Please try again."
-                if is_malayalam: err = await _translate_async(err, "en", "ml")
+            except json.JSONDecodeError:
+                logger.error("[chat-stream] Failed to parse tool args: %r", tool_call_args)
+                err = "Something went wrong while booking. Please try again."
+                if is_malayalam:
+                    err = await _translate_async(err, "en", "ml")
                 yield f"data: {json.dumps(err)}\n\n"
-                
+            except Exception as e:
+                logger.exception("[chat-stream] Tool execution error: %s", e)
+                err = "Sorry, there was a technical error. Please try again."
+                if is_malayalam:
+                    err = await _translate_async(err, "en", "ml")
+                yield f"data: {json.dumps(err)}\n\n"
+
         else:
-            # If the AI is just chatting naturally
+            # Normal chat response — translate if needed
             if is_malayalam and english_chunks:
                 full_english = "".join(english_chunks)
                 full_malayalam = await _translate_async(full_english, "en", "ml")
@@ -6151,9 +6404,25 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
 
         yield "data: [DONE]\n\n"
 
+        # Log usage
+        if tt > 0:
+            try:
+                db.add(UsageLedger(
+                    hospital_id=request.hospital_id,
+                    endpoint="/chat-stream",
+                    prompt_tokens=pt,
+                    completion_tokens=ct,
+                    total_tokens=tt,
+                    estimated_cost=(tt / 1_000_000) * OPENAI_COST_PER_MTok
+                ))
+                db.commit()
+            except Exception as e:
+                logger.warning("[chat-stream] Usage logging failed: %s", e)
+
     return StreamingResponse(
-        event_generator(), media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"}
     )
 </file>
 
@@ -6161,7 +6430,7 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 import ChatMessage from './ChatMessage';
-import { Mic, MicOff, Send, Zap, Activity, Loader2, AlertCircle } from 'lucide-react';
+import { Mic, MicOff, Send, Zap, Activity, Loader2, AlertCircle, WifiOff } from 'lucide-react';
 
 interface ChatProps { hospitalId: string; }
 
@@ -6174,15 +6443,21 @@ interface Message {
 
 type MicState = 'idle' | 'recording';
 
-const SILENCE_THRESHOLD_MS = 1800;
+// How long of silence (with transcript content) before auto-sending
+const SILENCE_THRESHOLD_MS = 2200;  // slightly longer — helps Malayalam speakers
 const SILENCE_CHECK_INTERVAL_MS = 300;
+
+// How long of total silence (no transcript at all) before we show a hint
+const NO_SPEECH_TIMEOUT_MS = 8000;
+
+// Watchdog: if listening state hasn't been true for this long while recording, restart
+const WATCHDOG_INTERVAL_MS = 3000;
 
 const FALLBACK_SUGGESTIONS = {
   en: ["What can Arogya help me with?", "Which doctors are available?", "How do I contact the hospital?", "Tell me about this hospital"],
   ml: ["ആരോഗ്യ എന്തൊക്കെ സഹായിക്കും?", "ഏത് ഡോക്ടർ ഉണ്ട്?", "ആശുപത്രിയിൽ എങ്ങനെ ബന്ധപ്പെടാം?", "ഈ ആശുപത്രിയെക്കുറിച്ച് പറയൂ"],
 };
 
-// Shown while the real welcome is loading
 const LOADING_WELCOME = {
   en: "👋 Hello! I am **Arogya**. Loading your hospital information…",
   ml: "👋 നമസ്കാരം! ഞാൻ **ആരോഗ്യ**. ആശുപത്രി വിവരങ്ങൾ ലോഡ് ചെയ്യുന്നു…",
@@ -6193,9 +6468,10 @@ function buildHistory(messages: Message[]): { role: string; content: string }[] 
 }
 
 function getBaseURL(): string {
-  return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:8000/api/v1'
-    : 'https://hospital-ai-platform.onrender.com/api/v1';
+  return (import.meta as any).env?.VITE_API_URL
+    || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      ? 'http://localhost:8000/api/v1'
+      : 'https://hospital-ai-platform.onrender.com/api/v1');
 }
 
 const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
@@ -6205,17 +6481,18 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
   const [inputText, setInputText] = useState('');
   const [micState, setMicState] = useState<MicState>('idle');
   const [micError, setMicError] = useState<string | null>(null);
+  // Shown below mic button when no speech detected for a while
+  const [micHint, setMicHint] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<{ en: string[]; ml: string[] }>(FALLBACK_SUGGESTIONS);
-  const sessionToken = useRef<string>(
-  sessionStorage.getItem('bookingSessionToken') || (() => {
-    const t = crypto.randomUUID();
-    sessionStorage.setItem('bookingSessionToken', t);
-    return t;
-  })()
-);
-  // Cache welcome messages so we don't re-fetch on every language toggle
-  const welcomeCache = useRef<{ en: string; ml: string } | null>(null);
 
+  const sessionToken = useRef<string>(
+    sessionStorage.getItem('bookingSessionToken') || (() => {
+      const t = crypto.randomUUID();
+      sessionStorage.setItem('bookingSessionToken', t);
+      return t;
+    })()
+  );
+  const welcomeCache = useRef<{ en: string; ml: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const lastTranscriptUpdateRef = useRef<number>(0);
@@ -6223,28 +6500,107 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
   const silenceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoSendingRef = useRef(false);
   const handleSendRef = useRef<((text: string) => Promise<void>) | null>(null);
+  // Tracks whether we are actively trying to be in recording state
+  const shouldBeListeningRef = useRef(false);
+  // Watchdog timer ref
+  const watchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // No-speech timeout ref
+  const noSpeechTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Last time the listening flag was observed as true
+  const lastListeningTrueRef = useRef<number>(0);
+  // Current language ref (avoids stale closures in intervals)
+  const languageRef = useRef(language);
 
   const {
     transcript,
     listening,
     resetTranscript,
     browserSupportsSpeechRecognition,
+    isMicrophoneAvailable,
   } = useSpeechRecognition();
 
-  // ── Fetch dynamic welcome message from backend ────────────────────────────
+  // Keep languageRef in sync
+  useEffect(() => { languageRef.current = language; }, [language]);
+
+  // ── Safely start listening ────────────────────────────────────────────────
+  const startListeningNow = useCallback(() => {
+    try {
+      SpeechRecognition.startListening({
+        continuous: false,
+        language: languageRef.current === 'ml' ? 'ml-IN' : 'en-US',
+      });
+    } catch (e) {
+      // Ignore — watchdog will retry
+    }
+  }, []);
+
+  // ── Watchdog: checks every 3s that the browser is actually listening ──────
+  // Chrome silently kills the speech session after ~60s or on network hiccups.
+  // This detects that and restarts automatically.
+  const startWatchdog = useCallback(() => {
+    if (watchdogRef.current) clearInterval(watchdogRef.current);
+    watchdogRef.current = setInterval(() => {
+      if (!shouldBeListeningRef.current || autoSendingRef.current) return;
+      const timeSinceListening = Date.now() - lastListeningTrueRef.current;
+      if (timeSinceListening > WATCHDOG_INTERVAL_MS) {
+        // Session appears dead — restart
+        try {
+          SpeechRecognition.abortListening();
+        } catch (_) {}
+        setTimeout(() => {
+          if (shouldBeListeningRef.current && !autoSendingRef.current) {
+            startListeningNow();
+          }
+        }, 200);
+      }
+    }, WATCHDOG_INTERVAL_MS);
+  }, [startListeningNow]);
+
+  const stopWatchdog = useCallback(() => {
+    if (watchdogRef.current) {
+      clearInterval(watchdogRef.current);
+      watchdogRef.current = null;
+    }
+  }, []);
+
+  // ── No-speech hint timer ──────────────────────────────────────────────────
+  const startNoSpeechTimer = useCallback(() => {
+    if (noSpeechTimerRef.current) clearTimeout(noSpeechTimerRef.current);
+    noSpeechTimerRef.current = setTimeout(() => {
+      if (shouldBeListeningRef.current && !transcriptRef.current.trim()) {
+        setMicHint(
+          languageRef.current === 'ml'
+            ? 'ശബ്ദം കേൾക്കുന്നില്ല — അടുത്ത് സംസാരിക്കൂ'
+            : "Can't hear you — try speaking closer to the mic"
+        );
+      }
+    }, NO_SPEECH_TIMEOUT_MS);
+  }, []);
+
+  const clearNoSpeechTimer = useCallback(() => {
+    if (noSpeechTimerRef.current) {
+      clearTimeout(noSpeechTimerRef.current);
+      noSpeechTimerRef.current = null;
+    }
+    setMicHint(null);
+  }, []);
+
+  // ── Track when listening is true (for watchdog) ───────────────────────────
+  useEffect(() => {
+    if (listening) {
+      lastListeningTrueRef.current = Date.now();
+    }
+  }, [listening]);
+
+  // ── Fetch welcome ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!hospitalId) return;
     const token = localStorage.getItem('token');
-
-    // Show a loading placeholder immediately
     setMessages([{ role: 'assistant', content: LOADING_WELCOME[language], isWelcome: true }]);
-
     if (welcomeCache.current) {
-      // Already fetched — just swap language
       setMessages([{ role: 'assistant', content: welcomeCache.current[language], isWelcome: true }]);
       return;
     }
-
     fetch(`${getBaseURL()}/ai/welcome/${hospitalId}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
@@ -6254,45 +6610,32 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
           welcomeCache.current = { en: data.en, ml: data.ml };
           setMessages([{ role: 'assistant', content: data[language], isWelcome: true }]);
         } else {
-          // Backend didn't return expected shape — use a sensible fallback
-          setMessages([{
-            role: 'assistant',
-            content: language === 'ml'
-              ? "👋 നമസ്കാരം! ഞാൻ **ആരോഗ്യ**. എനിക്ക് എങ്ങനെ സഹായിക്കാനാകും?"
-              : "👋 Hello! I am **Arogya**. How can I help you today?",
-            isWelcome: true
-          }]);
+          setMessages([{ role: 'assistant', content: language === 'ml'
+            ? "👋 നമസ്കാരം! ഞാൻ **ആരോഗ്യ**. എനിക്ക് എങ്ങനെ സഹായിക്കാനാകും?"
+            : "👋 Hello! I am **Arogya**. How can I help you today?", isWelcome: true }]);
         }
       })
       .catch(() => {
-        setMessages([{
-          role: 'assistant',
-          content: language === 'ml'
-            ? "👋 നമസ്കാരം! ഞാൻ **ആരോഗ്യ**. എനിക്ക് എങ്ങനെ സഹായിക്കാനാകും?"
-            : "👋 Hello! I am **Arogya**. How can I help you today?",
-          isWelcome: true
-        }]);
+        setMessages([{ role: 'assistant', content: language === 'ml'
+          ? "👋 നമസ്കാരം! ഞാൻ **ആരോഗ്യ**. എനിക്ക് എങ്ങനെ സഹായിക്കാനാകും?"
+          : "👋 Hello! I am **Arogya**. How can I help you today?", isWelcome: true }]);
       });
-  // Only re-fetch when hospitalId changes; language changes are handled below
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hospitalId]);
 
-  // ── Swap welcome language without re-fetching ─────────────────────────────
   useEffect(() => {
     setMessages(prev => {
-      if (prev.length === 0) return prev;
-      const first = prev[0];
-      if (!first.isWelcome) return prev;
+      if (!prev.length || !prev[0].isWelcome) return prev;
       const newContent = welcomeCache.current
         ? welcomeCache.current[language]
         : language === 'ml'
           ? "👋 നമസ്കാരം! ഞാൻ **ആരോഗ്യ**. എനിക്ക് എങ്ങനെ സഹായിക്കാനാകും?"
           : "👋 Hello! I am **Arogya**. How can I help you today?";
-      return [{ ...first, content: newContent }, ...prev.slice(1)];
+      return [{ ...prev[0], content: newContent }, ...prev.slice(1)];
     });
   }, [language]);
 
-  // ── Fetch dynamic suggestions from backend ────────────────────────────────
+  // ── Fetch suggestions ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!hospitalId) return;
     const token = localStorage.getItem('token');
@@ -6306,11 +6649,19 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
 
   // ── Keep transcriptRef in sync ────────────────────────────────────────────
   useEffect(() => {
-    if (transcript !== transcriptRef.current) {
-      transcriptRef.current = transcript;
-      lastTranscriptUpdateRef.current = Date.now();
+if (transcript !== transcriptRef.current) {
+  // Only overwrite if new transcript has content, OR if we have nothing yet.
+  // Never let an empty reset from a new browser session wipe existing captured speech.
+  if (transcript.trim() || !transcriptRef.current.trim()) {
+    transcriptRef.current = transcript;
+  }
+  if (transcript.trim()) {
+    lastTranscriptUpdateRef.current = Date.now();
+  }
+      // Clear the no-speech hint as soon as they start speaking
+      if (transcript.trim()) clearNoSpeechTimer();
     }
-  }, [transcript]);
+  }, [transcript, clearNoSpeechTimer]);
 
   // ── Silence detection ─────────────────────────────────────────────────────
   const stopSilenceDetection = useCallback(() => {
@@ -6324,77 +6675,120 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
     stopSilenceDetection();
     lastTranscriptUpdateRef.current = Date.now();
     silenceIntervalRef.current = setInterval(() => {
+      if (autoSendingRef.current) return;
       const silentFor = Date.now() - lastTranscriptUpdateRef.current;
       const hasContent = transcriptRef.current.trim().length > 0;
       if (hasContent && silentFor >= SILENCE_THRESHOLD_MS) {
         stopSilenceDetection();
-        if (!autoSendingRef.current) {
-          autoSendingRef.current = true;
-          const captured = transcriptRef.current.trim();
-          SpeechRecognition.abortListening();
-          setMicState('idle');
-          if (handleSendRef.current) handleSendRef.current(captured);
-        }
+        autoSendingRef.current = true;
+        const captured = transcriptRef.current.trim();
+        shouldBeListeningRef.current = false;
+        stopWatchdog();
+        clearNoSpeechTimer();
+        SpeechRecognition.abortListening();
+        setMicState('idle');
+        if (handleSendRef.current) handleSendRef.current(captured);
       }
     }, SILENCE_CHECK_INTERVAL_MS);
-  }, [stopSilenceDetection]);
+  }, [stopSilenceDetection, stopWatchdog, clearNoSpeechTimer]);
 
-  useEffect(() => () => { stopSilenceDetection(); abortRef.current?.abort(); }, [stopSilenceDetection]);
-
-  // ── Restart listening when browser auto-stops (continuous: false) ─────────
+  // ── Restart listening when browser session ends (continuous: false) ───────
+  // This is the core loop that keeps listening active between utterances.
   useEffect(() => {
-    if (micState === 'recording' && !listening && !autoSendingRef.current && !isStreaming) {
-      const timer = setTimeout(() => {
-        if (micState === 'recording' && !autoSendingRef.current) {
-          SpeechRecognition.startListening({ continuous: false, language: language === 'ml' ? 'ml-IN' : 'en-US' });
-        }
-      }, 150);
-      return () => clearTimeout(timer);
+  if (autoSendingRef.current) return;
+  if (isStreaming) return;
+  if (listening) return;
+
+  const timer = setTimeout(() => {
+    if (shouldBeListeningRef.current && !autoSendingRef.current) {
+      const savedTranscript = transcriptRef.current;
+      startListeningNow();
+      if (savedTranscript && !transcriptRef.current) {
+        transcriptRef.current = savedTranscript;
+        lastTranscriptUpdateRef.current = Date.now();
+      }
     }
-  }, [listening, micState, language, isStreaming]);
+  }, 250);
+
+  return () => clearTimeout(timer);
+}, [listening, isStreaming, startListeningNow]);
+
+  // ── Cleanup on unmount ────────────────────────────────────────────────────
+  useEffect(() => () => {
+    shouldBeListeningRef.current = false;
+    stopSilenceDetection();
+    stopWatchdog();
+    clearNoSpeechTimer();
+    abortRef.current?.abort();
+  }, [stopSilenceDetection, stopWatchdog, clearNoSpeechTimer]);
 
   // ── Mic toggle ────────────────────────────────────────────────────────────
   const toggleMic = useCallback(async () => {
     setMicError(null);
+    setMicHint(null);
 
     if (micState === 'idle') {
+      // Check permission explicitly — gives a clear error instead of silent failure
       if (navigator.permissions) {
         try {
           const result = await navigator.permissions.query({ name: 'microphone' as PermissionName });
           if (result.state === 'denied') {
             setMicError(language === 'ml'
               ? 'മൈക്രോഫോൺ ആക്സസ് തടഞ്ഞിരിക്കുന്നു. ബ്രൗസർ സെറ്റിംഗ്സിൽ അനുവദിക്കൂ.'
-              : 'Microphone access is blocked. Please allow it in your browser settings and refresh.');
+              : 'Microphone access is blocked. Please allow it in your browser settings.');
             return;
           }
-        } catch { /* permissions API not supported */ }
+        } catch { /* permissions API not available on some browsers */ }
       }
+
+      // Also check isMicrophoneAvailable from the hook
+      if (!isMicrophoneAvailable) {
+        setMicError(language === 'ml'
+          ? 'മൈക്രോഫോൺ കണ്ടെത്തിയില്ല. ഉപകരണത്തിൽ മൈക്ക് ഉണ്ടെന്ന് ഉറപ്പുവരുത്തൂ.'
+          : 'No microphone found. Please check your device has a working microphone.');
+        return;
+      }
+
       try {
         resetTranscript();
         transcriptRef.current = '';
         lastTranscriptUpdateRef.current = Date.now();
+        lastListeningTrueRef.current = Date.now();
         autoSendingRef.current = false;
+        shouldBeListeningRef.current = true;
         setInputText('');
-        SpeechRecognition.startListening({ continuous: false, language: language === 'ml' ? 'ml-IN' : 'en-US' });
         setMicState('recording');
+        startListeningNow();
         startSilenceDetection();
+        startWatchdog();
+        startNoSpeechTimer();
       } catch {
+        shouldBeListeningRef.current = false;
+        setMicState('idle');
         setMicError(language === 'ml'
-          ? 'മൈക്രോഫോൺ ആക്സസ് ലഭ്യമല്ല. ക്രോം ബ്രൗസർ ഉപയോഗിക്കൂ.'
-          : 'Could not access microphone. Please use Chrome and ensure mic permission is granted.');
+          ? 'മൈക്രോഫോൺ ആരംഭിക്കാൻ കഴിഞ്ഞില്ല. Chrome ബ്രൗസർ ഉപയോഗിക്കൂ.'
+          : 'Could not start microphone. Please use Chrome browser.');
       }
     } else if (micState === 'recording') {
-      stopSilenceDetection();
+      // Manual cancel
+      shouldBeListeningRef.current = false;
       autoSendingRef.current = false;
+      stopSilenceDetection();
+      stopWatchdog();
+      clearNoSpeechTimer();
       SpeechRecognition.abortListening();
       resetTranscript();
       transcriptRef.current = '';
       setInputText('');
       setMicState('idle');
     }
-  }, [micState, language, startSilenceDetection, stopSilenceDetection, resetTranscript]);
+  }, [
+    micState, language, isMicrophoneAvailable,
+    startListeningNow, startSilenceDetection, startWatchdog, startNoSpeechTimer,
+    stopSilenceDetection, stopWatchdog, clearNoSpeechTimer, resetTranscript,
+  ]);
 
-  // ── Send (streaming) ──────────────────────────────────────────────────────
+  // ── Send ──────────────────────────────────────────────────────────────────
   const handleSend = useCallback(async (text: string) => {
     const msg = (text || inputText).trim();
     if (!msg || isStreaming) return;
@@ -6402,7 +6796,10 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
     abortRef.current?.abort();
     abortRef.current = new AbortController();
 
+    shouldBeListeningRef.current = false;
     stopSilenceDetection();
+    stopWatchdog();
+    clearNoSpeechTimer();
     SpeechRecognition.abortListening();
     resetTranscript();
     transcriptRef.current = '';
@@ -6410,6 +6807,7 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
     setInputText('');
     setMicState('idle');
     setMicError(null);
+    setMicHint(null);
 
     const historySnapshot = buildHistory(messages);
     setMessages(prev => [...prev, { role: 'user', content: msg }]);
@@ -6455,14 +6853,14 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
           }
           if (payload.startsWith('[ERROR]')) {
             setMessages(prev => prev.map((m, i) => i === prev.length - 1
-              ? { ...m, content: language === 'ml' ? 'ക്ഷമിക്കണം, ഒരു പ്രശ്‌നം ഉണ്ടായി. വീണ്ടും ശ്രമിക്കൂ.' : 'Sorry, something went wrong. Please try again.', isStreaming: false }
+              ? { ...m, content: language === 'ml' ? 'ക്ഷമിക്കണം, പ്രശ്‌നം ഉണ്ടായി. വീണ്ടും ശ്രമിക്കൂ.' : 'Sorry, something went wrong. Please try again.', isStreaming: false }
               : m));
             break;
           }
           try {
             const t = JSON.parse(payload);
             setMessages(prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, content: m.content + t } : m));
-          } catch { /* skip */ }
+          } catch { /* skip malformed frame */ }
         }
       }
     } catch (err: unknown) {
@@ -6473,10 +6871,9 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
     } finally {
       setIsStreaming(false);
     }
-  }, [messages, inputText, isStreaming, hospitalId, language, stopSilenceDetection, resetTranscript]);
+  }, [messages, inputText, isStreaming, hospitalId, language, stopSilenceDetection, stopWatchdog, clearNoSpeechTimer, resetTranscript]);
 
   useEffect(() => { handleSendRef.current = handleSend; }, [handleSend]);
-
   useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   const micBtnClass = {
@@ -6486,7 +6883,7 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
 
   const micLabel = {
     idle:      language === 'en' ? 'Tap to speak' : 'സംസാരിക്കുക',
-    recording: language === 'en' ? 'Listening… tap to cancel' : 'കേൾക്കുന്നു… റദ്ദാക്കാൻ ടാപ്പ് ചെയ്യൂ',
+    recording: language === 'en' ? 'Tap to cancel' : 'റദ്ദാക്കാൻ ടാപ്പ് ചെയ്യൂ',
   }[micState];
 
   if (!browserSupportsSpeechRecognition) {
@@ -6496,14 +6893,9 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
           <h3 className="font-bold flex items-center gap-2"><Activity className="w-4 h-4" /> Ask Arogya</h3>
         </div>
         <div className="p-6 bg-slate-50 flex-1">
-          <div className="bg-white rounded-xl p-4 border border-slate-100 shadow-sm mb-4">
-            <p className="text-sm text-gray-700" style={{ fontFamily: "'Noto Sans Malayalam', sans-serif" }}>
-              {language === 'ml' ? "👋 നമസ്കാരം! ഞാൻ ആരോഗ്യ. ടൈപ്പ് ചെയ്ത് ചോദ്യം ചോദിക്കൂ." : "👋 Hello! I am Arogya. You can type your question below."}
-            </p>
-          </div>
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
             <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-            <p className="text-xs text-amber-700 mt-1">
+            <p className="text-xs text-amber-700">
               {language === 'ml' ? 'ശബ്ദം ഉപയോഗിക്കാൻ Chrome ബ്രൗസർ ഉപയോഗിക്കൂ.' : 'Voice input requires Chrome browser.'}
             </p>
           </div>
@@ -6594,6 +6986,7 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
       {/* Input + mic */}
       <div className="p-4 border-t bg-white shrink-0 space-y-3">
 
+        {/* Permission / device error */}
         {micError && (
           <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
             <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
@@ -6622,7 +7015,22 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
             aria-label={micLabel}>
             {micState === 'recording' ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
           </button>
-          <p className="text-[9px] uppercase tracking-widest text-slate-400 font-black mt-2 text-center ml-text">{micLabel}</p>
+
+          {/* Mic status line — shows label normally, hint when no speech detected */}
+          <p className="text-[9px] uppercase tracking-widest text-slate-400 font-black mt-2 text-center ml-text">
+            {micHint ? (
+              <span className="text-amber-500 normal-case tracking-normal font-medium">
+                {micHint}
+              </span>
+            ) : micLabel}
+          </p>
+
+          {/* Live transcript preview below the button */}
+          {micState === 'recording' && !transcript && !micHint && (
+            <p className="text-[10px] text-slate-300 mt-1 ml-text">
+              {language === 'ml' ? 'സ്പഷ്ടമായി സംസാരിക്കൂ…' : 'Speak clearly…'}
+            </p>
+          )}
         </div>
 
       </div>
