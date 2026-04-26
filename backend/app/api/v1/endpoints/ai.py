@@ -464,7 +464,9 @@ def fetch_availability_context(question: str, sheet_id: str, hospital_id: int, t
 # =============================================================================
 
 def build_system_prompt_english() -> str:
-    return "Respond in English only. Be clear, accurate, and concise."
+    return """Respond in English only. 
+CRITICAL RULE: Be extremely concise and conversational. Use 1 to 2 short sentences maximum. 
+Do not write long paragraphs. Speak like a helpful receptionist on a quick phone call."""
 
 
 def build_fallback_instruction(doctors_found: int, kb_chunks: int, has_pharmacy: bool, has_labs: bool) -> str:
@@ -888,13 +890,12 @@ Read the conversation and the latest user message, then output exactly ONE word.
 
 Categories:
 STATUS  - User is asking to CHECK an existing appointment status or reference number.
-BOOKING - User wants to book/schedule an appointment, OR the assistant just asked for booking
-          details (name, age, phone, date, doctor) and the user is providing those details.
+BOOKING - User wants to book/schedule an appointment, OR is providing booking details.
 CANCEL  - User wants to cancel or stop an ongoing booking process.
-OTHER   - General hospital questions, greetings, doctor info, or anything else.
+OTHER   - General hospital questions, asking about medicines, lab tests, timings, or doctors.
 
 RULES:
-- If the assistant's last message was collecting booking info, reply: BOOKING
+- If the user changes the subject to ask a general question (e.g., about medicines, lab tests, or where something is), output: OTHER (Even if you were in the middle of booking).
 - Only output the single category word, nothing else."""
 
     context = (
@@ -1088,7 +1089,6 @@ You can book appointments for patients. Collect these details naturally, one at 
 
 VALIDATION RULES:
 - Phone: exactly 10 digits (or up to 15 with country code). If wrong length, ask again.
-- Age: numbers 1-120 only.
 - Name: extract only the name part; ignore extra words like "and she is 30 years old".
 - Date: must be a future date.
 
@@ -1096,6 +1096,7 @@ IMPORTANT:
 - Answer general questions normally using the knowledge base.
 - Only trigger 'book_appointment' once you have confirmed ALL 6 details with the patient.
 - Before triggering, show a confirmation summary and ask the patient to say 'yes' or 'no'.
+
 - If they say no or want to change something, ask which detail to correct.
 """
         openai_messages[0]["content"] += f"\n\n{agent_instructions}"
