@@ -22,12 +22,14 @@ def get_db() -> Generator:
 def get_current_tenant(token: str = Depends(oauth2_scheme)) -> int:
     """
     The Magic Key: Extracts the hospital_id from the JWT.
-    If the token is invalid or missing the ID, it denies access.
     """
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        hospital_id: int = payload.get("hospital_id")
-        if hospital_id is None:
+        hospital_id = payload.get("hospital_id")
+        role = payload.get("role")
+        
+        # FIX: Allow superadmins to bypass the null tenant check
+        if hospital_id is None and role != "superadmin":
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid authentication credentials: No tenant ID found",
