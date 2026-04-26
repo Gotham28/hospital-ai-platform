@@ -74,7 +74,6 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_doctor_schedules_doctor_id'), 'doctor_schedules', ['doctor_id'], unique=False)
     op.create_index(op.f('ix_doctor_schedules_id'), 'doctor_schedules', ['id'], unique=False)
-    op.drop_index(op.f('ix_knowledge_base_id'), table_name='knowledge_base')
     op.drop_table('knowledge_base')
     op.drop_index(op.f('ix_usage_ledger_id'), table_name='usage_ledger')
     op.drop_table('usage_ledger')
@@ -110,7 +109,6 @@ def downgrade() -> None:
     sa.ForeignKeyConstraint(['hospital_id'], ['hospital.id'], name=op.f('knowledge_base_hospital_id_fkey')),
     sa.PrimaryKeyConstraint('id', name=op.f('knowledge_base_pkey'))
     )
-    op.create_index(op.f('ix_knowledge_base_id'), 'knowledge_base', ['id'], unique=False)
     op.drop_index(op.f('ix_doctor_schedules_id'), table_name='doctor_schedules')
     op.drop_index(op.f('ix_doctor_schedules_doctor_id'), table_name='doctor_schedules')
     op.drop_table('doctor_schedules')
