@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import api from '../api/axios';
-import { TestTube, Plus, Trash2, Loader2 } from 'lucide-react';
+import { TestTube, Plus, Trash2, Loader2, Upload } from 'lucide-react';
 
 export default function LabTestsPage() {
   const { hospitalId } = useParams();
@@ -53,12 +53,47 @@ export default function LabTestsPage() {
       alert("Failed to delete");
     }
   };
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      setLoading(true);
+      await api.post(`/lab-tests/hospital/${hospitalId}/bulk-upload`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      alert("Lab tests imported successfully!");
+      fetchTests();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Import failed. Ensure it's a valid CSV.");
+    } finally {
+      setLoading(false);
+      event.target.value = ''; 
+    }
+  };
 
   return (
     <div className="space-y-6 max-w-5xl">
       <div className="flex items-center gap-3 border-b pb-4">
         <TestTube className="w-6 h-6 text-purple-600" />
         <h2 className="text-2xl font-bold text-gray-900">Lab & Diagnostics</h2>
+      </div>
+      <div className="flex justify-between items-center border-b pb-4">
+        <div className="flex items-center gap-3">
+          <TestTube className="w-6 h-6 text-purple-600" />
+          <h2 className="text-2xl font-bold text-gray-900">Lab & Diagnostics</h2>
+        </div>
+
+        <div className="relative">
+          <input type="file" id="lab-upload" className="hidden" onChange={handleFileUpload} accept=".csv" disabled={loading} />
+          <label htmlFor="lab-upload" className={`flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 cursor-pointer font-medium text-sm transition-colors ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            Import CSV
+          </label>
+        </div>
       </div>
 
       {/* Add New Test Form */}
