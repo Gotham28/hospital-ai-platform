@@ -77,10 +77,7 @@ export default function LabTestsPage() {
 
   return (
     <div className="space-y-6 max-w-5xl">
-      <div className="flex items-center gap-3 border-b pb-4">
-        <TestTube className="w-6 h-6 text-purple-600" />
-        <h2 className="text-2xl font-bold text-gray-900">Lab & Diagnostics</h2>
-      </div>
+
       <div className="flex justify-between items-center border-b pb-4">
         <div className="flex items-center gap-3">
           <TestTube className="w-6 h-6 text-purple-600" />

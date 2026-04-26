@@ -62,40 +62,76 @@ async def bulk_upload_medicines(
     if token_data.get("role") != "superadmin" and str(token_data.get("hospital_id")) != str(hospital_id):
         raise HTTPException(status_code=403, detail="Access denied")
 
-    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
-    if not hospital:
-        raise HTTPException(status_code=404, detail="Hospital not found")
-
     content = await file.read()
-    stream = io.StringIO(content.decode("utf-8"))
-    reader = csv.DictReader(stream)
+    text_content = content.decode("utf-8")
+    
+    # 1. Extract just the headers from the CSV
+    reader = csv.DictReader(io.StringIO(text_content))
+    csv_headers = reader.fieldnames
+    if not csv_headers:
+        raise HTTPException(status_code=400, detail="CSV file is empty or invalid.")
 
+    # 2. Ask the LLM to map the headers
+    import os
+    import json
+    from openai import OpenAI
+    oai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    
+    target_schema = {
+        "name": "Generic name or main title of the medicine (Required)",
+        "brand_name": "Brand name of the medicine",
+        "category": "Type or category (e.g., Tablet, Syrup)",
+        "price": "Cost or price of the medicine",
+        "stock_status": "Stock availability (e.g., In Stock, Out of Stock)",
+        "requires_prescription": "Does it need a prescription? (Yes/No/Boolean)"
+    }
+
+    prompt = f"""
+    You are a data mapping assistant. Map these provided CSV headers: {csv_headers}
+    To this target database schema: {json.dumps(target_schema)}
+    
+    Return ONLY a raw JSON object where keys are the database schema keys, and values are the EXACT matching string from the CSV headers.
+    If there is no logical match for a target key, set its value to null.
+    """
+
+    llm_resp = oai.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "system", "content": prompt}],
+        response_format={"type": "json_object"}
+    )
+    mapping = json.loads(llm_resp.choices[0].message.content)
+
+    # 3. Parse the CSV using the LLM's dynamic mapping
     count = 0
     for row in reader:
-        # Clean keys to lowercase for easier matching
-        normalized_row = {k.strip().lower(): v.strip() for k, v in row.items()}
-        
-        name = normalized_row.get("name") or normalized_row.get("generic name")
-        if not name:
-            continue # Skip empty rows
+        # Get the actual column names from the mapping
+        name_col = mapping.get("name")
+        if not name_col or not row.get(name_col):
+            continue # Skip rows without a primary name
 
-        # Parse boolean values safely
-        req_rx_str = normalized_row.get("requires prescription", "no").lower()
-        requires_prescription = req_rx_str in ["yes", "true", "1", "y"]
+        # Safely parse prescription boolean
+        rx_col = mapping.get("requires_prescription")
+        req_rx_str = str(row.get(rx_col, "no")).lower() if rx_col else "no"
+        requires_prescription = req_rx_str in ["yes", "true", "1", "y", "required"]
 
-        # Parse price safely
+        # Safely parse price
+        price_col = mapping.get("price")
         try:
-            price = float(normalized_row.get("price", 0))
+            price = float(str(row.get(price_col, 0)).replace("$", "").replace(",", "").strip()) if price_col else 0.0
         except ValueError:
             price = 0.0
 
+        brand_col = mapping.get("brand_name")
+        cat_col = mapping.get("category")
+        stock_col = mapping.get("stock_status")
+
         med = Medicine(
             hospital_id=hospital_id,
-            name=name,
-            brand_name=normalized_row.get("brand name", ""),
-            category=normalized_row.get("category", ""),
+            name=row.get(name_col).strip(),
+            brand_name=row.get(brand_col, "").strip() if brand_col else "",
+            category=row.get(cat_col, "").strip() if cat_col else "",
             price=price,
-            stock_status=normalized_row.get("stock status", "in_stock").lower().replace(" ", "_"),
+            stock_status=row.get(stock_col, "in_stock").strip().lower().replace(" ", "_") if stock_col else "in_stock",
             requires_prescription=requires_prescription
         )
         db.add(med)
@@ -103,7 +139,7 @@ async def bulk_upload_medicines(
 
     try:
         db.commit()
-        return {"message": f"Successfully imported {count} medicines."}
+        return {"message": f"AI mapping complete. Successfully imported {count} medicines."}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")

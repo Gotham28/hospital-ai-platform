@@ -76,10 +76,7 @@ export default function PharmacyPage() {
 
   return (
     <div className="space-y-6 max-w-5xl">
-      <div className="flex items-center gap-3 border-b pb-4">
-        <Pill className="w-6 h-6 text-blue-600" />
-        <h2 className="text-2xl font-bold text-gray-900">Pharmacy Inventory</h2>
-      </div>
+
       <div className="flex justify-between items-center border-b pb-4">
         <div className="flex items-center gap-3">
           <Pill className="w-6 h-6 text-blue-600" />

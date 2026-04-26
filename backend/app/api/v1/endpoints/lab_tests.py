@@ -62,38 +62,70 @@ async def bulk_upload_lab_tests(
     if token_data.get("role") != "superadmin" and str(token_data.get("hospital_id")) != str(hospital_id):
         raise HTTPException(status_code=403, detail="Access denied")
 
-    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
-    if not hospital:
-        raise HTTPException(status_code=404, detail="Hospital not found")
-
     content = await file.read()
-    stream = io.StringIO(content.decode("utf-8"))
-    reader = csv.DictReader(stream)
+    text_content = content.decode("utf-8")
+    
+    reader = csv.DictReader(io.StringIO(text_content))
+    csv_headers = reader.fieldnames
+    if not csv_headers:
+        raise HTTPException(status_code=400, detail="CSV file is empty or invalid.")
+
+    import os
+    import json
+    from openai import OpenAI
+    oai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    
+    target_schema = {
+        "name": "Name of the lab test or diagnostic (Required)",
+        "category": "Category (e.g., Blood Test, Imaging)",
+        "price": "Cost or price of the test",
+        "prerequisites": "Preparation instructions (e.g., Fasting required)",
+        "turnaround_time": "How long results take to arrive",
+        "is_inhouse": "Is this done in the hospital? (Yes/No/Boolean)"
+    }
+
+    prompt = f"""
+    You are a data mapping assistant. Map these provided CSV headers: {csv_headers}
+    To this target database schema: {json.dumps(target_schema)}
+    
+    Return ONLY a raw JSON object where keys are the database schema keys, and values are the EXACT matching string from the CSV headers.
+    If there is no logical match for a target key, set its value to null.
+    """
+
+    llm_resp = oai.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "system", "content": prompt}],
+        response_format={"type": "json_object"}
+    )
+    mapping = json.loads(llm_resp.choices[0].message.content)
 
     count = 0
     for row in reader:
-        normalized_row = {k.strip().lower(): v.strip() for k, v in row.items()}
-        
-        name = normalized_row.get("name") or normalized_row.get("test name")
-        if not name:
+        name_col = mapping.get("name")
+        if not name_col or not row.get(name_col):
             continue
 
-        # Parse boolean
-        inhouse_str = normalized_row.get("is inhouse", "yes").lower()
+        inhouse_col = mapping.get("is_inhouse")
+        inhouse_str = str(row.get(inhouse_col, "yes")).lower() if inhouse_col else "yes"
         is_inhouse = inhouse_str in ["yes", "true", "1", "y", "in-house", "inhouse"]
 
+        price_col = mapping.get("price")
         try:
-            price = float(normalized_row.get("price", 0))
+            price = float(str(row.get(price_col, 0)).replace("$", "").replace(",", "").strip()) if price_col else 0.0
         except ValueError:
             price = 0.0
 
+        cat_col = mapping.get("category")
+        prereq_col = mapping.get("prerequisites")
+        tat_col = mapping.get("turnaround_time")
+
         test = LabTest(
             hospital_id=hospital_id,
-            name=name,
-            category=normalized_row.get("category", ""),
+            name=row.get(name_col).strip(),
+            category=row.get(cat_col, "").strip() if cat_col else "",
             price=price,
-            prerequisites=normalized_row.get("prerequisites", ""),
-            turnaround_time=normalized_row.get("turnaround time", ""),
+            prerequisites=row.get(prereq_col, "").strip() if prereq_col else "",
+            turnaround_time=row.get(tat_col, "").strip() if tat_col else "",
             is_inhouse=is_inhouse
         )
         db.add(test)
@@ -101,7 +133,7 @@ async def bulk_upload_lab_tests(
 
     try:
         db.commit()
-        return {"message": f"Successfully imported {count} lab tests."}
+        return {"message": f"AI mapping complete. Successfully imported {count} lab tests."}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
