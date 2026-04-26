@@ -62,7 +62,7 @@ export default function DoctorsPage() {
     fetchAvailability(doc.id);
   };
 
-  const fetchAvailability = async (doctorId: int) => {
+  const fetchAvailability = async (doctorId: number) => {
     try {
       const [schedRes, leaveRes] = await Promise.all([
         api.get(`/availability/schedules/doctor/${doctorId}`),
@@ -101,12 +101,12 @@ export default function DoctorsPage() {
     } catch (err) { alert("Failed to add leave"); }
   };
 
-  const deleteSchedule = async (id: int) => {
+  const deleteSchedule = async (id: number) => {
     await api.delete(`/availability/schedules/${id}`);
     fetchAvailability(manageDoc.id);
   };
 
-  const deleteLeave = async (id: int) => {
+  const deleteLeave = async (id: number) => {
     await api.delete(`/availability/leaves/${id}`);
     fetchAvailability(manageDoc.id);
   };

@@ -170,6 +170,10 @@ async def bulk_upload_and_sync(
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
+    from openai import OpenAI
+    import os
+    oai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
     if not hospital:
         raise HTTPException(status_code=404, detail="Hospital not found")
@@ -178,6 +182,7 @@ async def bulk_upload_and_sync(
     stream = io.StringIO(content.decode("utf-8"))
     reader = csv.DictReader(stream)
 
+    doctors_to_embed = []
     count = 0
     for row in reader:
         normalized_row = {k.strip().lower(): v for k, v in row.items()}
@@ -194,11 +199,24 @@ async def bulk_upload_and_sync(
             hospital_id=hospital_id
         )
         db.add(doctor)
+        doctors_to_embed.append((doctor, name, dept, schedule))
         count += 1
+
+    db.flush()  # assigns IDs without committing
+
+    # Embed in batch
+    texts = [
+        f"Dr. {name}, {dept} specialist, schedule: {schedule}"
+        for _, name, dept, schedule in doctors_to_embed
+    ]
+    if texts:
+        resp = oai.embeddings.create(input=texts, model="text-embedding-3-small")
+        for (doctor, _, _, _), emb in zip(doctors_to_embed, resp.data):
+            doctor.embedding = emb.embedding
 
     try:
         db.commit()
-        return {"message": f"Successfully imported {count} doctors."}
+        return {"message": f"Successfully imported and embedded {count} doctors."}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Database Sync Failed: {str(e)}")

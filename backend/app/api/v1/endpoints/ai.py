@@ -271,6 +271,10 @@ def check_doctor_availability_db(doctor: Doctor, db: Session, target_date: datet
 
     # 2. Check regular schedule
     day_of_week = target_date.weekday() # 0=Monday, 6=Sunday
+    
+    # Check if ANY schedules exist for this doctor in the new system
+    has_any_schedule = db.query(DoctorSchedule).filter(DoctorSchedule.doctor_id == doctor.id).first() is not None
+    
     schedule = db.query(DoctorSchedule).filter(
         DoctorSchedule.doctor_id == doctor.id,
         DoctorSchedule.day_of_week == day_of_week,
@@ -279,37 +283,72 @@ def check_doctor_availability_db(doctor: Doctor, db: Session, target_date: datet
 
     if schedule:
         return f"Available today from {schedule.start_time} to {schedule.end_time}"
-    return "Not scheduled to work today"
+    
+    if has_any_schedule:
+        # They are using the new UI, but are just not scheduled today
+        return "Not scheduled to work today"
+    else:
+        # No new UI schedules exist yet! Fallback to the CSV base_schedule.
+        base = getattr(doctor, "base_schedule", None)
+        if base and base.lower() != "not specified":
+            return f"Standard Timings: {base}"
+        return "Timings not specified"
 
-def build_doctor_context(question: str, doctors: list, db: Session) -> tuple[str, int]:
+def build_doctor_context(question: str, hospital_id: int, db: Session) -> tuple[str, int]:
+    """
+    Semantic vector search for relevant doctors.
+    No hardcoded synonyms — embedding handles all language variants naturally.
+    """
+    # Embed the question
+    q_embedding = client.embeddings.create(
+        input=question, model="text-embedding-3-small"
+    ).data[0].embedding
+
+    today = datetime.now()
+
+    # Check if question is broad ("list all doctors", "who do you have")
+    broad_keywords = {"all", "list", "doctors", "staff", "everyone", "available"}
+    is_broad = len(set(question.lower().split()) & broad_keywords) >= 2
+
+    if is_broad:
+        # Return all doctors, unranked
+        doctors = (
+            db.query(Doctor)
+            .filter(Doctor.hospital_id == hospital_id)
+            .limit(20)
+            .all()
+        )
+    else:
+        # Semantic search — top 8 most relevant
+        doctors = (
+            db.query(Doctor)
+            .filter(Doctor.hospital_id == hospital_id)
+            .filter(Doctor.embedding != None)
+            .order_by(Doctor.embedding.cosine_distance(q_embedding))
+            .limit(8)
+            .all()
+        )
+        # Fallback: if no embeddings exist yet, return first 5
+        if not doctors:
+            doctors = (
+                db.query(Doctor)
+                .filter(Doctor.hospital_id == hospital_id)
+                .limit(5)
+                .all()
+            )
+
     if not doctors:
         return "No doctors currently registered for this hospital.\n", 0
 
-    scored = sorted(
-        [(score_doctor_relevance(question, d), d) for d in doctors],
-        key=lambda x: x[0], reverse=True
-    )
-    top_score = scored[0][0] if scored else 0.0
-    limit = MAX_RELEVANT_DOCTORS if top_score > 0.05 else DEFAULT_DOCTORS_IF_NO_MATCH
-
-    lines, total_chars, truncated = [], 0, False
-    today = datetime.now()
-    
-    for _, doctor in scored[:limit]:
-        # Fetch live availability directly from the DB!
+    lines = ["RELEVANT DOCTORS AND AVAILABILITY:\n"]
+    for doctor in doctors:
         status = check_doctor_availability_db(doctor, db, today)
-        line = f"- [ID: {doctor.id}] Dr. {doctor.name} ({doctor.department or 'General'}): LIVE STATUS: {status}\n"
-        
-        if total_chars + len(line) > DOCTOR_SECTION_MAX_CHARS:
-            truncated = True
-            break
-        lines.append(line)
-        total_chars += len(line)
+        lines.append(
+            f"- [ID: {doctor.id}] Dr. {doctor.name} "
+            f"({doctor.department or 'General'}): {status}\n"
+        )
 
-    section = "RELEVANT DOCTORS AND AVAILABILITY:\n" + "".join(lines)
-    if truncated:
-        section += f"(List truncated. Total doctors on file: {len(doctors)})\n"
-    return section, len(lines)
+    return "".join(lines), len(doctors)
 
 def build_pharmacy_context(question: str, medicines: list) -> str:
     """Matches user questions against the medicine database."""
@@ -428,14 +467,25 @@ def build_system_prompt_english() -> str:
     return "Respond in English only. Be clear, accurate, and concise."
 
 
-def build_fallback_instruction() -> str:
-    return """IMPORTANT - WHEN YOU DO NOT KNOW SOMETHING:
-If the patient asks about something not mentioned in the doctor list or knowledge
-above (e.g. pharmacy location, visiting hours, room numbers, fees) and you do not
-have that information:
-- Say clearly: "I don't have that information. Please ask at the reception desk."
+def build_fallback_instruction(doctors_found: int, kb_chunks: int, has_pharmacy: bool, has_labs: bool) -> str:
+    sources = []
+    if doctors_found > 0:
+        sources.append(f"{doctors_found} relevant doctors with live availability")
+    if kb_chunks > 0:
+        sources.append(f"{kb_chunks} hospital knowledge base entries")
+    if has_pharmacy:
+        sources.append("pharmacy inventory")
+    if has_labs:
+        sources.append("lab test catalog")
 
-Do NOT make up answers. Do NOT say information that is not in your context above."""
+    source_desc = ", ".join(sources) if sources else "no structured data"
+
+    return f"""You have access to: {source_desc}.
+
+Answer confidently from this data. If asked about something genuinely outside this data 
+(specific room numbers, exact wait times, billing disputes), acknowledge you don't have 
+that specific detail and suggest calling reception. Never refuse to answer about doctors, 
+departments, or services that appear in your context above."""
 
 
 def build_context(request: ChatRequest, db: Session, force_english: bool = False):
@@ -468,7 +518,12 @@ def build_context(request: ChatRequest, db: Session, force_english: bool = False
     kb_context, chunks_included = build_kb_context(raw_results)
 
     lang_instruction = build_system_prompt_english()
-    fallback_instruction = build_fallback_instruction()
+    fallback_instruction = build_fallback_instruction(
+    doctors_found=doctors_included,
+    kb_chunks=chunks_included,
+    has_pharmacy=len(all_medicines) > 0,
+    has_labs=len(all_tests) > 0
+)
 
     parts = [
         f"You are Arogya, the AI Assistant for {hospital.name}.",
@@ -719,7 +774,7 @@ async def chat_with_arogya(request: ChatRequest, db: Session = Depends(get_db)):
     translated_request = request.model_copy(update={"question": english_question})
     _, openai_messages, _ = build_context(translated_request, db, force_english=True)
 
-    ai_response = client.chat.completions.create(model=OPENAI_MODEL * 0.15* OPENAI_COST_PER_MTok, messages=openai_messages)
+    ai_response = client.chat.completions.create(model=OPENAI_MODEL, messages=openai_messages)
     english_answer = ai_response.choices[0].message.content or ""
 
     final_answer = english_answer

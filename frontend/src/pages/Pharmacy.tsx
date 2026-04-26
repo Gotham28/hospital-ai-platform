@@ -43,7 +43,7 @@ export default function PharmacyPage() {
     }
   };
 
-  const handleDelete = async (id: int) => {
+  const handleDelete = async (id: number) => {
     if (!confirm("Remove this medicine?")) return;
     try {
       await api.delete(`/medicines/${id}`);

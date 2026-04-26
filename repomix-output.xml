@@ -48,15 +48,18 @@ backend/alembic/script.py.mako
 backend/alembic/versions/8e2627e5f8b9_reset_baseline.py
 backend/alembic/versions/a1b2c3d4e5f6_add_appointments.py
 backend/alembic/versions/b2c3d4e5f6a7_add_user_role.py
+backend/alembic/versions/cea080e631b8_add_pharmacy_labs_and_doctor_.py
 backend/app/api/__init__.py
 backend/app/api/deps.py
 backend/app/api/v1/endpoints/__init__.py
 backend/app/api/v1/endpoints/ai.py
 backend/app/api/v1/endpoints/appointments.py
 backend/app/api/v1/endpoints/auth.py
+backend/app/api/v1/endpoints/doctor_availability.py
 backend/app/api/v1/endpoints/hospitals.py
+backend/app/api/v1/endpoints/lab_tests.py
+backend/app/api/v1/endpoints/medicines.py
 backend/app/api/v1/endpoints/usage.py
-backend/app/availability.py
 backend/app/core/__init__.py
 backend/app/core/config.py
 backend/app/crud/__init__.py
@@ -68,13 +71,19 @@ backend/app/db/session.py
 backend/app/main.py
 backend/app/models/__init__.py
 backend/app/models/appointment.py
+backend/app/models/doctor_availability.py
 backend/app/models/doctor.py
 backend/app/models/hospital.py
 backend/app/models/knowledge.py
+backend/app/models/lab_test.py
+backend/app/models/medicine.py
 backend/app/models/usage.py
 backend/app/models/user.py
 backend/app/schemas/__init__.py
+backend/app/schemas/doctor_availability.py
 backend/app/schemas/hospital.py
+backend/app/schemas/lab_test.py
+backend/app/schemas/medicine.py
 backend/app/schemas/user.py
 backend/app/services/booking_rules.py
 backend/app/services/email.py
@@ -106,7 +115,9 @@ frontend/src/main.tsx
 frontend/src/pages/Dashboard.tsx
 frontend/src/pages/Doctors.tsx
 frontend/src/pages/KnowledgeBase.tsx
+frontend/src/pages/LabTests.tsx
 frontend/src/pages/Login.tsx
+frontend/src/pages/Pharmacy.tsx
 frontend/src/pages/Settings.tsx
 frontend/src/themes/arogya-specialty/Chat.tsx
 frontend/src/themes/arogya-specialty/ChatMessage.tsx
@@ -571,23 +582,32 @@ class Appointment(Base):
     doctor   = relationship("Doctor")
 </file>
 
-<file path="backend/app/models/doctor.py">
-from sqlalchemy import Column, Integer, String, ForeignKey
+<file path="backend/app/models/doctor_availability.py">
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Date
 from sqlalchemy.orm import relationship
 from app.db.base_class import Base
 
-class Doctor(Base):
-    __tablename__ = "doctors"
-
-    id = Column(Integer, primary_key=True, index=True)
-    doctor_id = Column(String, index=True, nullable=False)
-    name = Column(String, nullable=False)
-    # Add these two missing columns:
-    department = Column(String, nullable=True) 
-    base_schedule = Column(String, nullable=True)
+class DoctorSchedule(Base):
+    __tablename__ = "doctor_schedules"
     
-    hospital_id = Column(Integer, ForeignKey("hospital.id"), nullable=False)
-    hospital = relationship("Hospital", back_populates="doctors")
+    id = Column(Integer, primary_key=True, index=True)
+    doctor_id = Column(Integer, ForeignKey("doctors.id", ondelete="CASCADE"), nullable=False, index=True)
+    day_of_week = Column(Integer, nullable=False) # 0=Monday, 1=Tuesday, ..., 6=Sunday
+    start_time = Column(String, nullable=False)   # e.g., "09:00"
+    end_time = Column(String, nullable=False)     # e.g., "17:00"
+    is_active = Column(Boolean, default=True)
+    
+    doctor = relationship("Doctor", back_populates="schedules")
+
+class DoctorLeave(Base):
+    __tablename__ = "doctor_leaves"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    doctor_id = Column(Integer, ForeignKey("doctors.id", ondelete="CASCADE"), nullable=False, index=True)
+    date = Column(Date, nullable=False, index=True)
+    reason = Column(String, nullable=True)
+    
+    doctor = relationship("Doctor", back_populates="leaves")
 </file>
 
 <file path="backend/app/models/knowledge.py">
@@ -609,6 +629,46 @@ class KnowledgeBase(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 </file>
 
+<file path="backend/app/models/lab_test.py">
+from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, Text
+from sqlalchemy.orm import relationship
+from app.db.base_class import Base
+
+class LabTest(Base):
+    __tablename__ = "lab_tests"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    hospital_id = Column(Integer, ForeignKey("hospital.id"), nullable=False, index=True)
+    name = Column(String, nullable=False, index=True)
+    category = Column(String, nullable=True)
+    price = Column(Float, nullable=True)
+    prerequisites = Column(Text, nullable=True) # e.g., "Fasting for 8 hours"
+    turnaround_time = Column(String, nullable=True)
+    is_inhouse = Column(Boolean, default=True)
+    
+    hospital = relationship("Hospital")
+</file>
+
+<file path="backend/app/models/medicine.py">
+from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey
+from sqlalchemy.orm import relationship
+from app.db.base_class import Base
+
+class Medicine(Base):
+    __tablename__ = "medicines"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    hospital_id = Column(Integer, ForeignKey("hospital.id"), nullable=False, index=True)
+    name = Column(String, nullable=False, index=True)
+    brand_name = Column(String, nullable=True)
+    category = Column(String, nullable=True)
+    price = Column(Float, nullable=True)
+    stock_status = Column(String, default="in_stock") # in_stock, out_of_stock, low_stock
+    requires_prescription = Column(Boolean, default=False)
+    
+    hospital = relationship("Hospital")
+</file>
+
 <file path="backend/app/models/usage.py">
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
 from datetime import datetime, timezone
@@ -627,9 +687,92 @@ class UsageLedger(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 </file>
 
-<file path="backend/app/schemas/__init__.py">
-from .hospital import Hospital, HospitalCreate, HospitalUpdate
-from .user import User, UserCreate, UserUpdate
+<file path="backend/app/schemas/doctor_availability.py">
+from typing import Optional
+from datetime import date
+from pydantic import BaseModel
+
+class DoctorScheduleBase(BaseModel):
+    day_of_week: int
+    start_time: str
+    end_time: str
+    is_active: Optional[bool] = True
+
+class DoctorScheduleCreate(DoctorScheduleBase):
+    doctor_id: int
+
+class DoctorSchedule(DoctorScheduleBase):
+    id: int
+    doctor_id: int
+
+    class Config:
+        from_attributes = True
+
+class DoctorLeaveBase(BaseModel):
+    date: date
+    reason: Optional[str] = None
+
+class DoctorLeaveCreate(DoctorLeaveBase):
+    doctor_id: int
+
+class DoctorLeave(DoctorLeaveBase):
+    id: int
+    doctor_id: int
+
+    class Config:
+        from_attributes = True
+</file>
+
+<file path="backend/app/schemas/lab_test.py">
+from typing import Optional
+from pydantic import BaseModel
+
+class LabTestBase(BaseModel):
+    name: str
+    category: Optional[str] = None
+    price: Optional[float] = None
+    prerequisites: Optional[str] = None
+    turnaround_time: Optional[str] = None
+    is_inhouse: Optional[bool] = True
+
+class LabTestCreate(LabTestBase):
+    hospital_id: int
+
+class LabTestUpdate(LabTestBase):
+    name: Optional[str] = None
+
+class LabTest(LabTestBase):
+    id: int
+    hospital_id: int
+
+    class Config:
+        from_attributes = True
+</file>
+
+<file path="backend/app/schemas/medicine.py">
+from typing import Optional
+from pydantic import BaseModel
+
+class MedicineBase(BaseModel):
+    name: str
+    brand_name: Optional[str] = None
+    category: Optional[str] = None
+    price: Optional[float] = None
+    stock_status: Optional[str] = "in_stock"
+    requires_prescription: Optional[bool] = False
+
+class MedicineCreate(MedicineBase):
+    hospital_id: int
+
+class MedicineUpdate(MedicineBase):
+    name: Optional[str] = None
+
+class Medicine(MedicineBase):
+    id: int
+    hospital_id: int
+
+    class Config:
+        from_attributes = True
 </file>
 
 <file path="backend/app/schemas/user.py">
@@ -1485,142 +1628,6 @@ const UsageStats = () => {
 export default UsageStats;
 </file>
 
-<file path="frontend/src/pages/Doctors.tsx">
-import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import api from '../api/axios';
-import { Search, Loader2, Upload, Users } from 'lucide-react';
-
-const DoctorsPage = () => {
-  const { hospitalId } = useParams();
-  const [doctors, setDoctors] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetchDoctors = async () => {
-    try {
-      const res = await api.get(`/hospitals/${hospitalId}/doctors`);
-      setDoctors(res.data);
-    } catch (err) {
-      console.error("Failed to fetch doctors", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchDoctors();
-  }, [hospitalId]);
-
-  // Automatic Bulk Upload Handler
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    try {
-      setLoading(true);
-      // This hits the backend endpoint that generates IDs automatically
-      await api.post(`/hospitals/${hospitalId}/doctors/bulk-upload`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      alert("Doctors imported successfully! IDs have been assigned automatically.");
-      fetchDoctors(); // Refresh the list to show new IDs
-    } catch (err) {
-      alert("Import failed. Ensure the file format is correct.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="p-8 space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Doctor Directory</h2>
-          <p className="text-gray-500 text-sm">Upload your staff list; IDs are assigned automatically for AI syncing.</p>
-        </div>
-        
-        {/* Bulk Upload Button (Replaces manual inputs) */}
-        <div className="relative">
-          <input 
-            type="file" 
-            id="bulk-upload" 
-            className="hidden" 
-            onChange={handleFileUpload} 
-            accept=".csv,.txt"
-            disabled={loading}
-          />
-          <label 
-            htmlFor="bulk-upload" 
-            className={`flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer font-medium shadow-sm ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-            Upload Staff Document
-          </label>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center gap-3">
-          <Search className="w-5 h-5 text-gray-400" />
-          <input 
-            type="text" 
-            placeholder="Search doctors or specialties..." 
-            className="bg-transparent border-none focus:ring-0 text-sm w-full"
-          />
-        </div>
-
-        {loading ? (
-          <div className="p-20 flex flex-col items-center justify-center text-gray-400">
-            <Loader2 className="animate-spin mb-2" />
-            <p>Syncing directory...</p>
-          </div>
-        ) : doctors.length === 0 ? (
-          <div className="p-20 text-center">
-            <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Users className="w-8 h-8 text-blue-200" />
-            </div>
-            <h3 className="text-lg font-medium text-gray-900">No doctors found</h3>
-            <p className="text-gray-500 max-w-xs mx-auto mt-1">
-              Upload your hospital staff list to begin. IDs will be generated for your Google Sheet.
-            </p>
-          </div>
-        ) : (
-          <table className="w-full text-left">
-            <thead className="bg-gray-50 text-xs uppercase text-gray-500 font-semibold border-b">
-              <tr>
-                <th className="p-4">Auto-Generated ID</th>
-                <th className="p-4">Name</th>
-                <th className="p-4">Department</th>
-                <th className="p-4">Connection Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {doctors.map((doc: any) => (
-                <tr key={doc.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="p-4 font-mono text-sm text-blue-600 font-bold">{doc.doctor_id}</td>
-                  <td className="p-4 text-sm font-medium text-gray-900">{doc.name}</td>
-                  <td className="p-4 text-sm text-gray-500">{doc.department || 'General'}</td>
-                  <td className="p-4">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                      Active & Ready
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </div>
-  );
-};
-
-export default DoctorsPage;
-</file>
-
 <file path="frontend/src/themes/arogya-specialty/index.tsx">
 import 'regenerator-runtime/runtime'; 
 import React from 'react';
@@ -2044,13 +2051,396 @@ def downgrade() -> None:
     op.drop_column('hospital', 'booking_config')
 </file>
 
-<file path="backend/app/api/v1/endpoints/__init__.py">
-# Location: D:\Hospital\hospital-ai-platform\backend\app\api\v1\endpoints\__init__.py
+<file path="backend/app/api/v1/endpoints/doctor_availability.py">
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from typing import List
+from app.api.deps import get_db, get_token_payload
+from app.models.doctor import Doctor
+from app.models.doctor_availability import DoctorSchedule, DoctorLeave
+from app.schemas.doctor_availability import (
+    DoctorSchedule as DoctorScheduleSchema, 
+    DoctorScheduleCreate, 
+    DoctorLeave as DoctorLeaveSchema, 
+    DoctorLeaveCreate
+)
 
-from .hospitals import router as hospitals
-from .auth import router as auth
-from .ai import router as ai
-from .appointments import router as appointments
+router = APIRouter()
+
+# ==========================================
+# SCHEDULES
+# ==========================================
+
+@router.post("/schedules/", response_model=DoctorScheduleSchema)
+def create_schedule(
+    payload: DoctorScheduleCreate,
+    db: Session = Depends(get_db),
+    token_data: dict = Depends(get_token_payload)
+):
+    doctor = db.query(Doctor).filter(Doctor.id == payload.doctor_id).first()
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+        
+    if token_data.get("role") != "superadmin" and str(token_data.get("hospital_id")) != str(doctor.hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    db_item = DoctorSchedule(**payload.model_dump())
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+@router.get("/schedules/doctor/{doctor_id}", response_model=List[DoctorScheduleSchema])
+def get_doctor_schedules(
+    doctor_id: int,
+    db: Session = Depends(get_db),
+    token_data: dict = Depends(get_token_payload)
+):
+    doctor = db.query(Doctor).filter(Doctor.id == doctor_id).first()
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+    
+    if token_data.get("role") != "superadmin" and str(token_data.get("hospital_id")) != str(doctor.hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    return db.query(DoctorSchedule).filter(DoctorSchedule.doctor_id == doctor_id).all()
+
+@router.delete("/schedules/{schedule_id}")
+def delete_schedule(
+    schedule_id: int,
+    db: Session = Depends(get_db),
+    token_data: dict = Depends(get_token_payload)
+):
+    schedule = db.query(DoctorSchedule).filter(DoctorSchedule.id == schedule_id).first()
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+        
+    doctor = db.query(Doctor).filter(Doctor.id == schedule.doctor_id).first()
+    if token_data.get("role") != "superadmin" and doctor and str(token_data.get("hospital_id")) != str(doctor.hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied")
+        
+    db.delete(schedule)
+    db.commit()
+    return {"status": "success"}
+
+# ==========================================
+# LEAVES
+# ==========================================
+
+@router.post("/leaves/", response_model=DoctorLeaveSchema)
+def create_leave(
+    payload: DoctorLeaveCreate,
+    db: Session = Depends(get_db),
+    token_data: dict = Depends(get_token_payload)
+):
+    doctor = db.query(Doctor).filter(Doctor.id == payload.doctor_id).first()
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+
+    if token_data.get("role") != "superadmin" and str(token_data.get("hospital_id")) != str(doctor.hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    db_item = DoctorLeave(**payload.model_dump())
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+@router.get("/leaves/doctor/{doctor_id}", response_model=List[DoctorLeaveSchema])
+def get_doctor_leaves(
+    doctor_id: int,
+    db: Session = Depends(get_db),
+    token_data: dict = Depends(get_token_payload)
+):
+    doctor = db.query(Doctor).filter(Doctor.id == doctor_id).first()
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+        
+    if token_data.get("role") != "superadmin" and str(token_data.get("hospital_id")) != str(doctor.hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied")
+        
+    return db.query(DoctorLeave).filter(DoctorLeave.doctor_id == doctor_id).order_by(DoctorLeave.date).all()
+
+@router.delete("/leaves/{leave_id}")
+def delete_leave(
+    leave_id: int,
+    db: Session = Depends(get_db),
+    token_data: dict = Depends(get_token_payload)
+):
+    leave = db.query(DoctorLeave).filter(DoctorLeave.id == leave_id).first()
+    if not leave:
+        raise HTTPException(status_code=404, detail="Leave not found")
+        
+    doctor = db.query(Doctor).filter(Doctor.id == leave.doctor_id).first()
+    if token_data.get("role") != "superadmin" and doctor and str(token_data.get("hospital_id")) != str(doctor.hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied")
+        
+    db.delete(leave)
+    db.commit()
+    return {"status": "success"}
+</file>
+
+<file path="backend/app/api/v1/endpoints/lab_tests.py">
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from typing import List
+from app.api.deps import get_db, get_current_tenant, get_token_payload
+from app.models.lab_test import LabTest
+from app.schemas.lab_test import LabTest as LabTestSchema, LabTestCreate, LabTestUpdate
+import csv
+import io
+from fastapi import UploadFile, File
+from app.models.hospital import Hospital
+router = APIRouter()
+
+@router.post("/", response_model=LabTestSchema)
+def create_lab_test(
+    payload: LabTestCreate, 
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant),
+    token_data: dict = Depends(get_token_payload)
+):
+    if token_data.get("role") != "superadmin" and str(token_data.get("hospital_id")) != str(payload.hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    db_item = LabTest(**payload.model_dump())
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+@router.get("/hospital/{hospital_id}", response_model=List[LabTestSchema])
+def list_lab_tests(
+    hospital_id: int, 
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant),
+    token_data: dict = Depends(get_token_payload)
+):
+    if token_data.get("role") != "superadmin" and str(token_data.get("hospital_id")) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    return db.query(LabTest).filter(LabTest.hospital_id == hospital_id).all()
+
+@router.delete("/{test_id}")
+def delete_lab_test(
+    test_id: int, 
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant)
+):
+    db_item = db.query(LabTest).filter(LabTest.id == test_id).first()
+    if not db_item:
+        raise HTTPException(status_code=404, detail="Lab test not found")
+    
+    db.delete(db_item)
+    db.commit()
+    return {"status": "success"}
+@router.post("/hospital/{hospital_id}/bulk-upload")
+async def bulk_upload_lab_tests(
+    hospital_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant),
+    token_data: dict = Depends(get_token_payload)
+):
+    if token_data.get("role") != "superadmin" and str(token_data.get("hospital_id")) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+
+    content = await file.read()
+    stream = io.StringIO(content.decode("utf-8"))
+    reader = csv.DictReader(stream)
+
+    count = 0
+    for row in reader:
+        normalized_row = {k.strip().lower(): v.strip() for k, v in row.items()}
+        
+        name = normalized_row.get("name") or normalized_row.get("test name")
+        if not name:
+            continue
+
+        # Parse boolean
+        inhouse_str = normalized_row.get("is inhouse", "yes").lower()
+        is_inhouse = inhouse_str in ["yes", "true", "1", "y", "in-house", "inhouse"]
+
+        try:
+            price = float(normalized_row.get("price", 0))
+        except ValueError:
+            price = 0.0
+
+        test = LabTest(
+            hospital_id=hospital_id,
+            name=name,
+            category=normalized_row.get("category", ""),
+            price=price,
+            prerequisites=normalized_row.get("prerequisites", ""),
+            turnaround_time=normalized_row.get("turnaround time", ""),
+            is_inhouse=is_inhouse
+        )
+        db.add(test)
+        count += 1
+
+    try:
+        db.commit()
+        return {"message": f"Successfully imported {count} lab tests."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+</file>
+
+<file path="backend/app/api/v1/endpoints/medicines.py">
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from typing import List
+from app.api.deps import get_db, get_current_tenant, get_token_payload
+from app.models.medicine import Medicine
+from app.schemas.medicine import Medicine as MedicineSchema, MedicineCreate, MedicineUpdate
+import csv
+import io
+from fastapi import UploadFile, File
+from app.models.hospital import Hospital
+router = APIRouter()
+
+@router.post("/", response_model=MedicineSchema)
+def create_medicine(
+    payload: MedicineCreate, 
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant),
+    token_data: dict = Depends(get_token_payload)
+):
+    if token_data.get("role") != "superadmin" and str(token_data.get("hospital_id")) != str(payload.hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    db_item = Medicine(**payload.model_dump())
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+@router.get("/hospital/{hospital_id}", response_model=List[MedicineSchema])
+def list_medicines(
+    hospital_id: int, 
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant),
+    token_data: dict = Depends(get_token_payload)
+):
+    if token_data.get("role") != "superadmin" and str(token_data.get("hospital_id")) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    return db.query(Medicine).filter(Medicine.hospital_id == hospital_id).all()
+
+@router.delete("/{medicine_id}")
+def delete_medicine(
+    medicine_id: int, 
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant)
+):
+    db_item = db.query(Medicine).filter(Medicine.id == medicine_id).first()
+    if not db_item:
+        raise HTTPException(status_code=404, detail="Medicine not found")
+    
+    db.delete(db_item)
+    db.commit()
+    return {"status": "success"}
+@router.post("/hospital/{hospital_id}/bulk-upload")
+async def bulk_upload_medicines(
+    hospital_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant),
+    token_data: dict = Depends(get_token_payload)
+):
+    if token_data.get("role") != "superadmin" and str(token_data.get("hospital_id")) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+
+    content = await file.read()
+    stream = io.StringIO(content.decode("utf-8"))
+    reader = csv.DictReader(stream)
+
+    count = 0
+    for row in reader:
+        # Clean keys to lowercase for easier matching
+        normalized_row = {k.strip().lower(): v.strip() for k, v in row.items()}
+        
+        name = normalized_row.get("name") or normalized_row.get("generic name")
+        if not name:
+            continue # Skip empty rows
+
+        # Parse boolean values safely
+        req_rx_str = normalized_row.get("requires prescription", "no").lower()
+        requires_prescription = req_rx_str in ["yes", "true", "1", "y"]
+
+        # Parse price safely
+        try:
+            price = float(normalized_row.get("price", 0))
+        except ValueError:
+            price = 0.0
+
+        med = Medicine(
+            hospital_id=hospital_id,
+            name=name,
+            brand_name=normalized_row.get("brand name", ""),
+            category=normalized_row.get("category", ""),
+            price=price,
+            stock_status=normalized_row.get("stock status", "in_stock").lower().replace(" ", "_"),
+            requires_prescription=requires_prescription
+        )
+        db.add(med)
+        count += 1
+
+    try:
+        db.commit()
+        return {"message": f"Successfully imported {count} medicines."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+</file>
+
+<file path="backend/app/core/config.py">
+from typing import Optional
+from pydantic_settings import BaseSettings
+
+class Settings(BaseSettings):
+    # Core
+    PROJECT_NAME: str = "Hospital AI Platform"
+    API_V1_STR: str = "/api/v1"
+    
+    # 1. ADD THIS LINE: This maps the Render environment variable to your code
+    DATABASE_URL: Optional[str] = None 
+
+    # Database Defaults (Keep these for local dev)
+    POSTGRES_SERVER: str = "localhost"
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "NewStrongPassword123!"
+    POSTGRES_DB: str = "hospital_ai"
+    POSTGRES_PORT: str = "5432"
+    
+    # Optional: If you want to override the full URL
+    SQLALCHEMY_DATABASE_URI: Optional[str] = None
+
+    # App Secrets
+    REDIS_URL: str = "redis://localhost:6379"
+    OPENAI_API_KEY: str = "sk-placeholder"
+    JWT_SECRET: str = "supersecret"
+
+    # Helper to build the URL dynamically
+    @property
+    def SQLALCHEMY_DATABASE_URL(self) -> str:
+        # Check Render's DATABASE_URL first
+        if self.DATABASE_URL:
+            # Render often gives 'postgres://', but SQLAlchemy needs 'postgresql://'
+            return self.DATABASE_URL.replace("postgres://", "postgresql://", 1)
+        
+        # Fallback to local construction
+        return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+
+settings = Settings()
 </file>
 
 <file path="backend/app/crud/crud_hospital.py">
@@ -2099,6 +2489,27 @@ engine = create_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 </file>
 
+<file path="backend/app/models/doctor.py">
+from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy.orm import relationship
+from app.db.base_class import Base
+
+class Doctor(Base):
+    __tablename__ = "doctors"
+
+    id = Column(Integer, primary_key=True, index=True)
+    doctor_id = Column(String, index=True, nullable=False)
+    name = Column(String, nullable=False)
+    # Add these two missing columns:
+    department = Column(String, nullable=True) 
+    base_schedule = Column(String, nullable=True)
+    
+    hospital_id = Column(Integer, ForeignKey("hospital.id"), nullable=False)
+    hospital = relationship("Hospital", back_populates="doctors")
+    schedules = relationship("DoctorSchedule", back_populates="doctor", cascade="all, delete-orphan")
+    leaves = relationship("DoctorLeave", back_populates="doctor", cascade="all, delete-orphan")
+</file>
+
 <file path="backend/app/models/user.py">
 from sqlalchemy import Boolean, Column, Integer, String, ForeignKey # Added ForeignKey
 from sqlalchemy.orm import relationship # Added relationship
@@ -2115,6 +2526,14 @@ class User(Base):
     # --- NEW: Multi-Tenancy Link ---
     hospital_id = Column(Integer, ForeignKey("hospital.id"), nullable=True) # Nullable for Superadmins
     hospital = relationship("Hospital", back_populates="users")
+</file>
+
+<file path="backend/app/schemas/__init__.py">
+from .hospital import Hospital, HospitalCreate, HospitalUpdate
+from .user import User, UserCreate, UserUpdate
+from .medicine import Medicine, MedicineCreate, MedicineUpdate
+from .lab_test import LabTest, LabTestCreate, LabTestUpdate
+from .doctor_availability import DoctorSchedule, DoctorScheduleCreate, DoctorLeave, DoctorLeaveCreate
 </file>
 
 <file path="backend/seed.py">
@@ -3044,6 +3463,724 @@ export function useAuth(): AuthContextValue {
 }
 </file>
 
+<file path="frontend/src/pages/Doctors.tsx">
+import React, { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import api from '../api/axios';
+import { Search, Loader2, Upload, Users, CalendarDays, Clock, Trash2, Plus, X } from 'lucide-react';
+
+const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+export default function DoctorsPage() {
+  const { hospitalId } = useParams();
+  const [doctors, setDoctors] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Modal State
+  const [manageDoc, setManageDoc] = useState<any>(null);
+  const [schedules, setSchedules] = useState<any[]>([]);
+  const [leaves, setLeaves] = useState<any[]>([]);
+  
+  // Form State
+  const [schedDay, setSchedDay] = useState('0');
+  const [schedStart, setSchedStart] = useState('09:00');
+  const [schedEnd, setSchedEnd] = useState('17:00');
+  const [leaveDate, setLeaveDate] = useState('');
+  const [leaveReason, setLeaveReason] = useState('');
+
+  const fetchDoctors = async () => {
+    try {
+      const res = await api.get(`/hospitals/${hospitalId}/doctors`);
+      setDoctors(res.data);
+    } catch (err) {
+      console.error("Failed to fetch doctors", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchDoctors(); }, [hospitalId]);
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      setLoading(true);
+      await api.post(`/hospitals/${hospitalId}/doctors/bulk-upload`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      fetchDoctors();
+    } catch (err) {
+      alert("Import failed. Ensure the file format is correct.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- Availability Management ---
+
+  const openManageModal = async (doc: any) => {
+    setManageDoc(doc);
+    fetchAvailability(doc.id);
+  };
+
+  const fetchAvailability = async (doctorId: int) => {
+    try {
+      const [schedRes, leaveRes] = await Promise.all([
+        api.get(`/availability/schedules/doctor/${doctorId}`),
+        api.get(`/availability/leaves/doctor/${doctorId}`)
+      ]);
+      setSchedules(schedRes.data);
+      setLeaves(leaveRes.data);
+    } catch (err) {
+      console.error("Failed to load availability", err);
+    }
+  };
+
+  const handleAddSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api.post('/availability/schedules/', {
+        doctor_id: manageDoc.id,
+        day_of_week: parseInt(schedDay),
+        start_time: schedStart,
+        end_time: schedEnd
+      });
+      fetchAvailability(manageDoc.id);
+    } catch (err) { alert("Failed to add schedule"); }
+  };
+
+  const handleAddLeave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api.post('/availability/leaves/', {
+        doctor_id: manageDoc.id,
+        date: leaveDate,
+        reason: leaveReason
+      });
+      setLeaveDate(''); setLeaveReason('');
+      fetchAvailability(manageDoc.id);
+    } catch (err) { alert("Failed to add leave"); }
+  };
+
+  const deleteSchedule = async (id: int) => {
+    await api.delete(`/availability/schedules/${id}`);
+    fetchAvailability(manageDoc.id);
+  };
+
+  const deleteLeave = async (id: int) => {
+    await api.delete(`/availability/leaves/${id}`);
+    fetchAvailability(manageDoc.id);
+  };
+
+  return (
+    <div className="p-8 space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Doctor Directory</h2>
+          <p className="text-gray-500 text-sm">Manage staff and working hours for AI scheduling.</p>
+        </div>
+        
+        <div className="relative">
+          <input type="file" id="bulk-upload" className="hidden" onChange={handleFileUpload} accept=".csv,.txt" disabled={loading} />
+          <label htmlFor="bulk-upload" className={`flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer font-medium shadow-sm ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            Upload Staff CSV
+          </label>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center gap-3">
+          <Search className="w-5 h-5 text-gray-400" />
+          <input type="text" placeholder="Search doctors..." className="bg-transparent border-none focus:ring-0 text-sm w-full outline-none" />
+        </div>
+
+        {loading ? (
+          <div className="p-20 flex justify-center text-blue-600"><Loader2 className="w-8 h-8 animate-spin" /></div>
+        ) : doctors.length === 0 ? (
+          <div className="p-20 text-center">
+            <Users className="w-12 h-12 text-blue-200 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900">No doctors found</h3>
+            <p className="text-gray-500 max-w-xs mx-auto mt-1">Upload your hospital staff list to begin.</p>
+          </div>
+        ) : (
+          <table className="w-full text-left">
+            <thead className="bg-gray-50 text-xs uppercase text-gray-500 font-semibold border-b">
+              <tr>
+                <th className="p-4">Name</th>
+                <th className="p-4">Department</th>
+                <th className="p-4">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {doctors.map(doc => (
+                <tr key={doc.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="p-4 text-sm font-medium text-gray-900">Dr. {doc.name}</td>
+                  <td className="p-4 text-sm text-gray-500">{doc.department || 'General'}</td>
+                  <td className="p-4">
+                    <button onClick={() => openManageModal(doc)} className="text-sm text-blue-600 font-medium hover:text-blue-800 flex items-center gap-1">
+                      <CalendarDays className="w-4 h-4" /> Manage Schedule
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* MANAGE SCHEDULE MODAL */}
+      {manageDoc && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+            
+            <div className="p-6 border-b flex justify-between items-center bg-gray-50">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Dr. {manageDoc.name}</h3>
+                <p className="text-sm text-gray-500">{manageDoc.department}</p>
+              </div>
+              <button onClick={() => setManageDoc(null)} className="text-gray-400 hover:text-gray-600"><X className="w-6 h-6" /></button>
+            </div>
+
+            <div className="p-6 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-8">
+              
+              {/* Weekly Schedule Section */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-gray-800 flex items-center gap-2"><Clock className="w-5 h-5 text-blue-600" /> Weekly Hours</h4>
+                <form onSubmit={handleAddSchedule} className="flex flex-wrap gap-2 items-end bg-blue-50/50 p-3 rounded-lg border border-blue-100">
+                  <div className="flex-1 min-w-[120px]">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Day</label>
+                    <select value={schedDay} onChange={e => setSchedDay(e.target.value)} className="w-full text-sm border rounded p-2">
+                      {DAYS_OF_WEEK.map((d, i) => <option key={i} value={i}>{d}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Start</label>
+                    <input type="time" value={schedStart} onChange={e => setSchedStart(e.target.value)} required className="w-full text-sm border rounded p-2" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">End</label>
+                    <input type="time" value={schedEnd} onChange={e => setSchedEnd(e.target.value)} required className="w-full text-sm border rounded p-2" />
+                  </div>
+                  <button type="submit" className="bg-blue-600 text-white p-2 rounded hover:bg-blue-700"><Plus className="w-5 h-5" /></button>
+                </form>
+
+                <div className="space-y-2">
+                  {schedules.map(s => (
+                    <div key={s.id} className="flex justify-between items-center bg-white border rounded-lg p-3 text-sm">
+                      <span className="font-medium w-24">{DAYS_OF_WEEK[s.day_of_week]}</span>
+                      <span className="text-gray-600">{s.start_time} - {s.end_time}</span>
+                      <button onClick={() => deleteSchedule(s.id)} className="text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  ))}
+                  {schedules.length === 0 && <p className="text-sm text-gray-400 italic">No schedules set.</p>}
+                </div>
+              </div>
+
+              {/* Leaves Section */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-gray-800 flex items-center gap-2"><CalendarDays className="w-5 h-5 text-red-600" /> Mark Absence</h4>
+                <form onSubmit={handleAddLeave} className="flex flex-wrap gap-2 items-end bg-red-50/50 p-3 rounded-lg border border-red-100">
+                  <div className="flex-1 min-w-[120px]">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Date</label>
+                    <input type="date" value={leaveDate} onChange={e => setLeaveDate(e.target.value)} required className="w-full text-sm border rounded p-2" />
+                  </div>
+                  <div className="flex-1 min-w-[120px]">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Reason (Optional)</label>
+                    <input type="text" value={leaveReason} onChange={e => setLeaveReason(e.target.value)} placeholder="e.g. Vacation" className="w-full text-sm border rounded p-2" />
+                  </div>
+                  <button type="submit" className="bg-red-600 text-white p-2 rounded hover:bg-red-700"><Plus className="w-5 h-5" /></button>
+                </form>
+
+                <div className="space-y-2">
+                  {leaves.map(l => (
+                    <div key={l.id} className="flex justify-between items-center bg-white border rounded-lg p-3 text-sm">
+                      <span className="font-medium text-red-600">{l.date}</span>
+                      <span className="text-gray-600 truncate max-w-[150px]">{l.reason || 'Absent'}</span>
+                      <button onClick={() => deleteLeave(l.id)} className="text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  ))}
+                  {leaves.length === 0 && <p className="text-sm text-gray-400 italic">No leaves marked.</p>}
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+</file>
+
+<file path="frontend/src/pages/LabTests.tsx">
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+import api from '../api/axios';
+import { TestTube, Plus, Trash2, Loader2, Upload } from 'lucide-react';
+
+export default function LabTestsPage() {
+  const { hospitalId } = useParams();
+  const [tests, setTests] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Form State
+  const [name, setName] = useState('');
+  const [category, setCategory] = useState('');
+  const [price, setPrice] = useState('');
+  const [prerequisites, setPrerequisites] = useState('');
+
+  const fetchTests = async () => {
+    try {
+      const res = await api.get(`/lab-tests/hospital/${hospitalId}`);
+      setTests(res.data);
+    } catch (err) {
+      console.error("Failed to fetch lab tests", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchTests(); }, [hospitalId]);
+
+  const handleAddTest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api.post('/lab-tests/', {
+        hospital_id: Number(hospitalId),
+        name,
+        category,
+        price: parseFloat(price) || 0,
+        prerequisites
+      });
+      setName(''); setCategory(''); setPrice(''); setPrerequisites('');
+      fetchTests();
+    } catch (err) {
+      alert("Failed to add test");
+    }
+  };
+
+  const handleDelete = async (id: int) => {
+    if (!confirm("Remove this lab test?")) return;
+    try {
+      await api.delete(`/lab-tests/${id}`);
+      fetchTests();
+    } catch (err) {
+      alert("Failed to delete");
+    }
+  };
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      setLoading(true);
+      await api.post(`/lab-tests/hospital/${hospitalId}/bulk-upload`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      alert("Lab tests imported successfully!");
+      fetchTests();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Import failed. Ensure it's a valid CSV.");
+    } finally {
+      setLoading(false);
+      event.target.value = ''; 
+    }
+  };
+
+  return (
+    <div className="space-y-6 max-w-5xl">
+      <div className="flex items-center gap-3 border-b pb-4">
+        <TestTube className="w-6 h-6 text-purple-600" />
+        <h2 className="text-2xl font-bold text-gray-900">Lab & Diagnostics</h2>
+      </div>
+      <div className="flex justify-between items-center border-b pb-4">
+        <div className="flex items-center gap-3">
+          <TestTube className="w-6 h-6 text-purple-600" />
+          <h2 className="text-2xl font-bold text-gray-900">Lab & Diagnostics</h2>
+        </div>
+
+        <div className="relative">
+          <input type="file" id="lab-upload" className="hidden" onChange={handleFileUpload} accept=".csv" disabled={loading} />
+          <label htmlFor="lab-upload" className={`flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 cursor-pointer font-medium text-sm transition-colors ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            Import CSV
+          </label>
+        </div>
+      </div>
+
+      {/* Add New Test Form */}
+      <form onSubmit={handleAddTest} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+        <div className="md:col-span-2">
+          <label className="block text-xs font-medium text-gray-700 mb-1">Test Name *</label>
+          <input required type="text" value={name} onChange={e => setName(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="e.g. Complete Blood Count (CBC)" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Category</label>
+          <input type="text" value={category} onChange={e => setCategory(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="e.g. Blood Test" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Price ($)</label>
+          <input type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="0.00" />
+        </div>
+        <div className="md:col-span-3">
+          <label className="block text-xs font-medium text-gray-700 mb-1">Preparation / Prerequisites (AI will read this to patients)</label>
+          <input type="text" value={prerequisites} onChange={e => setPrerequisites(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="e.g. Fasting required for 8-10 hours. Water is allowed." />
+        </div>
+        <div>
+          <button type="submit" className="w-full flex items-center justify-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm font-medium">
+            <Plus className="w-4 h-4" /> Add Test
+          </button>
+        </div>
+      </form>
+
+      {/* Tests Table */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        {loading ? (
+          <div className="p-12 flex justify-center text-purple-600"><Loader2 className="w-6 h-6 animate-spin" /></div>
+        ) : (
+          <table className="w-full text-left text-sm">
+            <thead className="bg-gray-50 border-b text-gray-500 uppercase text-xs">
+              <tr>
+                <th className="p-4">Test Name</th>
+                <th className="p-4">Category</th>
+                <th className="p-4">Price</th>
+                <th className="p-4">Prerequisites</th>
+                <th className="p-4">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {tests.map(test => (
+                <tr key={test.id} className="hover:bg-gray-50">
+                  <td className="p-4 font-medium">{test.name}</td>
+                  <td className="p-4 text-gray-500">{test.category || '-'}</td>
+                  <td className="p-4">${test.price}</td>
+                  <td className="p-4 text-gray-600 text-xs">{test.prerequisites || 'None'}</td>
+                  <td className="p-4">
+                    <button onClick={() => handleDelete(test.id)} className="text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                  </td>
+                </tr>
+              ))}
+              {tests.length === 0 && (
+                <tr><td colSpan={5} className="p-8 text-center text-gray-400">No lab tests added yet.</td></tr>
+              )}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="frontend/src/pages/Pharmacy.tsx">
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+import api from '../api/axios';
+import { Pill, Plus, Trash2, Loader2, Upload } from 'lucide-react';
+export default function PharmacyPage() {
+  const { hospitalId } = useParams();
+  const [medicines, setMedicines] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Form State
+  const [name, setName] = useState('');
+  const [brand, setBrand] = useState('');
+  const [price, setPrice] = useState('');
+  const [rxRequired, setRxRequired] = useState(false);
+
+  const fetchMedicines = async () => {
+    try {
+      const res = await api.get(`/medicines/hospital/${hospitalId}`);
+      setMedicines(res.data);
+    } catch (err) {
+      console.error("Failed to fetch medicines", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchMedicines(); }, [hospitalId]);
+
+  const handleAddMedicine = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api.post('/medicines/', {
+        hospital_id: Number(hospitalId),
+        name,
+        brand_name: brand,
+        price: parseFloat(price) || 0,
+        requires_prescription: rxRequired
+      });
+      setName(''); setBrand(''); setPrice(''); setRxRequired(false);
+      fetchMedicines();
+    } catch (err) {
+      alert("Failed to add medicine");
+    }
+  };
+
+  const handleDelete = async (id: int) => {
+    if (!confirm("Remove this medicine?")) return;
+    try {
+      await api.delete(`/medicines/${id}`);
+      fetchMedicines();
+    } catch (err) {
+      alert("Failed to delete");
+    }
+  };
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      setLoading(true);
+      await api.post(`/medicines/hospital/${hospitalId}/bulk-upload`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      alert("Pharmacy inventory imported successfully!");
+      fetchMedicines();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Import failed. Ensure it's a valid CSV.");
+    } finally {
+      setLoading(false);
+      event.target.value = ''; // Reset input
+    }
+  };
+
+  return (
+    <div className="space-y-6 max-w-5xl">
+      <div className="flex items-center gap-3 border-b pb-4">
+        <Pill className="w-6 h-6 text-blue-600" />
+        <h2 className="text-2xl font-bold text-gray-900">Pharmacy Inventory</h2>
+      </div>
+      <div className="flex justify-between items-center border-b pb-4">
+        <div className="flex items-center gap-3">
+          <Pill className="w-6 h-6 text-blue-600" />
+          <h2 className="text-2xl font-bold text-gray-900">Pharmacy Inventory</h2>
+        </div>
+        
+        <div className="relative">
+          <input type="file" id="pharmacy-upload" className="hidden" onChange={handleFileUpload} accept=".csv" disabled={loading} />
+          <label htmlFor="pharmacy-upload" className={`flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 cursor-pointer font-medium text-sm transition-colors ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            Import CSV
+          </label>
+        </div>
+      </div>
+
+      {/* Add New Medicine Form */}
+      <form onSubmit={handleAddMedicine} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+        <div className="md:col-span-2">
+          <label className="block text-xs font-medium text-gray-700 mb-1">Generic Name *</label>
+          <input required type="text" value={name} onChange={e => setName(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="e.g. Paracetamol" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Brand Name</label>
+          <input type="text" value={brand} onChange={e => setBrand(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="e.g. Tylenol" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Price ($)</label>
+          <input type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="0.00" />
+        </div>
+        <div className="flex flex-col gap-2">
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input type="checkbox" checked={rxRequired} onChange={e => setRxRequired(e.target.checked)} />
+            Requires Rx
+          </label>
+          <button type="submit" className="flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">
+            <Plus className="w-4 h-4" /> Add
+          </button>
+        </div>
+      </form>
+
+      {/* Inventory Table */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        {loading ? (
+          <div className="p-12 flex justify-center text-blue-600"><Loader2 className="w-6 h-6 animate-spin" /></div>
+        ) : (
+          <table className="w-full text-left text-sm">
+            <thead className="bg-gray-50 border-b text-gray-500 uppercase text-xs">
+              <tr>
+                <th className="p-4">Name</th>
+                <th className="p-4">Brand</th>
+                <th className="p-4">Price</th>
+                <th className="p-4">Prescription</th>
+                <th className="p-4">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {medicines.map(med => (
+                <tr key={med.id} className="hover:bg-gray-50">
+                  <td className="p-4 font-medium">{med.name}</td>
+                  <td className="p-4 text-gray-500">{med.brand_name || '-'}</td>
+                  <td className="p-4">${med.price}</td>
+                  <td className="p-4">{med.requires_prescription ? <span className="text-red-600 font-medium text-xs bg-red-50 px-2 py-1 rounded">Yes</span> : <span className="text-green-600 font-medium text-xs bg-green-50 px-2 py-1 rounded">No</span>}</td>
+                  <td className="p-4">
+                    <button onClick={() => handleDelete(med.id)} className="text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                  </td>
+                </tr>
+              ))}
+              {medicines.length === 0 && (
+                <tr><td colSpan={5} className="p-8 text-center text-gray-400">No medicines added yet.</td></tr>
+              )}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="backend/alembic/versions/cea080e631b8_add_pharmacy_labs_and_doctor_.py">
+"""add pharmacy labs and doctor availability
+
+Revision ID: cea080e631b8
+Revises: b2c3d4e5f6a7
+Create Date: 2026-04-26 15:02:10.163390
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
+
+# revision identifiers, used by Alembic.
+revision: str = 'cea080e631b8'
+down_revision: Union[str, None] = 'b2c3d4e5f6a7'
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    """Upgrade schema."""
+    # ### commands auto generated by Alembic - please adjust! ###
+    op.create_table('lab_tests',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('hospital_id', sa.Integer(), nullable=False),
+    sa.Column('name', sa.String(), nullable=False),
+    sa.Column('category', sa.String(), nullable=True),
+    sa.Column('price', sa.Float(), nullable=True),
+    sa.Column('prerequisites', sa.Text(), nullable=True),
+    sa.Column('turnaround_time', sa.String(), nullable=True),
+    sa.Column('is_inhouse', sa.Boolean(), nullable=True),
+    sa.ForeignKeyConstraint(['hospital_id'], ['hospital.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_lab_tests_hospital_id'), 'lab_tests', ['hospital_id'], unique=False)
+    op.create_index(op.f('ix_lab_tests_id'), 'lab_tests', ['id'], unique=False)
+    op.create_index(op.f('ix_lab_tests_name'), 'lab_tests', ['name'], unique=False)
+    op.create_table('medicines',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('hospital_id', sa.Integer(), nullable=False),
+    sa.Column('name', sa.String(), nullable=False),
+    sa.Column('brand_name', sa.String(), nullable=True),
+    sa.Column('category', sa.String(), nullable=True),
+    sa.Column('price', sa.Float(), nullable=True),
+    sa.Column('stock_status', sa.String(), nullable=True),
+    sa.Column('requires_prescription', sa.Boolean(), nullable=True),
+    sa.ForeignKeyConstraint(['hospital_id'], ['hospital.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_medicines_hospital_id'), 'medicines', ['hospital_id'], unique=False)
+    op.create_index(op.f('ix_medicines_id'), 'medicines', ['id'], unique=False)
+    op.create_index(op.f('ix_medicines_name'), 'medicines', ['name'], unique=False)
+    op.create_table('doctor_leaves',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('doctor_id', sa.Integer(), nullable=False),
+    sa.Column('date', sa.Date(), nullable=False),
+    sa.Column('reason', sa.String(), nullable=True),
+    sa.ForeignKeyConstraint(['doctor_id'], ['doctors.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_doctor_leaves_date'), 'doctor_leaves', ['date'], unique=False)
+    op.create_index(op.f('ix_doctor_leaves_doctor_id'), 'doctor_leaves', ['doctor_id'], unique=False)
+    op.create_index(op.f('ix_doctor_leaves_id'), 'doctor_leaves', ['id'], unique=False)
+    op.create_table('doctor_schedules',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('doctor_id', sa.Integer(), nullable=False),
+    sa.Column('day_of_week', sa.Integer(), nullable=False),
+    sa.Column('start_time', sa.String(), nullable=False),
+    sa.Column('end_time', sa.String(), nullable=False),
+    sa.Column('is_active', sa.Boolean(), nullable=True),
+    sa.ForeignKeyConstraint(['doctor_id'], ['doctors.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_doctor_schedules_doctor_id'), 'doctor_schedules', ['doctor_id'], unique=False)
+    op.create_index(op.f('ix_doctor_schedules_id'), 'doctor_schedules', ['id'], unique=False)
+    op.create_index(op.f('ix_appointments_doctor_id'), 'appointments', ['doctor_id'], unique=False)
+    # ### end Alembic commands ###
+
+
+def downgrade() -> None:
+    """Downgrade schema."""
+    # ### commands auto generated by Alembic - please adjust! ###
+    op.drop_index(op.f('ix_appointments_doctor_id'), table_name='appointments')
+    op.create_index(op.f('ix_appointments_doctor_date'), 'appointments', ['doctor_id', 'preferred_date'], unique=False)
+    op.create_table('usage_ledger',
+    sa.Column('id', sa.INTEGER(), autoincrement=True, nullable=False),
+    sa.Column('hospital_id', sa.INTEGER(), autoincrement=False, nullable=True),
+    sa.Column('endpoint', sa.VARCHAR(), autoincrement=False, nullable=True),
+    sa.Column('prompt_tokens', sa.INTEGER(), autoincrement=False, nullable=True),
+    sa.Column('completion_tokens', sa.INTEGER(), autoincrement=False, nullable=True),
+    sa.Column('total_tokens', sa.INTEGER(), autoincrement=False, nullable=True),
+    sa.Column('estimated_cost', sa.DOUBLE_PRECISION(precision=53), autoincrement=False, nullable=True),
+    sa.Column('created_at', postgresql.TIMESTAMP(), autoincrement=False, nullable=True),
+    sa.ForeignKeyConstraint(['hospital_id'], ['hospital.id'], name=op.f('usage_ledger_hospital_id_fkey')),
+    sa.PrimaryKeyConstraint('id', name=op.f('usage_ledger_pkey'))
+    )
+    op.create_index(op.f('ix_usage_ledger_id'), 'usage_ledger', ['id'], unique=False)
+    op.create_table('knowledge_base',
+    sa.Column('id', sa.INTEGER(), autoincrement=True, nullable=False),
+    sa.Column('hospital_id', sa.INTEGER(), autoincrement=False, nullable=False),
+    sa.Column('content', sa.TEXT(), autoincrement=False, nullable=False),
+    sa.Column('embedding', sa.NullType(), autoincrement=False, nullable=True),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), autoincrement=False, nullable=True),
+    sa.ForeignKeyConstraint(['hospital_id'], ['hospital.id'], name=op.f('knowledge_base_hospital_id_fkey')),
+    sa.PrimaryKeyConstraint('id', name=op.f('knowledge_base_pkey'))
+    )
+    op.drop_index(op.f('ix_doctor_schedules_id'), table_name='doctor_schedules')
+    op.drop_index(op.f('ix_doctor_schedules_doctor_id'), table_name='doctor_schedules')
+    op.drop_table('doctor_schedules')
+    op.drop_index(op.f('ix_doctor_leaves_id'), table_name='doctor_leaves')
+    op.drop_index(op.f('ix_doctor_leaves_doctor_id'), table_name='doctor_leaves')
+    op.drop_index(op.f('ix_doctor_leaves_date'), table_name='doctor_leaves')
+    op.drop_table('doctor_leaves')
+    op.drop_index(op.f('ix_medicines_name'), table_name='medicines')
+    op.drop_index(op.f('ix_medicines_id'), table_name='medicines')
+    op.drop_index(op.f('ix_medicines_hospital_id'), table_name='medicines')
+    op.drop_table('medicines')
+    op.drop_index(op.f('ix_lab_tests_name'), table_name='lab_tests')
+    op.drop_index(op.f('ix_lab_tests_id'), table_name='lab_tests')
+    op.drop_index(op.f('ix_lab_tests_hospital_id'), table_name='lab_tests')
+    op.drop_table('lab_tests')
+    # ### end Alembic commands ###
+</file>
+
+<file path="backend/app/api/v1/endpoints/__init__.py">
+# Location: D:\Hospital\hospital-ai-platform\backend\app\api\v1\endpoints\__init__.py
+from .hospitals import router as hospitals
+from .auth import router as auth
+from .ai import router as ai
+from .appointments import router as appointments
+from .usage import router as usage
+from .medicines import router as medicines
+from .lab_tests import router as lab_tests
+from .doctor_availability import router as availability
+</file>
+
 <file path="backend/app/api/v1/endpoints/appointments.py">
 """
 app/api/v1/endpoints/appointments.py
@@ -3395,237 +4532,6 @@ def update_booking_config(
     return {"status": "success", "config": config_payload.model_dump()}
 </file>
 
-<file path="backend/app/availability.py">
-import logging
-from datetime import datetime
-from pathlib import Path
-
-import gspread
-from google.oauth2.service_account import Credentials
-
-logger = logging.getLogger(__name__)
-
-CREDENTIALS_PATH = Path(__file__).resolve().parent.parent / "google_credentials.json"
-
-_cache: dict = {}
-_cache_time: dict = {}
-
-# Cache TTL in seconds — 5 minutes is a good balance between freshness
-# and not hammering the Sheets API on every chat message.
-CACHE_TTL_SECONDS = 300
-
-
-class AvailabilityError(Exception):
-    """
-    Raised when the Google Sheets availability fetch fails for any reason:
-    missing credentials, network error, quota exceeded, invalid sheet ID,
-    or permission denied.
-
-    Callers (ai.py) catch this specifically to distinguish a real failure
-    from an intentionally empty sheet, and to set a safe, directive
-    fallback message in the system prompt rather than a vague string
-    the LLM might ignore.
-    """
-    pass
-
-
-def get_sheet_client() -> gspread.Client:
-    """
-    Authenticate and return a gspread client using the service account
-    credentials file.
-
-    Raises AvailabilityError if the credentials file is missing or
-    authentication fails, so the caller gets a typed exception rather
-    than a raw FileNotFoundError or google.auth exception.
-    """
-    if not CREDENTIALS_PATH.exists():
-        raise AvailabilityError(
-            f"Google credentials file not found at {CREDENTIALS_PATH}. "
-            "Download your service account key from Google Cloud Console "
-            "and place it at backend/google_credentials.json."
-        )
-
-    try:
-        scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-        creds = Credentials.from_service_account_file(
-            str(CREDENTIALS_PATH), scopes=scopes
-        )
-        return gspread.authorize(creds)
-    except Exception as e:
-        raise AvailabilityError(
-            f"Failed to authenticate with Google Sheets API: {e}"
-        ) from e
-
-
-def get_doctor_availability(
-    sheet_id: str,
-    force_refresh: bool = False
-) -> dict:
-    """
-    Fetch doctor availability data from a Google Sheet, with in-process
-    per-hospital caching (TTL: CACHE_TTL_SECONDS).
-
-    Returns a dict keyed by doctor_id:
-        {
-            "H1-D-A1B2": {
-                "id": "H1-D-A1B2",
-                "name": "Dr. Rajesh Kumar",
-                "department": "Cardiology",
-                "schedule": "Mon-Fri 9am-1pm",
-                "absent_dates": "22-03-2026,23-03-2026",
-            },
-            ...
-        }
-
-    Returns {} if sheet_id is falsy (no sheet configured for this hospital).
-
-    Raises AvailabilityError if the fetch fails for any reason so callers
-    can provide a safe, explicit fallback rather than silently getting
-    stale or empty data.
-
-    Cache behaviour:
-        - On a successful fetch, the result is cached and the timestamp updated.
-        - On a failed fetch, the exception is raised immediately — we do NOT
-          silently return stale cache. The caller decides whether to use stale
-          data or show a safe fallback message. Serving stale data for
-          availability is safer than hallucinating, but the caller should know
-          it's stale.
-    """
-    if not sheet_id:
-        return {}
-
-    now = datetime.now()
-    last_refresh = _cache_time.get(sheet_id)
-    cache_is_fresh = (
-        sheet_id in _cache
-        and last_refresh is not None
-        and (now - last_refresh).total_seconds() < CACHE_TTL_SECONDS
-    )
-
-    if not force_refresh and cache_is_fresh:
-        logger.debug(
-            "[Availability] Cache hit for sheet_id=%s (%d doctors)",
-            sheet_id, len(_cache[sheet_id])
-        )
-        return _cache[sheet_id]
-
-    # Cache is stale or missing — attempt a live fetch
-    logger.info("[Availability] Fetching sheet_id=%s from Google Sheets API", sheet_id)
-
-    try:
-        client = get_sheet_client()
-        sheet = client.open_by_key(sheet_id).sheet1
-        records = sheet.get_all_records()
-    except AvailabilityError:
-        # Re-raise typed errors from get_sheet_client() as-is
-        raise
-    except gspread.exceptions.SpreadsheetNotFound:
-        raise AvailabilityError(
-            f"Google Sheet not found (sheet_id={sheet_id}). "
-            "Check the Sheet ID in Settings and ensure the service account "
-            "has been granted Viewer access to this sheet."
-        )
-    except gspread.exceptions.APIError as e:
-        status = getattr(e.response, 'status_code', 'unknown')
-        raise AvailabilityError(
-            f"Google Sheets API error (HTTP {status}) for sheet_id={sheet_id}: {e}"
-        ) from e
-    except Exception as e:
-        raise AvailabilityError(
-            f"Unexpected error fetching sheet_id={sheet_id}: {type(e).__name__}: {e}"
-        ) from e
-
-    # Parse the sheet records into our internal format
-    doctors: dict = {}
-    skipped = 0
-
-    for row in records:
-        doctor_id = str(row.get("Doctor ID", "")).strip()
-        name = str(row.get("Doctor Name", "")).strip()
-
-        if not doctor_id or not name:
-            skipped += 1
-            continue
-
-        doctors[doctor_id] = {
-            "id": doctor_id,
-            "name": name,
-            "department": str(row.get("Department", "")).strip(),
-            "schedule": str(row.get("Base Schedule", "")).strip(),
-            "absent_dates": str(row.get("Absent Dates (comma-separated)", "")).strip(),
-        }
-
-    if skipped:
-        logger.warning(
-            "[Availability] Skipped %d rows with missing Doctor ID or Name "
-            "in sheet_id=%s",
-            skipped, sheet_id
-        )
-
-    # Update cache only after a successful parse
-    _cache[sheet_id] = doctors
-    _cache_time[sheet_id] = now
-
-    logger.info(
-        "[Availability] Loaded %d doctors from sheet_id=%s",
-        len(doctors), sheet_id
-    )
-
-    return doctors
-
-
-def get_cached_or_empty(sheet_id: str) -> dict:
-    """
-    Returns the last known good cache for this sheet_id, or {} if no
-    cache exists. Used by callers that want to gracefully degrade to
-    stale data rather than showing an error message to the patient.
-
-    The caller is responsible for logging that stale data is being used.
-    """
-    return _cache.get(sheet_id, {})
-</file>
-
-<file path="backend/app/core/config.py">
-from typing import Optional
-from pydantic_settings import BaseSettings
-
-class Settings(BaseSettings):
-    # Core
-    PROJECT_NAME: str = "Hospital AI Platform"
-    API_V1_STR: str = "/api/v1"
-    
-    # 1. ADD THIS LINE: This maps the Render environment variable to your code
-    DATABASE_URL: Optional[str] = None 
-
-    # Database Defaults (Keep these for local dev)
-    POSTGRES_SERVER: str = "localhost"
-    POSTGRES_USER: str = "postgres"
-    POSTGRES_PASSWORD: str = "NewStrongPassword123!"
-    POSTGRES_DB: str = "hospital_ai"
-    POSTGRES_PORT: str = "5432"
-    
-    # Optional: If you want to override the full URL
-    SQLALCHEMY_DATABASE_URI: Optional[str] = None
-
-    # App Secrets
-    REDIS_URL: str = "redis://localhost:6379"
-    OPENAI_API_KEY: str = "sk-placeholder"
-    JWT_SECRET: str = "supersecret"
-
-    # Helper to build the URL dynamically
-    @property
-    def SQLALCHEMY_DATABASE_URL(self) -> str:
-        # Check Render's DATABASE_URL first
-        if self.DATABASE_URL:
-            # Render often gives 'postgres://', but SQLAlchemy needs 'postgresql://'
-            return self.DATABASE_URL.replace("postgres://", "postgresql://", 1)
-        
-        # Fallback to local construction
-        return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
-
-settings = Settings()
-</file>
-
 <file path="backend/app/crud/crud_user.py">
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
@@ -3660,14 +4566,6 @@ def create_user(db: Session, user: UserCreate):
     db.commit()
     db.refresh(db_obj)
     return db_obj
-</file>
-
-<file path="backend/app/db/base.py">
-from app.db.base_class import Base  # noqa
-from app.models.hospital import Hospital  # noqa
-from app.models.doctor import Doctor  # noqa
-from app.models.user import User  # noqa
-from app.models.appointment import Appointment  # noqa
 </file>
 
 <file path="frontend/src/main.tsx">
@@ -4069,73 +4967,6 @@ const KnowledgeBaseUpload = ({ hospitalId }: { hospitalId: string | undefined })
 export default KnowledgeBaseUpload;
 </file>
 
-<file path="backend/app/api/deps.py">
-import os
-from typing import Generator
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from jose import jwt, JWTError
-from app.db.session import SessionLocal
-
-# FIX #1: Load SECRET_KEY from environment, never hardcode it.
-# Set JWT_SECRET in your .env and Render environment variables.
-SECRET_KEY = os.getenv("JWT_SECRET", "dev-secret-key-change-in-production")
-ALGORITHM = "HS256"
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login")
-
-def get_db() -> Generator:
-    try:
-        db = SessionLocal()
-        yield db
-    finally:
-        db.close()
-
-def get_current_tenant(token: str = Depends(oauth2_scheme)) -> int:
-    """
-    The Magic Key: Extracts the hospital_id from the JWT.
-    If the token is invalid or missing the ID, it denies access.
-    """
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        hospital_id: int = payload.get("hospital_id")
-        if hospital_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid authentication credentials: No tenant ID found",
-            )
-        return hospital_id
-    except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-        )
-def get_current_user_role(token: str = Depends(oauth2_scheme)) -> str:
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload.get("role", "staff")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Could not validate credentials")
-
-def require_superadmin(role: str = Depends(get_current_user_role)):
-    if role != "superadmin":
-        raise HTTPException(status_code=403, detail="Access denied")
-    
-def get_token_payload(token: str = Depends(oauth2_scheme)) -> dict:
-    """
-    Decodes the JWT and returns the payload (role, hospital_id, sub) 
-    so routes can verify permissions.
-    """
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload
-    except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-        )
-</file>
-
 <file path="backend/app/api/v1/endpoints/auth.py">
 import os
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -4368,259 +5199,88 @@ export default function SettingsPage() {
 }
 </file>
 
-<file path="frontend/src/App.tsx">
-import { Routes, Route, Navigate, Link, useParams } from 'react-router-dom';
-import DashboardLayout from './layouts/DashboardLayout';
-import CreateHospitalModal from './components/CreateHospitalModal';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import DoctorsPage from './pages/Doctors';
-import SettingsPage from './pages/Settings';
-import ThemeLoader from './themes/ThemeLoader';
-import api from './api/axios';
-import { useEffect, useState } from 'react';
-import { Plus } from 'lucide-react';
-import { useAuth } from './context/AuthContext';
-import AppointmentsTab from './components/AppointmentsTab';
+<file path="backend/app/api/deps.py">
+import os
+from typing import Generator
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from jose import jwt, JWTError
+from app.db.session import SessionLocal
 
-function HospitalList() {
-  const [hospitals, setHospitals] = useState<any[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+# FIX #1: Load SECRET_KEY from environment, never hardcode it.
+# Set JWT_SECRET in your .env and Render environment variables.
+SECRET_KEY = os.getenv("JWT_SECRET", "dev-secret-key-change-in-production")
+ALGORITHM = "HS256"
 
-  const fetchHospitals = () => {
-    api.get('/hospitals/')
-      .then(res => setHospitals(res.data))
-      .catch(console.error);
-  };
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login")
 
-  useEffect(() => { fetchHospitals(); }, []);
+def get_db() -> Generator:
+    try:
+        db = SessionLocal()
+        yield db
+    finally:
+        db.close()
 
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Hospital Management</h2>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" /> Add Hospital
-        </button>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-3">
-        {hospitals.map((h: any) => (
-          <div key={h.id} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-            <h3 className="font-bold text-gray-900 text-lg">{h.name}</h3>
-            <p className="text-xs text-gray-400 mb-4">Slug: {h.slug}</p>
-
-            <div className="flex gap-2 border-t pt-4">
-              <Link
-                to={`/hospitals/${h.id}/appointments`}
-                className="flex-1 text-center text-xs bg-emerald-600 text-white py-2 rounded-md font-medium hover:bg-emerald-700"
-              >
-                Appointments
-              </Link>
-              <Link
-                to={`/hospitals/${h.id}/training`}
-                className="flex-1 text-center text-xs bg-blue-600 text-white py-2 rounded-md font-medium hover:bg-blue-700"
-              >
-                Train AI
-              </Link>
-              <Link
-                to={`/hospitals/${h.id}/settings`}
-                className="flex-1 text-center text-xs border border-gray-300 text-gray-600 py-2 rounded-md font-medium hover:bg-gray-50"
-              >
-                Settings
-              </Link>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <CreateHospitalModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSuccess={fetchHospitals}
-      />
-    </div>
-  );
-}
-
-// ==========================================
-// NEW: Security Guard Component
-// ==========================================
-function StaffGuard({ children }: { children: React.ReactNode }) {
-  const { role, hospitalId } = useAuth();
-  const { hospitalId: routeHospitalId } = useParams();
-
-  // If staff tries to access a different hospital's URL, kick them back to their own
-  if (role === 'staff' && String(hospitalId) !== String(routeHospitalId)) {
-    return <Navigate to={`/hospitals/${hospitalId}/settings`} replace />;
-  }
-  
-  return <>{children}</>;
-}
-
-// ==========================================
-// MAIN APP ROUTER
-// ==========================================
-export default function App() {
-  const { isAuthenticated, role, hospitalId } = useAuth();
-
-  return (
-    <Routes>
-      {/* Public patient-facing route */}
-      <Route path="/p/:hospitalSlug" element={<ThemeLoader />} />
-
-      {/* Auth route */}
-      <Route
-        path="/login"
-        element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
-      />
-
-      {/* Protected admin routes */}
-      <Route element={isAuthenticated ? <DashboardLayout /> : <Navigate to="/login" replace />}>
+def get_current_tenant(token: str = Depends(oauth2_scheme)) -> int:
+    """
+    The Magic Key: Extracts the hospital_id from the JWT.
+    """
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        hospital_id = payload.get("hospital_id")
+        role = payload.get("role")
         
-        {/* Root Route: Redirect Staff directly to Settings, Show list to Superadmin */}
-        <Route 
-          path="/" 
-          element={
-            role === 'staff' && hospitalId ? (
-              <Navigate to={`/hospitals/${hospitalId}/settings`} replace />
-            ) : (
-              <HospitalList />
+        # FIX: Allow superadmins to bypass the null tenant check
+        if hospital_id is None and role != "superadmin":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication credentials: No tenant ID found",
             )
-          } 
-        />
+        return hospital_id
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+        )
+def get_current_user_role(token: str = Depends(oauth2_scheme)) -> str:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload.get("role", "staff")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Could not validate credentials")
 
-        {/* Common Routes (Secured by StaffGuard so they can't swap IDs) */}
-        <Route 
-          path="/hospitals/:hospitalId/appointments" 
-          element={<StaffGuard><AppointmentsTab /></StaffGuard>} 
-        />
-        <Route 
-          path="/hospitals/:hospitalId/doctors" 
-          element={<StaffGuard><DoctorsPage /></StaffGuard>} 
-        />
-        <Route 
-          path="/hospitals/:hospitalId/settings" 
-          element={<StaffGuard><SettingsPage /></StaffGuard>} 
-        />
-
-        {/* Superadmin Only Routes */}
-        <Route 
-          path="/hospitals/:hospitalId/training" 
-          element={role === 'superadmin' ? <Dashboard /> : <Navigate to="/" replace />} 
-        />
-
-      </Route>
-
-      {/* Catch-all redirects to root, which will cleanly re-route based on role */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  );
-}
+def require_superadmin(role: str = Depends(get_current_user_role)):
+    if role != "superadmin":
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+def get_token_payload(token: str = Depends(oauth2_scheme)) -> dict:
+    """
+    Decodes the JWT and returns the payload (role, hospital_id, sub) 
+    so routes can verify permissions.
+    """
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+        )
 </file>
 
-<file path="frontend/src/layouts/DashboardLayout.tsx">
-import { Outlet, Link, useNavigate, useParams, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Building2, Settings, LogOut, BrainCircuit, CalendarCheck } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+<file path="backend/app/db/base.py">
+from app.db.base_class import Base  # noqa
+from app.models.hospital import Hospital  # noqa
+from app.models.doctor import Doctor  # noqa
+from app.models.user import User  # noqa
+from app.models.appointment import Appointment  # noqa
+from app.models.medicine import Medicine # noqa
+from app.models.lab_test import LabTest # noqa
+from app.models.doctor_availability import DoctorSchedule, DoctorLeave # noqa
 
-export default function DashboardLayout() {
-  const navigate = useNavigate();
-  const { hospitalId } = useParams();
-  const location = useLocation();
-  const { logout, role } = useAuth();
-
-  const handleSignOut = () => {
-    logout();
-    navigate('/login');
-  };
-
-  const isActive = (path: string) => location.pathname === path;
-  const linkBase = 'flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors';
-  const linkActive = 'bg-blue-50 text-blue-600';
-  const linkIdle = 'text-gray-700 hover:bg-blue-50';
-
-  return (
-    <div className="flex h-screen bg-gray-50">
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col shadow-sm">
-        <div className="p-6 border-b">
-          <h2 className="text-xl font-bold text-blue-600 flex items-center gap-2">
-            <Building2 className="w-6 h-6" /> Corvus Labs
-          </h2>
-        </div>
-
-        <nav className="flex-1 p-4 space-y-2">
-          {role === 'superadmin' && (
-            <Link
-              to="/"
-              className={`${linkBase} ${isActive('/') ? linkActive : linkIdle}`}
-            >
-              <LayoutDashboard className="w-5 h-5" /> Hospitals
-            </Link>
-          )}
-
-          {hospitalId && (
-            <>
-              <div className="mt-6 mb-2 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                Management
-              </div>
-
-              <Link
-                to={`/hospitals/${hospitalId}/appointments`}
-                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/appointments`) ? linkActive : linkIdle}`}
-              >
-                <CalendarCheck className="w-5 h-5 text-blue-500" /> Appointments
-              </Link>
-
-              <Link
-                to={`/hospitals/${hospitalId}/doctors`}
-                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/doctors`) ? linkActive : linkIdle}`}
-              >
-                <Users className="w-5 h-5 text-blue-500" /> Doctors
-              </Link>
-
-              {/* Settings is now visible to all roles */}
-              <Link
-                to={`/hospitals/${hospitalId}/settings`}
-                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/settings`) ? linkActive : linkIdle}`}
-              >
-                <Settings className="w-5 h-5 text-blue-500" /> Settings
-              </Link>
-
-              {/* AI Training is Superadmin only */}
-              {role === 'superadmin' && (
-                <Link
-                  to={`/hospitals/${hospitalId}/training`}
-                  className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/training`) ? linkActive : linkIdle}`}
-                >
-                  <BrainCircuit className="w-5 h-5 text-blue-500" /> AI Training
-                </Link>
-              )}
-            </>
-          )}
-        </nav>
-
-        <div className="p-4 border-t">
-          <button
-            onClick={handleSignOut}
-            className="flex items-center gap-3 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium w-full transition-colors"
-          >
-            <LogOut className="w-5 h-5" /> Sign Out
-          </button>
-        </div>
-      </aside>
-
-      <main className="flex-1 overflow-auto bg-gray-50">
-        <div className="p-8">
-          <Outlet />
-        </div>
-      </main>
-    </div>
-  );
-}
+# Make sure these are here!
+# from app.models.knowledge_base import KnowledgeBase # noqa
+# from app.models.usage import UsageLedger # noqa (Adjust these paths if they differ in your codebase)
 </file>
 
 <file path="frontend/src/pages/Login.tsx">
@@ -4876,6 +5536,283 @@ redis==7.2.0      # already there — just confirm it's present
 APScheduler==3.10.4
 </file>
 
+<file path="frontend/src/App.tsx">
+import { Routes, Route, Navigate, Link, useParams } from 'react-router-dom';
+import DashboardLayout from './layouts/DashboardLayout';
+import CreateHospitalModal from './components/CreateHospitalModal';
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import DoctorsPage from './pages/Doctors';
+import SettingsPage from './pages/Settings';
+import ThemeLoader from './themes/ThemeLoader';
+import api from './api/axios';
+import { useEffect, useState } from 'react';
+import { Plus } from 'lucide-react';
+import { useAuth } from './context/AuthContext';
+import AppointmentsTab from './components/AppointmentsTab';
+import PharmacyPage from './pages/Pharmacy';
+import LabTestsPage from './pages/LabTests';
+
+function HospitalList() {
+  const [hospitals, setHospitals] = useState<any[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const fetchHospitals = () => {
+    api.get('/hospitals/')
+      .then(res => setHospitals(res.data))
+      .catch(console.error);
+  };
+
+  useEffect(() => { fetchHospitals(); }, []);
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-gray-900">Hospital Management</h2>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          <Plus className="w-4 h-4" /> Add Hospital
+        </button>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-3">
+        {hospitals.map((h: any) => (
+          <div key={h.id} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+            <h3 className="font-bold text-gray-900 text-lg">{h.name}</h3>
+            <p className="text-xs text-gray-400 mb-4">Slug: {h.slug}</p>
+
+            <div className="flex gap-2 border-t pt-4">
+              <Link
+                to={`/hospitals/${h.id}/appointments`}
+                className="flex-1 text-center text-xs bg-emerald-600 text-white py-2 rounded-md font-medium hover:bg-emerald-700"
+              >
+                Appointments
+              </Link>
+              <Link
+                to={`/hospitals/${h.id}/training`}
+                className="flex-1 text-center text-xs bg-blue-600 text-white py-2 rounded-md font-medium hover:bg-blue-700"
+              >
+                Train AI
+              </Link>
+              <Link
+                to={`/hospitals/${h.id}/settings`}
+                className="flex-1 text-center text-xs border border-gray-300 text-gray-600 py-2 rounded-md font-medium hover:bg-gray-50"
+              >
+                Settings
+              </Link>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <CreateHospitalModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={fetchHospitals}
+      />
+    </div>
+  );
+}
+
+// ==========================================
+// NEW: Security Guard Component
+// ==========================================
+function StaffGuard({ children }: { children: React.ReactNode }) {
+  const { role, hospitalId } = useAuth();
+  const { hospitalId: routeHospitalId } = useParams();
+
+  // If staff tries to access a different hospital's URL, kick them back to their own
+  if (role === 'staff' && String(hospitalId) !== String(routeHospitalId)) {
+    return <Navigate to={`/hospitals/${hospitalId}/settings`} replace />;
+  }
+  
+  return <>{children}</>;
+}
+
+// ==========================================
+// MAIN APP ROUTER
+// ==========================================
+export default function App() {
+  const { isAuthenticated, role, hospitalId } = useAuth();
+
+  return (
+    <Routes>
+      {/* Public patient-facing route */}
+      <Route path="/p/:hospitalSlug" element={<ThemeLoader />} />
+
+      {/* Auth route */}
+      <Route
+        path="/login"
+        element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
+      />
+
+      {/* Protected admin routes */}
+      <Route element={isAuthenticated ? <DashboardLayout /> : <Navigate to="/login" replace />}>
+        
+        {/* Root Route: Redirect Staff directly to Settings, Show list to Superadmin */}
+        <Route 
+          path="/" 
+          element={
+            role === 'staff' && hospitalId ? (
+              <Navigate to={`/hospitals/${hospitalId}/settings`} replace />
+            ) : (
+              <HospitalList />
+            )
+          } 
+        />
+
+        {/* Common Routes (Secured by StaffGuard so they can't swap IDs) */}
+        <Route 
+          path="/hospitals/:hospitalId/appointments" 
+          element={<StaffGuard><AppointmentsTab /></StaffGuard>} 
+        />
+        <Route 
+          path="/hospitals/:hospitalId/doctors" 
+          element={<StaffGuard><DoctorsPage /></StaffGuard>} 
+        />
+        <Route 
+          path="/hospitals/:hospitalId/settings" 
+          element={<StaffGuard><SettingsPage /></StaffGuard>} 
+        />
+        <Route 
+          path="/hospitals/:hospitalId/pharmacy" 
+          element={<StaffGuard><PharmacyPage /></StaffGuard>} 
+        />
+        <Route 
+          path="/hospitals/:hospitalId/lab-tests" 
+          element={<StaffGuard><LabTestsPage /></StaffGuard>} 
+        />
+
+        {/* Superadmin Only Routes */}
+        <Route 
+          path="/hospitals/:hospitalId/training" 
+          element={role === 'superadmin' ? <Dashboard /> : <Navigate to="/" replace />} 
+        />
+
+      </Route>
+
+      {/* Catch-all redirects to root, which will cleanly re-route based on role */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+</file>
+
+<file path="frontend/src/layouts/DashboardLayout.tsx">
+import { Outlet, Link, useNavigate, useParams, useLocation } from 'react-router-dom';
+import { LayoutDashboard, Users, Building2, Settings, LogOut, BrainCircuit, CalendarCheck, Pill, TestTube } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+export default function DashboardLayout() {
+  const navigate = useNavigate();
+  const { hospitalId } = useParams();
+  const location = useLocation();
+  const { logout, role } = useAuth();
+
+  const handleSignOut = () => {
+    logout();
+    navigate('/login');
+  };
+
+  const isActive = (path: string) => location.pathname === path;
+  const linkBase = 'flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors';
+  const linkActive = 'bg-blue-50 text-blue-600';
+  const linkIdle = 'text-gray-700 hover:bg-blue-50';
+
+  return (
+    <div className="flex h-screen bg-gray-50">
+      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col shadow-sm">
+        <div className="p-6 border-b">
+          <h2 className="text-xl font-bold text-blue-600 flex items-center gap-2">
+            <Building2 className="w-6 h-6" /> Corvus Labs
+          </h2>
+        </div>
+
+        <nav className="flex-1 p-4 space-y-2">
+          {role === 'superadmin' && (
+            <Link
+              to="/"
+              className={`${linkBase} ${isActive('/') ? linkActive : linkIdle}`}
+            >
+              <LayoutDashboard className="w-5 h-5" /> Hospitals
+            </Link>
+          )}
+
+          {hospitalId && (
+            <>
+              <div className="mt-6 mb-2 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                Management
+              </div>
+
+              <Link
+                to={`/hospitals/${hospitalId}/appointments`}
+                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/appointments`) ? linkActive : linkIdle}`}
+              >
+                <CalendarCheck className="w-5 h-5 text-blue-500" /> Appointments
+              </Link>
+
+              <Link
+                to={`/hospitals/${hospitalId}/doctors`}
+                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/doctors`) ? linkActive : linkIdle}`}
+              >
+                <Users className="w-5 h-5 text-blue-500" /> Doctors
+              </Link>
+
+              {/* Settings is now visible to all roles */}
+              <Link
+                to={`/hospitals/${hospitalId}/settings`}
+                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/settings`) ? linkActive : linkIdle}`}
+              >
+                <Settings className="w-5 h-5 text-blue-500" /> Settings
+              </Link>
+              <Link
+                to={`/hospitals/${hospitalId}/pharmacy`}
+                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/pharmacy`) ? linkActive : linkIdle}`}
+              >
+                <Pill className="w-5 h-5 text-blue-500" /> Pharmacy
+              </Link>
+
+              <Link
+                to={`/hospitals/${hospitalId}/lab-tests`}
+                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/lab-tests`) ? linkActive : linkIdle}`}
+              >
+                <TestTube className="w-5 h-5 text-purple-500" /> Lab Tests
+              </Link>
+
+              {/* AI Training is Superadmin only */}
+              {role === 'superadmin' && (
+                <Link
+                  to={`/hospitals/${hospitalId}/training`}
+                  className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/training`) ? linkActive : linkIdle}`}
+                >
+                  <BrainCircuit className="w-5 h-5 text-blue-500" /> AI Training
+                </Link>
+              )}
+            </>
+          )}
+        </nav>
+
+        <div className="p-4 border-t">
+          <button
+            onClick={handleSignOut}
+            className="flex items-center gap-3 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium w-full transition-colors"
+          >
+            <LogOut className="w-5 h-5" /> Sign Out
+          </button>
+        </div>
+      </aside>
+
+      <main className="flex-1 overflow-auto bg-gray-50">
+        <div className="p-8">
+          <Outlet />
+        </div>
+      </main>
+    </div>
+  );
+}
+</file>
+
 <file path="backend/app/api/v1/endpoints/hospitals.py">
 import csv
 import io
@@ -4889,7 +5826,6 @@ from app import crud, schemas
 from app.api.deps import get_db, get_current_tenant, require_superadmin
 from app.models.hospital import Hospital
 from app.models.doctor import Doctor
-from app.availability import get_sheet_client
 from app.models.usage import UsageLedger
 
 router = APIRouter()
@@ -5051,14 +5987,14 @@ async def bulk_upload_and_sync(
     db: Session = Depends(get_db)
 ):
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
-    if not hospital or not hospital.google_sheet_id:
-        raise HTTPException(status_code=400, detail="Google Sheet ID not configured")
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
 
     content = await file.read()
     stream = io.StringIO(content.decode("utf-8"))
     reader = csv.DictReader(stream)
 
-    sheet_rows = []
+    count = 0
     for row in reader:
         normalized_row = {k.strip().lower(): v for k, v in row.items()}
         auto_id = f"H{hospital_id}-D-{uuid.uuid4().hex[:4].upper()}"
@@ -5074,17 +6010,14 @@ async def bulk_upload_and_sync(
             hospital_id=hospital_id
         )
         db.add(doctor)
-        sheet_rows.append([auto_id, name, dept, schedule, "", "Yes"])
+        count += 1
 
     try:
-        client = get_sheet_client()
-        sheet = client.open_by_key(hospital.google_sheet_id).sheet1
-        sheet.append_rows(sheet_rows)
         db.commit()
-        return {"message": f"Successfully imported {len(sheet_rows)} doctors."}
+        return {"message": f"Successfully imported {count} doctors."}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Google Sheet Sync Failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database Sync Failed: {str(e)}")
 
 @router.get("/{hospital_id}/billing")
 async def get_hospital_billing(hospital_id: int, db: Session = Depends(get_db)):
@@ -5194,6 +6127,9 @@ from app.api.v1.endpoints.ai import router as ai_router
 from app.db.session import engine
 from app.api.v1.endpoints.appointments import router as appointments_router
 from app.services.reminders import start_reminder_scheduler, stop_reminder_scheduler
+from app.api.v1.endpoints.medicines import router as medicines_router
+from app.api.v1.endpoints.lab_tests import router as lab_tests_router
+from app.api.v1.endpoints.doctor_availability import router as availability_router
 import os
 
 app = FastAPI(title="Hospital AI Platform")
@@ -5219,6 +6155,9 @@ app.include_router(auth_router,         prefix="/api/v1/auth",         tags=["au
 app.include_router(hospitals_router,    prefix="/api/v1/hospitals",    tags=["hospitals"])
 app.include_router(ai_router,           prefix="/api/v1/ai",           tags=["AI"])
 app.include_router(appointments_router, prefix="/api/v1/appointments", tags=["Appointments"])
+app.include_router(medicines_router, prefix="/api/v1/medicines", tags=["Medicines"])
+app.include_router(lab_tests_router, prefix="/api/v1/lab-tests", tags=["Lab Tests"])
+app.include_router(availability_router, prefix="/api/v1/availability", tags=["Doctor Availability"])
 
 @app.on_event("startup")
 def on_startup():
@@ -5260,11 +6199,9 @@ from app.models.hospital import Hospital
 from app.models.knowledge import KnowledgeBase
 from app.models.usage import UsageLedger
 from app.models.doctor import Doctor
-from app.availability import (
-    get_doctor_availability,
-    get_cached_or_empty,
-    AvailabilityError,
-)
+from app.models.medicine import Medicine
+from app.models.lab_test import LabTest
+from app.models.doctor_availability import DoctorSchedule, DoctorLeave
 import redis
 import uuid
 from app.models.appointment import Appointment
@@ -5500,7 +6437,30 @@ def score_doctor_relevance(question: str, doctor: Doctor) -> float:
     return max(token_score, substring_score)
 
 
-def build_doctor_context(question: str, doctors: list) -> tuple[str, int]:
+def check_doctor_availability_db(doctor: Doctor, db: Session, target_date: datetime) -> str:
+    """Queries PostgreSQL to find out if the doctor is working today."""
+    # 1. Check for leaves first
+    leave = db.query(DoctorLeave).filter(
+        DoctorLeave.doctor_id == doctor.id,
+        DoctorLeave.date == target_date.date()
+    ).first()
+    if leave:
+        reason = f" ({leave.reason})" if leave.reason else ""
+        return f"ABSENT TODAY{reason}"
+
+    # 2. Check regular schedule
+    day_of_week = target_date.weekday() # 0=Monday, 6=Sunday
+    schedule = db.query(DoctorSchedule).filter(
+        DoctorSchedule.doctor_id == doctor.id,
+        DoctorSchedule.day_of_week == day_of_week,
+        DoctorSchedule.is_active == True
+    ).first()
+
+    if schedule:
+        return f"Available today from {schedule.start_time} to {schedule.end_time}"
+    return "Not scheduled to work today"
+
+def build_doctor_context(question: str, doctors: list, db: Session) -> tuple[str, int]:
     if not doctors:
         return "No doctors currently registered for this hospital.\n", 0
 
@@ -5512,14 +6472,12 @@ def build_doctor_context(question: str, doctors: list) -> tuple[str, int]:
     limit = MAX_RELEVANT_DOCTORS if top_score > 0.05 else DEFAULT_DOCTORS_IF_NO_MATCH
 
     lines, total_chars, truncated = [], 0, False
+    today = datetime.now()
+    
     for _, doctor in scored[:limit]:
-        schedule = (
-            getattr(doctor, "base_schedule", None)
-            or getattr(doctor, "schedule", None)
-            or "Not specified"
-        )
-        # 🚀 FIX: Add [ID: X] to the text so the AI can learn the ID!
-        line = f"- [ID: {doctor.id}] Dr. {doctor.name} ({doctor.department or 'General'}): Schedule {schedule}\n"
+        # Fetch live availability directly from the DB!
+        status = check_doctor_availability_db(doctor, db, today)
+        line = f"- [ID: {doctor.id}] Dr. {doctor.name} ({doctor.department or 'General'}): LIVE STATUS: {status}\n"
         
         if total_chars + len(line) > DOCTOR_SECTION_MAX_CHARS:
             truncated = True
@@ -5527,11 +6485,61 @@ def build_doctor_context(question: str, doctors: list) -> tuple[str, int]:
         lines.append(line)
         total_chars += len(line)
 
-    section = "RELEVANT DOCTORS FOR THIS QUERY:\n" + "".join(lines)
+    section = "RELEVANT DOCTORS AND AVAILABILITY:\n" + "".join(lines)
     if truncated:
         section += f"(List truncated. Total doctors on file: {len(doctors)})\n"
     return section, len(lines)
 
+def build_pharmacy_context(question: str, medicines: list) -> str:
+    """Matches user questions against the medicine database."""
+    nq = normalize_name(question)
+    q_tokens = set(nq.split())
+    if not q_tokens or not medicines: return ""
+
+    scored = []
+    for m in medicines:
+        m_text = normalize_name(f"{m.name} {m.brand_name or ''} {m.category or ''}")
+        m_tokens = set(m_text.split())
+        score = len(q_tokens & m_tokens)
+        if score > 0:
+            scored.append((score, m))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    if not scored: return ""
+
+    lines = ["RELEVANT PHARMACY ITEMS:"]
+    for _, m in scored[:5]: # Top 5 closest matches
+        req_rx = "Prescription Required" if m.requires_prescription else "Over-the-counter"
+        status = (m.stock_status or "in_stock").replace("_", " ").title()
+        lines.append(f"- {m.name} ({m.brand_name or 'Generic'}): Status: {status}, Price: ${m.price or 'N/A'}, {req_rx}")
+
+    return "\n".join(lines) + "\n"
+
+def build_lab_tests_context(question: str, tests: list) -> str:
+    """Matches user questions against lab test prerequisites."""
+    nq = normalize_name(question)
+    q_tokens = set(nq.split())
+    if not q_tokens or not tests: return ""
+
+    scored = []
+    for t in tests:
+        t_text = normalize_name(f"{t.name} {t.category or ''}")
+        t_tokens = set(t_text.split())
+        score = len(q_tokens & t_tokens)
+        if score > 0:
+            scored.append((score, t))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    if not scored: return ""
+
+    lines = ["RELEVANT LAB TESTS:"]
+    for _, t in scored[:5]:
+        loc = "In-house" if t.is_inhouse else "External Partner"
+        lines.append(f"- {t.name} ({t.category or 'General'}): Price: ${t.price or 'N/A'}, Turnaround: {t.turnaround_time or 'N/A'}, Location: {loc}")
+        if t.prerequisites:
+            lines.append(f"  Preparation/Prerequisites: {t.prerequisites}")
+
+    return "\n".join(lines) + "\n"
 
 def resolve_doctor_id(user_text: str, doctor_data: dict):
     nq = normalize_name(user_text)
@@ -5619,12 +6627,15 @@ def build_context(request: ChatRequest, db: Session, force_english: bool = False
     if not hospital:
         raise HTTPException(status_code=404, detail="Hospital not found")
 
+# Fetch all structured data from the DB
     all_doctors = db.query(Doctor).filter(Doctor.hospital_id == hospital_id).all()
-    doctor_context, doctors_included = build_doctor_context(question, all_doctors)
+    all_medicines = db.query(Medicine).filter(Medicine.hospital_id == hospital_id).all()
+    all_tests = db.query(LabTest).filter(LabTest.hospital_id == hospital_id).all()
 
-    availability_context = ""
-    if hospital.google_sheet_id:
-        availability_context = fetch_availability_context(question, hospital.google_sheet_id, hospital_id, today_str)
+    # Build the context strings
+    doctor_context, doctors_included = build_doctor_context(question, all_doctors, db)
+    pharmacy_context = build_pharmacy_context(question, all_medicines)
+    lab_tests_context = build_lab_tests_context(question, all_tests)
 
     embed_resp = client.embeddings.create(input=question, model="text-embedding-3-small")
     raw_results = (
@@ -5648,9 +6659,11 @@ def build_context(request: ChatRequest, db: Session, force_english: bool = False
         "",
         doctor_context,
     ]
-
-    if availability_context:
-        parts.append(availability_context)
+    if pharmacy_context:
+        parts.extend(["", pharmacy_context])
+        
+    if lab_tests_context:
+        parts.extend(["", lab_tests_context])
 
     if kb_context:
         parts.extend(["", "ADDITIONAL KNOWLEDGE BASE:", kb_context])

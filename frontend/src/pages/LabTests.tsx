@@ -44,7 +44,7 @@ export default function LabTestsPage() {
     }
   };
 
-  const handleDelete = async (id: int) => {
+  const handleDelete = async (id: number) => {
     if (!confirm("Remove this lab test?")) return;
     try {
       await api.delete(`/lab-tests/${id}`);
