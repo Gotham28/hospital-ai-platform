@@ -499,12 +499,11 @@ def build_context(request: ChatRequest, db: Session, force_english: bool = False
         raise HTTPException(status_code=404, detail="Hospital not found")
 
 # Fetch all structured data from the DB
-    all_doctors = db.query(Doctor).filter(Doctor.hospital_id == hospital_id).all()
     all_medicines = db.query(Medicine).filter(Medicine.hospital_id == hospital_id).all()
     all_tests = db.query(LabTest).filter(LabTest.hospital_id == hospital_id).all()
 
     # Build the context strings
-    doctor_context, doctors_included = build_doctor_context(question, all_doctors, db)
+    doctor_context, doctors_included = build_doctor_context(question, hospital_id, db)
     pharmacy_context = build_pharmacy_context(question, all_medicines)
     lab_tests_context = build_lab_tests_context(question, all_tests)
 
