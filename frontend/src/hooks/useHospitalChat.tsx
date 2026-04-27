@@ -214,4 +214,4 @@ return {
   inputText, setInputText, micState, micError,
   suggestions, handleSend, toggleMic,
   vadLoading  // ✅ replaces `vad` in the return
-};
+};}
