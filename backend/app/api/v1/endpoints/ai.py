@@ -1317,7 +1317,9 @@ IMPORTANT:
 @router.post("/transcribe")
 async def transcribe_audio(
     file: UploadFile = File(...),
-    language: str = Form("en") 
+    language: str = Form("en"),
+    hospital_id: int = Form(0),      # ← add this
+    db: Session = Depends(get_db)    # ← add this
 ):
     # 1. Create a unique temporary filename
     temp_filename = f"temp_{uuid.uuid4().hex}_{file.filename}"

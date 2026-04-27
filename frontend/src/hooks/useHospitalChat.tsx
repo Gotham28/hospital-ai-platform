@@ -42,6 +42,7 @@ export function useHospitalChat(hospitalId: string) {
   const welcomeCache = useRef<{ en: string; ml: string } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const handleSendRef = useRef<((text: string) => Promise<void>) | null>(null);
+  const micActiveRef = useRef(false);
 
   // --- 1. Fetch Welcome & Suggestions ---
   useEffect(() => {
@@ -155,8 +156,11 @@ const { loading: vadLoading, errored: vadErrored, start: vadStart, pause: vadPau
   baseAssetPath: "/vad-assets/",       // ✅ served from your own Vercel deployment
   onnxWASMBasePath: "/vad-assets/",
   model: "legacy",
-  onSpeechStart: () => setMicState('recording'),
-  onSpeechEnd: async (audio) => {
+    onSpeechStart: () => {
+    if (micActiveRef.current) setMicState('recording');  // ← guard added
+  },
+    onSpeechEnd: async (audio) => {
+    if (!micActiveRef.current) return;
     // ✅ No vad.pause() here — the hook manages its own state
     setMicState('transcribing');
     try {
@@ -184,14 +188,15 @@ const { loading: vadLoading, errored: vadErrored, start: vadStart, pause: vadPau
     }
   },
   onVADMisfire: () => {
+    if (!micActiveRef.current) return;   // ← guard added
     setMicState('idle');
-    // ✅ No vad.pause() here either
   }
 });
 
 const toggleMic = () => {
   setMicError(null);
   if (micState === 'recording' || micState === 'transcribing') {
+    micActiveRef.current = false;
     vadPause();           // ✅ top-level, not vad.pause()
     setMicState('idle');
   } else {
@@ -203,6 +208,7 @@ const toggleMic = () => {
       setMicError(language === 'en' ? 'Voice AI failed to load.' : 'ശബ്ദ AI പരാജയപ്പെട്ടു.');
       return;
     }
+    micActiveRef.current = true;
     vadStart();           // ✅ top-level, not vad.start()
     setMicState('recording');
   }
