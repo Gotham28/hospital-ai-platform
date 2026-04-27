@@ -8,9 +8,9 @@ interface ChatProps { hospitalId: string; }
 const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
   // Plug the UI into the brain
   const {
-    language, setLanguage, messages, isStreaming, inputText, setInputText,
-    micState, micError, suggestions, handleSend, toggleMic,vad
-  } = useHospitalChat(hospitalId);
+  language, setLanguage, messages, isStreaming, inputText, setInputText,
+  micState, micError, suggestions, handleSend, toggleMic, vadLoading  // ✅ vad → vadLoading
+} = useHospitalChat(hospitalId);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -23,7 +23,7 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
   }[micState];
 
   const micLabel = {
-    idle: vad.loading 
+    idle: vadLoading 
             ? (language === 'en' ? 'Loading AI...' : 'ലോഡുചെയ്യുന്നു...') 
             : (language === 'en' ? 'Tap to speak' : 'സംസാരിക്കുക'),
     recording: language === 'en' ? 'Listening...' : 'ശ്രദ്ധിക്കുന്നു...',
