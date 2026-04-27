@@ -150,12 +150,13 @@ export function useHospitalChat(hospitalId: string) {
 
   // --- 3. The Silero VAD Mic Logic ---
   const vad = useMicVAD({
-    startOnLoad: false,
-  workletURL: "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.30/dist/vad.worklet.bundle.min.js",
-  modelURL:   "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.30/dist/silero_vad.onnx",
-  wasmURL:    "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/ort-wasm-simd.wasm",
-    onSpeechStart: () => setMicState('recording'),
-    onSpeechEnd: async (audio) => {
+  startOnLoad: false,
+  // Point BOTH paths to the same CDN dist folder for vad-web@0.0.30
+  baseAssetPath: "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.30/dist/",
+  onnxWASMBasePath: "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/",
+  model: "legacy", // "legacy" = silero_vad_legacy.onnx (the v4 model, what you were using before)
+  onSpeechStart: () => setMicState('recording'),
+  onSpeechEnd: async (audio) => {
       vad.pause(); 
       setMicState('transcribing');
 
