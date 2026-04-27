@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-
+from app.core.config import settings  # ← add this if not already there
 from app.api.deps import get_db
 from app.models.hospital import Hospital
 from app.models.knowledge import KnowledgeBase
@@ -1347,7 +1347,6 @@ async def transcribe_audio(
 
         # 4. Send to Sarvam
         with open(temp_filename, "rb") as audio_file:
-            import httpx
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
                     "https://api.sarvam.ai/speech-to-text",
@@ -1369,7 +1368,7 @@ async def transcribe_audio(
         return {"transcript": transcript}
 
     except HTTPException:
-        raise
+        raise   
     except Exception as e:
         logger.error(f"Transcription failed: {e}")
         raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
