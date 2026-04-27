@@ -1,6 +1,7 @@
 import csv
 import io
 import uuid
+import json # Ensure this is imported at the top
 from sqlalchemy import func
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File
@@ -179,36 +180,56 @@ async def bulk_upload_and_sync(
         raise HTTPException(status_code=404, detail="Hospital not found")
 
     content = await file.read()
-    stream = io.StringIO(content.decode("utf-8"))
-    reader = csv.DictReader(stream)
+    text_content = content.decode("utf-8")
+    reader = csv.DictReader(io.StringIO(text_content))
+    csv_headers = reader.fieldnames
+    
+    if not csv_headers:
+        raise HTTPException(status_code=400, detail="CSV is empty.")
+
+    target_schema = {
+        "name": "Doctor's name (Required)",
+        "department": "Department or specialty",
+        "base_schedule": "General working hours, availability, or schedule"
+    }
+
+    prompt = f"""
+    Map these CSV headers: {csv_headers}
+    To this schema: {json.dumps(target_schema)}
+    Return ONLY a raw JSON object where keys are the schema keys and values are the exact matching string from the CSV headers. Null if no match.
+    """
+
+    llm_resp = oai.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "system", "content": prompt}],
+        response_format={"type": "json_object"}
+    )
+    mapping = json.loads(llm_resp.choices[0].message.content)
 
     doctors_to_embed = []
     count = 0
     for row in reader:
-        normalized_row = {k.strip().lower(): v for k, v in row.items()}
-        auto_id = f"H{hospital_id}-D-{uuid.uuid4().hex[:4].upper()}"
-        name = normalized_row.get('doctor name') or normalized_row.get('name') or 'Unknown'
-        dept = normalized_row.get('department') or 'General'
-        schedule = normalized_row.get('base schedule') or normalized_row.get('schedule') or 'Not Specified'
+        name_col = mapping.get("name")
+        if not name_col or not row.get(name_col):
+            continue
 
-        doctor = Doctor(
-            doctor_id=auto_id,
-            name=name,
-            department=dept,
-            base_schedule=schedule,
-            hospital_id=hospital_id
-        )
+        dept_col = mapping.get("department")
+        sched_col = mapping.get("base_schedule")
+        
+        name = row.get(name_col).strip()
+        dept = row.get(dept_col, "General").strip() if dept_col else "General"
+        schedule = row.get(sched_col, "Not Specified").strip() if sched_col else "Not Specified"
+        auto_id = f"H{hospital_id}-D-{uuid.uuid4().hex[:4].upper()}"
+
+        doctor = Doctor(doctor_id=auto_id, name=name, department=dept, base_schedule=schedule, hospital_id=hospital_id)
         db.add(doctor)
         doctors_to_embed.append((doctor, name, dept, schedule))
         count += 1
 
-    db.flush()  # assigns IDs without committing
+    db.flush()
 
-    # Embed in batch
-    texts = [
-        f"Dr. {name}, {dept} specialist, schedule: {schedule}"
-        for _, name, dept, schedule in doctors_to_embed
-    ]
+    # Bulk generate embeddings so the AI can route patients to them
+    texts = [f"Dr. {name}, {dept} specialist, schedule: {schedule}" for _, name, dept, schedule in doctors_to_embed]
     if texts:
         resp = oai.embeddings.create(input=texts, model="text-embedding-3-small")
         for (doctor, _, _, _), emb in zip(doctors_to_embed, resp.data):
@@ -216,7 +237,7 @@ async def bulk_upload_and_sync(
 
     try:
         db.commit()
-        return {"message": f"Successfully imported and embedded {count} doctors."}
+        return {"message": f"Successfully imported, mapped, and embedded {count} doctors."}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Database Sync Failed: {str(e)}")
@@ -254,7 +275,29 @@ async def get_hospital_billing(hospital_id: int, db: Session = Depends(get_db)):
             "platform_fee": platform_fee_inr,
         }
     }
+@router.delete("/{hospital_id}/doctors/{doctor_id}")
+def delete_doctor(hospital_id: int, doctor_id: int, db: Session = Depends(get_db)):
+    doctor = db.query(Doctor).filter(Doctor.id == doctor_id, Doctor.hospital_id == hospital_id).first()
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+    db.delete(doctor)
+    db.commit()
+    return {"status": "success"}
 
+@router.patch("/{hospital_id}/doctors/{doctor_id}")
+def update_doctor(hospital_id: int, doctor_id: int, payload: dict = Body(...), db: Session = Depends(get_db)):
+    doctor = db.query(Doctor).filter(Doctor.id == doctor_id, Doctor.hospital_id == hospital_id).first()
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+    
+    for key, value in payload.items():
+        if hasattr(doctor, key):
+            setattr(doctor, key, value)
+            
+    # If core details change, we should theoretically re-embed here, but for simple edits this is fine.
+    db.commit()
+    db.refresh(doctor)
+    return doctor
 @router.post("/{hospital_id}/staff")
 def create_staff_account(
     hospital_id: int,
@@ -280,3 +323,9 @@ def create_staff_account(
     db.add(user)
     db.commit()
     return {"status": "success", "email": user.email}
+
+@router.delete("/{hospital_id}/billing/reset")
+def reset_hospital_billing(hospital_id: int, db: Session = Depends(get_db)):
+    db.query(UsageLedger).filter(UsageLedger.hospital_id == hospital_id).delete()
+    db.commit()
+    return {"status": "success", "message": "Billing cycle reset successfully"}

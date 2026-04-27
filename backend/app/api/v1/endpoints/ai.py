@@ -371,7 +371,7 @@ def build_pharmacy_context(question: str, medicines: list) -> str:
     for _, m in scored[:5]: # Top 5 closest matches
         req_rx = "Prescription Required" if m.requires_prescription else "Over-the-counter"
         status = (m.stock_status or "in_stock").replace("_", " ").title()
-        lines.append(f"- {m.name} ({m.brand_name or 'Generic'}): Status: {status}, Price: ${m.price or 'N/A'}, {req_rx}")
+        lines.append(f"- {m.name} ({m.brand_name or 'Generic'}): Status: {status}, Price: ₹{m.price or 'N/A'}, {req_rx}")
 
     return "\n".join(lines) + "\n"
 
@@ -395,7 +395,7 @@ def build_lab_tests_context(question: str, tests: list) -> str:
     lines = ["RELEVANT LAB TESTS:"]
     for _, t in scored[:5]:
         loc = "In-house" if t.is_inhouse else "External Partner"
-        lines.append(f"- {t.name} ({t.category or 'General'}): Price: ${t.price or 'N/A'}, Turnaround: {t.turnaround_time or 'N/A'}, Location: {loc}")
+        lines.append(f"- {t.name} ({t.category or 'General'}): Price: ₹{t.price or 'N/A'}, Turnaround: {t.turnaround_time or 'N/A'}, Location: {loc}")
         if t.prerequisites:
             lines.append(f"  Preparation/Prerequisites: {t.prerequisites}")
 

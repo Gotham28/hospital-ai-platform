@@ -111,7 +111,8 @@ async def bulk_upload_lab_tests(
 
         price_col = mapping.get("price")
         try:
-            price = float(str(row.get(price_col, 0)).replace("$", "").replace(",", "").strip()) if price_col else 0.0
+            # Change this line in both files:
+            price = float(str(row.get(price_col, 0)).replace("₹", "").replace("$", "").replace(",", "").strip()) if price_col else 0.0
         except ValueError:
             price = 0.0
 
@@ -137,3 +138,21 @@ async def bulk_upload_lab_tests(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+    @router.patch("/{test_id}", response_model=LabTestSchema)
+def update_lab_test(
+    test_id: int, 
+    payload: LabTestUpdate,
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant)
+):
+    db_item = db.query(LabTest).filter(LabTest.id == test_id).first()
+    if not db_item:
+        raise HTTPException(status_code=404, detail="Lab test not found")
+    
+    update_data = payload.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_item, key, value)
+        
+    db.commit()
+    db.refresh(db_item)
+    return db_item

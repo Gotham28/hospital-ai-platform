@@ -8,7 +8,8 @@ export default function LabTestsPage() {
   const [tests, setTests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Form State
+  // Form & Edit State
+  const [editingTest, setEditingTest] = useState<any>(null);
   const [name, setName] = useState('');
   const [category, setCategory] = useState('');
   const [price, setPrice] = useState('');
@@ -27,20 +28,45 @@ export default function LabTestsPage() {
 
   useEffect(() => { fetchTests(); }, [hospitalId]);
 
-  const handleAddTest = async (e: React.FormEvent) => {
+  const handleEditClick = (test: any) => {
+    setEditingTest(test);
+    setName(test.name);
+    setCategory(test.category || '');
+    setPrice(test.price || '');
+    setPrerequisites(test.prerequisites || '');
+  };
+
+  const cancelEdit = () => {
+    setEditingTest(null);
+    setName('');
+    setCategory('');
+    setPrice('');
+    setPrerequisites('');
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.post('/lab-tests/', {
-        hospital_id: Number(hospitalId),
-        name,
-        category,
-        price: parseFloat(price) || 0,
-        prerequisites
-      });
-      setName(''); setCategory(''); setPrice(''); setPrerequisites('');
+      if (editingTest) {
+        await api.patch(`/lab-tests/${editingTest.id}`, {
+          name,
+          category,
+          price: parseFloat(price) || 0,
+          prerequisites
+        });
+      } else {
+        await api.post('/lab-tests/', {
+          hospital_id: Number(hospitalId),
+          name,
+          category,
+          price: parseFloat(price) || 0,
+          prerequisites
+        });
+      }
+      cancelEdit();
       fetchTests();
     } catch (err) {
-      alert("Failed to add test");
+      alert(editingTest ? "Failed to update test" : "Failed to add test");
     }
   };
 
@@ -53,6 +79,7 @@ export default function LabTestsPage() {
       alert("Failed to delete");
     }
   };
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -93,28 +120,33 @@ export default function LabTestsPage() {
         </div>
       </div>
 
-      {/* Add New Test Form */}
-      <form onSubmit={handleAddTest} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+      {/* Add / Edit Test Form */}
+      <form onSubmit={handleSubmit} className={`p-6 rounded-xl shadow-sm border grid grid-cols-1 md:grid-cols-4 gap-4 items-end transition-colors ${editingTest ? 'bg-purple-50 border-purple-200' : 'bg-white border-gray-200'}`}>
         <div className="md:col-span-2">
           <label className="block text-xs font-medium text-gray-700 mb-1">Test Name *</label>
-          <input required type="text" value={name} onChange={e => setName(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="e.g. Complete Blood Count (CBC)" />
+          <input required type="text" value={name} onChange={e => setName(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm bg-white" placeholder="e.g. Complete Blood Count (CBC)" />
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">Category</label>
-          <input type="text" value={category} onChange={e => setCategory(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="e.g. Blood Test" />
+          <input type="text" value={category} onChange={e => setCategory(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm bg-white" placeholder="e.g. Blood Test" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Price ($)</label>
-          <input type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="0.00" />
+          <label className="block text-xs font-medium text-gray-700 mb-1">Price (₹)</label>
+          <input type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm bg-white" placeholder="0.00" />
         </div>
         <div className="md:col-span-3">
           <label className="block text-xs font-medium text-gray-700 mb-1">Preparation / Prerequisites (AI will read this to patients)</label>
-          <input type="text" value={prerequisites} onChange={e => setPrerequisites(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="e.g. Fasting required for 8-10 hours. Water is allowed." />
+          <input type="text" value={prerequisites} onChange={e => setPrerequisites(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm bg-white" placeholder="e.g. Fasting required for 8-10 hours. Water is allowed." />
         </div>
-        <div>
-          <button type="submit" className="w-full flex items-center justify-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm font-medium">
-            <Plus className="w-4 h-4" /> Add Test
+        <div className="flex gap-2">
+          <button type="submit" className="flex-1 flex items-center justify-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm font-medium">
+            {editingTest ? "Update" : <><Plus className="w-4 h-4" /> Add Test</>}
           </button>
+          {editingTest && (
+            <button type="button" onClick={cancelEdit} className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 text-sm font-medium">
+              Cancel
+            </button>
+          )}
         </div>
       </form>
 
@@ -138,9 +170,10 @@ export default function LabTestsPage() {
                 <tr key={test.id} className="hover:bg-gray-50">
                   <td className="p-4 font-medium">{test.name}</td>
                   <td className="p-4 text-gray-500">{test.category || '-'}</td>
-                  <td className="p-4">${test.price}</td>
+                  <td className="p-4">₹{test.price}</td>
                   <td className="p-4 text-gray-600 text-xs">{test.prerequisites || 'None'}</td>
-                  <td className="p-4">
+                  <td className="p-4 flex items-center gap-3">
+                    <button onClick={() => handleEditClick(test)} className="text-purple-600 hover:text-purple-800 text-sm font-medium">Edit</button>
                     <button onClick={() => handleDelete(test.id)} className="text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
                   </td>
                 </tr>

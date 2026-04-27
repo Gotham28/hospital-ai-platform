@@ -10,12 +10,18 @@ export default function DoctorsPage() {
   const [doctors, setDoctors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Main Form & Edit State
+  const [editingDoc, setEditingDoc] = useState<any>(null);
+  const [docName, setDocName] = useState('');
+  const [docDept, setDocDept] = useState('');
+  const [docSchedule, setDocSchedule] = useState('');
+
   // Modal State
   const [manageDoc, setManageDoc] = useState<any>(null);
   const [schedules, setSchedules] = useState<any[]>([]);
   const [leaves, setLeaves] = useState<any[]>([]);
   
-  // Form State
+  // Modal Form State
   const [schedDay, setSchedDay] = useState('0');
   const [schedStart, setSchedStart] = useState('09:00');
   const [schedEnd, setSchedEnd] = useState('17:00');
@@ -47,15 +53,68 @@ export default function DoctorsPage() {
       await api.post(`/hospitals/${hospitalId}/doctors/bulk-upload`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
+      alert("Staff imported and AI-mapped successfully!");
       fetchDoctors();
-    } catch (err) {
-      alert("Import failed. Ensure the file format is correct.");
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Import failed. Ensure it's a valid CSV.");
     } finally {
       setLoading(false);
+      event.target.value = '';
     }
   };
 
-  // --- Availability Management ---
+  // --- Doctor Core Management (Add, Edit, Delete) ---
+
+  const handleEditClick = (doc: any) => {
+    setEditingDoc(doc);
+    setDocName(doc.name);
+    setDocDept(doc.department || '');
+    setDocSchedule(doc.base_schedule || '');
+  };
+
+  const cancelDocEdit = () => {
+    setEditingDoc(null);
+    setDocName('');
+    setDocDept('');
+    setDocSchedule('');
+  };
+
+  const handleDocSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingDoc) {
+        await api.patch(`/hospitals/${hospitalId}/doctors/${editingDoc.id}`, {
+          name: docName,
+          department: docDept,
+          base_schedule: docSchedule
+        });
+      } else {
+        // Automatically generate a doctor_id for manual creations
+        await api.post(`/hospitals/${hospitalId}/doctors`, {
+          name: docName,
+          department: docDept,
+          base_schedule: docSchedule,
+          doctor_id: `H${hospitalId}-D-${Math.floor(Math.random() * 10000)}`
+        });
+      }
+      cancelDocEdit();
+      fetchDoctors();
+    } catch (err) {
+      alert(editingDoc ? "Failed to update doctor" : "Failed to add doctor");
+    }
+  };
+
+  const deleteDoctor = async (id: number) => {
+    if (!confirm("Remove this doctor and all their schedules?")) return;
+    try {
+      await api.delete(`/hospitals/${hospitalId}/doctors/${id}`);
+      fetchDoctors();
+    } catch (err) {
+      alert("Failed to delete doctor");
+    }
+  };
+
+  // --- Detailed Availability Management ---
 
   const openManageModal = async (doc: any) => {
     setManageDoc(doc);
@@ -121,12 +180,38 @@ export default function DoctorsPage() {
         
         <div className="relative">
           <input type="file" id="bulk-upload" className="hidden" onChange={handleFileUpload} accept=".csv,.txt" disabled={loading} />
-          <label htmlFor="bulk-upload" className={`flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer font-medium shadow-sm ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+          <label htmlFor="bulk-upload" className={`flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer font-medium shadow-sm transition-colors ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}>
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
             Upload Staff CSV
           </label>
         </div>
       </div>
+
+      {/* Add / Edit Doctor Form */}
+      <form onSubmit={handleDocSubmit} className={`p-6 rounded-xl shadow-sm border grid grid-cols-1 md:grid-cols-4 gap-4 items-end transition-colors ${editingDoc ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200'}`}>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Doctor Name *</label>
+          <input required type="text" value={docName} onChange={e => setDocName(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm bg-white" placeholder="e.g. John Doe" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Department</label>
+          <input type="text" value={docDept} onChange={e => setDocDept(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm bg-white" placeholder="e.g. Cardiology" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Base Schedule</label>
+          <input type="text" value={docSchedule} onChange={e => setDocSchedule(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm bg-white" placeholder="e.g. Mon-Fri 9AM-5PM" />
+        </div>
+        <div className="flex gap-2">
+          <button type="submit" className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">
+            {editingDoc ? "Update" : <><Plus className="w-4 h-4" /> Add Doctor</>}
+          </button>
+          {editingDoc && (
+            <button type="button" onClick={cancelDocEdit} className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 text-sm font-medium">
+              Cancel
+            </button>
+          )}
+        </div>
+      </form>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center gap-3">
@@ -148,6 +233,7 @@ export default function DoctorsPage() {
               <tr>
                 <th className="p-4">Name</th>
                 <th className="p-4">Department</th>
+                <th className="p-4">Base Schedule</th>
                 <th className="p-4">Actions</th>
               </tr>
             </thead>
@@ -156,10 +242,13 @@ export default function DoctorsPage() {
                 <tr key={doc.id} className="hover:bg-gray-50 transition-colors">
                   <td className="p-4 text-sm font-medium text-gray-900">Dr. {doc.name}</td>
                   <td className="p-4 text-sm text-gray-500">{doc.department || 'General'}</td>
-                  <td className="p-4">
-                    <button onClick={() => openManageModal(doc)} className="text-sm text-blue-600 font-medium hover:text-blue-800 flex items-center gap-1">
-                      <CalendarDays className="w-4 h-4" /> Manage Schedule
+                  <td className="p-4 text-sm text-gray-500 truncate max-w-[200px]">{doc.base_schedule || 'Not Specified'}</td>
+                  <td className="p-4 flex items-center gap-4">
+                    <button onClick={() => openManageModal(doc)} className="text-sm text-emerald-600 font-medium hover:text-emerald-800 flex items-center gap-1">
+                      <CalendarDays className="w-4 h-4" /> Manage
                     </button>
+                    <button onClick={() => handleEditClick(doc)} className="text-blue-600 hover:text-blue-800 text-sm font-medium">Edit</button>
+                    <button onClick={() => deleteDoctor(doc.id)} className="text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
                   </td>
                 </tr>
               ))}
@@ -168,7 +257,7 @@ export default function DoctorsPage() {
         )}
       </div>
 
-      {/* MANAGE SCHEDULE MODAL */}
+      {/* MANAGE SCHEDULE MODAL (Remains unchanged) */}
       {manageDoc && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
