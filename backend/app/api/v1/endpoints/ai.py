@@ -1317,25 +1317,38 @@ IMPORTANT:
 @router.post("/transcribe")
 async def transcribe_audio(
     file: UploadFile = File(...),
-    language: str = Form("en") # Automatically accepts the language from React
+    language: str = Form("en") 
 ):
+    # 1. Create a unique temporary filename
     temp_filename = f"temp_{uuid.uuid4().hex}_{file.filename}"
     
     try:
+        # 2. Save the incoming audio blob to disk temporarily
         with open(temp_filename, "wb") as buffer:
             buffer.write(await file.read())
         
-        # Tell Whisper EXACTLY which language to expect (ml = Malayalam, en = English)
-        whisper_lang = "ml" if language == "ml" else "en"
-        
+        # 3. Read the file and send to OpenAI
         with open(temp_filename, "rb") as audio_file:
-            transcript_response = client.audio.transcriptions.create(
-                model="whisper-1", 
-                file=audio_file,
-                language=whisper_lang, # This stops it from guessing Telugu
-                prompt="Medical terms, hospital appointments, doctors." # Helps accuracy
-            )
             
+            # Base arguments for the API call
+            kwargs = {
+                "model": "whisper-1",
+                "file": audio_file,
+            }
+            
+            # Dynamically adjust based on language to bypass the 400 error
+            if language == "en":
+                kwargs["language"] = "en"
+                kwargs["prompt"] = "Medical terms, hospital appointments, doctors, patient."
+            else:
+                # For Malayalam: Omit "language" to avoid the unsupported error, 
+                # but provide a Malayalam prompt to force auto-detect away from Telugu.
+                kwargs["prompt"] = "നമസ്കാരം, ഇത് മലയാളം ആണ്. ആശുപത്രി, ഡോക്ടർ, പനി, അപ്പോയിന്റ്മെന്റ്."
+                
+            # Make the API call
+            transcript_response = client.audio.transcriptions.create(**kwargs)
+            
+        # 4. Return the transcribed text
         return {"transcript": transcript_response.text}
 
     except Exception as e:
@@ -1343,5 +1356,6 @@ async def transcribe_audio(
         raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
         
     finally:
+        # 5. ALWAYS clean up the temporary file
         if os.path.exists(temp_filename):
             os.remove(temp_filename)
