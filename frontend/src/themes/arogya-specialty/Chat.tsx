@@ -104,12 +104,12 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
 
 <div className="flex flex-col items-center">
           <button type="button" onClick={toggleMic} 
-            disabled={isStreaming || micState === 'transcribing' || vad.loading}
+            disabled={isStreaming || micState === 'transcribing' || vadLoading}
             className={`p-4 rounded-full transition-all transform active:scale-90 shadow-lg disabled:opacity-50 flex items-center justify-center ${micBtnClass}`}
             aria-label={micLabel}>
             
             {/* Show a spinner if VAD is downloading its files */}
-            {vad.loading ? <Loader2 className="w-6 h-6 animate-spin" /> : 
+            {vadLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : 
              micState === 'recording' ? <MicOff className="w-6 h-6" /> : 
              micState === 'transcribing' ? <Loader2 className="w-6 h-6 animate-spin" /> : 
              <Mic className="w-6 h-6" />}

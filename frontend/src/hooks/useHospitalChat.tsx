@@ -149,86 +149,69 @@ export function useHospitalChat(hospitalId: string) {
   useEffect(() => { handleSendRef.current = handleSend; }, [handleSend]);
 
   // --- 3. The Silero VAD Mic Logic ---
-  const vad = useMicVAD({
+// --- 3. The Silero VAD Mic Logic ---
+const { loading: vadLoading, errored: vadErrored, start: vadStart, pause: vadPause } = useMicVAD({
   startOnLoad: false,
-  // Point BOTH paths to the same CDN dist folder for vad-web@0.0.30
   baseAssetPath: "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.30/dist/",
-  onnxWASMBasePath: "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/",
-  model: "legacy", // "legacy" = silero_vad_legacy.onnx (the v4 model, what you were using before)
+  onnxWASMBasePath: "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/",
+  model: "legacy",
   onSpeechStart: () => setMicState('recording'),
   onSpeechEnd: async (audio) => {
-      vad.pause(); 
-      setMicState('transcribing');
-
-      try {
-        const wavBuffer = utils.encodeWAV(audio);
-        const audioBlob = new Blob([wavBuffer], { type: 'audio/wav' });
-        
-        const formData = new FormData();
-        formData.append('file', audioBlob, 'recording.wav');
-        formData.append('language', language);
-        formData.append('hospital_id', hospitalId); 
-
-        const token = localStorage.getItem('token');
-        const res = await fetch(`${getBaseURL()}/ai/transcribe`, {
-          method: 'POST',
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-          body: formData
-        });
-        
-        if (!res.ok) throw new Error("Transcription failed");
-        const data = await res.json();
-        
-        setMicState('idle');
-        if (data.transcript && data.transcript.trim() && handleSendRef.current) {
-            handleSendRef.current(data.transcript.trim());
-        }
-      } catch (error) {
-        setMicError(language === 'ml' ? 'ശബ്ദം മനസ്സിലാക്കാൻ കഴിഞ്ഞില്ല.' : 'Failed to transcribe audio.');
-        setMicState('idle'); 
-      }
-    },
-    onVADMisfire: () => {
+    // ✅ No vad.pause() here — the hook manages its own state
+    setMicState('transcribing');
+    try {
+      const wavBuffer = utils.encodeWAV(audio);
+      const audioBlob = new Blob([wavBuffer], { type: 'audio/wav' });
+      const formData = new FormData();
+      formData.append('file', audioBlob, 'recording.wav');
+      formData.append('language', language);
+      formData.append('hospital_id', hospitalId);
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${getBaseURL()}/ai/transcribe`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData
+      });
+      if (!res.ok) throw new Error("Transcription failed");
+      const data = await res.json();
       setMicState('idle');
-      vad.pause();
+      if (data.transcript?.trim() && handleSendRef.current) {
+        handleSendRef.current(data.transcript.trim());
+      }
+    } catch (error) {
+      setMicError(language === 'ml' ? 'ശബ്ദം മനസ്സിലാക്കാൻ കഴിഞ്ഞില്ല.' : 'Failed to transcribe audio.');
+      setMicState('idle');
     }
-  });
+  },
+  onVADMisfire: () => {
+    setMicState('idle');
+    // ✅ No vad.pause() here either
+  }
+});
 
 const toggleMic = () => {
-    setMicError(null);
-
-    // FORCE OFF: If our UI says it's recording, trust the UI and force it to pause, 
-    // regardless of what the VAD engine thinks it's doing.
-    if (micState === 'recording' || micState === 'transcribing') {
-      vad.pause();
-      setMicState('idle');
-    } else {
-      // PREVENT START: Don't let the user click if the neural network is still downloading
-      if (vad.loading) {
-        setMicError(language === 'en' ? 'Voice AI is still loading...' : 'ശബ്ദ AI ലോഡുചെയ്യുന്നു...');
-        return;
-      }
-      if (vad.errored) {
-        setMicError(language === 'en' ? 'Voice AI failed to load.' : 'ശബ്ദ AI പരാജയപ്പെട്ടു.');
-        return;
-      }
-
-      vad.start();
-      setMicState('recording'); 
+  setMicError(null);
+  if (micState === 'recording' || micState === 'transcribing') {
+    vadPause();           // ✅ top-level, not vad.pause()
+    setMicState('idle');
+  } else {
+    if (vadLoading) {
+      setMicError(language === 'en' ? 'Voice AI is still loading...' : 'ശബ്ദ AI ലോഡുചെയ്യുന്നു...');
+      return;
     }
-  };
+    if (vadErrored) {
+      setMicError(language === 'en' ? 'Voice AI failed to load.' : 'ശബ്ദ AI പരാജയപ്പെട്ടു.');
+      return;
+    }
+    vadStart();           // ✅ top-level, not vad.start()
+    setMicState('recording');
+  }
+};
 
-  return {
-    language,
-    setLanguage,
-    messages,
-    isStreaming,
-    inputText,
-    setInputText,
-    micState,
-    micError,
-    suggestions,
-    handleSend,
-    toggleMic,vad
-  };
-} 
+// Update the return value — remove `vad`, expose vadLoading instead
+return {
+  language, setLanguage, messages, isStreaming,
+  inputText, setInputText, micState, micError,
+  suggestions, handleSend, toggleMic,
+  vadLoading  // ✅ replaces `vad` in the return
+};
