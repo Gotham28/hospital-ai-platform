@@ -122,7 +122,8 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
   }, [micState]);
 
   // ── Whisper Mic Logic ─────────────────────────────────────────────────────
-const toggleMic = async () => {
+// Replace your existing toggleMic with this:
+  const toggleMic = async () => {
     setMicError(null);
 
     if (micState === 'idle') {
@@ -132,10 +133,16 @@ const toggleMic = async () => {
         mediaRecorderRef.current = mediaRecorder;
         audioChunksRef.current = [];
 
-        // --- NATIVE SILENCE DETECTION ---
-        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        // --- NATIVE SILENCE DETECTION (Upgraded) ---
+        // Some browsers suspend audio context by default, we ensure it's running
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        const audioContext = new AudioContextClass();
+        if (audioContext.state === 'suspended') {
+            await audioContext.resume();
+        }
+        
         const analyser = audioContext.createAnalyser();
-        analyser.minDecibels = -50; // Volume threshold
+        analyser.minDecibels = -70; // Catch slightly softer voices
         const source = audioContext.createMediaStreamSource(stream);
         source.connect(analyser);
         
@@ -150,14 +157,15 @@ const toggleMic = async () => {
           }
           
           analyser.getByteFrequencyData(dataArray);
-          const avgVolume = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+          // Use Math.max for PEAK volume instead of average to ignore background hums
+          const maxVolume = Math.max(...dataArray);
 
-          if (avgVolume > 10) {
+          if (maxVolume > 25) { 
             silenceStart = Date.now();
             isSpeaking = true;
           } else {
             const timeSilent = Date.now() - silenceStart;
-            // Auto stop: 2 seconds of silence if they spoke, OR 6 seconds if they clicked mic but never spoke
+            // Stop recording after 2 seconds of silence (if they spoke) or 6 seconds (if they never spoke)
             if ((isSpeaking && timeSilent > 2000) || (!isSpeaking && timeSilent > 6000)) {
               mediaRecorder.stop();
               return;
@@ -165,7 +173,7 @@ const toggleMic = async () => {
           }
           requestAnimationFrame(checkSilence);
         };
-        checkSilence(); // Start the loop
+        checkSilence(); // Start the monitoring loop
         // --------------------------------
 
         mediaRecorder.ondataavailable = (event) => {
@@ -179,7 +187,7 @@ const toggleMic = async () => {
           const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
           const formData = new FormData();
           formData.append('file', audioBlob, 'recording.webm');
-          formData.append('language', language); // Send 'ml' or 'en' to FastAPI
+          formData.append('language', language);
 
           try {
             const token = localStorage.getItem('token');
@@ -192,17 +200,20 @@ const toggleMic = async () => {
             if (!res.ok) throw new Error("Transcription failed");
             const data = await res.json();
             
-            // AUTO SEND: Instantly push the text to the chat pipeline
+            // Set UI back to idle FIRST, then trigger the auto-send
+            setMicState('idle');
+            
             if (data.transcript && data.transcript.trim()) {
-              if (handleSendRef.current) {
-                handleSendRef.current(data.transcript.trim());
-              }
+                if (handleSendRef.current) {
+                    // Send the transcript directly to the pipeline
+                    handleSendRef.current(data.transcript.trim());
+                }
             }
           } catch (error) {
             console.error("Whisper error:", error);
             setMicError(language === 'ml' ? 'ശബ്ദം മനസ്സിലാക്കാൻ കഴിഞ്ഞില്ല.' : 'Failed to transcribe audio.');
+            setMicState('idle'); // Ensure state resets on error
           } finally {
-            setMicState('idle');
             stream.getTracks().forEach(track => track.stop());
           }
         };
@@ -215,15 +226,18 @@ const toggleMic = async () => {
           : 'Microphone access denied. Please check settings.');
       }
     } else if (micState === 'recording') {
-      // Allows user to manually tap to stop if they don't want to wait 2 seconds
       mediaRecorderRef.current?.stop();
     }
   };
 
   // ── Send Logic ────────────────────────────────────────────────────────────
-  const handleSend = useCallback(async (text: string) => {
-    const msg = (text || inputText).trim();
-    if (!msg || isStreaming || micState !== 'idle') return;
+// Replace your existing handleSend with this:
+  const handleSend = useCallback(async (text?: string) => {
+    // If text is passed directly (from the mic), use it. Otherwise use the input box.
+    const msg = (typeof text === 'string' ? text : inputText).trim();
+    
+    // Notice we removed the micState check here so the auto-send isn't blocked!
+    if (!msg || isStreaming) return;
 
     abortRef.current?.abort();
     abortRef.current = new AbortController();
@@ -293,7 +307,7 @@ const toggleMic = async () => {
     } finally {
       setIsStreaming(false);
     }
-  }, [messages, inputText, isStreaming, hospitalId, language, micState]);
+  }, [messages, inputText, isStreaming, hospitalId, language]);
 
   useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
