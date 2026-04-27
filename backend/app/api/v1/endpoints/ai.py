@@ -921,35 +921,7 @@ RULES:
     except Exception as e:
         logger.warning("Intent classification failed: %s", e)
         return "OTHER"
-@router.post("/transcribe")
-async def transcribe_audio(file: UploadFile = File(...)):
-    # 1. Create a unique temporary filename so concurrent users don't overwrite it
-    temp_filename = f"temp_{uuid.uuid4().hex}_{file.filename}"
-    
-    try:
-        # 2. Save the incoming audio blob to disk temporarily
-        with open(temp_filename, "wb") as buffer:
-            buffer.write(await file.read())
-        
-        # 3. Send the file to OpenAI's Whisper model
-        with open(temp_filename, "rb") as audio_file:
-            transcript_response = client.audio.transcriptions.create(
-                model="whisper-1", 
-                file=audio_file,
-                # Optional: Force Malayalam or let it auto-detect
-                # language="ml" 
-            )
-            
-        # 4. Return the transcribed text
-        return {"transcript": transcript_response.text}
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
-        
-    finally:
-        # 5. ALWAYS clean up the temporary file, even if the API call fails
-        if os.path.exists(temp_filename):
-            os.remove(temp_filename)
 
 @router.post("/chat-stream")
 async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
@@ -1342,3 +1314,34 @@ IMPORTANT:
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"}
     )
+@router.post("/transcribe")
+async def transcribe_audio(
+    file: UploadFile = File(...),
+    language: str = Form("en") # Automatically accepts the language from React
+):
+    temp_filename = f"temp_{uuid.uuid4().hex}_{file.filename}"
+    
+    try:
+        with open(temp_filename, "wb") as buffer:
+            buffer.write(await file.read())
+        
+        # Tell Whisper EXACTLY which language to expect (ml = Malayalam, en = English)
+        whisper_lang = "ml" if language == "ml" else "en"
+        
+        with open(temp_filename, "rb") as audio_file:
+            transcript_response = client.audio.transcriptions.create(
+                model="whisper-1", 
+                file=audio_file,
+                language=whisper_lang, # This stops it from guessing Telugu
+                prompt="Medical terms, hospital appointments, doctors." # Helps accuracy
+            )
+            
+        return {"transcript": transcript_response.text}
+
+    except Exception as e:
+        logger.error(f"Whisper Transcription failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
+        
+    finally:
+        if os.path.exists(temp_filename):
+            os.remove(temp_filename)

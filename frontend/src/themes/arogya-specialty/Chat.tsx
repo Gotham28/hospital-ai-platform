@@ -122,7 +122,7 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
   }, [micState]);
 
   // ── Whisper Mic Logic ─────────────────────────────────────────────────────
-  const toggleMic = async () => {
+const toggleMic = async () => {
     setMicError(null);
 
     if (micState === 'idle') {
@@ -131,6 +131,42 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
         const mediaRecorder = new MediaRecorder(stream);
         mediaRecorderRef.current = mediaRecorder;
         audioChunksRef.current = [];
+
+        // --- NATIVE SILENCE DETECTION ---
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const analyser = audioContext.createAnalyser();
+        analyser.minDecibels = -50; // Volume threshold
+        const source = audioContext.createMediaStreamSource(stream);
+        source.connect(analyser);
+        
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        let silenceStart = Date.now();
+        let isSpeaking = false;
+
+        const checkSilence = () => {
+          if (mediaRecorder.state !== 'recording') {
+            audioContext.close();
+            return;
+          }
+          
+          analyser.getByteFrequencyData(dataArray);
+          const avgVolume = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+
+          if (avgVolume > 10) {
+            silenceStart = Date.now();
+            isSpeaking = true;
+          } else {
+            const timeSilent = Date.now() - silenceStart;
+            // Auto stop: 2 seconds of silence if they spoke, OR 6 seconds if they clicked mic but never spoke
+            if ((isSpeaking && timeSilent > 2000) || (!isSpeaking && timeSilent > 6000)) {
+              mediaRecorder.stop();
+              return;
+            }
+          }
+          requestAnimationFrame(checkSilence);
+        };
+        checkSilence(); // Start the loop
+        // --------------------------------
 
         mediaRecorder.ondataavailable = (event) => {
           if (event.data.size > 0) {
@@ -143,6 +179,7 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
           const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
           const formData = new FormData();
           formData.append('file', audioBlob, 'recording.webm');
+          formData.append('language', language); // Send 'ml' or 'en' to FastAPI
 
           try {
             const token = localStorage.getItem('token');
@@ -153,10 +190,14 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
             });
             
             if (!res.ok) throw new Error("Transcription failed");
-            
             const data = await res.json();
-            // Append transcribed text so the user can verify/edit it before sending
-            setInputText(prev => prev + (prev ? " " : "") + data.transcript);
+            
+            // AUTO SEND: Instantly push the text to the chat pipeline
+            if (data.transcript && data.transcript.trim()) {
+              if (handleSendRef.current) {
+                handleSendRef.current(data.transcript.trim());
+              }
+            }
           } catch (error) {
             console.error("Whisper error:", error);
             setMicError(language === 'ml' ? 'ശബ്ദം മനസ്സിലാക്കാൻ കഴിഞ്ഞില്ല.' : 'Failed to transcribe audio.');
@@ -174,7 +215,7 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
           : 'Microphone access denied. Please check settings.');
       }
     } else if (micState === 'recording') {
-      // Stop recording and trigger the onstop event (transcription)
+      // Allows user to manually tap to stop if they don't want to wait 2 seconds
       mediaRecorderRef.current?.stop();
     }
   };
@@ -267,6 +308,8 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
     recording:    language === 'en' ? 'Tap to finish' : 'അവസാനിപ്പിക്കാൻ ടാപ്പ് ചെയ്യൂ',
     transcribing: language === 'en' ? 'Translating...' : 'വിവർത്തനം ചെയ്യുന്നു...',
   }[micState];
+  const handleSendRef = useRef<((text: string) => Promise<void>) | null>(null);
+  useEffect(() => { handleSendRef.current = handleSend; }, [handleSend]);
 
   return (
     <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 flex flex-col h-[650px]">
