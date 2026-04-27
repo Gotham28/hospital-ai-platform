@@ -5,6 +5,7 @@ import fitz
 import logging
 import unicodedata
 import httpx
+import uuid
 from typing import List, Optional, AsyncGenerator
 from datetime import datetime
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -12,7 +13,7 @@ from openai import OpenAI, AsyncOpenAI
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
-
+from fastapi import APIRouter, UploadFile, File, HTTPException
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from app.api.deps import get_db
@@ -920,7 +921,35 @@ RULES:
     except Exception as e:
         logger.warning("Intent classification failed: %s", e)
         return "OTHER"
+@router.post("/transcribe")
+async def transcribe_audio(file: UploadFile = File(...)):
+    # 1. Create a unique temporary filename so concurrent users don't overwrite it
+    temp_filename = f"temp_{uuid.uuid4().hex}_{file.filename}"
+    
+    try:
+        # 2. Save the incoming audio blob to disk temporarily
+        with open(temp_filename, "wb") as buffer:
+            buffer.write(await file.read())
+        
+        # 3. Send the file to OpenAI's Whisper model
+        with open(temp_filename, "rb") as audio_file:
+            transcript_response = client.audio.transcriptions.create(
+                model="whisper-1", 
+                file=audio_file,
+                # Optional: Force Malayalam or let it auto-detect
+                # language="ml" 
+            )
+            
+        # 4. Return the transcribed text
+        return {"transcript": transcript_response.text}
 
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
+        
+    finally:
+        # 5. ALWAYS clean up the temporary file, even if the API call fails
+        if os.path.exists(temp_filename):
+            os.remove(temp_filename)
 
 @router.post("/chat-stream")
 async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
