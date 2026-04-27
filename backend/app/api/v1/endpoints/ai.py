@@ -1332,6 +1332,8 @@ async def transcribe_audio(
         duration_seconds = file_size / (16000 * 2)  # 16kHz 16-bit mono
         if duration_seconds < 1.0:
             return {"transcript": ""}
+        if duration_seconds > 28.0:  # Sarvam limit is 30s, give 2s buffer
+            return {"transcript": ""}
 
         # 3. Pick the right model and language code
         if language == "ml":

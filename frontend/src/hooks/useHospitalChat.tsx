@@ -156,6 +156,10 @@ const { loading: vadLoading, errored: vadErrored, start: vadStart, pause: vadPau
   baseAssetPath: "/vad-assets/",       // ✅ served from your own Vercel deployment
   onnxWASMBasePath: "/vad-assets/",
   model: "legacy",
+  positiveSpeechThreshold: 0.6,   // higher = needs more confidence to START speech
+  negativeSpeechThreshold: 0.35,  // higher = cuts off silence faster
+  minSpeechMs: 4,             // minimum frames before it counts as real speech
+  redemptionMs: 8, 
     onSpeechStart: () => {
     if (micActiveRef.current) setMicState('recording');  // ← guard added
   },
