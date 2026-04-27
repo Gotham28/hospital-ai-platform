@@ -144,7 +144,7 @@ async def bulk_upload_medicines(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
-    @router.patch("/{medicine_id}", response_model=MedicineSchema)
+@router.patch("/{medicine_id}", response_model=MedicineSchema)
 def update_medicine(
     medicine_id: int, 
     payload: MedicineUpdate,

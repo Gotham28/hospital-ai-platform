@@ -138,7 +138,7 @@ async def bulk_upload_lab_tests(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
-    @router.patch("/{test_id}", response_model=LabTestSchema)
+@router.patch("/{test_id}", response_model=LabTestSchema)
 def update_lab_test(
     test_id: int, 
     payload: LabTestUpdate,
