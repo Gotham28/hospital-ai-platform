@@ -457,6 +457,47 @@ def get_usage_summary(
 
 </file>
 
+<file path="backend/app/core/config.py">
+from typing import Optional
+from pydantic_settings import BaseSettings
+
+class Settings(BaseSettings):
+    # Core
+    PROJECT_NAME: str = "Hospital AI Platform"
+    API_V1_STR: str = "/api/v1"
+    
+    # 1. ADD THIS LINE: This maps the Render environment variable to your code
+    DATABASE_URL: Optional[str] = None 
+
+    # Database Defaults (Keep these for local dev)
+    POSTGRES_SERVER: str = "localhost"
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "NewStrongPassword123!"
+    POSTGRES_DB: str = "hospital_ai"
+    POSTGRES_PORT: str = "5432"
+    
+    # Optional: If you want to override the full URL
+    SQLALCHEMY_DATABASE_URI: Optional[str] = None
+
+    # App Secrets
+    REDIS_URL: str = "redis://localhost:6379"
+    OPENAI_API_KEY: str = "sk-placeholder"
+    JWT_SECRET: str = "supersecret"
+
+    # Helper to build the URL dynamically
+    @property
+    def SQLALCHEMY_DATABASE_URL(self) -> str:
+        # Check Render's DATABASE_URL first
+        if self.DATABASE_URL:
+            # Render often gives 'postgres://', but SQLAlchemy needs 'postgresql://'
+            return self.DATABASE_URL.replace("postgres://", "postgresql://", 1)
+        
+        # Fallback to local construction
+        return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+
+settings = Settings()
+</file>
+
 <file path="backend/app/crud/__init__.py">
 from .crud_hospital import create_hospital, get_hospital, get_hospital_by_slug, get_hospitals
 from .crud_user import create_user, get_user, get_user_by_email
@@ -558,6 +599,71 @@ from app.models.doctor import Doctor
 print("Creating database tables...")
 Base.metadata.create_all(bind=engine)
 print("Tables created successfully!")
+</file>
+
+<file path="backend/seed.py">
+from app.db.session import SessionLocal
+from app.models.hospital import Hospital
+from app.models.user import User
+from passlib.context import CryptContext
+# Add these lines to the top of seed.py
+from app.models.hospital import Hospital
+from app.models.user import User
+# Ensure the Doctor model is imported so SQLAlchemy can "see" it
+from app.models.doctor import Doctor
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+db = SessionLocal()
+
+def seed_data():
+    try:
+        # 1. Check if Hospital exists, if not, create it
+        hospital = db.query(Hospital).filter(Hospital.slug == "arogya-specialty").first()
+        
+        if not hospital:
+            hospital = Hospital(
+                name="Arogya Specialty Hospital",
+                slug="arogya-specialty",
+                is_active=True
+            )
+            db.add(hospital)
+            db.commit()
+            db.refresh(hospital)
+            print(f"Created new hospital: {hospital.name}")
+        else:
+            print(f"Hospital already exists: {hospital.name} (ID: {hospital.id})")
+
+        # 2. Check if Admin User exists, if not, create it
+        admin_email = "admin@arogya.com"
+        user = db.query(User).filter(User.email == admin_email).first()
+
+        if not user:
+            admin_user = User(
+                email=admin_email,
+                hashed_password=pwd_context.hash("admin123"),
+                hospital_id=hospital.id,
+                is_active=True
+            )
+            db.add(admin_user)
+            db.commit()
+            print(f"Created admin user: {admin_email}")
+        else:
+            # If user exists, let's update the password to be sure it's admin123
+            user.hashed_password = pwd_context.hash("admin123")
+            user.hospital_id = hospital.id
+            db.commit()
+            print(f"Updated existing admin user: {admin_email}")
+            
+        print("\n✅ Success! Log in with admin@arogya.com / admin123")
+        
+    except Exception as e:
+        print(f"❌ Error seeding data: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+if __name__ == "__main__":
+    seed_data()
 </file>
 
 <file path="frontend/.gitignore">
@@ -1106,6 +1212,14 @@ export default {
 }
 </file>
 
+<file path="frontend/vercel.json">
+{
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
+</file>
+
 <file path="package.json">
 {
   "name": "frontend",
@@ -1219,47 +1333,6 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_column('user', 'role')
-</file>
-
-<file path="backend/app/core/config.py">
-from typing import Optional
-from pydantic_settings import BaseSettings
-
-class Settings(BaseSettings):
-    # Core
-    PROJECT_NAME: str = "Hospital AI Platform"
-    API_V1_STR: str = "/api/v1"
-    
-    # 1. ADD THIS LINE: This maps the Render environment variable to your code
-    DATABASE_URL: Optional[str] = None 
-
-    # Database Defaults (Keep these for local dev)
-    POSTGRES_SERVER: str = "localhost"
-    POSTGRES_USER: str = "postgres"
-    POSTGRES_PASSWORD: str = "NewStrongPassword123!"
-    POSTGRES_DB: str = "hospital_ai"
-    POSTGRES_PORT: str = "5432"
-    
-    # Optional: If you want to override the full URL
-    SQLALCHEMY_DATABASE_URI: Optional[str] = None
-
-    # App Secrets
-    REDIS_URL: str = "redis://localhost:6379"
-    OPENAI_API_KEY: str = "sk-placeholder"
-    JWT_SECRET: str = "supersecret"
-
-    # Helper to build the URL dynamically
-    @property
-    def SQLALCHEMY_DATABASE_URL(self) -> str:
-        # Check Render's DATABASE_URL first
-        if self.DATABASE_URL:
-            # Render often gives 'postgres://', but SQLAlchemy needs 'postgresql://'
-            return self.DATABASE_URL.replace("postgres://", "postgresql://", 1)
-        
-        # Fallback to local construction
-        return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
-
-settings = Settings()
 </file>
 
 <file path="backend/app/crud/crud_hospital.py">
@@ -1999,69 +2072,49 @@ finally:
     db.close()
 </file>
 
-<file path="backend/seed.py">
-from app.db.session import SessionLocal
-from app.models.hospital import Hospital
-from app.models.user import User
-from passlib.context import CryptContext
-# Add these lines to the top of seed.py
-from app.models.hospital import Hospital
-from app.models.user import User
-# Ensure the Doctor model is imported so SQLAlchemy can "see" it
-from app.models.doctor import Doctor
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-db = SessionLocal()
-
-def seed_data():
-    try:
-        # 1. Check if Hospital exists, if not, create it
-        hospital = db.query(Hospital).filter(Hospital.slug == "arogya-specialty").first()
-        
-        if not hospital:
-            hospital = Hospital(
-                name="Arogya Specialty Hospital",
-                slug="arogya-specialty",
-                is_active=True
-            )
-            db.add(hospital)
-            db.commit()
-            db.refresh(hospital)
-            print(f"Created new hospital: {hospital.name}")
-        else:
-            print(f"Hospital already exists: {hospital.name} (ID: {hospital.id})")
-
-        # 2. Check if Admin User exists, if not, create it
-        admin_email = "admin@arogya.com"
-        user = db.query(User).filter(User.email == admin_email).first()
-
-        if not user:
-            admin_user = User(
-                email=admin_email,
-                hashed_password=pwd_context.hash("admin123"),
-                hospital_id=hospital.id,
-                is_active=True
-            )
-            db.add(admin_user)
-            db.commit()
-            print(f"Created admin user: {admin_email}")
-        else:
-            # If user exists, let's update the password to be sure it's admin123
-            user.hashed_password = pwd_context.hash("admin123")
-            user.hospital_id = hospital.id
-            db.commit()
-            print(f"Updated existing admin user: {admin_email}")
-            
-        print("\n✅ Success! Log in with admin@arogya.com / admin123")
-        
-    except Exception as e:
-        print(f"❌ Error seeding data: {e}")
-        db.rollback()
-    finally:
-        db.close()
-
-if __name__ == "__main__":
-    seed_data()
+<file path="frontend/package.json">
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "axios": "^1.13.5",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.575.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "^7.13.1",
+    "react-speech-recognition": "^4.0.1",
+    "regenerator-runtime": "^0.14.1",
+    "tailwind-merge": "^3.5.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@tailwindcss/postcss": "^4.2.1",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "autoprefixer": "^10.4.27",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.2.1",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.48.0",
+    "vite": "^7.3.1"
+  }
+}
 </file>
 
 <file path="frontend/src/components/BookingConfigPanel.tsx">
@@ -2566,12 +2619,82 @@ export default function CreateHospitalModal({ isOpen, onClose, onSuccess }: Prop
 }
 </file>
 
-<file path="frontend/vercel.json">
-{
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
-}
+<file path="requirements.txt">
+alembic==1.18.4
+annotated-doc==0.0.4
+annotated-types==0.7.0
+anyio==4.12.1
+bcrypt==4.0.1
+certifi==2026.1.4
+cffi==2.0.0
+charset-normalizer==3.4.4
+click==8.3.1
+colorama==0.4.6
+cryptography==46.0.5
+distro==1.9.0
+dnspython==2.8.0
+ecdsa==0.19.1
+email-validator==2.3.0
+fastapi==0.129.2
+google-auth==2.48.0
+google-auth-oauthlib==1.3.0
+greenlet==3.3.2
+gspread==6.2.1
+gunicorn==25.1.0
+h11==0.16.0
+httpcore==1.0.9
+httplib2==0.31.2
+httpx==0.28.1
+idna==3.11
+jiter==0.13.0
+jsonpatch==1.33
+jsonpointer==3.0.0
+langchain-core==1.2.16
+langchain-text-splitters==1.1.1
+langsmith==0.7.9
+Mako==1.3.10
+MarkupSafe==3.0.3
+numpy==2.4.2
+oauth2client==4.1.3
+oauthlib==3.3.1
+openai==2.21.0
+orjson==3.11.7
+packaging==26.0
+passlib==1.7.4
+pgvector==0.4.2
+psycopg2-binary==2.9.11
+pyasn1==0.6.2
+pyasn1_modules==0.4.2
+pycparser==3.0
+pydantic==2.12.5
+pydantic-settings==2.13.1
+pydantic_core==2.41.5
+PyMuPDF==1.27.1
+pyparsing==3.3.2
+python-dotenv==1.2.1
+python-jose==3.5.0
+python-multipart==0.0.22
+PyYAML==6.0.3
+redis==7.2.0
+requests==2.32.5
+requests-oauthlib==2.0.0
+requests-toolbelt==1.0.0
+rsa==4.9.1
+six==1.17.0
+sniffio==1.3.1
+SQLAlchemy==2.0.46
+starlette==0.52.1
+tenacity==9.1.4
+tqdm==4.67.3
+typing-inspection==0.4.2
+typing_extensions==4.15.0
+urllib3==2.6.3
+uuid_utils==0.14.1
+uvicorn==0.41.0
+xxhash==3.6.0
+zstandard==0.25.0
+redis==7.2.0      # already there — just confirm it's present
+APScheduler==3.10.4
 </file>
 
 <file path="backend/alembic/versions/a1b2c3d4e5f6_add_appointments.py">
@@ -2867,49 +2990,28 @@ class Doctor(Base):
     leaves = relationship("DoctorLeave", back_populates="doctor", cascade="all, delete-orphan")
 </file>
 
-<file path="frontend/package.json">
-{
-  "name": "frontend",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "axios": "^1.13.5",
-    "clsx": "^2.1.1",
-    "lucide-react": "^0.575.0",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "react-markdown": "^10.1.0",
-    "react-router-dom": "^7.13.1",
-    "react-speech-recognition": "^4.0.1",
-    "regenerator-runtime": "^0.14.1",
-    "tailwind-merge": "^3.5.0"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.39.1",
-    "@tailwindcss/postcss": "^4.2.1",
-    "@types/node": "^24.10.1",
-    "@types/react": "^19.2.7",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.1.1",
-    "autoprefixer": "^10.4.27",
-    "eslint": "^9.39.1",
-    "eslint-plugin-react-hooks": "^7.0.1",
-    "eslint-plugin-react-refresh": "^0.4.24",
-    "globals": "^16.5.0",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^4.2.1",
-    "typescript": "~5.9.3",
-    "typescript-eslint": "^8.48.0",
-    "vite": "^7.3.1"
-  }
-}
+<file path="backend/app/models/hospital.py">
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+from app.db.base_class import Base
+
+class Hospital(Base):
+    __tablename__ = "hospital"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, index=True)
+    slug = Column(String, unique=True, index=True, nullable=False) # e.g., "apollo-delhi" for URLs
+    address = Column(String, nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    system_prompt = Column(Text, default="You are Arogya, a helpful assistant for a specialty hospital.")
+    # Add this column to your existing Hospital class
+    google_sheet_id = Column(String, nullable=True)
+    booking_config = Column(Text, nullable=True)  # JSON string
+    # Relationship: One Hospital has many Users
+    users = relationship("User", back_populates="hospital")
+    # Inside your Hospital class in app/models/hospital.py
+    doctors = relationship("Doctor", back_populates="hospital", cascade="all, delete-orphan")
 </file>
 
 <file path="frontend/src/components/AppointmentsTab.tsx">
@@ -3214,102 +3316,6 @@ export default function AppointmentsTab() {
 }
 </file>
 
-<file path="frontend/src/components/HospitalStats.tsx">
-import { useEffect, useState } from 'react';
-import api from '../api/axios';
-import { Activity, CreditCard, TrendingUp } from 'lucide-react';
-
-export default function HospitalStats({ hospitalId }: { hospitalId: number }) {
-  const [billing, setBilling] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchBilling = async () => {
-      try {
-        const res = await api.get(`/hospitals/${hospitalId}/billing`);
-        setBilling(res.data);
-        setError(null);
-      } catch (err) {
-        console.error("Billing fetch failed", err);
-        setError("Could not load billing data.");
-      }
-    };
-    if (hospitalId) fetchBilling();
-  }, [hospitalId]);
-
-  if (!billing && !error) {
-    return (
-      <div className="p-8 text-center animate-pulse bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
-        <p className="text-gray-500 font-medium">Calculating real-time usage...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-4 bg-red-50 text-red-600 rounded-lg border border-red-100">
-        {error}
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-      {/* Activity Card */}
-      <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-        <div className="flex items-center gap-3 text-blue-600 mb-4">
-          <Activity size={20} />
-          <h4 className="font-semibold text-gray-700">Monthly Usage</h4>
-        </div>
-        <div className="space-y-1">
-          <p className="text-2xl font-bold text-gray-900">
-            {billing?.usage?.total_chats ?? 0}
-          </p>
-          <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
-            {(billing?.usage?.tokens_consumed ?? 0).toLocaleString()} tokens used
-          </p>
-        </div>
-      </div>
-
-      {/* Internal Cost Card */}
-      <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-        <div className="flex items-center gap-3 text-orange-600 mb-4">
-          <TrendingUp size={20} />
-          <h4 className="font-semibold text-gray-700">Gothos Cost (USD)</h4>
-        </div>
-        <div className="space-y-1">
-          <p className="text-2xl font-bold text-gray-900">
-            ${billing?.usage?.raw_cost_usd ?? "0.00"}
-          </p>
-          <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
-            Total OpenAI Overhead
-          </p>
-        </div>
-      </div>
-
-      {/* Invoice Card (INR) */}
-      {/* FIX #5: Was reading billing?.invoice?.total_due_inr but the old backend
-          returned estimated_invoice_inr at the top level. Backend is now fixed to
-          return { invoice: { total_due_inr, platform_fee } } so this path is correct. */}
-      <div className="bg-blue-600 p-6 rounded-xl shadow-lg text-white transform hover:scale-[1.02] transition-transform">
-        <div className="flex items-center gap-3 mb-4 opacity-90">
-          <CreditCard size={20} />
-          <h4 className="font-semibold">Current Invoice</h4>
-        </div>
-        <div className="space-y-1">
-          <p className="text-3xl font-bold">
-            ₹{(billing?.invoice?.total_due_inr ?? 0).toLocaleString()}
-          </p>
-          <p className="text-xs opacity-75 font-medium uppercase tracking-wider">
-            Platform: ₹{billing?.invoice?.platform_fee ?? 0} + Usage
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-</file>
-
 <file path="frontend/src/context/AuthContext.tsx">
 import React, { createContext, useContext, useState, useCallback } from 'react';
 
@@ -3499,261 +3505,6 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
-</file>
-
-<file path="frontend/src/pages/Doctors.tsx">
-import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import api from '../api/axios';
-import { Search, Loader2, Upload, Users, CalendarDays, Clock, Trash2, Plus, X } from 'lucide-react';
-
-const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-
-export default function DoctorsPage() {
-  const { hospitalId } = useParams();
-  const [doctors, setDoctors] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // Modal State
-  const [manageDoc, setManageDoc] = useState<any>(null);
-  const [schedules, setSchedules] = useState<any[]>([]);
-  const [leaves, setLeaves] = useState<any[]>([]);
-  
-  // Form State
-  const [schedDay, setSchedDay] = useState('0');
-  const [schedStart, setSchedStart] = useState('09:00');
-  const [schedEnd, setSchedEnd] = useState('17:00');
-  const [leaveDate, setLeaveDate] = useState('');
-  const [leaveReason, setLeaveReason] = useState('');
-
-  const fetchDoctors = async () => {
-    try {
-      const res = await api.get(`/hospitals/${hospitalId}/doctors`);
-      setDoctors(res.data);
-    } catch (err) {
-      console.error("Failed to fetch doctors", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { fetchDoctors(); }, [hospitalId]);
-
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    try {
-      setLoading(true);
-      await api.post(`/hospitals/${hospitalId}/doctors/bulk-upload`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      fetchDoctors();
-    } catch (err) {
-      alert("Import failed. Ensure the file format is correct.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // --- Availability Management ---
-
-  const openManageModal = async (doc: any) => {
-    setManageDoc(doc);
-    fetchAvailability(doc.id);
-  };
-
-  const fetchAvailability = async (doctorId: number) => {
-    try {
-      const [schedRes, leaveRes] = await Promise.all([
-        api.get(`/availability/schedules/doctor/${doctorId}`),
-        api.get(`/availability/leaves/doctor/${doctorId}`)
-      ]);
-      setSchedules(schedRes.data);
-      setLeaves(leaveRes.data);
-    } catch (err) {
-      console.error("Failed to load availability", err);
-    }
-  };
-
-  const handleAddSchedule = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await api.post('/availability/schedules/', {
-        doctor_id: manageDoc.id,
-        day_of_week: parseInt(schedDay),
-        start_time: schedStart,
-        end_time: schedEnd
-      });
-      fetchAvailability(manageDoc.id);
-    } catch (err) { alert("Failed to add schedule"); }
-  };
-
-  const handleAddLeave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await api.post('/availability/leaves/', {
-        doctor_id: manageDoc.id,
-        date: leaveDate,
-        reason: leaveReason
-      });
-      setLeaveDate(''); setLeaveReason('');
-      fetchAvailability(manageDoc.id);
-    } catch (err) { alert("Failed to add leave"); }
-  };
-
-  const deleteSchedule = async (id: number) => {
-    await api.delete(`/availability/schedules/${id}`);
-    fetchAvailability(manageDoc.id);
-  };
-
-  const deleteLeave = async (id: number) => {
-    await api.delete(`/availability/leaves/${id}`);
-    fetchAvailability(manageDoc.id);
-  };
-
-  return (
-    <div className="p-8 space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Doctor Directory</h2>
-          <p className="text-gray-500 text-sm">Manage staff and working hours for AI scheduling.</p>
-        </div>
-        
-        <div className="relative">
-          <input type="file" id="bulk-upload" className="hidden" onChange={handleFileUpload} accept=".csv,.txt" disabled={loading} />
-          <label htmlFor="bulk-upload" className={`flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer font-medium shadow-sm ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-            Upload Staff CSV
-          </label>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center gap-3">
-          <Search className="w-5 h-5 text-gray-400" />
-          <input type="text" placeholder="Search doctors..." className="bg-transparent border-none focus:ring-0 text-sm w-full outline-none" />
-        </div>
-
-        {loading ? (
-          <div className="p-20 flex justify-center text-blue-600"><Loader2 className="w-8 h-8 animate-spin" /></div>
-        ) : doctors.length === 0 ? (
-          <div className="p-20 text-center">
-            <Users className="w-12 h-12 text-blue-200 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900">No doctors found</h3>
-            <p className="text-gray-500 max-w-xs mx-auto mt-1">Upload your hospital staff list to begin.</p>
-          </div>
-        ) : (
-          <table className="w-full text-left">
-            <thead className="bg-gray-50 text-xs uppercase text-gray-500 font-semibold border-b">
-              <tr>
-                <th className="p-4">Name</th>
-                <th className="p-4">Department</th>
-                <th className="p-4">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {doctors.map(doc => (
-                <tr key={doc.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="p-4 text-sm font-medium text-gray-900">Dr. {doc.name}</td>
-                  <td className="p-4 text-sm text-gray-500">{doc.department || 'General'}</td>
-                  <td className="p-4">
-                    <button onClick={() => openManageModal(doc)} className="text-sm text-blue-600 font-medium hover:text-blue-800 flex items-center gap-1">
-                      <CalendarDays className="w-4 h-4" /> Manage Schedule
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* MANAGE SCHEDULE MODAL */}
-      {manageDoc && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
-            
-            <div className="p-6 border-b flex justify-between items-center bg-gray-50">
-              <div>
-                <h3 className="text-xl font-bold text-gray-900">Dr. {manageDoc.name}</h3>
-                <p className="text-sm text-gray-500">{manageDoc.department}</p>
-              </div>
-              <button onClick={() => setManageDoc(null)} className="text-gray-400 hover:text-gray-600"><X className="w-6 h-6" /></button>
-            </div>
-
-            <div className="p-6 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-8">
-              
-              {/* Weekly Schedule Section */}
-              <div className="space-y-4">
-                <h4 className="font-semibold text-gray-800 flex items-center gap-2"><Clock className="w-5 h-5 text-blue-600" /> Weekly Hours</h4>
-                <form onSubmit={handleAddSchedule} className="flex flex-wrap gap-2 items-end bg-blue-50/50 p-3 rounded-lg border border-blue-100">
-                  <div className="flex-1 min-w-[120px]">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Day</label>
-                    <select value={schedDay} onChange={e => setSchedDay(e.target.value)} className="w-full text-sm border rounded p-2">
-                      {DAYS_OF_WEEK.map((d, i) => <option key={i} value={i}>{d}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Start</label>
-                    <input type="time" value={schedStart} onChange={e => setSchedStart(e.target.value)} required className="w-full text-sm border rounded p-2" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">End</label>
-                    <input type="time" value={schedEnd} onChange={e => setSchedEnd(e.target.value)} required className="w-full text-sm border rounded p-2" />
-                  </div>
-                  <button type="submit" className="bg-blue-600 text-white p-2 rounded hover:bg-blue-700"><Plus className="w-5 h-5" /></button>
-                </form>
-
-                <div className="space-y-2">
-                  {schedules.map(s => (
-                    <div key={s.id} className="flex justify-between items-center bg-white border rounded-lg p-3 text-sm">
-                      <span className="font-medium w-24">{DAYS_OF_WEEK[s.day_of_week]}</span>
-                      <span className="text-gray-600">{s.start_time} - {s.end_time}</span>
-                      <button onClick={() => deleteSchedule(s.id)} className="text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
-                    </div>
-                  ))}
-                  {schedules.length === 0 && <p className="text-sm text-gray-400 italic">No schedules set.</p>}
-                </div>
-              </div>
-
-              {/* Leaves Section */}
-              <div className="space-y-4">
-                <h4 className="font-semibold text-gray-800 flex items-center gap-2"><CalendarDays className="w-5 h-5 text-red-600" /> Mark Absence</h4>
-                <form onSubmit={handleAddLeave} className="flex flex-wrap gap-2 items-end bg-red-50/50 p-3 rounded-lg border border-red-100">
-                  <div className="flex-1 min-w-[120px]">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Date</label>
-                    <input type="date" value={leaveDate} onChange={e => setLeaveDate(e.target.value)} required className="w-full text-sm border rounded p-2" />
-                  </div>
-                  <div className="flex-1 min-w-[120px]">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Reason (Optional)</label>
-                    <input type="text" value={leaveReason} onChange={e => setLeaveReason(e.target.value)} placeholder="e.g. Vacation" className="w-full text-sm border rounded p-2" />
-                  </div>
-                  <button type="submit" className="bg-red-600 text-white p-2 rounded hover:bg-red-700"><Plus className="w-5 h-5" /></button>
-                </form>
-
-                <div className="space-y-2">
-                  {leaves.map(l => (
-                    <div key={l.id} className="flex justify-between items-center bg-white border rounded-lg p-3 text-sm">
-                      <span className="font-medium text-red-600">{l.date}</span>
-                      <span className="text-gray-600 truncate max-w-[150px]">{l.reason || 'Absent'}</span>
-                      <button onClick={() => deleteLeave(l.id)} className="text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
-                    </div>
-                  ))}
-                  {leaves.length === 0 && <p className="text-sm text-gray-400 italic">No leaves marked.</p>}
-                </div>
-              </div>
-
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 </file>
 
 <file path="frontend/src/pages/KnowledgeBase.tsx">
@@ -4025,84 +3776,6 @@ const KnowledgeBaseUpload = ({ hospitalId }: { hospitalId: string | undefined })
 };
 
 export default KnowledgeBaseUpload;
-</file>
-
-<file path="requirements.txt">
-alembic==1.18.4
-annotated-doc==0.0.4
-annotated-types==0.7.0
-anyio==4.12.1
-bcrypt==4.0.1
-certifi==2026.1.4
-cffi==2.0.0
-charset-normalizer==3.4.4
-click==8.3.1
-colorama==0.4.6
-cryptography==46.0.5
-distro==1.9.0
-dnspython==2.8.0
-ecdsa==0.19.1
-email-validator==2.3.0
-fastapi==0.129.2
-google-auth==2.48.0
-google-auth-oauthlib==1.3.0
-greenlet==3.3.2
-gspread==6.2.1
-gunicorn==25.1.0
-h11==0.16.0
-httpcore==1.0.9
-httplib2==0.31.2
-httpx==0.28.1
-idna==3.11
-jiter==0.13.0
-jsonpatch==1.33
-jsonpointer==3.0.0
-langchain-core==1.2.16
-langchain-text-splitters==1.1.1
-langsmith==0.7.9
-Mako==1.3.10
-MarkupSafe==3.0.3
-numpy==2.4.2
-oauth2client==4.1.3
-oauthlib==3.3.1
-openai==2.21.0
-orjson==3.11.7
-packaging==26.0
-passlib==1.7.4
-pgvector==0.4.2
-psycopg2-binary==2.9.11
-pyasn1==0.6.2
-pyasn1_modules==0.4.2
-pycparser==3.0
-pydantic==2.12.5
-pydantic-settings==2.13.1
-pydantic_core==2.41.5
-PyMuPDF==1.27.1
-pyparsing==3.3.2
-python-dotenv==1.2.1
-python-jose==3.5.0
-python-multipart==0.0.22
-PyYAML==6.0.3
-redis==7.2.0
-requests==2.32.5
-requests-oauthlib==2.0.0
-requests-toolbelt==1.0.0
-rsa==4.9.1
-six==1.17.0
-sniffio==1.3.1
-SQLAlchemy==2.0.46
-starlette==0.52.1
-tenacity==9.1.4
-tqdm==4.67.3
-typing-inspection==0.4.2
-typing_extensions==4.15.0
-urllib3==2.6.3
-uuid_utils==0.14.1
-uvicorn==0.41.0
-xxhash==3.6.0
-zstandard==0.25.0
-redis==7.2.0      # already there — just confirm it's present
-APScheduler==3.10.4
 </file>
 
 <file path="backend/alembic/versions/cea080e631b8_add_pharmacy_labs_and_doctor_.py">
@@ -4628,320 +4301,6 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     return {"access_token": access_token, "token_type": "bearer"}
 </file>
 
-<file path="backend/app/api/v1/endpoints/lab_tests.py">
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from typing import List
-from app.api.deps import get_db, get_current_tenant, get_token_payload
-from app.models.lab_test import LabTest
-from app.schemas.lab_test import LabTest as LabTestSchema, LabTestCreate, LabTestUpdate
-import csv
-import io
-from fastapi import UploadFile, File
-from app.models.hospital import Hospital
-router = APIRouter()
-
-@router.post("/", response_model=LabTestSchema)
-def create_lab_test(
-    payload: LabTestCreate, 
-    db: Session = Depends(get_db),
-    _tenant: int = Depends(get_current_tenant),
-    token_data: dict = Depends(get_token_payload)
-):
-    if token_data.get("role") != "superadmin" and str(token_data.get("hospital_id")) != str(payload.hospital_id):
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    db_item = LabTest(**payload.model_dump())
-    db.add(db_item)
-    db.commit()
-    db.refresh(db_item)
-    return db_item
-
-@router.get("/hospital/{hospital_id}", response_model=List[LabTestSchema])
-def list_lab_tests(
-    hospital_id: int, 
-    db: Session = Depends(get_db),
-    _tenant: int = Depends(get_current_tenant),
-    token_data: dict = Depends(get_token_payload)
-):
-    if token_data.get("role") != "superadmin" and str(token_data.get("hospital_id")) != str(hospital_id):
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    return db.query(LabTest).filter(LabTest.hospital_id == hospital_id).all()
-
-@router.delete("/{test_id}")
-def delete_lab_test(
-    test_id: int, 
-    db: Session = Depends(get_db),
-    _tenant: int = Depends(get_current_tenant)
-):
-    db_item = db.query(LabTest).filter(LabTest.id == test_id).first()
-    if not db_item:
-        raise HTTPException(status_code=404, detail="Lab test not found")
-    
-    db.delete(db_item)
-    db.commit()
-    return {"status": "success"}
-@router.post("/hospital/{hospital_id}/bulk-upload")
-async def bulk_upload_lab_tests(
-    hospital_id: int,
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    _tenant: int = Depends(get_current_tenant),
-    token_data: dict = Depends(get_token_payload)
-):
-    if token_data.get("role") != "superadmin" and str(token_data.get("hospital_id")) != str(hospital_id):
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    content = await file.read()
-    text_content = content.decode("utf-8")
-    
-    reader = csv.DictReader(io.StringIO(text_content))
-    csv_headers = reader.fieldnames
-    if not csv_headers:
-        raise HTTPException(status_code=400, detail="CSV file is empty or invalid.")
-
-    import os
-    import json
-    from openai import OpenAI
-    oai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    
-    target_schema = {
-        "name": "Name of the lab test or diagnostic (Required)",
-        "category": "Category (e.g., Blood Test, Imaging)",
-        "price": "Cost or price of the test",
-        "prerequisites": "Preparation instructions (e.g., Fasting required)",
-        "turnaround_time": "How long results take to arrive",
-        "is_inhouse": "Is this done in the hospital? (Yes/No/Boolean)"
-    }
-
-    prompt = f"""
-    You are a data mapping assistant. Map these provided CSV headers: {csv_headers}
-    To this target database schema: {json.dumps(target_schema)}
-    
-    Return ONLY a raw JSON object where keys are the database schema keys, and values are the EXACT matching string from the CSV headers.
-    If there is no logical match for a target key, set its value to null.
-    """
-
-    llm_resp = oai.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "system", "content": prompt}],
-        response_format={"type": "json_object"}
-    )
-    mapping = json.loads(llm_resp.choices[0].message.content)
-
-    count = 0
-    for row in reader:
-        name_col = mapping.get("name")
-        if not name_col or not row.get(name_col):
-            continue
-
-        inhouse_col = mapping.get("is_inhouse")
-        inhouse_str = str(row.get(inhouse_col, "yes")).lower() if inhouse_col else "yes"
-        is_inhouse = inhouse_str in ["yes", "true", "1", "y", "in-house", "inhouse"]
-
-        price_col = mapping.get("price")
-        try:
-            price = float(str(row.get(price_col, 0)).replace("$", "").replace(",", "").strip()) if price_col else 0.0
-        except ValueError:
-            price = 0.0
-
-        cat_col = mapping.get("category")
-        prereq_col = mapping.get("prerequisites")
-        tat_col = mapping.get("turnaround_time")
-
-        test = LabTest(
-            hospital_id=hospital_id,
-            name=row.get(name_col).strip(),
-            category=row.get(cat_col, "").strip() if cat_col else "",
-            price=price,
-            prerequisites=row.get(prereq_col, "").strip() if prereq_col else "",
-            turnaround_time=row.get(tat_col, "").strip() if tat_col else "",
-            is_inhouse=is_inhouse
-        )
-        db.add(test)
-        count += 1
-
-    try:
-        db.commit()
-        return {"message": f"AI mapping complete. Successfully imported {count} lab tests."}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
-</file>
-
-<file path="backend/app/api/v1/endpoints/medicines.py">
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from typing import List
-from app.api.deps import get_db, get_current_tenant, get_token_payload
-from app.models.medicine import Medicine
-from app.schemas.medicine import Medicine as MedicineSchema, MedicineCreate, MedicineUpdate
-import csv
-import io
-from fastapi import UploadFile, File
-from app.models.hospital import Hospital
-router = APIRouter()
-
-@router.post("/", response_model=MedicineSchema)
-def create_medicine(
-    payload: MedicineCreate, 
-    db: Session = Depends(get_db),
-    _tenant: int = Depends(get_current_tenant),
-    token_data: dict = Depends(get_token_payload)
-):
-    if token_data.get("role") != "superadmin" and str(token_data.get("hospital_id")) != str(payload.hospital_id):
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    db_item = Medicine(**payload.model_dump())
-    db.add(db_item)
-    db.commit()
-    db.refresh(db_item)
-    return db_item
-
-@router.get("/hospital/{hospital_id}", response_model=List[MedicineSchema])
-def list_medicines(
-    hospital_id: int, 
-    db: Session = Depends(get_db),
-    _tenant: int = Depends(get_current_tenant),
-    token_data: dict = Depends(get_token_payload)
-):
-    if token_data.get("role") != "superadmin" and str(token_data.get("hospital_id")) != str(hospital_id):
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    return db.query(Medicine).filter(Medicine.hospital_id == hospital_id).all()
-
-@router.delete("/{medicine_id}")
-def delete_medicine(
-    medicine_id: int, 
-    db: Session = Depends(get_db),
-    _tenant: int = Depends(get_current_tenant)
-):
-    db_item = db.query(Medicine).filter(Medicine.id == medicine_id).first()
-    if not db_item:
-        raise HTTPException(status_code=404, detail="Medicine not found")
-    
-    db.delete(db_item)
-    db.commit()
-    return {"status": "success"}
-@router.post("/hospital/{hospital_id}/bulk-upload")
-async def bulk_upload_medicines(
-    hospital_id: int,
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    _tenant: int = Depends(get_current_tenant),
-    token_data: dict = Depends(get_token_payload)
-):
-    if token_data.get("role") != "superadmin" and str(token_data.get("hospital_id")) != str(hospital_id):
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    content = await file.read()
-    text_content = content.decode("utf-8")
-    
-    # 1. Extract just the headers from the CSV
-    reader = csv.DictReader(io.StringIO(text_content))
-    csv_headers = reader.fieldnames
-    if not csv_headers:
-        raise HTTPException(status_code=400, detail="CSV file is empty or invalid.")
-
-    # 2. Ask the LLM to map the headers
-    import os
-    import json
-    from openai import OpenAI
-    oai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    
-    target_schema = {
-        "name": "Generic name or main title of the medicine (Required)",
-        "brand_name": "Brand name of the medicine",
-        "category": "Type or category (e.g., Tablet, Syrup)",
-        "price": "Cost or price of the medicine",
-        "stock_status": "Stock availability (e.g., In Stock, Out of Stock)",
-        "requires_prescription": "Does it need a prescription? (Yes/No/Boolean)"
-    }
-
-    prompt = f"""
-    You are a data mapping assistant. Map these provided CSV headers: {csv_headers}
-    To this target database schema: {json.dumps(target_schema)}
-    
-    Return ONLY a raw JSON object where keys are the database schema keys, and values are the EXACT matching string from the CSV headers.
-    If there is no logical match for a target key, set its value to null.
-    """
-
-    llm_resp = oai.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "system", "content": prompt}],
-        response_format={"type": "json_object"}
-    )
-    mapping = json.loads(llm_resp.choices[0].message.content)
-
-    # 3. Parse the CSV using the LLM's dynamic mapping
-    count = 0
-    for row in reader:
-        # Get the actual column names from the mapping
-        name_col = mapping.get("name")
-        if not name_col or not row.get(name_col):
-            continue # Skip rows without a primary name
-
-        # Safely parse prescription boolean
-        rx_col = mapping.get("requires_prescription")
-        req_rx_str = str(row.get(rx_col, "no")).lower() if rx_col else "no"
-        requires_prescription = req_rx_str in ["yes", "true", "1", "y", "required"]
-
-        # Safely parse price
-        price_col = mapping.get("price")
-        try:
-            price = float(str(row.get(price_col, 0)).replace("$", "").replace(",", "").strip()) if price_col else 0.0
-        except ValueError:
-            price = 0.0
-
-        brand_col = mapping.get("brand_name")
-        cat_col = mapping.get("category")
-        stock_col = mapping.get("stock_status")
-
-        med = Medicine(
-            hospital_id=hospital_id,
-            name=row.get(name_col).strip(),
-            brand_name=row.get(brand_col, "").strip() if brand_col else "",
-            category=row.get(cat_col, "").strip() if cat_col else "",
-            price=price,
-            stock_status=row.get(stock_col, "in_stock").strip().lower().replace(" ", "_") if stock_col else "in_stock",
-            requires_prescription=requires_prescription
-        )
-        db.add(med)
-        count += 1
-
-    try:
-        db.commit()
-        return {"message": f"AI mapping complete. Successfully imported {count} medicines."}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
-</file>
-
-<file path="backend/app/models/hospital.py">
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
-from app.db.base_class import Base
-
-class Hospital(Base):
-    __tablename__ = "hospital"
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False, index=True)
-    slug = Column(String, unique=True, index=True, nullable=False) # e.g., "apollo-delhi" for URLs
-    address = Column(String, nullable=True)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    system_prompt = Column(Text, default="You are Arogya, a helpful assistant for a specialty hospital.")
-    # Add this column to your existing Hospital class
-    google_sheet_id = Column(String, nullable=True)
-    booking_config = Column(Text, nullable=True)  # JSON string
-    # Relationship: One Hospital has many Users
-    users = relationship("User", back_populates="hospital")
-    # Inside your Hospital class in app/models/hospital.py
-    doctors = relationship("Doctor", back_populates="hospital", cascade="all, delete-orphan")
-</file>
-
 <file path="backend/app/schemas/hospital.py">
 from typing import Optional
 from datetime import datetime
@@ -4969,6 +4328,445 @@ class Hospital(HospitalBase):
 
     class Config:
         from_attributes = True
+</file>
+
+<file path="frontend/src/components/HospitalStats.tsx">
+import { useEffect, useState } from 'react';
+import api from '../api/axios';
+import { Activity, CreditCard, TrendingUp, RefreshCw } from 'lucide-react';
+
+export default function HospitalStats({ hospitalId }: { hospitalId: number }) {
+  const [billing, setBilling] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
+
+  const fetchBilling = async () => {
+    try {
+      const res = await api.get(`/hospitals/${hospitalId}/billing`);
+      setBilling(res.data);
+      setError(null);
+    } catch (err) {
+      setError("Could not load billing data.");
+    }
+  };
+
+  useEffect(() => {
+    if (hospitalId) fetchBilling();
+  }, [hospitalId]);
+
+  const handleReset = async () => {
+    if (!confirm("Are you sure you want to reset all usage data for this billing cycle?")) return;
+    setResetting(true);
+    try {
+      await api.delete(`/hospitals/${hospitalId}/billing/reset`);
+      await fetchBilling();
+    } catch (err) {
+      alert("Failed to reset billing.");
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  if (!billing && !error) return <div className="p-8 text-center animate-pulse">Calculating usage...</div>;
+
+  return (
+    <div className="relative">
+      <div className="absolute -top-12 right-0">
+         <button 
+           onClick={handleReset} 
+           disabled={resetting}
+           className="flex items-center gap-2 text-sm text-gray-500 hover:text-red-600 transition-colors"
+         >
+           <RefreshCw className={`w-4 h-4 ${resetting ? 'animate-spin' : ''}`} />
+           Reset Billing Cycle
+         </button>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        {/* Activity Card */}
+        <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+          <div className="flex items-center gap-3 text-blue-600 mb-4">
+            <Activity size={20} />
+            <h4 className="font-semibold text-gray-700">Monthly Usage</h4>
+          </div>
+          <div className="space-y-1">
+            <p className="text-2xl font-bold text-gray-900">{billing?.usage?.total_chats ?? 0}</p>
+            <p className="text-xs text-gray-400 font-medium uppercase">{(billing?.usage?.tokens_consumed ?? 0).toLocaleString()} tokens</p>
+          </div>
+        </div>
+
+        {/* Cost Card */}
+        <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+          <div className="flex items-center gap-3 text-orange-600 mb-4">
+            <TrendingUp size={20} />
+            <h4 className="font-semibold text-gray-700">OpenAI Overhead</h4>
+          </div>
+          <div className="space-y-1">
+             {/* Changed to Rupees */}
+            <p className="text-2xl font-bold text-gray-900">₹{(billing?.usage?.raw_cost_usd * 83).toFixed(2) ?? "0.00"}</p>
+            <p className="text-xs text-gray-400 font-medium uppercase">Raw API Cost</p>
+          </div>
+        </div>
+
+        {/* Invoice Card */}
+        <div className="bg-blue-600 p-6 rounded-xl shadow-lg text-white">
+          <div className="flex items-center gap-3 mb-4 opacity-90">
+            <CreditCard size={20} />
+            <h4 className="font-semibold">Current Invoice</h4>
+          </div>
+          <div className="space-y-1">
+            <p className="text-3xl font-bold">₹{(billing?.invoice?.total_due_inr ?? 0).toLocaleString()}</p>
+            <p className="text-xs opacity-75 font-medium uppercase">Platform: ₹{billing?.invoice?.platform_fee ?? 0} + Usage</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="frontend/src/pages/Doctors.tsx">
+import React, { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import api from '../api/axios';
+import { Search, Loader2, Upload, Users, CalendarDays, Clock, Trash2, Plus, X } from 'lucide-react';
+
+const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+export default function DoctorsPage() {
+  const { hospitalId } = useParams();
+  const [doctors, setDoctors] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Main Form & Edit State
+  const [editingDoc, setEditingDoc] = useState<any>(null);
+  const [docName, setDocName] = useState('');
+  const [docDept, setDocDept] = useState('');
+  const [docSchedule, setDocSchedule] = useState('');
+
+  // Modal State
+  const [manageDoc, setManageDoc] = useState<any>(null);
+  const [schedules, setSchedules] = useState<any[]>([]);
+  const [leaves, setLeaves] = useState<any[]>([]);
+  
+  // Modal Form State
+  const [schedDay, setSchedDay] = useState('0');
+  const [schedStart, setSchedStart] = useState('09:00');
+  const [schedEnd, setSchedEnd] = useState('17:00');
+  const [leaveDate, setLeaveDate] = useState('');
+  const [leaveReason, setLeaveReason] = useState('');
+
+  const fetchDoctors = async () => {
+    try {
+      const res = await api.get(`/hospitals/${hospitalId}/doctors`);
+      setDoctors(res.data);
+    } catch (err) {
+      console.error("Failed to fetch doctors", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchDoctors(); }, [hospitalId]);
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      setLoading(true);
+      await api.post(`/hospitals/${hospitalId}/doctors/bulk-upload`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      alert("Staff imported and AI-mapped successfully!");
+      fetchDoctors();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Import failed. Ensure it's a valid CSV.");
+    } finally {
+      setLoading(false);
+      event.target.value = '';
+    }
+  };
+
+  // --- Doctor Core Management (Add, Edit, Delete) ---
+
+  const handleEditClick = (doc: any) => {
+    setEditingDoc(doc);
+    setDocName(doc.name);
+    setDocDept(doc.department || '');
+    setDocSchedule(doc.base_schedule || '');
+  };
+
+  const cancelDocEdit = () => {
+    setEditingDoc(null);
+    setDocName('');
+    setDocDept('');
+    setDocSchedule('');
+  };
+
+  const handleDocSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingDoc) {
+        await api.patch(`/hospitals/${hospitalId}/doctors/${editingDoc.id}`, {
+          name: docName,
+          department: docDept,
+          base_schedule: docSchedule
+        });
+      } else {
+        // Automatically generate a doctor_id for manual creations
+        await api.post(`/hospitals/${hospitalId}/doctors`, {
+          name: docName,
+          department: docDept,
+          base_schedule: docSchedule,
+          doctor_id: `H${hospitalId}-D-${Math.floor(Math.random() * 10000)}`
+        });
+      }
+      cancelDocEdit();
+      fetchDoctors();
+    } catch (err) {
+      alert(editingDoc ? "Failed to update doctor" : "Failed to add doctor");
+    }
+  };
+
+  const deleteDoctor = async (id: number) => {
+    if (!confirm("Remove this doctor and all their schedules?")) return;
+    try {
+      await api.delete(`/hospitals/${hospitalId}/doctors/${id}`);
+      fetchDoctors();
+    } catch (err) {
+      alert("Failed to delete doctor");
+    }
+  };
+
+  // --- Detailed Availability Management ---
+
+  const openManageModal = async (doc: any) => {
+    setManageDoc(doc);
+    fetchAvailability(doc.id);
+  };
+
+  const fetchAvailability = async (doctorId: number) => {
+    try {
+      const [schedRes, leaveRes] = await Promise.all([
+        api.get(`/availability/schedules/doctor/${doctorId}`),
+        api.get(`/availability/leaves/doctor/${doctorId}`)
+      ]);
+      setSchedules(schedRes.data);
+      setLeaves(leaveRes.data);
+    } catch (err) {
+      console.error("Failed to load availability", err);
+    }
+  };
+
+  const handleAddSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api.post('/availability/schedules/', {
+        doctor_id: manageDoc.id,
+        day_of_week: parseInt(schedDay),
+        start_time: schedStart,
+        end_time: schedEnd
+      });
+      fetchAvailability(manageDoc.id);
+    } catch (err) { alert("Failed to add schedule"); }
+  };
+
+  const handleAddLeave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api.post('/availability/leaves/', {
+        doctor_id: manageDoc.id,
+        date: leaveDate,
+        reason: leaveReason
+      });
+      setLeaveDate(''); setLeaveReason('');
+      fetchAvailability(manageDoc.id);
+    } catch (err) { alert("Failed to add leave"); }
+  };
+
+  const deleteSchedule = async (id: number) => {
+    await api.delete(`/availability/schedules/${id}`);
+    fetchAvailability(manageDoc.id);
+  };
+
+  const deleteLeave = async (id: number) => {
+    await api.delete(`/availability/leaves/${id}`);
+    fetchAvailability(manageDoc.id);
+  };
+
+  return (
+    <div className="p-8 space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Doctor Directory</h2>
+          <p className="text-gray-500 text-sm">Manage staff and working hours for AI scheduling.</p>
+        </div>
+        
+        <div className="relative">
+          <input type="file" id="bulk-upload" className="hidden" onChange={handleFileUpload} accept=".csv,.txt" disabled={loading} />
+          <label htmlFor="bulk-upload" className={`flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer font-medium shadow-sm transition-colors ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            Upload Staff CSV
+          </label>
+        </div>
+      </div>
+
+      {/* Add / Edit Doctor Form */}
+      <form onSubmit={handleDocSubmit} className={`p-6 rounded-xl shadow-sm border grid grid-cols-1 md:grid-cols-4 gap-4 items-end transition-colors ${editingDoc ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200'}`}>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Doctor Name *</label>
+          <input required type="text" value={docName} onChange={e => setDocName(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm bg-white" placeholder="e.g. John Doe" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Department</label>
+          <input type="text" value={docDept} onChange={e => setDocDept(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm bg-white" placeholder="e.g. Cardiology" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Base Schedule</label>
+          <input type="text" value={docSchedule} onChange={e => setDocSchedule(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm bg-white" placeholder="e.g. Mon-Fri 9AM-5PM" />
+        </div>
+        <div className="flex gap-2">
+          <button type="submit" className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">
+            {editingDoc ? "Update" : <><Plus className="w-4 h-4" /> Add Doctor</>}
+          </button>
+          {editingDoc && (
+            <button type="button" onClick={cancelDocEdit} className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 text-sm font-medium">
+              Cancel
+            </button>
+          )}
+        </div>
+      </form>
+
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center gap-3">
+          <Search className="w-5 h-5 text-gray-400" />
+          <input type="text" placeholder="Search doctors..." className="bg-transparent border-none focus:ring-0 text-sm w-full outline-none" />
+        </div>
+
+        {loading ? (
+          <div className="p-20 flex justify-center text-blue-600"><Loader2 className="w-8 h-8 animate-spin" /></div>
+        ) : doctors.length === 0 ? (
+          <div className="p-20 text-center">
+            <Users className="w-12 h-12 text-blue-200 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900">No doctors found</h3>
+            <p className="text-gray-500 max-w-xs mx-auto mt-1">Upload your hospital staff list to begin.</p>
+          </div>
+        ) : (
+          <table className="w-full text-left">
+            <thead className="bg-gray-50 text-xs uppercase text-gray-500 font-semibold border-b">
+              <tr>
+                <th className="p-4">Name</th>
+                <th className="p-4">Department</th>
+                <th className="p-4">Base Schedule</th>
+                <th className="p-4">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {doctors.map(doc => (
+                <tr key={doc.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="p-4 text-sm font-medium text-gray-900">Dr. {doc.name}</td>
+                  <td className="p-4 text-sm text-gray-500">{doc.department || 'General'}</td>
+                  <td className="p-4 text-sm text-gray-500 truncate max-w-[200px]">{doc.base_schedule || 'Not Specified'}</td>
+                  <td className="p-4 flex items-center gap-4">
+                    <button onClick={() => openManageModal(doc)} className="text-sm text-emerald-600 font-medium hover:text-emerald-800 flex items-center gap-1">
+                      <CalendarDays className="w-4 h-4" /> Manage
+                    </button>
+                    <button onClick={() => handleEditClick(doc)} className="text-blue-600 hover:text-blue-800 text-sm font-medium">Edit</button>
+                    <button onClick={() => deleteDoctor(doc.id)} className="text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* MANAGE SCHEDULE MODAL (Remains unchanged) */}
+      {manageDoc && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+            
+            <div className="p-6 border-b flex justify-between items-center bg-gray-50">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Dr. {manageDoc.name}</h3>
+                <p className="text-sm text-gray-500">{manageDoc.department}</p>
+              </div>
+              <button onClick={() => setManageDoc(null)} className="text-gray-400 hover:text-gray-600"><X className="w-6 h-6" /></button>
+            </div>
+
+            <div className="p-6 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-8">
+              
+              {/* Weekly Schedule Section */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-gray-800 flex items-center gap-2"><Clock className="w-5 h-5 text-blue-600" /> Weekly Hours</h4>
+                <form onSubmit={handleAddSchedule} className="flex flex-wrap gap-2 items-end bg-blue-50/50 p-3 rounded-lg border border-blue-100">
+                  <div className="flex-1 min-w-[120px]">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Day</label>
+                    <select value={schedDay} onChange={e => setSchedDay(e.target.value)} className="w-full text-sm border rounded p-2">
+                      {DAYS_OF_WEEK.map((d, i) => <option key={i} value={i}>{d}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Start</label>
+                    <input type="time" value={schedStart} onChange={e => setSchedStart(e.target.value)} required className="w-full text-sm border rounded p-2" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">End</label>
+                    <input type="time" value={schedEnd} onChange={e => setSchedEnd(e.target.value)} required className="w-full text-sm border rounded p-2" />
+                  </div>
+                  <button type="submit" className="bg-blue-600 text-white p-2 rounded hover:bg-blue-700"><Plus className="w-5 h-5" /></button>
+                </form>
+
+                <div className="space-y-2">
+                  {schedules.map(s => (
+                    <div key={s.id} className="flex justify-between items-center bg-white border rounded-lg p-3 text-sm">
+                      <span className="font-medium w-24">{DAYS_OF_WEEK[s.day_of_week]}</span>
+                      <span className="text-gray-600">{s.start_time} - {s.end_time}</span>
+                      <button onClick={() => deleteSchedule(s.id)} className="text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  ))}
+                  {schedules.length === 0 && <p className="text-sm text-gray-400 italic">No schedules set.</p>}
+                </div>
+              </div>
+
+              {/* Leaves Section */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-gray-800 flex items-center gap-2"><CalendarDays className="w-5 h-5 text-red-600" /> Mark Absence</h4>
+                <form onSubmit={handleAddLeave} className="flex flex-wrap gap-2 items-end bg-red-50/50 p-3 rounded-lg border border-red-100">
+                  <div className="flex-1 min-w-[120px]">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Date</label>
+                    <input type="date" value={leaveDate} onChange={e => setLeaveDate(e.target.value)} required className="w-full text-sm border rounded p-2" />
+                  </div>
+                  <div className="flex-1 min-w-[120px]">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Reason (Optional)</label>
+                    <input type="text" value={leaveReason} onChange={e => setLeaveReason(e.target.value)} placeholder="e.g. Vacation" className="w-full text-sm border rounded p-2" />
+                  </div>
+                  <button type="submit" className="bg-red-600 text-white p-2 rounded hover:bg-red-700"><Plus className="w-5 h-5" /></button>
+                </form>
+
+                <div className="space-y-2">
+                  {leaves.map(l => (
+                    <div key={l.id} className="flex justify-between items-center bg-white border rounded-lg p-3 text-sm">
+                      <span className="font-medium text-red-600">{l.date}</span>
+                      <span className="text-gray-600 truncate max-w-[150px]">{l.reason || 'Absent'}</span>
+                      <button onClick={() => deleteLeave(l.id)} className="text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  ))}
+                  {leaves.length === 0 && <p className="text-sm text-gray-400 italic">No leaves marked.</p>}
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 </file>
 
 <file path="frontend/src/pages/Settings.tsx">
@@ -5173,166 +4971,6 @@ def get_token_payload(token: str = Depends(oauth2_scheme)) -> dict:
         )
 </file>
 
-<file path="frontend/src/pages/LabTests.tsx">
-import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import api from '../api/axios';
-import { TestTube, Plus, Trash2, Loader2, Upload } from 'lucide-react';
-
-export default function LabTestsPage() {
-  const { hospitalId } = useParams();
-  const [tests, setTests] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  
-  // Form State
-  const [name, setName] = useState('');
-  const [category, setCategory] = useState('');
-  const [price, setPrice] = useState('');
-  const [prerequisites, setPrerequisites] = useState('');
-
-  const fetchTests = async () => {
-    try {
-      const res = await api.get(`/lab-tests/hospital/${hospitalId}`);
-      setTests(res.data);
-    } catch (err) {
-      console.error("Failed to fetch lab tests", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { fetchTests(); }, [hospitalId]);
-
-  const handleAddTest = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await api.post('/lab-tests/', {
-        hospital_id: Number(hospitalId),
-        name,
-        category,
-        price: parseFloat(price) || 0,
-        prerequisites
-      });
-      setName(''); setCategory(''); setPrice(''); setPrerequisites('');
-      fetchTests();
-    } catch (err) {
-      alert("Failed to add test");
-    }
-  };
-
-  const handleDelete = async (id: number) => {
-    if (!confirm("Remove this lab test?")) return;
-    try {
-      await api.delete(`/lab-tests/${id}`);
-      fetchTests();
-    } catch (err) {
-      alert("Failed to delete");
-    }
-  };
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    try {
-      setLoading(true);
-      await api.post(`/lab-tests/hospital/${hospitalId}/bulk-upload`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      alert("Lab tests imported successfully!");
-      fetchTests();
-    } catch (err: any) {
-      alert(err.response?.data?.detail || "Import failed. Ensure it's a valid CSV.");
-    } finally {
-      setLoading(false);
-      event.target.value = ''; 
-    }
-  };
-
-  return (
-    <div className="space-y-6 max-w-5xl">
-
-      <div className="flex justify-between items-center border-b pb-4">
-        <div className="flex items-center gap-3">
-          <TestTube className="w-6 h-6 text-purple-600" />
-          <h2 className="text-2xl font-bold text-gray-900">Lab & Diagnostics</h2>
-        </div>
-
-        <div className="relative">
-          <input type="file" id="lab-upload" className="hidden" onChange={handleFileUpload} accept=".csv" disabled={loading} />
-          <label htmlFor="lab-upload" className={`flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 cursor-pointer font-medium text-sm transition-colors ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-            Import CSV
-          </label>
-        </div>
-      </div>
-
-      {/* Add New Test Form */}
-      <form onSubmit={handleAddTest} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-        <div className="md:col-span-2">
-          <label className="block text-xs font-medium text-gray-700 mb-1">Test Name *</label>
-          <input required type="text" value={name} onChange={e => setName(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="e.g. Complete Blood Count (CBC)" />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Category</label>
-          <input type="text" value={category} onChange={e => setCategory(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="e.g. Blood Test" />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Price ($)</label>
-          <input type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="0.00" />
-        </div>
-        <div className="md:col-span-3">
-          <label className="block text-xs font-medium text-gray-700 mb-1">Preparation / Prerequisites (AI will read this to patients)</label>
-          <input type="text" value={prerequisites} onChange={e => setPrerequisites(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="e.g. Fasting required for 8-10 hours. Water is allowed." />
-        </div>
-        <div>
-          <button type="submit" className="w-full flex items-center justify-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm font-medium">
-            <Plus className="w-4 h-4" /> Add Test
-          </button>
-        </div>
-      </form>
-
-      {/* Tests Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        {loading ? (
-          <div className="p-12 flex justify-center text-purple-600"><Loader2 className="w-6 h-6 animate-spin" /></div>
-        ) : (
-          <table className="w-full text-left text-sm">
-            <thead className="bg-gray-50 border-b text-gray-500 uppercase text-xs">
-              <tr>
-                <th className="p-4">Test Name</th>
-                <th className="p-4">Category</th>
-                <th className="p-4">Price</th>
-                <th className="p-4">Prerequisites</th>
-                <th className="p-4">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {tests.map(test => (
-                <tr key={test.id} className="hover:bg-gray-50">
-                  <td className="p-4 font-medium">{test.name}</td>
-                  <td className="p-4 text-gray-500">{test.category || '-'}</td>
-                  <td className="p-4">${test.price}</td>
-                  <td className="p-4 text-gray-600 text-xs">{test.prerequisites || 'None'}</td>
-                  <td className="p-4">
-                    <button onClick={() => handleDelete(test.id)} className="text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
-                  </td>
-                </tr>
-              ))}
-              {tests.length === 0 && (
-                <tr><td colSpan={5} className="p-8 text-center text-gray-400">No lab tests added yet.</td></tr>
-              )}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </div>
-  );
-}
-</file>
-
 <file path="frontend/src/pages/Login.tsx">
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -5432,165 +5070,6 @@ const Login = () => {
 export default Login;
 </file>
 
-<file path="frontend/src/pages/Pharmacy.tsx">
-import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import api from '../api/axios';
-import { Pill, Plus, Trash2, Loader2, Upload } from 'lucide-react';
-export default function PharmacyPage() {
-  const { hospitalId } = useParams();
-  const [medicines, setMedicines] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  
-  // Form State
-  const [name, setName] = useState('');
-  const [brand, setBrand] = useState('');
-  const [price, setPrice] = useState('');
-  const [rxRequired, setRxRequired] = useState(false);
-
-  const fetchMedicines = async () => {
-    try {
-      const res = await api.get(`/medicines/hospital/${hospitalId}`);
-      setMedicines(res.data);
-    } catch (err) {
-      console.error("Failed to fetch medicines", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { fetchMedicines(); }, [hospitalId]);
-
-  const handleAddMedicine = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await api.post('/medicines/', {
-        hospital_id: Number(hospitalId),
-        name,
-        brand_name: brand,
-        price: parseFloat(price) || 0,
-        requires_prescription: rxRequired
-      });
-      setName(''); setBrand(''); setPrice(''); setRxRequired(false);
-      fetchMedicines();
-    } catch (err) {
-      alert("Failed to add medicine");
-    }
-  };
-
-  const handleDelete = async (id: number) => {
-    if (!confirm("Remove this medicine?")) return;
-    try {
-      await api.delete(`/medicines/${id}`);
-      fetchMedicines();
-    } catch (err) {
-      alert("Failed to delete");
-    }
-  };
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    try {
-      setLoading(true);
-      await api.post(`/medicines/hospital/${hospitalId}/bulk-upload`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      alert("Pharmacy inventory imported successfully!");
-      fetchMedicines();
-    } catch (err: any) {
-      alert(err.response?.data?.detail || "Import failed. Ensure it's a valid CSV.");
-    } finally {
-      setLoading(false);
-      event.target.value = ''; // Reset input
-    }
-  };
-
-  return (
-    <div className="space-y-6 max-w-5xl">
-
-      <div className="flex justify-between items-center border-b pb-4">
-        <div className="flex items-center gap-3">
-          <Pill className="w-6 h-6 text-blue-600" />
-          <h2 className="text-2xl font-bold text-gray-900">Pharmacy Inventory</h2>
-        </div>
-        
-        <div className="relative">
-          <input type="file" id="pharmacy-upload" className="hidden" onChange={handleFileUpload} accept=".csv" disabled={loading} />
-          <label htmlFor="pharmacy-upload" className={`flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 cursor-pointer font-medium text-sm transition-colors ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-            Import CSV
-          </label>
-        </div>
-      </div>
-
-      {/* Add New Medicine Form */}
-      <form onSubmit={handleAddMedicine} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-        <div className="md:col-span-2">
-          <label className="block text-xs font-medium text-gray-700 mb-1">Generic Name *</label>
-          <input required type="text" value={name} onChange={e => setName(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="e.g. Paracetamol" />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Brand Name</label>
-          <input type="text" value={brand} onChange={e => setBrand(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="e.g. Tylenol" />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Price ($)</label>
-          <input type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="0.00" />
-        </div>
-        <div className="flex flex-col gap-2">
-          <label className="flex items-center gap-2 text-sm text-gray-700">
-            <input type="checkbox" checked={rxRequired} onChange={e => setRxRequired(e.target.checked)} />
-            Requires Rx
-          </label>
-          <button type="submit" className="flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">
-            <Plus className="w-4 h-4" /> Add
-          </button>
-        </div>
-      </form>
-
-      {/* Inventory Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        {loading ? (
-          <div className="p-12 flex justify-center text-blue-600"><Loader2 className="w-6 h-6 animate-spin" /></div>
-        ) : (
-          <table className="w-full text-left text-sm">
-            <thead className="bg-gray-50 border-b text-gray-500 uppercase text-xs">
-              <tr>
-                <th className="p-4">Name</th>
-                <th className="p-4">Brand</th>
-                <th className="p-4">Price</th>
-                <th className="p-4">Prescription</th>
-                <th className="p-4">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {medicines.map(med => (
-                <tr key={med.id} className="hover:bg-gray-50">
-                  <td className="p-4 font-medium">{med.name}</td>
-                  <td className="p-4 text-gray-500">{med.brand_name || '-'}</td>
-                  <td className="p-4">${med.price}</td>
-                  <td className="p-4">{med.requires_prescription ? <span className="text-red-600 font-medium text-xs bg-red-50 px-2 py-1 rounded">Yes</span> : <span className="text-green-600 font-medium text-xs bg-green-50 px-2 py-1 rounded">No</span>}</td>
-                  <td className="p-4">
-                    <button onClick={() => handleDelete(med.id)} className="text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
-                  </td>
-                </tr>
-              ))}
-              {medicines.length === 0 && (
-                <tr><td colSpan={5} className="p-8 text-center text-gray-400">No medicines added yet.</td></tr>
-              )}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </div>
-  );
-}
-</file>
-
 <file path="frontend/src/themes/arogya-specialty/ChatMessage.tsx">
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
@@ -5665,6 +5144,334 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, isStreaming, l
 };
 
 export default ChatMessage;
+</file>
+
+<file path="backend/app/api/v1/endpoints/lab_tests.py">
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from typing import List
+from app.api.deps import get_db, get_current_tenant, get_token_payload
+from app.models.lab_test import LabTest
+from app.schemas.lab_test import LabTest as LabTestSchema, LabTestCreate, LabTestUpdate
+import csv
+import io
+from fastapi import UploadFile, File
+from app.models.hospital import Hospital
+router = APIRouter()
+
+@router.post("/", response_model=LabTestSchema)
+def create_lab_test(
+    payload: LabTestCreate, 
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant),
+    token_data: dict = Depends(get_token_payload)
+):
+    if token_data.get("role") != "superadmin" and str(token_data.get("hospital_id")) != str(payload.hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    db_item = LabTest(**payload.model_dump())
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+@router.get("/hospital/{hospital_id}", response_model=List[LabTestSchema])
+def list_lab_tests(
+    hospital_id: int, 
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant),
+    token_data: dict = Depends(get_token_payload)
+):
+    if token_data.get("role") != "superadmin" and str(token_data.get("hospital_id")) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    return db.query(LabTest).filter(LabTest.hospital_id == hospital_id).all()
+
+@router.delete("/{test_id}")
+def delete_lab_test(
+    test_id: int, 
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant)
+):
+    db_item = db.query(LabTest).filter(LabTest.id == test_id).first()
+    if not db_item:
+        raise HTTPException(status_code=404, detail="Lab test not found")
+    
+    db.delete(db_item)
+    db.commit()
+    return {"status": "success"}
+@router.post("/hospital/{hospital_id}/bulk-upload")
+async def bulk_upload_lab_tests(
+    hospital_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant),
+    token_data: dict = Depends(get_token_payload)
+):
+    if token_data.get("role") != "superadmin" and str(token_data.get("hospital_id")) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    content = await file.read()
+    text_content = content.decode("utf-8")
+    
+    reader = csv.DictReader(io.StringIO(text_content))
+    csv_headers = reader.fieldnames
+    if not csv_headers:
+        raise HTTPException(status_code=400, detail="CSV file is empty or invalid.")
+
+    import os
+    import json
+    from openai import OpenAI
+    oai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    
+    target_schema = {
+        "name": "Name of the lab test or diagnostic (Required)",
+        "category": "Category (e.g., Blood Test, Imaging)",
+        "price": "Cost or price of the test",
+        "prerequisites": "Preparation instructions (e.g., Fasting required)",
+        "turnaround_time": "How long results take to arrive",
+        "is_inhouse": "Is this done in the hospital? (Yes/No/Boolean)"
+    }
+
+    prompt = f"""
+    You are a data mapping assistant. Map these provided CSV headers: {csv_headers}
+    To this target database schema: {json.dumps(target_schema)}
+    
+    Return ONLY a raw JSON object where keys are the database schema keys, and values are the EXACT matching string from the CSV headers.
+    If there is no logical match for a target key, set its value to null.
+    """
+
+    llm_resp = oai.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "system", "content": prompt}],
+        response_format={"type": "json_object"}
+    )
+    mapping = json.loads(llm_resp.choices[0].message.content)
+
+    count = 0
+    for row in reader:
+        name_col = mapping.get("name")
+        if not name_col or not row.get(name_col):
+            continue
+
+        inhouse_col = mapping.get("is_inhouse")
+        inhouse_str = str(row.get(inhouse_col, "yes")).lower() if inhouse_col else "yes"
+        is_inhouse = inhouse_str in ["yes", "true", "1", "y", "in-house", "inhouse"]
+
+        price_col = mapping.get("price")
+        try:
+            # Change this line in both files:
+            price = float(str(row.get(price_col, 0)).replace("₹", "").replace("$", "").replace(",", "").strip()) if price_col else 0.0
+        except ValueError:
+            price = 0.0
+
+        cat_col = mapping.get("category")
+        prereq_col = mapping.get("prerequisites")
+        tat_col = mapping.get("turnaround_time")
+
+        test = LabTest(
+            hospital_id=hospital_id,
+            name=row.get(name_col).strip(),
+            category=row.get(cat_col, "").strip() if cat_col else "",
+            price=price,
+            prerequisites=row.get(prereq_col, "").strip() if prereq_col else "",
+            turnaround_time=row.get(tat_col, "").strip() if tat_col else "",
+            is_inhouse=is_inhouse
+        )
+        db.add(test)
+        count += 1
+
+    try:
+        db.commit()
+        return {"message": f"AI mapping complete. Successfully imported {count} lab tests."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+@router.patch("/{test_id}", response_model=LabTestSchema)
+def update_lab_test(
+    test_id: int, 
+    payload: LabTestUpdate,
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant)
+):
+    db_item = db.query(LabTest).filter(LabTest.id == test_id).first()
+    if not db_item:
+        raise HTTPException(status_code=404, detail="Lab test not found")
+    
+    update_data = payload.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_item, key, value)
+        
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+</file>
+
+<file path="backend/app/api/v1/endpoints/medicines.py">
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from typing import List
+from app.api.deps import get_db, get_current_tenant, get_token_payload
+from app.models.medicine import Medicine
+from app.schemas.medicine import Medicine as MedicineSchema, MedicineCreate, MedicineUpdate
+import csv
+import io
+from fastapi import UploadFile, File
+from app.models.hospital import Hospital
+router = APIRouter()
+
+@router.post("/", response_model=MedicineSchema)
+def create_medicine(
+    payload: MedicineCreate, 
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant),
+    token_data: dict = Depends(get_token_payload)
+):
+    if token_data.get("role") != "superadmin" and str(token_data.get("hospital_id")) != str(payload.hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    db_item = Medicine(**payload.model_dump())
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+@router.get("/hospital/{hospital_id}", response_model=List[MedicineSchema])
+def list_medicines(
+    hospital_id: int, 
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant),
+    token_data: dict = Depends(get_token_payload)
+):
+    if token_data.get("role") != "superadmin" and str(token_data.get("hospital_id")) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    return db.query(Medicine).filter(Medicine.hospital_id == hospital_id).all()
+
+@router.delete("/{medicine_id}")
+def delete_medicine(
+    medicine_id: int, 
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant)
+):
+    db_item = db.query(Medicine).filter(Medicine.id == medicine_id).first()
+    if not db_item:
+        raise HTTPException(status_code=404, detail="Medicine not found")
+    
+    db.delete(db_item)
+    db.commit()
+    return {"status": "success"}
+@router.post("/hospital/{hospital_id}/bulk-upload")
+async def bulk_upload_medicines(
+    hospital_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant),
+    token_data: dict = Depends(get_token_payload)
+):
+    if token_data.get("role") != "superadmin" and str(token_data.get("hospital_id")) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    content = await file.read()
+    text_content = content.decode("utf-8")
+    
+    # 1. Extract just the headers from the CSV
+    reader = csv.DictReader(io.StringIO(text_content))
+    csv_headers = reader.fieldnames
+    if not csv_headers:
+        raise HTTPException(status_code=400, detail="CSV file is empty or invalid.")
+
+    # 2. Ask the LLM to map the headers
+    import os
+    import json
+    from openai import OpenAI
+    oai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    
+    target_schema = {
+        "name": "Generic name or main title of the medicine (Required)",
+        "brand_name": "Brand name of the medicine",
+        "category": "Type or category (e.g., Tablet, Syrup)",
+        "price": "Cost or price of the medicine",
+        "stock_status": "Stock availability (e.g., In Stock, Out of Stock)",
+        "requires_prescription": "Does it need a prescription? (Yes/No/Boolean)"
+    }
+
+    prompt = f"""
+    You are a data mapping assistant. Map these provided CSV headers: {csv_headers}
+    To this target database schema: {json.dumps(target_schema)}
+    
+    Return ONLY a raw JSON object where keys are the database schema keys, and values are the EXACT matching string from the CSV headers.
+    If there is no logical match for a target key, set its value to null.
+    """
+
+    llm_resp = oai.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "system", "content": prompt}],
+        response_format={"type": "json_object"}
+    )
+    mapping = json.loads(llm_resp.choices[0].message.content)
+
+    # 3. Parse the CSV using the LLM's dynamic mapping
+    count = 0
+    for row in reader:
+        # Get the actual column names from the mapping
+        name_col = mapping.get("name")
+        if not name_col or not row.get(name_col):
+            continue # Skip rows without a primary name
+
+        # Safely parse prescription boolean
+        rx_col = mapping.get("requires_prescription")
+        req_rx_str = str(row.get(rx_col, "no")).lower() if rx_col else "no"
+        requires_prescription = req_rx_str in ["yes", "true", "1", "y", "required"]
+
+        # Safely parse price
+        price_col = mapping.get("price")
+        try:
+# Change this line in both files:
+            price = float(str(row.get(price_col, 0)).replace("₹", "").replace("$", "").replace(",", "").strip()) if price_col else 0.0        
+        except ValueError:
+            price = 0.0
+
+        brand_col = mapping.get("brand_name")
+        cat_col = mapping.get("category")
+        stock_col = mapping.get("stock_status")
+
+        med = Medicine(
+            hospital_id=hospital_id,
+            name=row.get(name_col).strip(),
+            brand_name=row.get(brand_col, "").strip() if brand_col else "",
+            category=row.get(cat_col, "").strip() if cat_col else "",
+            price=price,
+            stock_status=row.get(stock_col, "in_stock").strip().lower().replace(" ", "_") if stock_col else "in_stock",
+            requires_prescription=requires_prescription
+        )
+        db.add(med)
+        count += 1
+
+    try:
+        db.commit()
+        return {"message": f"AI mapping complete. Successfully imported {count} medicines."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+@router.patch("/{medicine_id}", response_model=MedicineSchema)
+def update_medicine(
+    medicine_id: int, 
+    payload: MedicineUpdate,
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant)
+):
+    db_item = db.query(Medicine).filter(Medicine.id == medicine_id).first()
+    if not db_item:
+        raise HTTPException(status_code=404, detail="Medicine not found")
+    
+    update_data = payload.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_item, key, value)
+        
+    db.commit()
+    db.refresh(db_item)
+    return db_item
 </file>
 
 <file path="backend/app/db/base.py">
@@ -5959,10 +5766,436 @@ export default function DashboardLayout() {
 }
 </file>
 
+<file path="frontend/src/pages/LabTests.tsx">
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+import api from '../api/axios';
+import { TestTube, Plus, Trash2, Loader2, Upload } from 'lucide-react';
+
+export default function LabTestsPage() {
+  const { hospitalId } = useParams();
+  const [tests, setTests] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Form & Edit State
+  const [editingTest, setEditingTest] = useState<any>(null);
+  const [name, setName] = useState('');
+  const [category, setCategory] = useState('');
+  const [price, setPrice] = useState('');
+  const [prerequisites, setPrerequisites] = useState('');
+
+  const fetchTests = async () => {
+    try {
+      const res = await api.get(`/lab-tests/hospital/${hospitalId}`);
+      setTests(res.data);
+    } catch (err) {
+      console.error("Failed to fetch lab tests", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchTests(); }, [hospitalId]);
+
+  const handleEditClick = (test: any) => {
+    setEditingTest(test);
+    setName(test.name);
+    setCategory(test.category || '');
+    setPrice(test.price || '');
+    setPrerequisites(test.prerequisites || '');
+  };
+
+  const cancelEdit = () => {
+    setEditingTest(null);
+    setName('');
+    setCategory('');
+    setPrice('');
+    setPrerequisites('');
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingTest) {
+        await api.patch(`/lab-tests/${editingTest.id}`, {
+          name,
+          category,
+          price: parseFloat(price) || 0,
+          prerequisites
+        });
+      } else {
+        await api.post('/lab-tests/', {
+          hospital_id: Number(hospitalId),
+          name,
+          category,
+          price: parseFloat(price) || 0,
+          prerequisites
+        });
+      }
+      cancelEdit();
+      fetchTests();
+    } catch (err) {
+      alert(editingTest ? "Failed to update test" : "Failed to add test");
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm("Remove this lab test?")) return;
+    try {
+      await api.delete(`/lab-tests/${id}`);
+      fetchTests();
+    } catch (err) {
+      alert("Failed to delete");
+    }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      setLoading(true);
+      await api.post(`/lab-tests/hospital/${hospitalId}/bulk-upload`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      alert("Lab tests imported successfully!");
+      fetchTests();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Import failed. Ensure it's a valid CSV.");
+    } finally {
+      setLoading(false);
+      event.target.value = ''; 
+    }
+  };
+
+  return (
+    <div className="space-y-6 max-w-5xl">
+
+      <div className="flex justify-between items-center border-b pb-4">
+        <div className="flex items-center gap-3">
+          <TestTube className="w-6 h-6 text-purple-600" />
+          <h2 className="text-2xl font-bold text-gray-900">Lab & Diagnostics</h2>
+        </div>
+
+        <div className="relative">
+          <input type="file" id="lab-upload" className="hidden" onChange={handleFileUpload} accept=".csv" disabled={loading} />
+          <label htmlFor="lab-upload" className={`flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 cursor-pointer font-medium text-sm transition-colors ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            Import CSV
+          </label>
+        </div>
+      </div>
+
+      {/* Add / Edit Test Form */}
+      <form onSubmit={handleSubmit} className={`p-6 rounded-xl shadow-sm border grid grid-cols-1 md:grid-cols-4 gap-4 items-end transition-colors ${editingTest ? 'bg-purple-50 border-purple-200' : 'bg-white border-gray-200'}`}>
+        <div className="md:col-span-2">
+          <label className="block text-xs font-medium text-gray-700 mb-1">Test Name *</label>
+          <input required type="text" value={name} onChange={e => setName(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm bg-white" placeholder="e.g. Complete Blood Count (CBC)" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Category</label>
+          <input type="text" value={category} onChange={e => setCategory(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm bg-white" placeholder="e.g. Blood Test" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Price (₹)</label>
+          <input type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm bg-white" placeholder="0.00" />
+        </div>
+        <div className="md:col-span-3">
+          <label className="block text-xs font-medium text-gray-700 mb-1">Preparation / Prerequisites (AI will read this to patients)</label>
+          <input type="text" value={prerequisites} onChange={e => setPrerequisites(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm bg-white" placeholder="e.g. Fasting required for 8-10 hours. Water is allowed." />
+        </div>
+        <div className="flex gap-2">
+          <button type="submit" className="flex-1 flex items-center justify-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm font-medium">
+            {editingTest ? "Update" : <><Plus className="w-4 h-4" /> Add Test</>}
+          </button>
+          {editingTest && (
+            <button type="button" onClick={cancelEdit} className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 text-sm font-medium">
+              Cancel
+            </button>
+          )}
+        </div>
+      </form>
+
+      {/* Tests Table */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        {loading ? (
+          <div className="p-12 flex justify-center text-purple-600"><Loader2 className="w-6 h-6 animate-spin" /></div>
+        ) : (
+          <table className="w-full text-left text-sm">
+            <thead className="bg-gray-50 border-b text-gray-500 uppercase text-xs">
+              <tr>
+                <th className="p-4">Test Name</th>
+                <th className="p-4">Category</th>
+                <th className="p-4">Price</th>
+                <th className="p-4">Prerequisites</th>
+                <th className="p-4">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {tests.map(test => (
+                <tr key={test.id} className="hover:bg-gray-50">
+                  <td className="p-4 font-medium">{test.name}</td>
+                  <td className="p-4 text-gray-500">{test.category || '-'}</td>
+                  <td className="p-4">₹{test.price}</td>
+                  <td className="p-4 text-gray-600 text-xs">{test.prerequisites || 'None'}</td>
+                  <td className="p-4 flex items-center gap-3">
+                    <button onClick={() => handleEditClick(test)} className="text-purple-600 hover:text-purple-800 text-sm font-medium">Edit</button>
+                    <button onClick={() => handleDelete(test.id)} className="text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                  </td>
+                </tr>
+              ))}
+              {tests.length === 0 && (
+                <tr><td colSpan={5} className="p-8 text-center text-gray-400">No lab tests added yet.</td></tr>
+              )}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="frontend/src/pages/Pharmacy.tsx">
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+import api from '../api/axios';
+import { Pill, Plus, Trash2, Loader2, Upload } from 'lucide-react';
+
+export default function PharmacyPage() {
+  const { hospitalId } = useParams();
+  const [medicines, setMedicines] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Form & Edit State
+  const [editingMed, setEditingMed] = useState<any>(null);
+  const [name, setName] = useState('');
+  const [brand, setBrand] = useState('');
+  const [price, setPrice] = useState('');
+  const [rxRequired, setRxRequired] = useState(false);
+
+  const fetchMedicines = async () => {
+    try {
+      const res = await api.get(`/medicines/hospital/${hospitalId}`);
+      setMedicines(res.data);
+    } catch (err) {
+      console.error("Failed to fetch medicines", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchMedicines(); }, [hospitalId]);
+
+  const handleEditClick = (med: any) => {
+    setEditingMed(med);
+    setName(med.name);
+    setBrand(med.brand_name || '');
+    setPrice(med.price || '');
+    setRxRequired(med.requires_prescription);
+  };
+
+  const cancelEdit = () => {
+    setEditingMed(null);
+    setName('');
+    setBrand('');
+    setPrice('');
+    setRxRequired(false);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingMed) {
+        await api.patch(`/medicines/${editingMed.id}`, {
+          name,
+          brand_name: brand,
+          price: parseFloat(price) || 0,
+          requires_prescription: rxRequired
+        });
+      } else {
+        await api.post('/medicines/', {
+          hospital_id: Number(hospitalId),
+          name,
+          brand_name: brand,
+          price: parseFloat(price) || 0,
+          requires_prescription: rxRequired
+        });
+      }
+      cancelEdit();
+      fetchMedicines();
+    } catch (err) {
+      alert(editingMed ? "Failed to update medicine" : "Failed to add medicine");
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm("Remove this medicine?")) return;
+    try {
+      await api.delete(`/medicines/${id}`);
+      fetchMedicines();
+    } catch (err) {
+      alert("Failed to delete");
+    }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      setLoading(true);
+      await api.post(`/medicines/hospital/${hospitalId}/bulk-upload`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      alert("Pharmacy inventory imported successfully!");
+      fetchMedicines();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Import failed. Ensure it's a valid CSV.");
+    } finally {
+      setLoading(false);
+      event.target.value = ''; // Reset input
+    }
+  };
+
+  return (
+    <div className="space-y-6 max-w-5xl">
+
+      <div className="flex justify-between items-center border-b pb-4">
+        <div className="flex items-center gap-3">
+          <Pill className="w-6 h-6 text-blue-600" />
+          <h2 className="text-2xl font-bold text-gray-900">Pharmacy Inventory</h2>
+        </div>
+        
+        <div className="relative">
+          <input type="file" id="pharmacy-upload" className="hidden" onChange={handleFileUpload} accept=".csv" disabled={loading} />
+          <label htmlFor="pharmacy-upload" className={`flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 cursor-pointer font-medium text-sm transition-colors ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            Import CSV
+          </label>
+        </div>
+      </div>
+
+      {/* Add / Edit Medicine Form */}
+      <form onSubmit={handleSubmit} className={`p-6 rounded-xl shadow-sm border grid grid-cols-1 md:grid-cols-5 gap-4 items-end transition-colors ${editingMed ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200'}`}>
+        <div className="md:col-span-2">
+          <label className="block text-xs font-medium text-gray-700 mb-1">Generic Name *</label>
+          <input required type="text" value={name} onChange={e => setName(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm bg-white" placeholder="e.g. Paracetamol" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Brand Name</label>
+          <input type="text" value={brand} onChange={e => setBrand(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm bg-white" placeholder="e.g. Tylenol" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Price (₹)</label>
+          <input type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm bg-white" placeholder="0.00" />
+        </div>
+        <div className="flex flex-col gap-2">
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input type="checkbox" checked={rxRequired} onChange={e => setRxRequired(e.target.checked)} />
+            Requires Rx
+          </label>
+          <div className="flex gap-2">
+            <button type="submit" className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">
+              {editingMed ? "Update" : <><Plus className="w-4 h-4" /> Add</>}
+            </button>
+            {editingMed && (
+              <button type="button" onClick={cancelEdit} className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 text-sm font-medium">
+                Cancel
+              </button>
+            )}
+          </div>
+        </div>
+      </form>
+
+      {/* Inventory Table */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        {loading ? (
+          <div className="p-12 flex justify-center text-blue-600"><Loader2 className="w-6 h-6 animate-spin" /></div>
+        ) : (
+          <table className="w-full text-left text-sm">
+            <thead className="bg-gray-50 border-b text-gray-500 uppercase text-xs">
+              <tr>
+                <th className="p-4">Name</th>
+                <th className="p-4">Brand</th>
+                <th className="p-4">Price</th>
+                <th className="p-4">Prescription</th>
+                <th className="p-4">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {medicines.map(med => (
+                <tr key={med.id} className="hover:bg-gray-50">
+                  <td className="p-4 font-medium">{med.name}</td>
+                  <td className="p-4 text-gray-500">{med.brand_name || '-'}</td>
+                  <td className="p-4">₹{med.price}</td>
+                  <td className="p-4">{med.requires_prescription ? <span className="text-red-600 font-medium text-xs bg-red-50 px-2 py-1 rounded">Yes</span> : <span className="text-green-600 font-medium text-xs bg-green-50 px-2 py-1 rounded">No</span>}</td>
+                  <td className="p-4 flex items-center gap-3">
+                    <button onClick={() => handleEditClick(med)} className="text-blue-600 hover:text-blue-800 text-sm font-medium">Edit</button>
+                    <button onClick={() => handleDelete(med.id)} className="text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                  </td>
+                </tr>
+              ))}
+              {medicines.length === 0 && (
+                <tr><td colSpan={5} className="p-8 text-center text-gray-400">No medicines added yet.</td></tr>
+              )}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="frontend/src/api/axios.ts">
+import axios from 'axios';
+
+const baseURL = import.meta.env.VITE_API_URL
+  || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:8000/api/v1'
+    : 'https://hospital-ai-platform.onrender.com/api/v1');
+
+const api = axios.create({
+  baseURL,
+  headers: { 'Content-Type': 'application/json' },
+});
+
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) config.headers.Authorization = `Bearer ${token}`;
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('bookingSessionToken');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
+export default api;
+</file>
+
 <file path="backend/app/api/v1/endpoints/hospitals.py">
 import csv
 import io
 import uuid
+import json # Ensure this is imported at the top
 from sqlalchemy import func
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File
@@ -6141,36 +6374,56 @@ async def bulk_upload_and_sync(
         raise HTTPException(status_code=404, detail="Hospital not found")
 
     content = await file.read()
-    stream = io.StringIO(content.decode("utf-8"))
-    reader = csv.DictReader(stream)
+    text_content = content.decode("utf-8")
+    reader = csv.DictReader(io.StringIO(text_content))
+    csv_headers = reader.fieldnames
+    
+    if not csv_headers:
+        raise HTTPException(status_code=400, detail="CSV is empty.")
+
+    target_schema = {
+        "name": "Doctor's name (Required)",
+        "department": "Department or specialty",
+        "base_schedule": "General working hours, availability, or schedule"
+    }
+
+    prompt = f"""
+    Map these CSV headers: {csv_headers}
+    To this schema: {json.dumps(target_schema)}
+    Return ONLY a raw JSON object where keys are the schema keys and values are the exact matching string from the CSV headers. Null if no match.
+    """
+
+    llm_resp = oai.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "system", "content": prompt}],
+        response_format={"type": "json_object"}
+    )
+    mapping = json.loads(llm_resp.choices[0].message.content)
 
     doctors_to_embed = []
     count = 0
     for row in reader:
-        normalized_row = {k.strip().lower(): v for k, v in row.items()}
-        auto_id = f"H{hospital_id}-D-{uuid.uuid4().hex[:4].upper()}"
-        name = normalized_row.get('doctor name') or normalized_row.get('name') or 'Unknown'
-        dept = normalized_row.get('department') or 'General'
-        schedule = normalized_row.get('base schedule') or normalized_row.get('schedule') or 'Not Specified'
+        name_col = mapping.get("name")
+        if not name_col or not row.get(name_col):
+            continue
 
-        doctor = Doctor(
-            doctor_id=auto_id,
-            name=name,
-            department=dept,
-            base_schedule=schedule,
-            hospital_id=hospital_id
-        )
+        dept_col = mapping.get("department")
+        sched_col = mapping.get("base_schedule")
+        
+        name = row.get(name_col).strip()
+        dept = row.get(dept_col, "General").strip() if dept_col else "General"
+        schedule = row.get(sched_col, "Not Specified").strip() if sched_col else "Not Specified"
+        auto_id = f"H{hospital_id}-D-{uuid.uuid4().hex[:4].upper()}"
+
+        doctor = Doctor(doctor_id=auto_id, name=name, department=dept, base_schedule=schedule, hospital_id=hospital_id)
         db.add(doctor)
         doctors_to_embed.append((doctor, name, dept, schedule))
         count += 1
 
-    db.flush()  # assigns IDs without committing
+    db.flush()
 
-    # Embed in batch
-    texts = [
-        f"Dr. {name}, {dept} specialist, schedule: {schedule}"
-        for _, name, dept, schedule in doctors_to_embed
-    ]
+    # Bulk generate embeddings so the AI can route patients to them
+    texts = [f"Dr. {name}, {dept} specialist, schedule: {schedule}" for _, name, dept, schedule in doctors_to_embed]
     if texts:
         resp = oai.embeddings.create(input=texts, model="text-embedding-3-small")
         for (doctor, _, _, _), emb in zip(doctors_to_embed, resp.data):
@@ -6178,7 +6431,7 @@ async def bulk_upload_and_sync(
 
     try:
         db.commit()
-        return {"message": f"Successfully imported and embedded {count} doctors."}
+        return {"message": f"Successfully imported, mapped, and embedded {count} doctors."}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Database Sync Failed: {str(e)}")
@@ -6216,7 +6469,29 @@ async def get_hospital_billing(hospital_id: int, db: Session = Depends(get_db)):
             "platform_fee": platform_fee_inr,
         }
     }
+@router.delete("/{hospital_id}/doctors/{doctor_id}")
+def delete_doctor(hospital_id: int, doctor_id: int, db: Session = Depends(get_db)):
+    doctor = db.query(Doctor).filter(Doctor.id == doctor_id, Doctor.hospital_id == hospital_id).first()
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+    db.delete(doctor)
+    db.commit()
+    return {"status": "success"}
 
+@router.patch("/{hospital_id}/doctors/{doctor_id}")
+def update_doctor(hospital_id: int, doctor_id: int, payload: dict = Body(...), db: Session = Depends(get_db)):
+    doctor = db.query(Doctor).filter(Doctor.id == doctor_id, Doctor.hospital_id == hospital_id).first()
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+    
+    for key, value in payload.items():
+        if hasattr(doctor, key):
+            setattr(doctor, key, value)
+            
+    # If core details change, we should theoretically re-embed here, but for simple edits this is fine.
+    db.commit()
+    db.refresh(doctor)
+    return doctor
 @router.post("/{hospital_id}/staff")
 def create_staff_account(
     hospital_id: int,
@@ -6242,43 +6517,12 @@ def create_staff_account(
     db.add(user)
     db.commit()
     return {"status": "success", "email": user.email}
-</file>
 
-<file path="frontend/src/api/axios.ts">
-import axios from 'axios';
-
-const baseURL = import.meta.env.VITE_API_URL
-  || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:8000/api/v1'
-    : 'https://hospital-ai-platform.onrender.com/api/v1');
-
-const api = axios.create({
-  baseURL,
-  headers: { 'Content-Type': 'application/json' },
-});
-
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) config.headers.Authorization = `Bearer ${token}`;
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      sessionStorage.removeItem('bookingSessionToken');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
-);
-
-export default api;
+@router.delete("/{hospital_id}/billing/reset")
+def reset_hospital_billing(hospital_id: int, db: Session = Depends(get_db)):
+    db.query(UsageLedger).filter(UsageLedger.hospital_id == hospital_id).delete()
+    db.commit()
+    return {"status": "success", "message": "Billing cycle reset successfully"}
 </file>
 
 <file path="backend/app/main.py">
@@ -6348,6 +6592,7 @@ import fitz
 import logging
 import unicodedata
 import httpx
+import uuid
 from typing import List, Optional, AsyncGenerator
 from datetime import datetime
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -6355,7 +6600,7 @@ from openai import OpenAI, AsyncOpenAI
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
-
+from fastapi import APIRouter, UploadFile, File, HTTPException
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from app.api.deps import get_db
@@ -6714,7 +6959,7 @@ def build_pharmacy_context(question: str, medicines: list) -> str:
     for _, m in scored[:5]: # Top 5 closest matches
         req_rx = "Prescription Required" if m.requires_prescription else "Over-the-counter"
         status = (m.stock_status or "in_stock").replace("_", " ").title()
-        lines.append(f"- {m.name} ({m.brand_name or 'Generic'}): Status: {status}, Price: ${m.price or 'N/A'}, {req_rx}")
+        lines.append(f"- {m.name} ({m.brand_name or 'Generic'}): Status: {status}, Price: ₹{m.price or 'N/A'}, {req_rx}")
 
     return "\n".join(lines) + "\n"
 
@@ -6738,7 +6983,7 @@ def build_lab_tests_context(question: str, tests: list) -> str:
     lines = ["RELEVANT LAB TESTS:"]
     for _, t in scored[:5]:
         loc = "In-house" if t.is_inhouse else "External Partner"
-        lines.append(f"- {t.name} ({t.category or 'General'}): Price: ${t.price or 'N/A'}, Turnaround: {t.turnaround_time or 'N/A'}, Location: {loc}")
+        lines.append(f"- {t.name} ({t.category or 'General'}): Price: ₹{t.price or 'N/A'}, Turnaround: {t.turnaround_time or 'N/A'}, Location: {loc}")
         if t.prerequisites:
             lines.append(f"  Preparation/Prerequisites: {t.prerequisites}")
 
@@ -7656,13 +7901,57 @@ IMPORTANT:
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"}
     )
+@router.post("/transcribe")
+async def transcribe_audio(
+    file: UploadFile = File(...),
+    language: str = Form("en") 
+):
+    # 1. Create a unique temporary filename
+    temp_filename = f"temp_{uuid.uuid4().hex}_{file.filename}"
+    
+    try:
+        # 2. Save the incoming audio blob to disk temporarily
+        with open(temp_filename, "wb") as buffer:
+            buffer.write(await file.read())
+        
+        # 3. Read the file and send to OpenAI
+        with open(temp_filename, "rb") as audio_file:
+            
+            # Base arguments for the API call
+            kwargs = {
+                "model": "whisper-1",
+                "file": audio_file,
+            }
+            
+            # Dynamically adjust based on language to bypass the 400 error
+            if language == "en":
+                kwargs["language"] = "en"
+                kwargs["prompt"] = "Medical terms, hospital appointments, doctors, patient."
+            else:
+                # For Malayalam: Omit "language" to avoid the unsupported error, 
+                # but provide a Malayalam prompt to force auto-detect away from Telugu.
+                kwargs["prompt"] = "നമസ്കാരം, ഇത് മലയാളം ആണ്. ആശുപത്രി, ഡോക്ടർ, പനി, അപ്പോയിന്റ്മെന്റ്."
+                
+            # Make the API call
+            transcript_response = client.audio.transcriptions.create(**kwargs)
+            
+        # 4. Return the transcribed text
+        return {"transcript": transcript_response.text}
+
+    except Exception as e:
+        logger.error(f"Whisper Transcription failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
+        
+    finally:
+        # 5. ALWAYS clean up the temporary file
+        if os.path.exists(temp_filename):
+            os.remove(temp_filename)
 </file>
 
 <file path="frontend/src/themes/arogya-specialty/Chat.tsx">
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 import ChatMessage from './ChatMessage';
-import { Mic, MicOff, Send, Zap, Activity, Loader2, AlertCircle, WifiOff } from 'lucide-react';
+import { Mic, MicOff, Send, Zap, Activity, Loader2, AlertCircle } from 'lucide-react';
 
 interface ChatProps { hospitalId: string; }
 
@@ -7673,17 +7962,7 @@ interface Message {
   isStreaming?: boolean;
 }
 
-type MicState = 'idle' | 'recording';
-
-// How long of silence (with transcript content) before auto-sending
-const SILENCE_THRESHOLD_MS = 2200;  // slightly longer — helps Malayalam speakers
-const SILENCE_CHECK_INTERVAL_MS = 300;
-
-// How long of total silence (no transcript at all) before we show a hint
-const NO_SPEECH_TIMEOUT_MS = 8000;
-
-// Watchdog: if listening state hasn't been true for this long while recording, restart
-const WATCHDOG_INTERVAL_MS = 3000;
+type MicState = 'idle' | 'recording' | 'transcribing';
 
 const FALLBACK_SUGGESTIONS = {
   en: ["What can Arogya help me with?", "Which doctors are available?", "How do I contact the hospital?", "Tell me about this hospital"],
@@ -7713,8 +7992,6 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
   const [inputText, setInputText] = useState('');
   const [micState, setMicState] = useState<MicState>('idle');
   const [micError, setMicError] = useState<string | null>(null);
-  // Shown below mic button when no speech detected for a while
-  const [micHint, setMicHint] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<{ en: string[]; ml: string[] }>(FALLBACK_SUGGESTIONS);
 
   const sessionToken = useRef<string>(
@@ -7724,105 +8001,14 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
       return t;
     })()
   );
+  
   const welcomeCache = useRef<{ en: string; ml: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const lastTranscriptUpdateRef = useRef<number>(0);
-  const transcriptRef = useRef<string>('');
-  const silenceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const autoSendingRef = useRef(false);
-  const handleSendRef = useRef<((text: string) => Promise<void>) | null>(null);
-  // Tracks whether we are actively trying to be in recording state
-  const shouldBeListeningRef = useRef(false);
-  // Watchdog timer ref
-  const watchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  // No-speech timeout ref
-  const noSpeechTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Last time the listening flag was observed as true
-  const lastListeningTrueRef = useRef<number>(0);
-  // Current language ref (avoids stale closures in intervals)
-  const languageRef = useRef(language);
 
-  const {
-    transcript,
-    listening,
-    resetTranscript,
-    browserSupportsSpeechRecognition,
-    isMicrophoneAvailable,
-  } = useSpeechRecognition();
-
-  // Keep languageRef in sync
-  useEffect(() => { languageRef.current = language; }, [language]);
-
-  // ── Safely start listening ────────────────────────────────────────────────
-  const startListeningNow = useCallback(() => {
-    try {
-      SpeechRecognition.startListening({
-        continuous: false,
-        language: languageRef.current === 'ml' ? 'ml-IN' : 'en-US',
-      });
-    } catch (e) {
-      // Ignore — watchdog will retry
-    }
-  }, []);
-
-  // ── Watchdog: checks every 3s that the browser is actually listening ──────
-  // Chrome silently kills the speech session after ~60s or on network hiccups.
-  // This detects that and restarts automatically.
-  const startWatchdog = useCallback(() => {
-    if (watchdogRef.current) clearInterval(watchdogRef.current);
-    watchdogRef.current = setInterval(() => {
-      if (!shouldBeListeningRef.current || autoSendingRef.current) return;
-      const timeSinceListening = Date.now() - lastListeningTrueRef.current;
-      if (timeSinceListening > WATCHDOG_INTERVAL_MS) {
-        // Session appears dead — restart
-        try {
-          SpeechRecognition.abortListening();
-        } catch (_) {}
-        setTimeout(() => {
-          if (shouldBeListeningRef.current && !autoSendingRef.current) {
-            startListeningNow();
-          }
-        }, 200);
-      }
-    }, WATCHDOG_INTERVAL_MS);
-  }, [startListeningNow]);
-
-  const stopWatchdog = useCallback(() => {
-    if (watchdogRef.current) {
-      clearInterval(watchdogRef.current);
-      watchdogRef.current = null;
-    }
-  }, []);
-
-  // ── No-speech hint timer ──────────────────────────────────────────────────
-  const startNoSpeechTimer = useCallback(() => {
-    if (noSpeechTimerRef.current) clearTimeout(noSpeechTimerRef.current);
-    noSpeechTimerRef.current = setTimeout(() => {
-      if (shouldBeListeningRef.current && !transcriptRef.current.trim()) {
-        setMicHint(
-          languageRef.current === 'ml'
-            ? 'ശബ്ദം കേൾക്കുന്നില്ല — അടുത്ത് സംസാരിക്കൂ'
-            : "Can't hear you — try speaking closer to the mic"
-        );
-      }
-    }, NO_SPEECH_TIMEOUT_MS);
-  }, []);
-
-  const clearNoSpeechTimer = useCallback(() => {
-    if (noSpeechTimerRef.current) {
-      clearTimeout(noSpeechTimerRef.current);
-      noSpeechTimerRef.current = null;
-    }
-    setMicHint(null);
-  }, []);
-
-  // ── Track when listening is true (for watchdog) ───────────────────────────
-  useEffect(() => {
-    if (listening) {
-      lastListeningTrueRef.current = Date.now();
-    }
-  }, [listening]);
+  // Whisper Audio Refs
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   // ── Fetch welcome ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -7852,7 +8038,6 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
           ? "👋 നമസ്കാരം! ഞാൻ **ആരോഗ്യ**. എനിക്ക് എങ്ങനെ സഹായിക്കാനാകും?"
           : "👋 Hello! I am **Arogya**. How can I help you today?", isWelcome: true }]);
       });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hospitalId]);
 
   useEffect(() => {
@@ -7879,167 +8064,137 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
       .catch(() => {});
   }, [hospitalId]);
 
-  // ── Keep transcriptRef in sync ────────────────────────────────────────────
-  useEffect(() => {
-if (transcript !== transcriptRef.current) {
-  // Only overwrite if new transcript has content, OR if we have nothing yet.
-  // Never let an empty reset from a new browser session wipe existing captured speech.
-  if (transcript.trim() || !transcriptRef.current.trim()) {
-    transcriptRef.current = transcript;
-  }
-  if (transcript.trim()) {
-    lastTranscriptUpdateRef.current = Date.now();
-  }
-      // Clear the no-speech hint as soon as they start speaking
-      if (transcript.trim()) clearNoSpeechTimer();
-    }
-  }, [transcript, clearNoSpeechTimer]);
-
-  // ── Silence detection ─────────────────────────────────────────────────────
-  const stopSilenceDetection = useCallback(() => {
-    if (silenceIntervalRef.current) {
-      clearInterval(silenceIntervalRef.current);
-      silenceIntervalRef.current = null;
-    }
-  }, []);
-
-  const startSilenceDetection = useCallback(() => {
-    stopSilenceDetection();
-    lastTranscriptUpdateRef.current = Date.now();
-    silenceIntervalRef.current = setInterval(() => {
-      if (autoSendingRef.current) return;
-      const silentFor = Date.now() - lastTranscriptUpdateRef.current;
-      const hasContent = transcriptRef.current.trim().length > 0;
-      if (hasContent && silentFor >= SILENCE_THRESHOLD_MS) {
-        stopSilenceDetection();
-        autoSendingRef.current = true;
-        const captured = transcriptRef.current.trim();
-        shouldBeListeningRef.current = false;
-        stopWatchdog();
-        clearNoSpeechTimer();
-        SpeechRecognition.abortListening();
-        setMicState('idle');
-        if (handleSendRef.current) handleSendRef.current(captured);
-      }
-    }, SILENCE_CHECK_INTERVAL_MS);
-  }, [stopSilenceDetection, stopWatchdog, clearNoSpeechTimer]);
-
-  // ── Restart listening when browser session ends (continuous: false) ───────
-  // This is the core loop that keeps listening active between utterances.
-  useEffect(() => {
-  if (autoSendingRef.current) return;
-  if (isStreaming) return;
-  if (listening) return;
-
-  const timer = setTimeout(() => {
-    if (shouldBeListeningRef.current && !autoSendingRef.current) {
-      const savedTranscript = transcriptRef.current;
-      startListeningNow();
-      if (savedTranscript && !transcriptRef.current) {
-        transcriptRef.current = savedTranscript;
-        lastTranscriptUpdateRef.current = Date.now();
-      }
-    }
-  }, 250);
-
-  return () => clearTimeout(timer);
-}, [listening, isStreaming, startListeningNow]);
-
   // ── Cleanup on unmount ────────────────────────────────────────────────────
   useEffect(() => () => {
-    shouldBeListeningRef.current = false;
-    stopSilenceDetection();
-    stopWatchdog();
-    clearNoSpeechTimer();
+    if (mediaRecorderRef.current && micState === 'recording') {
+      mediaRecorderRef.current.stop();
+    }
     abortRef.current?.abort();
-  }, [stopSilenceDetection, stopWatchdog, clearNoSpeechTimer]);
+  }, [micState]);
 
-  // ── Mic toggle ────────────────────────────────────────────────────────────
-  const toggleMic = useCallback(async () => {
+  // ── Whisper Mic Logic ─────────────────────────────────────────────────────
+// Replace your existing toggleMic with this:
+  const toggleMic = async () => {
     setMicError(null);
-    setMicHint(null);
 
     if (micState === 'idle') {
-      // Check permission explicitly — gives a clear error instead of silent failure
-      if (navigator.permissions) {
-        try {
-          const result = await navigator.permissions.query({ name: 'microphone' as PermissionName });
-          if (result.state === 'denied') {
-            setMicError(language === 'ml'
-              ? 'മൈക്രോഫോൺ ആക്സസ് തടഞ്ഞിരിക്കുന്നു. ബ്രൗസർ സെറ്റിംഗ്സിൽ അനുവദിക്കൂ.'
-              : 'Microphone access is blocked. Please allow it in your browser settings.');
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+        audioChunksRef.current = [];
+
+        // --- NATIVE SILENCE DETECTION (Upgraded) ---
+        // Some browsers suspend audio context by default, we ensure it's running
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        const audioContext = new AudioContextClass();
+        if (audioContext.state === 'suspended') {
+            await audioContext.resume();
+        }
+        
+        const analyser = audioContext.createAnalyser();
+        analyser.minDecibels = -70; // Catch slightly softer voices
+        const source = audioContext.createMediaStreamSource(stream);
+        source.connect(analyser);
+        
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        let silenceStart = Date.now();
+        let isSpeaking = false;
+
+        const checkSilence = () => {
+          if (mediaRecorder.state !== 'recording') {
+            audioContext.close();
             return;
           }
-        } catch { /* permissions API not available on some browsers */ }
-      }
+          
+          analyser.getByteFrequencyData(dataArray);
+          // Use Math.max for PEAK volume instead of average to ignore background hums
+          const maxVolume = Math.max(...dataArray);
 
-      // Also check isMicrophoneAvailable from the hook
-      if (!isMicrophoneAvailable) {
-        setMicError(language === 'ml'
-          ? 'മൈക്രോഫോൺ കണ്ടെത്തിയില്ല. ഉപകരണത്തിൽ മൈക്ക് ഉണ്ടെന്ന് ഉറപ്പുവരുത്തൂ.'
-          : 'No microphone found. Please check your device has a working microphone.');
-        return;
-      }
+          if (maxVolume > 25) { 
+            silenceStart = Date.now();
+            isSpeaking = true;
+          } else {
+            const timeSilent = Date.now() - silenceStart;
+            // Stop recording after 2 seconds of silence (if they spoke) or 6 seconds (if they never spoke)
+            if ((isSpeaking && timeSilent > 2000) || (!isSpeaking && timeSilent > 6000)) {
+              mediaRecorder.stop();
+              return;
+            }
+          }
+          requestAnimationFrame(checkSilence);
+        };
+        checkSilence(); // Start the monitoring loop
+        // --------------------------------
 
-      try {
-        resetTranscript();
-        transcriptRef.current = '';
-        lastTranscriptUpdateRef.current = Date.now();
-        lastListeningTrueRef.current = Date.now();
-        autoSendingRef.current = false;
-        shouldBeListeningRef.current = true;
-        setInputText('');
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            audioChunksRef.current.push(event.data);
+          }
+        };
+
+        mediaRecorder.onstop = async () => {
+          setMicState('transcribing');
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          const formData = new FormData();
+          formData.append('file', audioBlob, 'recording.webm');
+          formData.append('language', language);
+
+          try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${getBaseURL()}/ai/transcribe`, {
+              method: 'POST',
+              headers: token ? { Authorization: `Bearer ${token}` } : {},
+              body: formData
+            });
+            
+            if (!res.ok) throw new Error("Transcription failed");
+            const data = await res.json();
+            
+            // Set UI back to idle FIRST, then trigger the auto-send
+            setMicState('idle');
+            
+            if (data.transcript && data.transcript.trim()) {
+                if (handleSendRef.current) {
+                    // Send the transcript directly to the pipeline
+                    handleSendRef.current(data.transcript.trim());
+                }
+            }
+          } catch (error) {
+            console.error("Whisper error:", error);
+            setMicError(language === 'ml' ? 'ശബ്ദം മനസ്സിലാക്കാൻ കഴിഞ്ഞില്ല.' : 'Failed to transcribe audio.');
+            setMicState('idle'); // Ensure state resets on error
+          } finally {
+            stream.getTracks().forEach(track => track.stop());
+          }
+        };
+
+        mediaRecorder.start();
         setMicState('recording');
-        startListeningNow();
-        startSilenceDetection();
-        startWatchdog();
-        startNoSpeechTimer();
-      } catch {
-        shouldBeListeningRef.current = false;
-        setMicState('idle');
-        setMicError(language === 'ml'
-          ? 'മൈക്രോഫോൺ ആരംഭിക്കാൻ കഴിഞ്ഞില്ല. Chrome ബ്രൗസർ ഉപയോഗിക്കൂ.'
-          : 'Could not start microphone. Please use Chrome browser.');
+      } catch (err) {
+        setMicError(language === 'ml' 
+          ? 'മൈക്രോഫോൺ ആക്സസ് തടഞ്ഞിരിക്കുന്നു. അനുവദിക്കൂ.' 
+          : 'Microphone access denied. Please check settings.');
       }
     } else if (micState === 'recording') {
-      // Manual cancel
-      shouldBeListeningRef.current = false;
-      autoSendingRef.current = false;
-      stopSilenceDetection();
-      stopWatchdog();
-      clearNoSpeechTimer();
-      SpeechRecognition.abortListening();
-      resetTranscript();
-      transcriptRef.current = '';
-      setInputText('');
-      setMicState('idle');
+      mediaRecorderRef.current?.stop();
     }
-  }, [
-    micState, language, isMicrophoneAvailable,
-    startListeningNow, startSilenceDetection, startWatchdog, startNoSpeechTimer,
-    stopSilenceDetection, stopWatchdog, clearNoSpeechTimer, resetTranscript,
-  ]);
+  };
 
-  // ── Send ──────────────────────────────────────────────────────────────────
-  const handleSend = useCallback(async (text: string) => {
-    const msg = (text || inputText).trim();
+  // ── Send Logic ────────────────────────────────────────────────────────────
+// Replace your existing handleSend with this:
+  const handleSend = useCallback(async (text?: string) => {
+    // If text is passed directly (from the mic), use it. Otherwise use the input box.
+    const msg = (typeof text === 'string' ? text : inputText).trim();
+    
+    // Notice we removed the micState check here so the auto-send isn't blocked!
     if (!msg || isStreaming) return;
 
     abortRef.current?.abort();
     abortRef.current = new AbortController();
 
-    shouldBeListeningRef.current = false;
-    stopSilenceDetection();
-    stopWatchdog();
-    clearNoSpeechTimer();
-    SpeechRecognition.abortListening();
-    resetTranscript();
-    transcriptRef.current = '';
-    autoSendingRef.current = false;
     setInputText('');
-    setMicState('idle');
     setMicError(null);
-    setMicHint(null);
 
     const historySnapshot = buildHistory(messages);
     setMessages(prev => [...prev, { role: 'user', content: msg }]);
@@ -8103,55 +8258,26 @@ if (transcript !== transcriptRef.current) {
     } finally {
       setIsStreaming(false);
     }
-  }, [messages, inputText, isStreaming, hospitalId, language, stopSilenceDetection, stopWatchdog, clearNoSpeechTimer, resetTranscript]);
+  }, [messages, inputText, isStreaming, hospitalId, language]);
 
-  useEffect(() => { handleSendRef.current = handleSend; }, [handleSend]);
   useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   const micBtnClass = {
-    idle:      'bg-emerald-50 text-emerald-600 hover:bg-emerald-100',
-    recording: 'bg-red-500 text-white ring-4 ring-red-100 animate-pulse',
+    idle:         'bg-emerald-50 text-emerald-600 hover:bg-emerald-100',
+    recording:    'bg-red-500 text-white ring-4 ring-red-100 animate-pulse',
+    transcribing: 'bg-emerald-600 text-white opacity-80',
   }[micState];
 
   const micLabel = {
-    idle:      language === 'en' ? 'Tap to speak' : 'സംസാരിക്കുക',
-    recording: language === 'en' ? 'Tap to cancel' : 'റദ്ദാക്കാൻ ടാപ്പ് ചെയ്യൂ',
+    idle:         language === 'en' ? 'Tap to speak' : 'സംസാരിക്കുക',
+    recording:    language === 'en' ? 'Tap to finish' : 'അവസാനിപ്പിക്കാൻ ടാപ്പ് ചെയ്യൂ',
+    transcribing: language === 'en' ? 'Translating...' : 'വിവർത്തനം ചെയ്യുന്നു...',
   }[micState];
-
-  if (!browserSupportsSpeechRecognition) {
-    return (
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 flex flex-col">
-        <div className="bg-emerald-600 p-4 text-white shrink-0">
-          <h3 className="font-bold flex items-center gap-2"><Activity className="w-4 h-4" /> Ask Arogya</h3>
-        </div>
-        <div className="p-6 bg-slate-50 flex-1">
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
-            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-            <p className="text-xs text-amber-700">
-              {language === 'ml' ? 'ശബ്ദം ഉപയോഗിക്കാൻ Chrome ബ്രൗസർ ഉപയോഗിക്കൂ.' : 'Voice input requires Chrome browser.'}
-            </p>
-          </div>
-        </div>
-        <div className="p-4 border-t bg-white">
-          <div className="flex items-center gap-2">
-            <input type="text" value={inputText} onChange={e => setInputText(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSend(inputText)}
-              placeholder={language === 'ml' ? "ചോദിക്കൂ..." : "Ask anything..."}
-              className="flex-1 bg-slate-100 border-none rounded-full px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
-              style={{ fontFamily: "'Noto Sans Malayalam', sans-serif" }} />
-            <button onClick={() => handleSend(inputText)} disabled={!inputText.trim() || isStreaming}
-              className="p-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-700 disabled:opacity-40">
-              <Send className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const handleSendRef = useRef<((text: string) => Promise<void>) | null>(null);
+  useEffect(() => { handleSendRef.current = handleSend; }, [handleSend]);
 
   return (
     <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 flex flex-col h-[650px]">
-
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Malayalam:wght@400;500;700&display=swap');
         .ml-text { font-family: 'Noto Sans Malayalam', 'Manjari', sans-serif !important; }
@@ -8166,7 +8292,7 @@ if (transcript !== transcriptRef.current) {
           </h3>
           <button
             onClick={() => setLanguage(l => l === 'en' ? 'ml' : 'en')}
-            disabled={micState === 'recording'}
+            disabled={micState !== 'idle'}
             className="bg-emerald-700 px-3 py-1 rounded-md text-xs font-bold border border-white/20 disabled:opacity-50 ml-text"
           >
             {language === 'en' ? 'English' : 'മലയാളം'}
@@ -8179,17 +8305,6 @@ if (transcript !== transcriptRef.current) {
         {messages.map((msg, idx) => (
           <ChatMessage key={idx} role={msg.role} content={msg.content} isStreaming={msg.isStreaming} language={language} />
         ))}
-
-        {micState === 'recording' && transcript && (
-          <div className="flex justify-end">
-            <div className="bg-emerald-50 text-emerald-800 px-4 py-2 rounded-2xl rounded-tr-none text-sm italic border border-emerald-200 shadow-sm max-w-[85%] ml-text">
-              <span className="text-[10px] text-emerald-500 font-bold block mb-1 not-italic uppercase tracking-wider">
-                {language === 'en' ? 'Hearing…' : 'കേൾക്കുന്നു…'}
-              </span>
-              {transcript}
-            </div>
-          </div>
-        )}
 
         {isStreaming && messages[messages.length - 1]?.content === '' && (
           <div className="flex items-center gap-2 text-emerald-600 p-2 bg-white rounded-lg w-fit shadow-sm border border-slate-100">
@@ -8207,7 +8322,7 @@ if (transcript !== transcriptRef.current) {
       <div className="px-4 py-2 bg-slate-50 border-t border-slate-100">
         <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
           {suggestions[language].map((text, i) => (
-            <button key={i} disabled={isStreaming || micState === 'recording'} onClick={() => handleSend(text)}
+            <button key={i} disabled={isStreaming || micState !== 'idle'} onClick={() => handleSend(text)}
               className="flex-none bg-white border border-emerald-100 text-emerald-700 text-[11px] px-3 py-1.5 rounded-full shadow-sm hover:bg-emerald-50 active:scale-95 transition-all disabled:opacity-40 whitespace-nowrap ml-text">
               <Zap className="w-3 h-3 text-amber-400 fill-amber-400 inline mr-1" />{text}
             </button>
@@ -8217,8 +8332,6 @@ if (transcript !== transcriptRef.current) {
 
       {/* Input + mic */}
       <div className="p-4 border-t bg-white shrink-0 space-y-3">
-
-        {/* Permission / device error */}
         {micError && (
           <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
             <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
@@ -8229,42 +8342,29 @@ if (transcript !== transcriptRef.current) {
         <div className="flex items-center gap-2">
           <input type="text" value={inputText} onChange={e => setInputText(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !isStreaming && handleSend(inputText)}
-            placeholder={micState === 'recording'
-              ? (language === 'en' ? 'Listening…' : 'കേൾക്കുന്നു…')
-              : (language === 'en' ? 'Ask anything…' : 'ചോദിക്കൂ…')}
-            disabled={isStreaming || micState === 'recording'}
+            placeholder={language === 'en' ? 'Ask anything…' : 'ചോദിക്കൂ…'}
+            disabled={isStreaming || micState !== 'idle'}
             className="flex-1 bg-slate-100 border-none rounded-full px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-60 ml-text"
             style={{ fontFamily: "'Noto Sans Malayalam', sans-serif" }} />
-          <button onClick={() => handleSend(inputText)} disabled={isStreaming || !inputText.trim()}
+          <button onClick={() => handleSend(inputText)} disabled={isStreaming || !inputText.trim() || micState !== 'idle'}
             className="p-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-700 disabled:opacity-40">
             <Send className="w-4 h-4" />
           </button>
         </div>
 
         <div className="flex flex-col items-center">
-          <button type="button" onClick={toggleMic} disabled={isStreaming}
-            className={`p-4 rounded-full transition-all transform active:scale-90 shadow-lg disabled:opacity-50 ${micBtnClass}`}
+          <button type="button" onClick={toggleMic} disabled={isStreaming || micState === 'transcribing'}
+            className={`p-4 rounded-full transition-all transform active:scale-90 shadow-lg disabled:opacity-50 flex items-center justify-center ${micBtnClass}`}
             aria-label={micLabel}>
-            {micState === 'recording' ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+            {micState === 'recording' ? <MicOff className="w-6 h-6" /> : 
+             micState === 'transcribing' ? <Loader2 className="w-6 h-6 animate-spin" /> : 
+             <Mic className="w-6 h-6" />}
           </button>
 
-          {/* Mic status line — shows label normally, hint when no speech detected */}
           <p className="text-[9px] uppercase tracking-widest text-slate-400 font-black mt-2 text-center ml-text">
-            {micHint ? (
-              <span className="text-amber-500 normal-case tracking-normal font-medium">
-                {micHint}
-              </span>
-            ) : micLabel}
+             {micLabel}
           </p>
-
-          {/* Live transcript preview below the button */}
-          {micState === 'recording' && !transcript && !micHint && (
-            <p className="text-[10px] text-slate-300 mt-1 ml-text">
-              {language === 'ml' ? 'സ്പഷ്ടമായി സംസാരിക്കൂ…' : 'Speak clearly…'}
-            </p>
-          )}
         </div>
-
       </div>
     </div>
   );
