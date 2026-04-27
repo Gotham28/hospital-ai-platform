@@ -152,8 +152,8 @@ export function useHospitalChat(hospitalId: string) {
 // --- 3. The Silero VAD Mic Logic ---
 const { loading: vadLoading, errored: vadErrored, start: vadStart, pause: vadPause } = useMicVAD({
   startOnLoad: false,
-  baseAssetPath: "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.30/dist/",
-  onnxWASMBasePath: "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/",
+  baseAssetPath: "/vad-assets/",       // ✅ served from your own Vercel deployment
+  onnxWASMBasePath: "/vad-assets/",
   model: "legacy",
   onSpeechStart: () => setMicState('recording'),
   onSpeechEnd: async (audio) => {
