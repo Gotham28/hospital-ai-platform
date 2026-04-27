@@ -190,12 +190,25 @@ export function useHospitalChat(hospitalId: string) {
     }
   });
 
-  const toggleMic = () => {
+const toggleMic = () => {
     setMicError(null);
-    if (vad.listening) {
+
+    // FORCE OFF: If our UI says it's recording, trust the UI and force it to pause, 
+    // regardless of what the VAD engine thinks it's doing.
+    if (micState === 'recording' || micState === 'transcribing') {
       vad.pause();
       setMicState('idle');
     } else {
+      // PREVENT START: Don't let the user click if the neural network is still downloading
+      if (vad.loading) {
+        setMicError(language === 'en' ? 'Voice AI is still loading...' : 'ശബ്ദ AI ലോഡുചെയ്യുന്നു...');
+        return;
+      }
+      if (vad.errored) {
+        setMicError(language === 'en' ? 'Voice AI failed to load.' : 'ശബ്ദ AI പരാജയപ്പെട്ടു.');
+        return;
+      }
+
       vad.start();
       setMicState('recording'); 
     }
@@ -212,6 +225,6 @@ export function useHospitalChat(hospitalId: string) {
     micError,
     suggestions,
     handleSend,
-    toggleMic
+    toggleMic,vad
   };
 } 

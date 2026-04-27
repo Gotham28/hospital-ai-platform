@@ -9,7 +9,7 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
   // Plug the UI into the brain
   const {
     language, setLanguage, messages, isStreaming, inputText, setInputText,
-    micState, micError, suggestions, handleSend, toggleMic
+    micState, micError, suggestions, handleSend, toggleMic,vad
   } = useHospitalChat(hospitalId);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -23,7 +23,9 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
   }[micState];
 
   const micLabel = {
-    idle: language === 'en' ? 'Tap to speak' : 'സംസാരിക്കുക',
+    idle: vad.loading 
+            ? (language === 'en' ? 'Loading AI...' : 'ലോഡുചെയ്യുന്നു...') 
+            : (language === 'en' ? 'Tap to speak' : 'സംസാരിക്കുക'),
     recording: language === 'en' ? 'Listening...' : 'ശ്രദ്ധിക്കുന്നു...',
     transcribing: language === 'en' ? 'Translating...' : 'വിവർത്തനം ചെയ്യുന്നു...',
   }[micState];
@@ -100,13 +102,18 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
           </button>
         </div>
 
-        <div className="flex flex-col items-center">
-          <button type="button" onClick={toggleMic} disabled={isStreaming || micState === 'transcribing'}
+<div className="flex flex-col items-center">
+          <button type="button" onClick={toggleMic} 
+            disabled={isStreaming || micState === 'transcribing' || vad.loading}
             className={`p-4 rounded-full transition-all transform active:scale-90 shadow-lg disabled:opacity-50 flex items-center justify-center ${micBtnClass}`}
             aria-label={micLabel}>
-            {micState === 'recording' ? <MicOff className="w-6 h-6" /> : 
+            
+            {/* Show a spinner if VAD is downloading its files */}
+            {vad.loading ? <Loader2 className="w-6 h-6 animate-spin" /> : 
+             micState === 'recording' ? <MicOff className="w-6 h-6" /> : 
              micState === 'transcribing' ? <Loader2 className="w-6 h-6 animate-spin" /> : 
              <Mic className="w-6 h-6" />}
+             
           </button>
           <p className="text-[9px] uppercase tracking-widest text-slate-400 font-black mt-2 text-center ml-text">
              {micLabel}
