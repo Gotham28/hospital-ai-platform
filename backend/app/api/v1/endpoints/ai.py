@@ -1318,46 +1318,61 @@ IMPORTANT:
 async def transcribe_audio(
     file: UploadFile = File(...),
     language: str = Form("en"),
-    hospital_id: int = Form(0),      # ← add this
-    db: Session = Depends(get_db)    # ← add this
+    hospital_id: int = Form(0),
+    db: Session = Depends(get_db)
 ):
-    # 1. Create a unique temporary filename
     temp_filename = f"temp_{uuid.uuid4().hex}_{file.filename}"
-    
     try:
-        # 2. Save the incoming audio blob to disk temporarily
+        # 1. Save audio temporarily
         with open(temp_filename, "wb") as buffer:
             buffer.write(await file.read())
-        
-        # 3. Read the file and send to OpenAI
-        with open(temp_filename, "rb") as audio_file:
-            
-            # Base arguments for the API call
-            kwargs = {
-                "model": "whisper-1",
-                "file": audio_file,
-            }
-            
-            # Dynamically adjust based on language to bypass the 400 error
-            if language == "en":
-                kwargs["language"] = "en"
-                kwargs["prompt"] = "Medical terms, hospital appointments, doctors, patient."
-            else:
-                # For Malayalam: Omit "language" to avoid the unsupported error, 
-                # but provide a Malayalam prompt to force auto-detect away from Telugu.
-                kwargs["prompt"] = "നമസ്കാരം, ഇത് മലയാളം ആണ്. ആശുപത്രി, ഡോക്ടർ, പനി, അപ്പോയിന്റ്മെന്റ്."
-                
-            # Make the API call
-            transcript_response = client.audio.transcriptions.create(**kwargs)
-            
-        # 4. Return the transcribed text
-        return {"transcript": transcript_response.text}
 
+        # 2. Reject clips that are too short — causes hallucinations
+        file_size = os.path.getsize(temp_filename)
+        duration_seconds = file_size / (16000 * 2)  # 16kHz 16-bit mono
+        if duration_seconds < 1.0:
+            return {"transcript": ""}
+
+        # 3. Pick the right model and language code
+        if language == "ml":
+            # saaras:v3 with codemix mode = Malayalam script + English words in English
+            # This is exactly what you need for "ഇന്ന് pediatrician ഉണ്ടോ?"
+            model = "saaras:v3"
+            lang_code = "ml-IN"
+            mode = "codemix"
+        else:
+            model = "saarika:v2.5"
+            lang_code = "en-IN"
+            mode = "transcribe"
+
+        # 4. Send to Sarvam
+        with open(temp_filename, "rb") as audio_file:
+            import httpx
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    "https://api.sarvam.ai/speech-to-text",
+                    headers={"api-subscription-key": settings.SARVAM_API_KEY},
+                    data={
+                        "model": model,
+                        "language_code": lang_code,
+                        "mode": mode,
+                    },
+                    files={"file": ("recording.wav", audio_file, "audio/wav")},
+                )
+
+        if not response.is_success:
+            logger.error(f"Sarvam STT error: {response.status_code} {response.text}")
+            raise HTTPException(status_code=502, detail="Transcription service error")
+
+        result = response.json()
+        transcript = result.get("transcript", "")
+        return {"transcript": transcript}
+
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Whisper Transcription failed: {e}")
+        logger.error(f"Transcription failed: {e}")
         raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
-        
     finally:
-        # 5. ALWAYS clean up the temporary file
         if os.path.exists(temp_filename):
             os.remove(temp_filename)

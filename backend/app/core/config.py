@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379"
     OPENAI_API_KEY: str = "sk-placeholder"
     JWT_SECRET: str = "supersecret"
+    SARVAM_API_KEY: str = ""
 
     # Helper to build the URL dynamically
     @property
