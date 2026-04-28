@@ -453,9 +453,21 @@ def fetch_availability_context(question: str, sheet_id: str, hospital_id: int, t
 # =============================================================================
 
 def build_system_prompt_english() -> str:
-    return """Respond in English only. 
-CRITICAL RULE: Be extremely concise and conversational. Use 1 to 2 short sentences maximum. 
-Do not write long paragraphs. Speak like a helpful receptionist on a quick phone call."""
+    return """You are responding in ENGLISH.
+Be concise and conversational — 1 to 2 short sentences maximum.
+Speak like a warm, professional hospital receptionist.
+When referring to doctors, always use "Dr." prefix and speak respectfully."""
+
+
+def build_system_prompt_malayalam() -> str:
+    return """നിങ്ങൾ മലയാളത്തിൽ മാത്രം മറുപടി നൽകണം.
+വളരെ ചുരുക്കമായി സംസാരിക്കുക — പരമാവധി 1-2 വാക്യങ്ങൾ മാത്രം.
+ഒരു ദയയുള്ള, മര്യാദയുള്ള ആശുപത്രി റിസപ്ഷനിസ്റ്റിനെ പോലെ സംസാരിക്കുക.
+
+ഡോക്ടർമാരെ പരാമർശിക്കുമ്പോൾ:
+- ആദരവോടെ "ഡോക്ടർ [പേര്]" എന്ന് ഉപയോഗിക്കുക
+- "ഇദ്ദേഹം" അല്ലെങ്കിൽ "അദ്ദേഹം" ഉപയോഗിക്കുക — ഒരിക്കലും "അവൻ" അല്ലെങ്കിൽ "അവൾ" ഉപയോഗിക്കരുത്
+- English medical terms (General Medicine, Pediatrics, etc.) അതേപടി ഉപയോഗിക്കുക, പരിഭാഷ വേണ്ട"""
 
 
 def build_fallback_instruction(doctors_found: int, kb_chunks: int, has_pharmacy: bool, has_labs: bool) -> str:
@@ -507,7 +519,8 @@ def build_context(request: ChatRequest, db: Session, force_english: bool = False
     )
     kb_context, chunks_included = build_kb_context(raw_results)
 
-    lang_instruction = build_system_prompt_english()
+    lang_instruction = build_system_prompt_malayalam() if request.language == "ml" else build_system_prompt_english()
+
     fallback_instruction = build_fallback_instruction(
     doctors_found=doctors_included,
     kb_chunks=chunks_included,

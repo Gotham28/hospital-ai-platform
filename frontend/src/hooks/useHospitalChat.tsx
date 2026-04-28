@@ -165,9 +165,13 @@ const vadOptions = useMemo(() => ({
   onSpeechStart: () => {
     if (micActiveRef.current) setMicState('recording');
   },
-  onSpeechEnd: async (audio: Float32Array) => {
+  onSpeechEnd: async (audio) => {
     if (!micActiveRef.current) return;
-    setMicState('transcribing');
+  
+  micActiveRef.current = false;  // ← ADD: lock it immediately
+  vadPause();                     // ← ADD: stop VAD right away
+  setMicState('transcribing');
+  
     try {
       const wavBuffer = utils.encodeWAV(audio);
       const audioBlob = new Blob([wavBuffer], { type: 'audio/wav' });
