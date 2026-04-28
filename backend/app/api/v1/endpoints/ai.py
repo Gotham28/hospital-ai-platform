@@ -296,47 +296,36 @@ def check_doctor_availability_db(doctor: Doctor, db: Session, target_date: datet
         return "Timings not specified"
 
 def build_doctor_context(question: str, hospital_id: int, db: Session) -> tuple[str, int]:
-    """
-    Semantic vector search for relevant doctors.
-    No hardcoded synonyms — embedding handles all language variants naturally.
-    """
-    # Embed the question
-    q_embedding = client.embeddings.create(
-        input=question, model="text-embedding-3-small"
-    ).data[0].embedding
-
     today = datetime.now()
 
-    # Check if question is broad ("list all doctors", "who do you have")
     broad_keywords = {"all", "list", "doctors", "staff", "everyone", "available"}
     is_broad = len(set(question.lower().split()) & broad_keywords) >= 2
 
-    if is_broad:
-        # Return all doctors, unranked
-        doctors = (
-            db.query(Doctor)
-            .filter(Doctor.hospital_id == hospital_id)
-            .limit(20)
-            .all()
-        )
-    else:
-        # Semantic search — top 8 most relevant
-        doctors = (
-            db.query(Doctor)
-            .filter(Doctor.hospital_id == hospital_id)
-            .filter(Doctor.embedding != None)
-            .order_by(Doctor.embedding.cosine_distance(q_embedding))
-            .limit(8)
-            .all()
-        )
-        # Fallback: if no embeddings exist yet, return first 5
-        if not doctors:
+    doctors = []
+    if not is_broad:
+        try:
+            q_embedding = client.embeddings.create(
+                input=question, model="text-embedding-3-small"
+            ).data[0].embedding
             doctors = (
                 db.query(Doctor)
                 .filter(Doctor.hospital_id == hospital_id)
-                .limit(5)
+                .filter(Doctor.embedding != None)
+                .order_by(Doctor.embedding.cosine_distance(q_embedding))
+                .limit(8)
                 .all()
             )
+        except Exception as e:
+            logger.warning(f"Embedding search failed: {e}")
+
+    # If broad query, embedding failed, or too few results — return ALL doctors
+    if is_broad or len(doctors) < 3:
+        doctors = (
+            db.query(Doctor)
+            .filter(Doctor.hospital_id == hospital_id)
+            .limit(30)
+            .all()
+        )
 
     if not doctors:
         return "No doctors currently registered for this hospital.\n", 0
@@ -348,7 +337,6 @@ def build_doctor_context(question: str, hospital_id: int, db: Session) -> tuple[
             f"- [ID: {doctor.id}] Dr. {doctor.name} "
             f"({doctor.department or 'General'}): {status}\n"
         )
-
     return "".join(lines), len(doctors)
 
 def build_pharmacy_context(question: str, medicines: list) -> str:

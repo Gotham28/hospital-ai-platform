@@ -2,6 +2,9 @@ import csv
 import io
 import uuid
 import json # Ensure this is imported at the top
+import os        # ← ADD
+import logging   # ← ADD
+from openai import OpenAI   # ← ADD
 from sqlalchemy import func
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File

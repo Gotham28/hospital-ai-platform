@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useMicVAD, utils } from "@ricky0123/vad-react";
 
 interface Message {
@@ -43,6 +43,8 @@ export function useHospitalChat(hospitalId: string) {
   const abortRef = useRef<AbortController | null>(null);
   const handleSendRef = useRef<((text: string) => Promise<void>) | null>(null);
   const micActiveRef = useRef(false);
+  const languageRef = useRef(language);
+  useEffect(() => { languageRef.current = language; }, [language]);
 
   // --- 1. Fetch Welcome & Suggestions ---
   useEffect(() => {
@@ -151,21 +153,20 @@ export function useHospitalChat(hospitalId: string) {
 
   // --- 3. The Silero VAD Mic Logic ---
 // --- 3. The Silero VAD Mic Logic ---
-const { loading: vadLoading, errored: vadErrored, start: vadStart, pause: vadPause } = useMicVAD({
+const vadOptions = useMemo(() => ({
   startOnLoad: false,
-  baseAssetPath: "/vad-assets/",       // ✅ served from your own Vercel deployment
+  baseAssetPath: "/vad-assets/",
   onnxWASMBasePath: "/vad-assets/",
-  model: "legacy",
-  positiveSpeechThreshold: 0.6,   // higher = needs more confidence to START speech
-  negativeSpeechThreshold: 0.35,  // higher = cuts off silence faster
-  minSpeechMs: 250,             // minimum frames before it counts as real speech
-  redemptionMs: 1500, 
-    onSpeechStart: () => {
-    if (micActiveRef.current) setMicState('recording');  // ← guard added
+  model: "legacy" as const,
+  positiveSpeechThreshold: 0.6,
+  negativeSpeechThreshold: 0.35,
+  minSpeechMs: 250,
+  redemptionMs: 1500,
+  onSpeechStart: () => {
+    if (micActiveRef.current) setMicState('recording');
   },
-    onSpeechEnd: async (audio) => {
+  onSpeechEnd: async (audio: Float32Array) => {
     if (!micActiveRef.current) return;
-    // ✅ No vad.pause() here — the hook manages its own state
     setMicState('transcribing');
     try {
       const wavBuffer = utils.encodeWAV(audio);
@@ -173,7 +174,7 @@ const { loading: vadLoading, errored: vadErrored, start: vadStart, pause: vadPau
       const formData = new FormData();
       formData.append('file', audioBlob, 'recording.wav');
       formData.append('language', language);
-      formData.append('hospital_id', hospitalId);
+      formData.append('hospital_id', String(parseInt(hospitalId) || 0));
       const token = localStorage.getItem('token');
       const res = await fetch(`${getBaseURL()}/ai/transcribe`, {
         method: 'POST',
@@ -192,10 +193,12 @@ const { loading: vadLoading, errored: vadErrored, start: vadStart, pause: vadPau
     }
   },
   onVADMisfire: () => {
-    if (!micActiveRef.current) return;   // ← guard added
+    if (!micActiveRef.current) return;
     setMicState('idle');
   }
-});
+}), []); // empty — refs and setters are stable, language captured via ref below
+
+const { loading: vadLoading, errored: vadErrored, start: vadStart, pause: vadPause } = useMicVAD(vadOptions);
 
 const toggleMic = () => {
   setMicError(null);
