@@ -1267,6 +1267,8 @@ IMPORTANT:
                 if is_malayalam:
                     success_msg = await _translate_async(success_msg, "en", "ml")
                 yield f"data: {json.dumps(success_msg)}\n\n"
+                yield "data: [DONE]\n\n"  # ← add this
+                return   
 
             except json.JSONDecodeError:
                 logger.error("[chat-stream] Failed to parse tool args: %r", tool_call_args)

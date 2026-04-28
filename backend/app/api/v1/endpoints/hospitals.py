@@ -144,12 +144,7 @@ def get_hospital_doctors(
     return db.query(Doctor).filter(Doctor.hospital_id == hospital_id).all()
 
 @router.post("/{hospital_id}/doctors")
-def add_doctor(
-    hospital_id: int,
-    payload: dict = Body(...),
-    db: Session = Depends(get_db)
-):
-    """Add a single doctor manually."""
+def add_doctor(hospital_id: int, payload: dict = Body(...), db: Session = Depends(get_db)):
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
     if not hospital:
         raise HTTPException(status_code=404, detail="Hospital not found")
@@ -161,6 +156,18 @@ def add_doctor(
         hospital_id=hospital_id
     )
     db.add(new_doc)
+    db.flush()  # get the ID without committing
+
+    # Auto-embed so the AI can find this doctor immediately
+    try:
+        from openai import OpenAI
+        oai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        text = f"Dr. {new_doc.name}, {new_doc.department} specialist"
+        resp = oai.embeddings.create(input=[text], model="text-embedding-3-small")
+        new_doc.embedding = resp.data[0].embedding
+    except Exception as e:
+        logger.warning(f"Embedding failed for new doctor: {e}")  # non-fatal
+
     db.commit()
     db.refresh(new_doc)
     return new_doc
@@ -289,12 +296,22 @@ def update_doctor(hospital_id: int, doctor_id: int, payload: dict = Body(...), d
     doctor = db.query(Doctor).filter(Doctor.id == doctor_id, Doctor.hospital_id == hospital_id).first()
     if not doctor:
         raise HTTPException(status_code=404, detail="Doctor not found")
-    
+
+    needs_reembed = any(k in payload for k in ("name", "department", "base_schedule"))
     for key, value in payload.items():
         if hasattr(doctor, key):
             setattr(doctor, key, value)
-            
-    # If core details change, we should theoretically re-embed here, but for simple edits this is fine.
+
+    if needs_reembed:
+        try:
+            from openai import OpenAI
+            oai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            text = f"Dr. {doctor.name}, {doctor.department} specialist, schedule: {doctor.base_schedule or ''}"
+            resp = oai.embeddings.create(input=[text], model="text-embedding-3-small")
+            doctor.embedding = resp.data[0].embedding
+        except Exception as e:
+            logger.warning(f"Re-embedding failed: {e}")
+
     db.commit()
     db.refresh(doctor)
     return doctor

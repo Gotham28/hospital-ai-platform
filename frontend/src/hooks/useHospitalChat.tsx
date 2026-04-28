@@ -158,8 +158,8 @@ const { loading: vadLoading, errored: vadErrored, start: vadStart, pause: vadPau
   model: "legacy",
   positiveSpeechThreshold: 0.6,   // higher = needs more confidence to START speech
   negativeSpeechThreshold: 0.35,  // higher = cuts off silence faster
-  minSpeechMs: 4,             // minimum frames before it counts as real speech
-  redemptionMs: 8, 
+  minSpeechMs: 250,             // minimum frames before it counts as real speech
+  redemptionMs: 1500, 
     onSpeechStart: () => {
     if (micActiveRef.current) setMicState('recording');  // ← guard added
   },
