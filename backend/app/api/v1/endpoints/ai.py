@@ -617,39 +617,40 @@ def embed_chunks_batch(chunks: List[str]) -> List[List[float]]:
 
 @router.get("/welcome/{hospital_id}")
 async def get_welcome(hospital_id: int, db: Session = Depends(get_db)):
-    """
-    Returns a personalised welcome message for the chat UI.
-    Lists exactly what this hospital's bot can help with, based on
-    what is actually configured (doctors, KB, etc.).
-
-    Response: { "en": "...", "ml": "..." }
-    """
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
     if not hospital:
         raise HTTPException(status_code=404, detail="Hospital not found")
 
     doctors = db.query(Doctor).filter(Doctor.hospital_id == hospital_id).all()
     has_kb = db.query(KnowledgeBase).filter(KnowledgeBase.hospital_id == hospital_id).first() is not None
-
+    has_pharmacy = db.query(Medicine).filter(Medicine.hospital_id == hospital_id).first() is not None
+    has_labs = db.query(LabTest).filter(LabTest.hospital_id == hospital_id).first() is not None
     dept_names = sorted({d.department for d in doctors if d.department})
 
-    en_caps, ml_caps = [], []
+    hospital_name = hospital.name or "this hospital"
 
-    if doctors:
-        dept_list = ", ".join(dept_names) if dept_names else "General"
-        en_caps.append(f"🩺 Tell you about our doctors — {dept_list}")
-        ml_caps.append(f"🩺 ഞങ്ങളുടെ ഡോക്ടർമാരെ കുറിച്ച് പറയുക — {dept_list}")
-        en_caps.append("📅 Share doctor schedules and today's availability")
-        ml_caps.append("📅 ഡോക്ടറുടെ ഷെഡ്യൂളും ഇന്നത്തെ ലഭ്യതയും")
+    en_caps = [
+        "🩺 Check **doctor availability** — today or any day",
+        f"📋 Browse doctors by department — {', '.join(dept_names) if dept_names else 'General'}",
+        "📅 **Book an appointment** with any available doctor",
+    ]
+    ml_caps = [
+        "🩺 **ഡോക്ടറുടെ ലഭ്യത** പരിശോധിക്കുക — ഇന്ന് അല്ലെങ്കിൽ ഏത് ദിവസവും",
+        f"📋 വിഭാഗം അനുസരിച്ച് ഡോക്ടർമാരെ കണ്ടെത്തുക — {', '.join(dept_names) if dept_names else 'General'}",
+        "📅 ഏത് ഡോക്ടറുടെ അടുത്തും **അപ്പോയിന്റ്മെന്റ്** ബുക്ക് ചെയ്യുക",
+    ]
+
+    if has_pharmacy:
+        en_caps.append("💊 Look up **medicines** — availability and details")
+        ml_caps.append("💊 **മരുന്നുകൾ** പരിശോധിക്കുക — ലഭ്യതയും വിവരങ്ങളും")
+
+    if has_labs:
+        en_caps.append("🔬 Check **lab tests** — what's offered and pricing")
+        ml_caps.append("🔬 **ലാബ് ടെസ്റ്റുകൾ** — എന്തൊക്കെ ഉണ്ട്, വിലവിവരം")
 
     if has_kb:
-        en_caps.append("🏥 Answer questions about the hospital (timings, services, etc.)")
-        ml_caps.append("🏥 ആശുപത്രിയെ കുറിച്ചുള്ള ചോദ്യങ്ങൾക്ക് മറുപടി നൽകുക")
-
-    en_caps.append("📞 Guide you to the right department or contact")
-    ml_caps.append("📞 ശരിയായ വിഭാഗത്തിലേക്കോ ബന്ധപ്പെടുന്നതിന് നിർദ്ദേശം നൽകുക")
-
-    hospital_name = hospital.name or "this hospital"
+        en_caps.append("🏥 Answer questions about hospital **timings, services & contact**")
+        ml_caps.append("🏥 ആശുപത്രി **സമയം, സേവനങ്ങൾ, ബന്ധപ്പെടൽ** സംബന്ധിച്ച ചോദ്യങ്ങൾ")
 
     en_msg = "\n".join([
         f"👋 Hello! I am **Arogya**, the AI assistant for **{hospital_name}**.",
@@ -657,7 +658,7 @@ async def get_welcome(hospital_id: int, db: Session = Depends(get_db)):
         "Here is what I can help you with:",
         *[f"- {c}" for c in en_caps],
         "",
-        "Just type or speak your question! 🎤",
+        "Type or tap the mic to speak 🎤",
     ])
 
     ml_msg = "\n".join([
@@ -666,7 +667,7 @@ async def get_welcome(hospital_id: int, db: Session = Depends(get_db)):
         "ഞാൻ ഇവ സഹായിക്കാം:",
         *[f"- {c}" for c in ml_caps],
         "",
-        "താഴെ ടൈപ്പ് ചെയ്യൂ അല്ലെങ്കിൽ സംസാരിക്കൂ! 🎤",
+        "ടൈപ്പ് ചെയ്യൂ അല്ലെങ്കിൽ മൈക്ക് അമർത്തി സംസാരിക്കൂ 🎤",
     ])
 
     return {"en": en_msg, "ml": ml_msg}
@@ -678,31 +679,29 @@ async def get_suggestions(hospital_id: int, db: Session = Depends(get_db)):
     if not hospital:
         raise HTTPException(status_code=404, detail="Hospital not found")
 
-    doctors = db.query(Doctor).filter(Doctor.hospital_id == hospital_id).limit(3).all()
-    has_kb = db.query(KnowledgeBase).filter(KnowledgeBase.hospital_id == hospital_id).first() is not None
+    doctors = db.query(Doctor).filter(Doctor.hospital_id == hospital_id).all()
+    has_pharmacy = db.query(Medicine).filter(Medicine.hospital_id == hospital_id).first() is not None
+    has_labs = db.query(LabTest).filter(LabTest.hospital_id == hospital_id).first() is not None
+    dept_names = sorted({d.department for d in doctors if d.department})
 
-    en_suggestions, ml_suggestions = [], []
+    en_suggestions = ["Which doctors are available today?"]
+    ml_suggestions = ["ഇന്ന് ഏത് ഡോക്ടർ ഉണ്ട്?"]
 
-    if doctors:
-        for doctor in doctors[:2]:
-            dept = doctor.department or "General"
-            en_suggestions.append(f"Who is the {dept} doctor?")
-            ml_suggestions.append(f"{dept} ഡോക്ടർ ആരാണ്?")
-        en_suggestions.append("Which doctors are available today?")
-        ml_suggestions.append("ഇന്ന് ഏത് ഡോക്ടർ ഉണ്ട്?")
-    else:
-        en_suggestions.append("What can Arogya help me with?")
-        ml_suggestions.append("ആരോഗ്യ എന്തൊക്കെ സഹായിക്കും?")
+    # Pick 2 real departments for specific questions
+    for dept in dept_names[:2]:
+        en_suggestions.append(f"Is there a {dept} doctor today?")
+        ml_suggestions.append(f"ഇന്ന് {dept} ഡോക്ടർ ഉണ്ടോ?")
 
-    if has_kb:
-        en_suggestions.append("What are the hospital timings?")
-        ml_suggestions.append("ആശുപത്രി സമയം എന്താണ്?")
-    else:
-        en_suggestions.append("How do I contact the hospital?")
-        ml_suggestions.append("ആശുപത്രിയിൽ എങ്ങനെ ബന്ധപ്പെടാം?")
+    if has_pharmacy:
+        en_suggestions.append("What medicines are available?")
+        ml_suggestions.append("എന്തൊക്കെ മരുന്നുകൾ ഉണ്ട്?")
 
-    en_suggestions.append("Tell me about this hospital")
-    ml_suggestions.append("ഈ ആശുപത്രിയെക്കുറിച്ച് പറയൂ")
+    if has_labs:
+        en_suggestions.append("What lab tests do you offer?")
+        ml_suggestions.append("എന്തൊക്കെ ലാബ് ടെസ്റ്റുകൾ ഉണ്ട്?")
+
+    en_suggestions.append("Book an appointment")
+    ml_suggestions.append("അപ്പോയിന്റ്മെന്റ് ബുക്ക് ചെയ്യണം")
 
     return {"en": en_suggestions[:4], "ml": ml_suggestions[:4]}
 
