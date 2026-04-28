@@ -8,6 +8,8 @@ load_dotenv()
 
 from openai import OpenAI
 from app.db.session import SessionLocal
+from app.models.hospital import Hospital  # ← ADD THIS LINE — needed for relationship resolution
+
 from app.models.doctor import Doctor
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))

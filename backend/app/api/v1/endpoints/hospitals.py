@@ -163,7 +163,6 @@ def add_doctor(hospital_id: int, payload: dict = Body(...), db: Session = Depend
 
     # Auto-embed so the AI can find this doctor immediately
     try:
-        from openai import OpenAI
         oai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         text = f"Dr. {new_doc.name}, {new_doc.department} specialist"
         resp = oai.embeddings.create(input=[text], model="text-embedding-3-small")
