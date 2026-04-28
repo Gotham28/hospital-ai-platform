@@ -8,9 +8,17 @@ load_dotenv()
 
 from openai import OpenAI
 from app.db.session import SessionLocal
-from app.models.hospital import Hospital  # ← ADD THIS LINE — needed for relationship resolution
 
+# Import ALL models so SQLAlchemy can resolve every relationship
+from app.models.hospital import Hospital
+from app.models.user import User
 from app.models.doctor import Doctor
+from app.models.doctor_availability import DoctorSchedule, DoctorLeave
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+db = SessionLocal()
+
+# ... rest of file unchanged
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 db = SessionLocal()
