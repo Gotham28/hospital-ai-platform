@@ -1,0 +1,181 @@
+/* =========================================================
+   BKM Hospital Payannur - Custom UI Theme
+   Theme: Sapphire & Amber (Dark Mode)
+   ========================================================= */
+
+:root {
+  /* Core Color Palette */
+  --bkm-primary: #1e3a8a;       /* Sapphire Blue */
+  --bkm-secondary: #06b6d4;     /* Cyan */
+  --bkm-accent: #f59e0b;        /* Amber/Gold */
+  
+  /* Backgrounds */
+  --bkm-bg-dark: #0f172a;       /* Very Dark Blue/Slate */
+  --bkm-bg-card: #1e293b;       /* Card Background */
+  --bkm-bg-hover: #334155;      /* Lighter Card Background */
+  
+  /* Typography */
+  --bkm-text-main: #f8fafc;     /* White/Light Gray */
+  --bkm-text-muted: #94a3b8;    /* Muted Slate */
+  
+  /* Status Colors */
+  --bkm-status-good: #10b981;   /* Emerald */
+  --bkm-status-warn: #f59e0b;   /* Amber */
+  --bkm-status-critical: #ef4444; /* Red */
+}
+
+/* ---------------------------------------------------------
+   Base Layout & Overrides
+   --------------------------------------------------------- */
+.bkm-theme-wrapper {
+  background-color: var(--bkm-bg-dark);
+  color: var(--bkm-text-main);
+  min-height: 100vh;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.bkm-theme-wrapper .bkm-header {
+  background-color: var(--bkm-bg-card);
+  border-bottom: 2px solid var(--bkm-primary);
+  padding: 1rem 2rem;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.bkm-theme-wrapper .bkm-logo-text {
+  color: var(--bkm-text-main);
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.bkm-theme-wrapper .bkm-logo-accent {
+  color: var(--bkm-secondary);
+}
+
+/* ---------------------------------------------------------
+   Dashboard Cards (Departments, Stats)
+   --------------------------------------------------------- */
+.bkm-card {
+  background-color: var(--bkm-bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.bkm-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--bkm-secondary);
+}
+
+.bkm-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--bkm-bg-hover);
+  padding-bottom: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.bkm-card-title {
+  color: var(--bkm-text-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+/* ---------------------------------------------------------
+   Data Visualization (Bars & Badges)
+   --------------------------------------------------------- */
+.bkm-progress-track {
+  background-color: var(--bkm-bg-hover);
+  border-radius: 9999px;
+  height: 8px;
+  width: 100%;
+  overflow: hidden;
+  margin-top: 0.5rem;
+}
+
+.bkm-progress-fill {
+  background-color: var(--bkm-secondary);
+  height: 100%;
+  transition: width 0.4s ease;
+}
+
+.bkm-progress-fill.priority-high {
+  background-color: var(--bkm-status-critical);
+}
+
+.bkm-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background-color: rgba(6, 182, 212, 0.1);
+  color: var(--bkm-secondary);
+}
+
+.bkm-badge.priority {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: var(--bkm-accent);
+}
+
+/* ---------------------------------------------------------
+   Buttons & Interactive Elements
+   --------------------------------------------------------- */
+.bkm-btn-primary {
+  background-color: var(--bkm-primary);
+  color: var(--bkm-text-main);
+  border: 1px solid transparent;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.bkm-btn-primary:hover {
+  background-color: #1d4ed8; /* Slightly lighter blue */
+  box-shadow: 0 0 10px rgba(30, 58, 138, 0.5);
+}
+
+.bkm-btn-accent {
+  background-color: var(--bkm-accent);
+  color: var(--bkm-bg-dark);
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.bkm-btn-accent:hover {
+  background-color: #d97706;
+}
+
+/* ---------------------------------------------------------
+   Chat UI Overrides for BKM
+   --------------------------------------------------------- */
+.bkm-chat-container {
+  background-color: var(--bkm-bg-card);
+  border: 1px solid var(--bkm-bg-hover);
+  border-radius: 16px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+.bkm-chat-bubble-ai {
+  background-color: var(--bkm-bg-hover);
+  color: var(--bkm-text-main);
+  border-radius: 16px 16px 16px 4px;
+}
+
+.bkm-chat-bubble-user {
+  background-color: var(--bkm-primary);
+  color: var(--bkm-text-main);
+  border-radius: 16px 16px 4px 16px;
+}

@@ -505,6 +505,36 @@ from .crud_hospital import create_hospital, get_hospital, get_hospital_by_slug, 
 from .crud_user import create_user, get_user, get_user_by_email
 </file>
 
+<file path="backend/app/crud/crud_hospital.py">
+from sqlalchemy.orm import Session
+from app.models.hospital import Hospital
+from app.schemas.hospital import HospitalCreate
+
+def get_hospital(db: Session, hospital_id: int):
+    return db.query(Hospital).filter(Hospital.id == hospital_id).first()
+
+def get_hospital_by_slug(db: Session, slug: str):
+    return db.query(Hospital).filter(Hospital.slug == slug).first()
+
+def get_hospitals(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(Hospital).offset(skip).limit(limit).all()
+
+def create_hospital(db: Session, hospital: HospitalCreate):
+    db_obj = Hospital(
+        name=hospital.name,
+        slug=hospital.slug,
+        address=hospital.address,
+        is_active=hospital.is_active,
+        # Ensure your HospitalCreate schema includes these, or add defaults here
+        system_prompt=getattr(hospital, 'system_prompt', "You are Arogya..."),
+        google_sheet_id=getattr(hospital, 'google_sheet_id', None)
+    )
+    db.add(db_obj)
+    db.commit()
+    db.refresh(db_obj)
+    return db_obj
+</file>
+
 <file path="backend/app/db/base_class.py">
 from typing import Any
 from sqlalchemy.ext.declarative import as_declarative, declared_attr
@@ -1300,36 +1330,6 @@ class Settings(BaseSettings):
 settings = Settings()
 </file>
 
-<file path="backend/app/crud/crud_hospital.py">
-from sqlalchemy.orm import Session
-from app.models.hospital import Hospital
-from app.schemas.hospital import HospitalCreate
-
-def get_hospital(db: Session, hospital_id: int):
-    return db.query(Hospital).filter(Hospital.id == hospital_id).first()
-
-def get_hospital_by_slug(db: Session, slug: str):
-    return db.query(Hospital).filter(Hospital.slug == slug).first()
-
-def get_hospitals(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(Hospital).offset(skip).limit(limit).all()
-
-def create_hospital(db: Session, hospital: HospitalCreate):
-    db_obj = Hospital(
-        name=hospital.name,
-        slug=hospital.slug,
-        address=hospital.address,
-        is_active=hospital.is_active,
-        # Ensure your HospitalCreate schema includes these, or add defaults here
-        system_prompt=getattr(hospital, 'system_prompt', "You are Arogya..."),
-        google_sheet_id=getattr(hospital, 'google_sheet_id', None)
-    )
-    db.add(db_obj)
-    db.commit()
-    db.refresh(db_obj)
-    return db_obj
-</file>
-
 <file path="backend/app/db/session.py">
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -1413,6 +1413,30 @@ class DoctorLeave(Base):
     reason = Column(String, nullable=True)
     
     doctor = relationship("Doctor", back_populates="leaves")
+</file>
+
+<file path="backend/app/models/hospital.py">
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+from app.db.base_class import Base
+
+class Hospital(Base):
+    __tablename__ = "hospital"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, index=True)
+    slug = Column(String, unique=True, index=True, nullable=False) # e.g., "apollo-delhi" for URLs
+    address = Column(String, nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    system_prompt = Column(Text, default="You are Arogya, a helpful assistant for a specialty hospital.")
+    # Add this column to your existing Hospital class
+    google_sheet_id = Column(String, nullable=True)
+    booking_config = Column(Text, nullable=True)  # JSON string
+    # Relationship: One Hospital has many Users
+    users = relationship("User", back_populates="hospital")
+    # Inside your Hospital class in app/models/hospital.py
+    doctors = relationship("Doctor", back_populates="hospital", cascade="all, delete-orphan")
 </file>
 
 <file path="backend/app/models/lab_test.py">
@@ -1992,49 +2016,6 @@ def start_reminder_scheduler() -> None:
 def stop_reminder_scheduler() -> None:
     if _scheduler.running:
         _scheduler.shutdown()
-</file>
-
-<file path="backend/embed_doctors.py">
-"""
-Run once to backfill embeddings for all existing doctors.
-Usage: python embed_doctors.py
-"""
-import os
-from dotenv import load_dotenv
-load_dotenv()
-
-from openai import OpenAI
-from app.db.session import SessionLocal
-from app.models.doctor import Doctor
-
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-db = SessionLocal()
-
-def make_embed_text(doctor: Doctor) -> str:
-    parts = [f"Dr. {doctor.name}"]
-    if doctor.department:
-        parts.append(f"{doctor.department} specialist")
-    if doctor.base_schedule:
-        parts.append(f"schedule: {doctor.base_schedule}")
-    return ", ".join(parts)
-
-try:
-    doctors = db.query(Doctor).filter(Doctor.embedding == None).all()
-    print(f"Found {len(doctors)} doctors without embeddings.")
-
-    for i, doctor in enumerate(doctors):
-        text = make_embed_text(doctor)
-        resp = client.embeddings.create(input=text, model="text-embedding-3-small")
-        doctor.embedding = resp.data[0].embedding
-        print(f"  [{i+1}/{len(doctors)}] Embedded: {doctor.name} ({doctor.department})")
-
-    db.commit()
-    print("Done. All doctors embedded.")
-except Exception as e:
-    db.rollback()
-    print(f"Error: {e}")
-finally:
-    db.close()
 </file>
 
 <file path="frontend/public/vad-assets/ort-wasm-simd-threaded.asyncify.mjs">
@@ -3141,30 +3122,6 @@ class Doctor(Base):
     hospital = relationship("Hospital", back_populates="doctors")
     schedules = relationship("DoctorSchedule", back_populates="doctor", cascade="all, delete-orphan")
     leaves = relationship("DoctorLeave", back_populates="doctor", cascade="all, delete-orphan")
-</file>
-
-<file path="backend/app/models/hospital.py">
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
-from app.db.base_class import Base
-
-class Hospital(Base):
-    __tablename__ = "hospital"
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False, index=True)
-    slug = Column(String, unique=True, index=True, nullable=False) # e.g., "apollo-delhi" for URLs
-    address = Column(String, nullable=True)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    system_prompt = Column(Text, default="You are Arogya, a helpful assistant for a specialty hospital.")
-    # Add this column to your existing Hospital class
-    google_sheet_id = Column(String, nullable=True)
-    booking_config = Column(Text, nullable=True)  # JSON string
-    # Relationship: One Hospital has many Users
-    users = relationship("User", back_populates="hospital")
-    # Inside your Hospital class in app/models/hospital.py
-    doctors = relationship("Doctor", back_populates="hospital", cascade="all, delete-orphan")
 </file>
 
 <file path="frontend/package.json">
@@ -4550,6 +4507,59 @@ class Hospital(HospitalBase):
 
     class Config:
         from_attributes = True
+</file>
+
+<file path="backend/embed_doctors.py">
+"""
+Run once to backfill embeddings for all existing doctors.
+Usage: python embed_doctors.py
+"""
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+from openai import OpenAI
+from app.db.session import SessionLocal
+
+# Import ALL models so SQLAlchemy can resolve every relationship
+from app.models.hospital import Hospital
+from app.models.user import User
+from app.models.doctor import Doctor
+from app.models.doctor_availability import DoctorSchedule, DoctorLeave
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+db = SessionLocal()
+
+# ... rest of file unchanged
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+db = SessionLocal()
+
+def make_embed_text(doctor: Doctor) -> str:
+    parts = [f"Dr. {doctor.name}"]
+    if doctor.department:
+        parts.append(f"{doctor.department} specialist")
+    if doctor.base_schedule:
+        parts.append(f"schedule: {doctor.base_schedule}")
+    return ", ".join(parts)
+
+try:
+    doctors = db.query(Doctor).filter(Doctor.embedding == None).all()
+    print(f"Found {len(doctors)} doctors without embeddings.")
+
+    for i, doctor in enumerate(doctors):
+        text = make_embed_text(doctor)
+        resp = client.embeddings.create(input=text, model="text-embedding-3-small")
+        doctor.embedding = resp.data[0].embedding
+        print(f"  [{i+1}/{len(doctors)}] Embedded: {doctor.name} ({doctor.department})")
+
+    db.commit()
+    print("Done. All doctors embedded.")
+except Exception as e:
+    db.rollback()
+    print(f"Error: {e}")
+finally:
+    db.close()
 </file>
 
 <file path="frontend/src/components/HospitalStats.tsx">
@@ -6376,11 +6386,110 @@ export default function PharmacyPage() {
 }
 </file>
 
+<file path="frontend/src/api/axios.ts">
+import axios from 'axios';
+
+const baseURL = import.meta.env.VITE_API_URL
+  || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:8000/api/v1'
+    : 'https://hospital-ai-platform.onrender.com/api/v1');
+
+const api = axios.create({
+  baseURL,
+  headers: { 'Content-Type': 'application/json' },
+});
+
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) config.headers.Authorization = `Bearer ${token}`;
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('bookingSessionToken');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
+export default api;
+</file>
+
+<file path="backend/app/main.py">
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.db.base import Base
+from app.api.v1.endpoints.auth import router as auth_router
+from app.api.v1.endpoints.hospitals import router as hospitals_router
+from app.api.v1.endpoints.ai import router as ai_router
+from app.db.session import engine
+from app.api.v1.endpoints.appointments import router as appointments_router
+from app.services.reminders import start_reminder_scheduler, stop_reminder_scheduler
+from app.api.v1.endpoints.medicines import router as medicines_router
+from app.api.v1.endpoints.lab_tests import router as lab_tests_router
+from app.api.v1.endpoints.doctor_availability import router as availability_router
+import os
+
+app = FastAPI(title="Hospital AI Platform")
+Base.metadata.create_all(bind=engine)
+
+# Single source of truth for allowed origins
+ALLOWED_ORIGINS = [
+    o.strip() for o in os.getenv(
+        "ALLOWED_ORIGINS",
+        "https://hospital-ai-platform.vercel.app,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
+    ).split(",") if o.strip()
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(auth_router,         prefix="/api/v1/auth",         tags=["auth"])
+app.include_router(hospitals_router,    prefix="/api/v1/hospitals",    tags=["hospitals"])
+app.include_router(ai_router,           prefix="/api/v1/ai",           tags=["AI"])
+app.include_router(appointments_router, prefix="/api/v1/appointments", tags=["Appointments"])
+app.include_router(medicines_router, prefix="/api/v1/medicines", tags=["Medicines"])
+app.include_router(lab_tests_router, prefix="/api/v1/lab-tests", tags=["Lab Tests"])
+app.include_router(availability_router, prefix="/api/v1/availability", tags=["Doctor Availability"])
+
+@app.on_event("startup")
+def on_startup():
+    start_reminder_scheduler()
+
+@app.on_event("shutdown")
+def on_shutdown():
+    stop_reminder_scheduler()
+
+@app.get("/")
+def read_root():
+    return {
+        "status": "online",
+        "message": "Welcome to the Hospital AI Platform API",
+        "version": "v1.0.0"
+    }
+</file>
+
 <file path="backend/app/api/v1/endpoints/hospitals.py">
 import csv
 import io
 import uuid
 import json # Ensure this is imported at the top
+import os        # ← ADD
+import logging   # ← ADD
+from openai import OpenAI   # ← ADD
 from sqlalchemy import func
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File
@@ -6523,12 +6632,7 @@ def get_hospital_doctors(
     return db.query(Doctor).filter(Doctor.hospital_id == hospital_id).all()
 
 @router.post("/{hospital_id}/doctors")
-def add_doctor(
-    hospital_id: int,
-    payload: dict = Body(...),
-    db: Session = Depends(get_db)
-):
-    """Add a single doctor manually."""
+def add_doctor(hospital_id: int, payload: dict = Body(...), db: Session = Depends(get_db)):
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
     if not hospital:
         raise HTTPException(status_code=404, detail="Hospital not found")
@@ -6540,6 +6644,17 @@ def add_doctor(
         hospital_id=hospital_id
     )
     db.add(new_doc)
+    db.flush()  # get the ID without committing
+
+    # Auto-embed so the AI can find this doctor immediately
+    try:
+        oai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        text = f"Dr. {new_doc.name}, {new_doc.department} specialist"
+        resp = oai.embeddings.create(input=[text], model="text-embedding-3-small")
+        new_doc.embedding = resp.data[0].embedding
+    except Exception as e:
+        logger.warning(f"Embedding failed for new doctor: {e}")  # non-fatal
+
     db.commit()
     db.refresh(new_doc)
     return new_doc
@@ -6668,12 +6783,22 @@ def update_doctor(hospital_id: int, doctor_id: int, payload: dict = Body(...), d
     doctor = db.query(Doctor).filter(Doctor.id == doctor_id, Doctor.hospital_id == hospital_id).first()
     if not doctor:
         raise HTTPException(status_code=404, detail="Doctor not found")
-    
+
+    needs_reembed = any(k in payload for k in ("name", "department", "base_schedule"))
     for key, value in payload.items():
         if hasattr(doctor, key):
             setattr(doctor, key, value)
-            
-    # If core details change, we should theoretically re-embed here, but for simple edits this is fine.
+
+    if needs_reembed:
+        try:
+            from openai import OpenAI
+            oai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            text = f"Dr. {doctor.name}, {doctor.department} specialist, schedule: {doctor.base_schedule or ''}"
+            resp = oai.embeddings.create(input=[text], model="text-embedding-3-small")
+            doctor.embedding = resp.data[0].embedding
+        except Exception as e:
+            logger.warning(f"Re-embedding failed: {e}")
+
     db.commit()
     db.refresh(doctor)
     return doctor
@@ -6710,104 +6835,8 @@ def reset_hospital_billing(hospital_id: int, db: Session = Depends(get_db)):
     return {"status": "success", "message": "Billing cycle reset successfully"}
 </file>
 
-<file path="frontend/src/api/axios.ts">
-import axios from 'axios';
-
-const baseURL = import.meta.env.VITE_API_URL
-  || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:8000/api/v1'
-    : 'https://hospital-ai-platform.onrender.com/api/v1');
-
-const api = axios.create({
-  baseURL,
-  headers: { 'Content-Type': 'application/json' },
-});
-
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) config.headers.Authorization = `Bearer ${token}`;
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      sessionStorage.removeItem('bookingSessionToken');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
-);
-
-export default api;
-</file>
-
-<file path="backend/app/main.py">
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from app.db.base import Base
-from app.api.v1.endpoints.auth import router as auth_router
-from app.api.v1.endpoints.hospitals import router as hospitals_router
-from app.api.v1.endpoints.ai import router as ai_router
-from app.db.session import engine
-from app.api.v1.endpoints.appointments import router as appointments_router
-from app.services.reminders import start_reminder_scheduler, stop_reminder_scheduler
-from app.api.v1.endpoints.medicines import router as medicines_router
-from app.api.v1.endpoints.lab_tests import router as lab_tests_router
-from app.api.v1.endpoints.doctor_availability import router as availability_router
-import os
-
-app = FastAPI(title="Hospital AI Platform")
-Base.metadata.create_all(bind=engine)
-
-# Single source of truth for allowed origins
-ALLOWED_ORIGINS = [
-    o.strip() for o in os.getenv(
-        "ALLOWED_ORIGINS",
-        "https://hospital-ai-platform.vercel.app,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
-    ).split(",") if o.strip()
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.include_router(auth_router,         prefix="/api/v1/auth",         tags=["auth"])
-app.include_router(hospitals_router,    prefix="/api/v1/hospitals",    tags=["hospitals"])
-app.include_router(ai_router,           prefix="/api/v1/ai",           tags=["AI"])
-app.include_router(appointments_router, prefix="/api/v1/appointments", tags=["Appointments"])
-app.include_router(medicines_router, prefix="/api/v1/medicines", tags=["Medicines"])
-app.include_router(lab_tests_router, prefix="/api/v1/lab-tests", tags=["Lab Tests"])
-app.include_router(availability_router, prefix="/api/v1/availability", tags=["Doctor Availability"])
-
-@app.on_event("startup")
-def on_startup():
-    start_reminder_scheduler()
-
-@app.on_event("shutdown")
-def on_shutdown():
-    stop_reminder_scheduler()
-
-@app.get("/")
-def read_root():
-    return {
-        "status": "online",
-        "message": "Welcome to the Hospital AI Platform API",
-        "version": "v1.0.0"
-    }
-</file>
-
 <file path="frontend/src/hooks/useHospitalChat.tsx">
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useMicVAD, utils } from "@ricky0123/vad-react";
 
 interface Message {
@@ -6852,6 +6881,8 @@ export function useHospitalChat(hospitalId: string) {
   const abortRef = useRef<AbortController | null>(null);
   const handleSendRef = useRef<((text: string) => Promise<void>) | null>(null);
   const micActiveRef = useRef(false);
+  const languageRef = useRef(language);
+  useEffect(() => { languageRef.current = language; }, [language]);
 
   // --- 1. Fetch Welcome & Suggestions ---
   useEffect(() => {
@@ -6960,29 +6991,32 @@ export function useHospitalChat(hospitalId: string) {
 
   // --- 3. The Silero VAD Mic Logic ---
 // --- 3. The Silero VAD Mic Logic ---
-const { loading: vadLoading, errored: vadErrored, start: vadStart, pause: vadPause } = useMicVAD({
+const vadOptions = useMemo(() => ({
   startOnLoad: false,
-  baseAssetPath: "/vad-assets/",       // ✅ served from your own Vercel deployment
+  baseAssetPath: "/vad-assets/",
   onnxWASMBasePath: "/vad-assets/",
-  model: "legacy",
-  positiveSpeechThreshold: 0.6,   // higher = needs more confidence to START speech
-  negativeSpeechThreshold: 0.35,  // higher = cuts off silence faster
-  minSpeechMs: 4,             // minimum frames before it counts as real speech
-  redemptionMs: 8, 
-    onSpeechStart: () => {
-    if (micActiveRef.current) setMicState('recording');  // ← guard added
+  model: "legacy" as const,
+  positiveSpeechThreshold: 0.6,
+  negativeSpeechThreshold: 0.35,
+  minSpeechMs: 250,
+  redemptionMs: 1500,
+  onSpeechStart: () => {
+    if (micActiveRef.current) setMicState('recording');
   },
-    onSpeechEnd: async (audio) => {
+  onSpeechEnd: async (audio) => {
     if (!micActiveRef.current) return;
-    // ✅ No vad.pause() here — the hook manages its own state
-    setMicState('transcribing');
+  
+  micActiveRef.current = false;  // ← ADD: lock it immediately
+  vadPause();                     // ← ADD: stop VAD right away
+  setMicState('transcribing');
+  
     try {
       const wavBuffer = utils.encodeWAV(audio);
       const audioBlob = new Blob([wavBuffer], { type: 'audio/wav' });
       const formData = new FormData();
       formData.append('file', audioBlob, 'recording.wav');
       formData.append('language', language);
-      formData.append('hospital_id', hospitalId);
+      formData.append('hospital_id', String(parseInt(hospitalId) || 0));
       const token = localStorage.getItem('token');
       const res = await fetch(`${getBaseURL()}/ai/transcribe`, {
         method: 'POST',
@@ -7001,10 +7035,12 @@ const { loading: vadLoading, errored: vadErrored, start: vadStart, pause: vadPau
     }
   },
   onVADMisfire: () => {
-    if (!micActiveRef.current) return;   // ← guard added
+    if (!micActiveRef.current) return;
     setMicState('idle');
   }
-});
+}), []); // empty — refs and setters are stable, language captured via ref below
+
+const { loading: vadLoading, errored: vadErrored, start: vadStart, pause: vadPause } = useMicVAD(vadOptions);
 
 const toggleMic = () => {
   setMicError(null);
@@ -7465,47 +7501,36 @@ def check_doctor_availability_db(doctor: Doctor, db: Session, target_date: datet
         return "Timings not specified"
 
 def build_doctor_context(question: str, hospital_id: int, db: Session) -> tuple[str, int]:
-    """
-    Semantic vector search for relevant doctors.
-    No hardcoded synonyms — embedding handles all language variants naturally.
-    """
-    # Embed the question
-    q_embedding = client.embeddings.create(
-        input=question, model="text-embedding-3-small"
-    ).data[0].embedding
-
     today = datetime.now()
 
-    # Check if question is broad ("list all doctors", "who do you have")
     broad_keywords = {"all", "list", "doctors", "staff", "everyone", "available"}
     is_broad = len(set(question.lower().split()) & broad_keywords) >= 2
 
-    if is_broad:
-        # Return all doctors, unranked
-        doctors = (
-            db.query(Doctor)
-            .filter(Doctor.hospital_id == hospital_id)
-            .limit(20)
-            .all()
-        )
-    else:
-        # Semantic search — top 8 most relevant
-        doctors = (
-            db.query(Doctor)
-            .filter(Doctor.hospital_id == hospital_id)
-            .filter(Doctor.embedding != None)
-            .order_by(Doctor.embedding.cosine_distance(q_embedding))
-            .limit(8)
-            .all()
-        )
-        # Fallback: if no embeddings exist yet, return first 5
-        if not doctors:
+    doctors = []
+    if not is_broad:
+        try:
+            q_embedding = client.embeddings.create(
+                input=question, model="text-embedding-3-small"
+            ).data[0].embedding
             doctors = (
                 db.query(Doctor)
                 .filter(Doctor.hospital_id == hospital_id)
-                .limit(5)
+                .filter(Doctor.embedding != None)
+                .order_by(Doctor.embedding.cosine_distance(q_embedding))
+                .limit(8)
                 .all()
             )
+        except Exception as e:
+            logger.warning(f"Embedding search failed: {e}")
+
+    # If broad query, embedding failed, or too few results — return ALL doctors
+    if is_broad or len(doctors) < 3:
+        doctors = (
+            db.query(Doctor)
+            .filter(Doctor.hospital_id == hospital_id)
+            .limit(30)
+            .all()
+        )
 
     if not doctors:
         return "No doctors currently registered for this hospital.\n", 0
@@ -7517,7 +7542,6 @@ def build_doctor_context(question: str, hospital_id: int, db: Session) -> tuple[
             f"- [ID: {doctor.id}] Dr. {doctor.name} "
             f"({doctor.department or 'General'}): {status}\n"
         )
-
     return "".join(lines), len(doctors)
 
 def build_pharmacy_context(question: str, medicines: list) -> str:
@@ -7634,9 +7658,21 @@ def fetch_availability_context(question: str, sheet_id: str, hospital_id: int, t
 # =============================================================================
 
 def build_system_prompt_english() -> str:
-    return """Respond in English only. 
-CRITICAL RULE: Be extremely concise and conversational. Use 1 to 2 short sentences maximum. 
-Do not write long paragraphs. Speak like a helpful receptionist on a quick phone call."""
+    return """You are responding in ENGLISH.
+Be concise and conversational — 1 to 2 short sentences maximum.
+Speak like a warm, professional hospital receptionist.
+When referring to doctors, always use "Dr." prefix and speak respectfully."""
+
+
+def build_system_prompt_malayalam() -> str:
+    return """നിങ്ങൾ മലയാളത്തിൽ മാത്രം മറുപടി നൽകണം.
+വളരെ ചുരുക്കമായി സംസാരിക്കുക — പരമാവധി 1-2 വാക്യങ്ങൾ മാത്രം.
+ഒരു ദയയുള്ള, മര്യാദയുള്ള ആശുപത്രി റിസപ്ഷനിസ്റ്റിനെ പോലെ സംസാരിക്കുക.
+
+ഡോക്ടർമാരെ പരാമർശിക്കുമ്പോൾ:
+- ആദരവോടെ "ഡോക്ടർ [പേര്]" എന്ന് ഉപയോഗിക്കുക
+- "ഇദ്ദേഹം" അല്ലെങ്കിൽ "അദ്ദേഹം" ഉപയോഗിക്കുക — ഒരിക്കലും "അവൻ" അല്ലെങ്കിൽ "അവൾ" ഉപയോഗിക്കരുത്
+- English medical terms (General Medicine, Pediatrics, etc.) അതേപടി ഉപയോഗിക്കുക, പരിഭാഷ വേണ്ട"""
 
 
 def build_fallback_instruction(doctors_found: int, kb_chunks: int, has_pharmacy: bool, has_labs: bool) -> str:
@@ -7688,7 +7724,8 @@ def build_context(request: ChatRequest, db: Session, force_english: bool = False
     )
     kb_context, chunks_included = build_kb_context(raw_results)
 
-    lang_instruction = build_system_prompt_english()
+    lang_instruction = build_system_prompt_malayalam() if request.language == "ml" else build_system_prompt_english()
+
     fallback_instruction = build_fallback_instruction(
     doctors_found=doctors_included,
     kb_chunks=chunks_included,
@@ -8436,6 +8473,8 @@ IMPORTANT:
                 if is_malayalam:
                     success_msg = await _translate_async(success_msg, "en", "ml")
                 yield f"data: {json.dumps(success_msg)}\n\n"
+                yield "data: [DONE]\n\n"  # ← add this
+                return   
 
             except json.JSONDecodeError:
                 logger.error("[chat-stream] Failed to parse tool args: %r", tool_call_args)
