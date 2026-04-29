@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from app.core.config import settings  # ← add this if not already there
+from app.core.config import settings
 from app.api.deps import get_db
 from app.models.hospital import Hospital
 from app.models.knowledge import KnowledgeBase
@@ -27,6 +27,7 @@ from app.models.doctor_availability import DoctorSchedule, DoctorLeave
 import redis
 import uuid
 from app.models.appointment import Appointment
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
@@ -38,9 +39,9 @@ client = OpenAI(api_key=_api_key)
 async_client = AsyncOpenAI(api_key=_api_key)
 _redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
 _redis = redis.from_url(_redis_url, decode_responses=True)
-BOOKING_SESSION_TTL = 600
-OPENAI_MODEL        = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-OPENAI_COST_PER_MTok = float(os.getenv("OPENAI_COST_PER_MTok", "0.15"))
+BOOKING_SESSION_TTL      = 600
+OPENAI_MODEL             = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_COST_PER_MTok     = float(os.getenv("OPENAI_COST_PER_MTok", "0.15"))
 MAX_HISTORY_TURNS        = 10
 PDF_CHUNK_SIZE           = 800
 PDF_CHUNK_OVERLAP        = 100
@@ -56,7 +57,7 @@ VALID_LANGUAGES          = {"en", "ml"}
 
 
 # =============================================================================
-# GOOGLE TRANSLATE BRIDGE
+# GOOGLE TRANSLATE BRIDGE  (kept only for fallback / STT post-processing)
 # =============================================================================
 
 _GTRANSLATE_URL = "https://translate.googleapis.com/translate_a/single"
@@ -89,8 +90,6 @@ async def _translate_async(text: str, source: str, target: str) -> str:
     except Exception as e:
         logger.warning("Async translation failed (%s->%s): %s", source, target, e)
         return text
-
-
 
 
 # =============================================================================
@@ -137,8 +136,7 @@ class ChatRequest(BaseModel):
     hospital_id: int
     language: str = Field(default="en")
     history: Optional[List[HistoryMessage]] = None
-    session_token: str = Field(default="default")  # ← add this line
-
+    session_token: str = Field(default="default")
 
     @field_validator("language")
     @classmethod
@@ -169,9 +167,6 @@ class IngestRequest(BaseModel):
 # DOCTOR RELEVANCE FILTERING
 # =============================================================================
 
-# Synonym map — variants for common department name spellings/abbreviations.
-# Both directions are listed so matching works regardless of which side uses
-# which spelling.
 _DEPT_SYNONYMS: dict[str, list[str]] = {
     "orthopaedics":     ["orthopedics", "ortho", "orthopedic", "orthopaedic", "bone", "joint"],
     "orthopedics":      ["orthopaedics", "ortho", "orthopedic", "orthopaedic", "bone", "joint"],
@@ -201,7 +196,6 @@ _DEPT_SYNONYMS: dict[str, list[str]] = {
 }
 
 def _expand_with_synonyms(tokens: set) -> set:
-    """Expand a token set with department synonyms."""
     expanded = set(tokens)
     for token in tokens:
         for canonical, variants in _DEPT_SYNONYMS.items():
@@ -212,7 +206,6 @@ def _expand_with_synonyms(tokens: set) -> set:
 
 
 def normalize_name(text: str) -> str:
-    """Lowercase, strip Dr. prefix, keep only latin letters and spaces."""
     text = text.lower()
     text = re.sub(r"dr\.?\s*", "", text)
     text = re.sub(r"[^a-z\s]", "", text)
@@ -220,13 +213,6 @@ def normalize_name(text: str) -> str:
 
 
 def score_doctor_relevance(question: str, doctor: Doctor) -> float:
-    """
-    Score how relevant a doctor entry is to the (English) question.
-
-    Uses synonym expansion so spelling variants ("orthopedics" vs
-    "orthopaedics") and abbreviations ("ortho") all match correctly.
-    A substring fallback handles partial department names.
-    """
     q_norm = normalize_name(question)
     q_tokens = set(q_norm.split())
     if not q_tokens:
@@ -234,7 +220,6 @@ def score_doctor_relevance(question: str, doctor: Doctor) -> float:
 
     dept  = normalize_name(doctor.department or "")
     name  = normalize_name(doctor.name or "")
-    # Support both field names used across different versions of the model
     sched = normalize_name(
         getattr(doctor, "base_schedule", None)
         or getattr(doctor, "schedule", None)
@@ -250,7 +235,6 @@ def score_doctor_relevance(question: str, doctor: Doctor) -> float:
 
     token_score = len(q_expanded & d_expanded) / len(q_expanded)
 
-    # Substring fallback: "ortho" in "orthopaedics"
     substring_score = 0.0
     for qt in q_tokens:
         if len(qt) >= 4 and qt in dept:
@@ -260,8 +244,6 @@ def score_doctor_relevance(question: str, doctor: Doctor) -> float:
 
 
 def check_doctor_availability_db(doctor: Doctor, db: Session, target_date: datetime) -> str:
-    """Queries PostgreSQL to find out if the doctor is working today."""
-    # 1. Check for leaves first
     leave = db.query(DoctorLeave).filter(
         DoctorLeave.doctor_id == doctor.id,
         DoctorLeave.date == target_date.date()
@@ -270,12 +252,10 @@ def check_doctor_availability_db(doctor: Doctor, db: Session, target_date: datet
         reason = f" ({leave.reason})" if leave.reason else ""
         return f"ABSENT TODAY{reason}"
 
-    # 2. Check regular schedule
-    day_of_week = target_date.weekday() # 0=Monday, 6=Sunday
-    
-    # Check if ANY schedules exist for this doctor in the new system
+    day_of_week = target_date.weekday()
+
     has_any_schedule = db.query(DoctorSchedule).filter(DoctorSchedule.doctor_id == doctor.id).first() is not None
-    
+
     schedule = db.query(DoctorSchedule).filter(
         DoctorSchedule.doctor_id == doctor.id,
         DoctorSchedule.day_of_week == day_of_week,
@@ -284,16 +264,15 @@ def check_doctor_availability_db(doctor: Doctor, db: Session, target_date: datet
 
     if schedule:
         return f"Available today from {schedule.start_time} to {schedule.end_time}"
-    
+
     if has_any_schedule:
-        # They are using the new UI, but are just not scheduled today
         return "Not scheduled to work today"
     else:
-        # No new UI schedules exist yet! Fallback to the CSV base_schedule.
         base = getattr(doctor, "base_schedule", None)
         if base and base.lower() != "not specified":
             return f"Standard Timings: {base}"
         return "Timings not specified"
+
 
 def build_doctor_context(question: str, hospital_id: int, db: Session) -> tuple[str, int]:
     today = datetime.now()
@@ -318,7 +297,6 @@ def build_doctor_context(question: str, hospital_id: int, db: Session) -> tuple[
         except Exception as e:
             logger.warning(f"Embedding search failed: {e}")
 
-    # If broad query, embedding failed, or too few results — return ALL doctors
     if is_broad or len(doctors) < 3:
         doctors = (
             db.query(Doctor)
@@ -339,11 +317,12 @@ def build_doctor_context(question: str, hospital_id: int, db: Session) -> tuple[
         )
     return "".join(lines), len(doctors)
 
+
 def build_pharmacy_context(question: str, medicines: list) -> str:
-    """Matches user questions against the medicine database."""
     nq = normalize_name(question)
     q_tokens = set(nq.split())
-    if not q_tokens or not medicines: return ""
+    if not q_tokens or not medicines:
+        return ""
 
     scored = []
     for m in medicines:
@@ -354,21 +333,23 @@ def build_pharmacy_context(question: str, medicines: list) -> str:
             scored.append((score, m))
 
     scored.sort(key=lambda x: x[0], reverse=True)
-    if not scored: return ""
+    if not scored:
+        return ""
 
     lines = ["RELEVANT PHARMACY ITEMS:"]
-    for _, m in scored[:5]: # Top 5 closest matches
+    for _, m in scored[:5]:
         req_rx = "Prescription Required" if m.requires_prescription else "Over-the-counter"
         status = (m.stock_status or "in_stock").replace("_", " ").title()
         lines.append(f"- {m.name} ({m.brand_name or 'Generic'}): Status: {status}, Price: ₹{m.price or 'N/A'}, {req_rx}")
 
     return "\n".join(lines) + "\n"
 
+
 def build_lab_tests_context(question: str, tests: list) -> str:
-    """Matches user questions against lab test prerequisites."""
     nq = normalize_name(question)
     q_tokens = set(nq.split())
-    if not q_tokens or not tests: return ""
+    if not q_tokens or not tests:
+        return ""
 
     scored = []
     for t in tests:
@@ -379,7 +360,8 @@ def build_lab_tests_context(question: str, tests: list) -> str:
             scored.append((score, t))
 
     scored.sort(key=lambda x: x[0], reverse=True)
-    if not scored: return ""
+    if not scored:
+        return ""
 
     lines = ["RELEVANT LAB TESTS:"]
     for _, t in scored[:5]:
@@ -389,6 +371,7 @@ def build_lab_tests_context(question: str, tests: list) -> str:
             lines.append(f"  Preparation/Prerequisites: {t.prerequisites}")
 
     return "\n".join(lines) + "\n"
+
 
 def resolve_doctor_id(user_text: str, doctor_data: dict):
     nq = normalize_name(user_text)
@@ -428,27 +411,6 @@ def build_kb_context(results: list) -> tuple[str, int]:
 
 
 # =============================================================================
-# AVAILABILITY
-# =============================================================================
-
-def fetch_availability_context(question: str, sheet_id: str, hospital_id: int, today_str: str) -> str:
-    try:
-        data = get_doctor_availability(sheet_id=sheet_id)
-        doc_id, doc_name = resolve_doctor_id(question, data)
-        if not doc_id:
-            return ""
-        doc_info = data.get(doc_id, {})
-        absent = [d.strip() for d in str(doc_info.get("absent_dates", "")).split(",") if d.strip()]
-        if today_str in absent:
-            return (f"IMPORTANT LIVE STATUS: {doc_name} is ABSENT TODAY ({today_str}). "
-                    "Tell the patient they are unavailable and suggest calling reception.")
-        return f"LIVE STATUS: {doc_name} is available today ({today_str})."
-    except Exception as e:
-        logger.exception("[Availability] Unexpected error hospital_id=%s: %s", hospital_id, e)
-        return ""
-
-
-# =============================================================================
 # SYSTEM PROMPT BUILDER
 # =============================================================================
 
@@ -456,18 +418,24 @@ def build_system_prompt_english() -> str:
     return """You are responding in ENGLISH.
 Be concise and conversational — 1 to 2 short sentences maximum.
 Speak like a warm, professional hospital receptionist.
-When referring to doctors, always use "Dr." prefix and speak respectfully."""
+When referring to doctors, always use "Dr." prefix and speak respectfully.
+
+CRITICAL: Each question is independent. When a patient asks about a new topic (e.g. moves from lab tests to asking about a doctor), treat it as a fresh question. Do NOT carry assumptions from the previous topic into your new answer."""
 
 
 def build_system_prompt_malayalam() -> str:
-    return """നിങ്ങൾ മലയാളത്തിൽ മാത്രം മറുപടി നൽകണം.
-വളരെ ചുരുക്കമായി സംസാരിക്കുക — പരമാവധി 1-2 വാക്യങ്ങൾ മാത്രം.
-ഒരു ദയയുള്ള, മര്യാദയുള്ള ആശുപത്രി റിസപ്ഷനിസ്റ്റിനെ പോലെ സംസാരിക്കുക.
+    return """നിങ്ങൾ മലയാളത്തിൽ മാത്രം മറുപടി നൽകണം — ഒരിക്കലും ഇംഗ്ലീഷിൽ അല്ല.
 
-ഡോക്ടർമാരെ പരാമർശിക്കുമ്പോൾ:
-- ആദരവോടെ "ഡോക്ടർ [പേര്]" എന്ന് ഉപയോഗിക്കുക
-- "ഇദ്ദേഹം" അല്ലെങ്കിൽ "അദ്ദേഹം" ഉപയോഗിക്കുക — ഒരിക്കലും "അവൻ" അല്ലെങ്കിൽ "അവൾ" ഉപയോഗിക്കരുത്
-- English medical terms (General Medicine, Pediatrics, etc.) അതേപടി ഉപയോഗിക്കുക, പരിഭാഷ വേണ്ട"""
+ഭാഷാ നിയമങ്ങൾ (MANDATORY):
+- ലളിതമായ, ദൈനംദിന മലയാളം ഉപയോഗിക്കുക. ഒരു ആശുപത്രി റിസപ്ഷനിൽ ജോലി ചെയ്യുന്ന ആൾ സംസാരിക്കുന്നതുപോലെ.
+- "ആദരണീയ ഡോക്ടർ", "ആശ്ലേഷം", "ഉറപ്പിക്കൂ" തുടങ്ങിയ ഔദ്യോഗിക/ഫോർമൽ വാക്കുകൾ ഉപയോഗിക്കരുത്.
+- ദിവസങ്ങൾ: "ബുധനാഴ്ച", "വ്യാഴാഴ്ച", "വെള്ളിയാഴ്ച" — ഇങ്ങനെ ഉപയോഗിക്കുക, കൃത്യമായി.
+- Medical terms (General Medicine, Pediatrics, Cardiology etc.) ഇംഗ്ലീഷിൽ തന്നെ ഉപയോഗിക്കുക.
+- ഡോക്ടർ: "ഡോക്ടർ [പേര്]" (ആദ്യക്ഷരം വലിയത്).
+- "അദ്ദേഹം" / "ഇദ്ദേഹം" ഉപയോഗിക്കുക — "അവൻ" / "അവൾ" ഒരിക്കലും പാടില്ല.
+- 1–2 വാക്യങ്ങൾ മാത്രം. ചുരുക്കമായി, കൃത്യമായി.
+
+CRITICAL: ഓരോ ചോദ്യവും സ്വതന്ത്രമാണ്. ഒരു വിഷയത്തിൽ നിന്ന് മറ്റൊന്നിലേക്ക് (ഉദാ: ലാബ് ടെസ്റ്റ് → ഡോക്ടർ) മാറുമ്പോൾ, മുൻ ചോദ്യത്തിന്റെ context പുതിയ ഉത്തരത്തിൽ കലർത്തരുത്."""
 
 
 def build_fallback_instruction(doctors_found: int, kb_chunks: int, has_pharmacy: bool, has_labs: bool) -> str:
@@ -494,18 +462,15 @@ departments, or services that appear in your context above."""
 def build_context(request: ChatRequest, db: Session, force_english: bool = False):
     hospital_id = request.hospital_id
     question = request.question
-    today_str = datetime.now().strftime("%d-%m-%Y")
     prompt_date_str = datetime.now().strftime("%A, %B %d, %Y")
 
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
     if not hospital:
         raise HTTPException(status_code=404, detail="Hospital not found")
 
-# Fetch all structured data from the DB
     all_medicines = db.query(Medicine).filter(Medicine.hospital_id == hospital_id).all()
     all_tests = db.query(LabTest).filter(LabTest.hospital_id == hospital_id).all()
 
-    # Build the context strings
     doctor_context, doctors_included = build_doctor_context(question, hospital_id, db)
     pharmacy_context = build_pharmacy_context(question, all_medicines)
     lab_tests_context = build_lab_tests_context(question, all_tests)
@@ -519,14 +484,14 @@ def build_context(request: ChatRequest, db: Session, force_english: bool = False
     )
     kb_context, chunks_included = build_kb_context(raw_results)
 
-    lang_instruction = build_system_prompt_malayalam() if request.language == "ml" else build_system_prompt_english()
+    lang_instruction = build_system_prompt_malayalam() if (request.language == "ml" and not force_english) else build_system_prompt_english()
 
     fallback_instruction = build_fallback_instruction(
-    doctors_found=doctors_included,
-    kb_chunks=chunks_included,
-    has_pharmacy=len(all_medicines) > 0,
-    has_labs=len(all_tests) > 0
-)
+        doctors_found=doctors_included,
+        kb_chunks=chunks_included,
+        has_pharmacy=len(all_medicines) > 0,
+        has_labs=len(all_tests) > 0
+    )
 
     parts = [
         f"You are Arogya, the AI Assistant for {hospital.name}.",
@@ -540,7 +505,7 @@ def build_context(request: ChatRequest, db: Session, force_english: bool = False
     ]
     if pharmacy_context:
         parts.extend(["", pharmacy_context])
-        
+
     if lab_tests_context:
         parts.extend(["", lab_tests_context])
 
@@ -554,8 +519,8 @@ def build_context(request: ChatRequest, db: Session, force_english: bool = False
     prompt_chars = len(system_prompt)
     if prompt_chars > SYSTEM_PROMPT_WARN_CHARS:
         logger.warning(
-            "System prompt over soft limit hospital_id=%s: %d chars (~%d tokens) doctors=%d/%d kb=%d",
-            hospital_id, prompt_chars, prompt_chars // 4, doctors_included, len(all_doctors), chunks_included,
+            "System prompt over soft limit hospital_id=%s: %d chars (~%d tokens) doctors=%d kb=%d",
+            hospital_id, prompt_chars, prompt_chars // 4, doctors_included, chunks_included,
         )
 
     history_messages = build_history_messages(request.history or [])
@@ -688,7 +653,6 @@ async def get_suggestions(hospital_id: int, db: Session = Depends(get_db)):
     en_suggestions = ["Which doctors are available today?"]
     ml_suggestions = ["ഇന്ന് ഏത് ഡോക്ടർ ഉണ്ട്?"]
 
-    # Pick 2 real departments for specific questions
     for dept in dept_names[:2]:
         en_suggestions.append(f"Is there a {dept} doctor today?")
         ml_suggestions.append(f"ഇന്ന് {dept} ഡോക്ടർ ഉണ്ടോ?")
@@ -766,22 +730,21 @@ async def upload_pdf(file: UploadFile = File(...), hospital_id: int = Form(...),
 
 @router.post("/chat")
 async def chat_with_arogya(request: ChatRequest, db: Session = Depends(get_db)):
-    is_malayalam = request.language == "ml"
+    # Non-streaming endpoint always responds in the requested language natively
+    _, openai_messages, _ = build_context(request, db, force_english=False)
 
-    english_question = request.question
-    if is_malayalam:
-        english_question = _translate(request.question, source="ml", target="en")
-        logger.info("[Translation] ml->en: %r -> %r", request.question[:80], english_question[:80])
-
-    translated_request = request.model_copy(update={"question": english_question})
-    _, openai_messages, _ = build_context(translated_request, db, force_english=True)
+    # For Malayalam, prepend the English question as a hidden note for context retrieval
+    # but the system prompt already instructs the model to reply in Malayalam
+    if request.language == "ml":
+        english_question = await _translate_async(request.question, "ml", "en")
+        openai_messages[-1]["content"] = (
+            f"[User asked in Malayalam: {request.question}]\n"
+            f"[English translation for your reference: {english_question}]\n"
+            f"Reply in Malayalam only."
+        )
 
     ai_response = client.chat.completions.create(model=OPENAI_MODEL, messages=openai_messages)
-    english_answer = ai_response.choices[0].message.content or ""
-
-    final_answer = english_answer
-    if is_malayalam:
-        final_answer = _translate(english_answer, source="en", target="ml")
+    answer = ai_response.choices[0].message.content or ""
 
     usage = ai_response.usage
     db.add(UsageLedger(
@@ -790,33 +753,18 @@ async def chat_with_arogya(request: ChatRequest, db: Session = Depends(get_db)):
         total_tokens=usage.total_tokens, estimated_cost=(usage.total_tokens / 1_000_000) * 0.15
     ))
     db.commit()
-    return {"answer": final_answer}
+    return {"answer": answer}
+
 
 # =============================================================================
-# COMPLETE REPLACEMENT for the chat_stream endpoint and classify_user_intent
-# in backend/app/api/v1/endpoints/ai.py
-#
-# Replace everything from:
-#   async def classify_user_intent(...)
-# through to the end of the file.
+# INTENT CLASSIFICATION
 # =============================================================================
+
 async def normalise_booking_input(
     raw_message: str,
     current_field: str,
     conversation_context: str = ""
 ) -> dict:
-    """
-    Uses the LLM to intelligently interpret and normalise a user's message
-    in the context of what field is currently being collected.
-
-    Returns a dict:
-    {
-        "intent": "provide" | "correct" | "cancel" | "unclear",
-        "field_to_correct": "phone" | "name" | "age" | "date" | "time" | "doctor" | null,
-        "normalised_value": "cleaned value ready to use" | null,
-        "reason": "brief explanation if unclear or correction"
-    }
-    """
     system_prompt = f"""You are a data extraction assistant for a hospital booking system.
 
 The assistant is currently collecting: {current_field}
@@ -832,11 +780,11 @@ Your job is to interpret what the user means and return a JSON object with these
 - "reason": brief note if intent is "unclear" or "correct"
 
 CRITICAL RULES for normalisation:
-- Phone numbers: Convert spoken/spaced digits to a single string of digits. "94 67 48 74 48" → "9467487448". "nine four six seven..." → "9467487448". Remove all spaces, dashes, brackets.
+- Phone numbers: Convert spoken/spaced digits to a single string of digits. "94 67 48 74 48" → "9467487448". Remove all spaces, dashes, brackets.
 - Names: Extract only the person's name. "Reetha and she is 50 years old" → "Reetha". "My name is John" → "John".
 - Ages: Extract only the number. "I am 45 years old" → "45". "forty five" → "45".
-- Corrections: "no my number is wrong" → intent=correct, field_to_correct=phone. "actually my name is..." → intent=correct, field_to_correct=name.
-- True cancellations: "I don't want to book anymore" → intent=cancel. "stop everything" → intent=cancel.
+- Corrections: "no my number is wrong" → intent=correct, field_to_correct=phone.
+- True cancellations: "I don't want to book anymore" → intent=cancel.
 - "no" alone during confirmation step: treat as intent=correct (patient wants to change something), NOT cancel.
 
 Return ONLY valid JSON, no markdown, no explanation."""
@@ -853,7 +801,6 @@ Return ONLY valid JSON, no markdown, no explanation."""
             ]
         )
         result = json.loads(resp.choices[0].message.content)
-        # Ensure all expected keys exist
         return {
             "intent": result.get("intent", "unclear"),
             "field_to_correct": result.get("field_to_correct"),
@@ -862,21 +809,19 @@ Return ONLY valid JSON, no markdown, no explanation."""
         }
     except Exception as e:
         logger.warning("normalise_booking_input failed: %s", e)
-        # Safe fallback: treat as a raw provide with the original message
         return {
             "intent": "provide",
             "field_to_correct": None,
             "normalised_value": raw_message,
             "reason": ""
         }
-    
+
+
 async def classify_user_intent(user_message: str, history: list = []) -> str:
     """
-    Uses a fast LLM call to semantically classify the user's intent.
-    Returns exactly one of: "STATUS", "BOOKING", "CANCEL", or "OTHER"
-    
-    This runs BEFORE build_context so we skip the expensive embedding
-    call entirely when the user is booking or cancelling.
+    Classifies user intent.  Importantly: if the user is mid-booking but asks
+    a general information question, this returns OTHER so that the topic switch
+    is respected and context bleed is avoided.
     """
     history_snippet = ""
     if history:
@@ -891,12 +836,14 @@ Read the conversation and the latest user message, then output exactly ONE word.
 
 Categories:
 STATUS  - User is asking to CHECK an existing appointment status or reference number.
-BOOKING - User wants to book/schedule an appointment, OR is providing booking details.
+BOOKING - User wants to book/schedule an appointment, OR is providing booking details (name, phone, age, date) in the middle of a booking flow.
 CANCEL  - User wants to cancel or stop an ongoing booking process.
-OTHER   - General hospital questions, asking about medicines, lab tests, timings, or doctors.
+OTHER   - General hospital questions: asking about doctors, medicines, lab tests, timings, availability, departments, or any informational question.
 
-RULES:
-- If the user changes the subject to ask a general question (e.g., about medicines, lab tests, or where something is), output: OTHER (Even if you were in the middle of booking).
+STRICT RULES:
+- If the user changes the subject to ask a general question (doctors, medicines, lab tests, timings), output: OTHER — even if you were in the middle of booking.
+- If the user asks "is there a doctor on Wednesday" or similar day/availability question, output: OTHER (not BOOKING).
+- Only output BOOKING if the user explicitly says they want to book, or is actively providing details (name/phone/age) for a booking that's already in progress.
 - Only output the single category word, nothing else."""
 
     context = (
@@ -916,42 +863,46 @@ RULES:
             ]
         )
         intent = resp.choices[0].message.content.strip().upper()
-        # Defensive: only accept known intents
         return intent if intent in {"STATUS", "BOOKING", "CANCEL", "OTHER"} else "OTHER"
     except Exception as e:
         logger.warning("Intent classification failed: %s", e)
         return "OTHER"
 
 
+# =============================================================================
+# CHAT STREAM
+# =============================================================================
+
 @router.post("/chat-stream")
 async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
     is_malayalam = request.language == "ml"
 
-    # Step 1: Translate input if Malayalam
+    # For Malayalam: translate to English for intent classification and context
+    # retrieval, but then generate the Malayalam response natively (no post-translate).
     english_question = request.question
     if is_malayalam:
         english_question = await _translate_async(request.question, "ml", "en")
         logger.info("[Translation] ml->en: %r -> %r", request.question[:60], english_question[:60])
 
-    # Step 2: Classify intent BEFORE any expensive DB/embedding calls
     intent = await classify_user_intent(english_question, request.history or [])
     logger.info("[Intent] %s -> %s", english_question[:60], intent)
 
     async def event_generator() -> AsyncGenerator[str, None]:
         pt = ct = tt = 0
-        
+
         # ── CANCEL ───────────────────────────────────────────────────────────
         if intent == "CANCEL":
-            msg = "Okay, I've cancelled any active requests. How else can I help you?"
-            if is_malayalam:
-                msg = await _translate_async(msg, "en", "ml")
+            msg = (
+                "ശരി, ഞാൻ ബുക്കിംഗ് നിർത്തി. മറ്റേതെങ്കിലും സഹായം വേണോ?"
+                if is_malayalam
+                else "Okay, I've cancelled any active requests. How else can I help you?"
+            )
             yield f"data: {json.dumps(msg)}\n\n"
             yield "data: [DONE]\n\n"
             return
 
         # ── STATUS CHECK ─────────────────────────────────────────────────────
         if intent == "STATUS":
-            # Look for a phone number across current message + recent history
             history_text = " ".join(
                 m.content for m in (request.history or [])[-6:]
             )
@@ -960,11 +911,10 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
 
             if not phone_match:
                 msg = (
-                    "I can check your appointment status! "
-                    "Please share the 10-digit phone number you used when booking."
+                    "അപ്പോയിന്റ്മെന്റ് സ്റ്റാറ്റസ് നോക്കാം! ബുക്ക് ചെയ്തപ്പോൾ ഉപയോഗിച്ച 10 അക്ക ഫോൺ നമ്പർ തരാമോ?"
+                    if is_malayalam
+                    else "I can check your appointment status! Please share the 10-digit phone number you used when booking."
                 )
-                if is_malayalam:
-                    msg = await _translate_async(msg, "en", "ml")
                 yield f"data: {json.dumps(msg)}\n\n"
                 yield "data: [DONE]\n\n"
                 return
@@ -983,16 +933,18 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
 
             if not appts:
                 msg = (
-                    f"I couldn't find any appointments for the number {extracted_phone}. "
-                    "Please double-check the number or contact the reception desk."
+                    f"{extracted_phone} എന്ന നമ്പരിൽ അപ്പോയിന്റ്മെന്റ് കണ്ടില്ല. നമ്പർ ശരിയാണോ എന്ന് ഒന്ന് നോക്കൂ, അല്ലെങ്കിൽ reception-ൽ വിളിക്കൂ."
+                    if is_malayalam
+                    else f"I couldn't find any appointments for the number {extracted_phone}. Please double-check or contact the reception desk."
                 )
-                if is_malayalam:
-                    msg = await _translate_async(msg, "en", "ml")
                 yield f"data: {json.dumps(msg)}\n\n"
                 yield "data: [DONE]\n\n"
                 return
 
-            reply_lines = ["Here is the status of your recent appointments:\n"]
+            reply_lines = [
+                "നിങ്ങളുടെ അപ്പോയിന്റ്മെന്റ് വിവരങ്ങൾ:\n" if is_malayalam
+                else "Here is the status of your recent appointments:\n"
+            ]
             for a in appts:
                 doc = db.query(Doctor).filter(Doctor.id == a.doctor_id).first()
                 doc_name = doc.name if doc else "Unknown"
@@ -1014,18 +966,39 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
             yield "data: [DONE]\n\n"
             return
 
-        # ── BOOKING & GENERAL CHAT (BOOKING or OTHER) ─────────────────────────
-        translated_request = request.model_copy(update={"question": english_question})
+        # ── BOOKING & GENERAL CHAT ────────────────────────────────────────────
+        #
+        # For Malayalam: build context using the English translation, but instruct
+        # the model to generate its reply directly in Malayalam.
+        # This completely eliminates the Google Translate post-processing step
+        # and the garbled/unnatural phrasing it produces.
+        #
+        context_question = english_question if is_malayalam else request.question
+        translated_request = request.model_copy(update={
+            "question": context_question,
+            # Keep language="ml" so build_context uses the Malayalam system prompt
+            "language": request.language,
+        })
         system_prompt, openai_messages, hospital = build_context(
-            translated_request, db, force_english=True
+            translated_request, db, force_english=False
         )
+
+        # For Malayalam, replace the final user message with a bilingual hint so
+        # the model has the original Malayalam text for nuance AND the English for
+        # understanding structured data references.
+        if is_malayalam:
+            openai_messages[-1]["content"] = (
+                f"{request.question}\n"
+                f"[English reference: {english_question}]"
+            )
+
         booking_field_keywords = {
-            "phone": ["phone", "number", "mobile", "contact"],
-            "name":  ["name", "patient's full name", "full name"],
-            "age":   ["age", "how old", "date of birth"],
-            "date":  ["date", "prefer", "which day"],
-            "time":  ["morning", "afternoon", "evening", "time of day"],
-            "doctor":["doctor", "which doctor", "department"],
+            "phone":  ["phone", "number", "mobile", "contact"],
+            "name":   ["name", "patient's full name", "full name"],
+            "age":    ["age", "how old", "date of birth"],
+            "date":   ["date", "prefer", "which day"],
+            "time":   ["morning", "afternoon", "evening", "time of day"],
+            "doctor": ["doctor", "which doctor", "department"],
         }
         current_field = None
         if request.history:
@@ -1038,7 +1011,7 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
                     current_field = field
                     break
 
-        processed_question = english_question
+        processed_question = context_question
         if current_field and intent == "BOOKING":
             context_snippet = "\n".join(
                 f"{'Bot' if m.role == 'assistant' else 'Patient'}: {m.content}"
@@ -1051,15 +1024,18 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
                         current_field, normalised["intent"], normalised["normalised_value"])
 
             if normalised["intent"] == "cancel":
-                msg = "Okay, I've cancelled the booking process. Is there anything else I can help you with?"
-                if is_malayalam: msg = await _translate_async(msg, "en", "ml")
+                msg = (
+                    "ശരി, ബുക്കിംഗ് നിർത്തി. മറ്റേതെങ്കിലും സഹായം വേണോ?"
+                    if is_malayalam
+                    else "Okay, I've cancelled the booking process. Is there anything else I can help you with?"
+                )
                 yield f"data: {json.dumps(msg)}\n\n"
                 yield "data: [DONE]\n\n"
                 return
 
             if normalised["intent"] == "correct":
                 field = normalised.get("field_to_correct", current_field)
-                prompts = {
+                en_prompts = {
                     "phone":  "Of course! Please provide the correct phone number.",
                     "name":   "Of course! What is the correct patient name?",
                     "age":    "Of course! What is the correct age?",
@@ -1067,39 +1043,69 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
                     "time":   "Of course! Morning, afternoon, or evening?",
                     "doctor": "Of course! Which doctor would you like to see?",
                 }
-                msg = prompts.get(field, "Of course! Please provide the correct information.")
-                if is_malayalam: msg = await _translate_async(msg, "en", "ml")
+                ml_prompts = {
+                    "phone":  "ശരി! ശരിയായ ഫോൺ നമ്പർ പറയൂ.",
+                    "name":   "ശരി! രോഗിയുടെ ശരിയായ പേര് എന്താണ്?",
+                    "age":    "ശരി! ശരിയായ പ്രായം എത്ര?",
+                    "date":   "ശരി! ഏത് തീയതി വേണം?",
+                    "time":   "ശരി! രാവിലെ, ഉച്ചക്ക്, അതോ വൈകിട്ട്?",
+                    "doctor": "ശരി! ഏത് ഡോക്ടറെ കാണണം?",
+                }
+                msg = (ml_prompts if is_malayalam else en_prompts).get(
+                    field, "ശരി! ശരിയായ വിവരം പറയൂ." if is_malayalam else "Of course! Please provide the correct information."
+                )
                 yield f"data: {json.dumps(msg)}\n\n"
                 yield "data: [DONE]\n\n"
                 return
 
             if normalised["intent"] == "provide" and normalised["normalised_value"]:
                 processed_question = normalised["normalised_value"]
-                openai_messages[-1]["content"] = processed_question
+                openai_messages[-1]["content"] = (
+                    processed_question
+                    if not is_malayalam
+                    else f"{request.question}\n[English reference: {processed_question}]"
+                )
 
-        # Agent instructions injected into the system prompt
-        agent_instructions = """
+        # Agent instructions (language-aware)
+        if is_malayalam:
+            agent_instructions = """
+APPOINTMENT BOOKING CAPABILITY (for Malayalam conversations):
+You can book appointments. Collect these details one at a time, asking in simple natural Malayalam:
+1. Doctor (use [ID: X] from the doctor list to identify)
+2. Preferred date — ask for a specific date or day of the week
+3. Time of day (morning/afternoon/evening — use: രാവിലെ / ഉച്ചക്ക് / വൈകിട്ട്)
+4. Patient's full name
+5. Patient's age
+6. Phone number (10 digits)
+
+VALIDATION:
+- Phone: exactly 10 digits. If wrong, ask again in Malayalam.
+- Date: must be a future date. Correctly interpret day names: ഞായർ=Sunday, തിങ്കൾ=Monday, ചൊവ്വ=Tuesday, ബുധൻ=Wednesday, വ്യാഴം=Thursday, വെള്ളി=Friday, ശനി=Saturday.
+- Before confirming, show a summary in Malayalam and ask "ഈ വിവരങ്ങൾ ശരിയാണോ?" (Is this correct?)
+
+IMPORTANT: Answer all general questions (doctors, tests, medicines, timings) directly and helpfully.
+Only trigger 'book_appointment' after the patient confirms ALL 6 details."""
+        else:
+            agent_instructions = """
 APPOINTMENT BOOKING CAPABILITY:
 You can book appointments for patients. Collect these details naturally, one at a time:
 1. Doctor (use the [ID: X] from the doctor list above to identify them)
 2. Preferred date (ask for a specific date like "April 20" or "next Monday")
 3. Time of day (morning, afternoon, or evening)
-4. Patient's full name (name only — do not accept extra words)
+4. Patient's full name (name only)
 5. Patient's age (number only, 1-120)
 6. Phone number (must be exactly 10 digits for Indian numbers)
 
 VALIDATION RULES:
-- Phone: exactly 10 digits (or up to 15 with country code). If wrong length, ask again.
-- Name: extract only the name part; ignore extra words like "and she is 30 years old".
+- Phone: exactly 10 digits. If wrong length, ask again.
+- Name: extract only the name part.
 - Date: must be a future date.
 
 IMPORTANT:
 - Answer general questions normally using the knowledge base.
 - Only trigger 'book_appointment' once you have confirmed ALL 6 details with the patient.
-- Before triggering, show a confirmation summary and ask the patient to say 'yes' or 'no'.
+- Before triggering, show a confirmation summary and ask the patient to confirm."""
 
-- If they say no or want to change something, ask which detail to correct.
-"""
         openai_messages[0]["content"] += f"\n\n{agent_instructions}"
 
         tools = [{
@@ -1137,9 +1143,11 @@ IMPORTANT:
             )
         except Exception as e:
             logger.exception("[chat-stream] OpenAI call failed: %s", e)
-            err = "Sorry, I'm having trouble connecting right now. Please try again."
-            if is_malayalam:
-                err = await _translate_async(err, "en", "ml")
+            err = (
+                "ക്ഷമിക്കണം, ഒരു ബന്ധ പ്രശ്നം ഉണ്ട്. ദയവായി വീണ്ടും ശ്രമിക്കൂ."
+                if is_malayalam
+                else "Sorry, I'm having trouble connecting right now. Please try again."
+            )
             yield f"data: {json.dumps(err)}\n\n"
             yield "data: [DONE]\n\n"
             return
@@ -1147,7 +1155,6 @@ IMPORTANT:
         tool_call_name = ""
         tool_call_args = ""
         is_tool_call = False
-        english_chunks: List[str] = []
 
         async for chunk in stream:
             if chunk.usage:
@@ -1167,11 +1174,9 @@ IMPORTANT:
                 if tc.function.arguments:
                     tool_call_args += tc.function.arguments
             elif delta.content and not is_tool_call:
-                token = delta.content
-                if is_malayalam:
-                    english_chunks.append(token)
-                else:
-                    yield f"data: {json.dumps(token)}\n\n"
+                # Stream tokens directly — no post-translation needed since
+                # the LLM generates Malayalam natively now.
+                yield f"data: {json.dumps(delta.content)}\n\n"
 
         # ── Handle tool call (booking) ────────────────────────────────────────
         if is_tool_call and tool_call_name == "book_appointment":
@@ -1181,25 +1186,24 @@ IMPORTANT:
 
                 args = json.loads(tool_call_args)
 
-                # Validate phone length
                 phone_digits = re.sub(r"\D", "", args.get("patient_phone", ""))
                 if len(phone_digits) < 7 or len(phone_digits) > 15:
                     err = (
-                        f"The phone number '{args.get('patient_phone')}' doesn't look right. "
-                        "Please ask the patient to provide their 10-digit mobile number again."
+                        f"ഫോൺ നമ്പർ '{args.get('patient_phone')}' ശരിയല്ല. ദയവായി 10 അക്ക മൊബൈൽ നമ്പർ വീണ്ടും തരൂ."
+                        if is_malayalam
+                        else f"The phone number '{args.get('patient_phone')}' doesn't look right. Please provide the 10-digit mobile number again."
                     )
-                    if is_malayalam:
-                        err = await _translate_async(err, "en", "ml")
                     yield f"data: {json.dumps(err)}\n\n"
                     yield "data: [DONE]\n\n"
                     return
 
-                # Validate age
                 age_str = re.sub(r"\D", "", str(args.get("patient_age", "")))
                 if not age_str or not (1 <= int(age_str) <= 120):
-                    err = "The age doesn't look right. Please ask the patient to confirm their age."
-                    if is_malayalam:
-                        err = await _translate_async(err, "en", "ml")
+                    err = (
+                        "പ്രായം ശരിയല്ല. ദയവായി വീണ്ടും പറയൂ."
+                        if is_malayalam
+                        else "The age doesn't look right. Please confirm the patient's age."
+                    )
                     yield f"data: {json.dumps(err)}\n\n"
                     yield "data: [DONE]\n\n"
                     return
@@ -1211,11 +1215,10 @@ IMPORTANT:
 
                 if not doctor:
                     err = (
-                        "I couldn't find that doctor in the system. "
-                        "Please ask the patient which doctor they'd like to see."
+                        "ആ ഡോക്ടറെ system-ൽ കണ്ടില്ല. ഏത് ഡോക്ടറെ കാണണം?"
+                        if is_malayalam
+                        else "I couldn't find that doctor in the system. Which doctor would you like to see?"
                     )
-                    if is_malayalam:
-                        err = await _translate_async(err, "en", "ml")
                     yield f"data: {json.dumps(err)}\n\n"
                     yield "data: [DONE]\n\n"
                     return
@@ -1257,42 +1260,44 @@ IMPORTANT:
                         time_of_day=appt.time_of_day,
                     )
 
-                success_msg = (
-                    f"✅ **Appointment Request Submitted!**\n\n"
-                    f"Reference: **{appt.reference_number}**\n"
-                    f"Doctor: {doctor.name} ({doctor.department})\n"
-                    f"Date: {appt.preferred_date} — {appt.time_of_day.title()}\n"
-                    f"Patient: {appt.patient_name}, age {appt.patient_age}\n\n"
-                    f"The hospital will call **{appt.patient_phone}** to confirm your slot."
-                )
                 if is_malayalam:
-                    success_msg = await _translate_async(success_msg, "en", "ml")
+                    success_msg = (
+                        f"✅ **അപ്പോയിന്റ്മെന്റ് അപേക്ഷ സ്വീകരിച്ചു!**\n\n"
+                        f"Reference: **{appt.reference_number}**\n"
+                        f"ഡോക്ടർ: {doctor.name} ({doctor.department})\n"
+                        f"തീയതി: {appt.preferred_date} — {appt.time_of_day}\n"
+                        f"രോഗി: {appt.patient_name}, {appt.patient_age} വയസ്സ്\n\n"
+                        f"ആശുപത്രി **{appt.patient_phone}** നമ്പരിൽ വിളിച്ച് slot confirm ചെയ്യും."
+                    )
+                else:
+                    success_msg = (
+                        f"✅ **Appointment Request Submitted!**\n\n"
+                        f"Reference: **{appt.reference_number}**\n"
+                        f"Doctor: {doctor.name} ({doctor.department})\n"
+                        f"Date: {appt.preferred_date} — {appt.time_of_day.title()}\n"
+                        f"Patient: {appt.patient_name}, age {appt.patient_age}\n\n"
+                        f"The hospital will call **{appt.patient_phone}** to confirm your slot."
+                    )
                 yield f"data: {json.dumps(success_msg)}\n\n"
-                yield "data: [DONE]\n\n"  # ← add this
-                return   
+                yield "data: [DONE]\n\n"
+                return
 
             except json.JSONDecodeError:
                 logger.error("[chat-stream] Failed to parse tool args: %r", tool_call_args)
-                err = "Something went wrong while booking. Please try again."
-                if is_malayalam:
-                    err = await _translate_async(err, "en", "ml")
+                err = (
+                    "ബുക്കിംഗ്-ൽ ഒരു error ഉണ്ടായി. ദയവായി വീണ്ടും ശ്രമിക്കൂ."
+                    if is_malayalam
+                    else "Something went wrong while booking. Please try again."
+                )
                 yield f"data: {json.dumps(err)}\n\n"
             except Exception as e:
                 logger.exception("[chat-stream] Tool execution error: %s", e)
-                err = "Sorry, there was a technical error. Please try again."
-                if is_malayalam:
-                    err = await _translate_async(err, "en", "ml")
+                err = (
+                    "ഒരു technical error ഉണ്ടായി. ദയവായി വീണ്ടും ശ്രമിക്കൂ."
+                    if is_malayalam
+                    else "Sorry, there was a technical error. Please try again."
+                )
                 yield f"data: {json.dumps(err)}\n\n"
-
-        else:
-            # Normal chat response — translate if needed
-            if is_malayalam and english_chunks:
-                full_english = "".join(english_chunks)
-                full_malayalam = await _translate_async(full_english, "en", "ml")
-                sentences = re.split(r'(?<=[.!?।\n])\s*', full_malayalam)
-                for sentence in sentences:
-                    if sentence.strip():
-                        yield f"data: {json.dumps(sentence + ' ')}\n\n"
 
         yield "data: [DONE]\n\n"
 
@@ -1316,6 +1321,8 @@ IMPORTANT:
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"}
     )
+
+
 @router.post("/transcribe")
 async def transcribe_audio(
     file: UploadFile = File(...),
@@ -1325,22 +1332,17 @@ async def transcribe_audio(
 ):
     temp_filename = f"temp_{uuid.uuid4().hex}_{file.filename}"
     try:
-        # 1. Save audio temporarily
         with open(temp_filename, "wb") as buffer:
             buffer.write(await file.read())
 
-        # 2. Reject clips that are too short — causes hallucinations
         file_size = os.path.getsize(temp_filename)
-        duration_seconds = file_size / (16000 * 2)  # 16kHz 16-bit mono
+        duration_seconds = file_size / (16000 * 2)
         if duration_seconds < 1.0:
             return {"transcript": ""}
-        if duration_seconds > 28.0:  # Sarvam limit is 30s, give 2s buffer
+        if duration_seconds > 28.0:
             return {"transcript": ""}
 
-        # 3. Pick the right model and language code
         if language == "ml":
-            # saaras:v3 with codemix mode = Malayalam script + English words in English
-            # This is exactly what you need for "ഇന്ന് pediatrician ഉണ്ടോ?"
             model = "saaras:v3"
             lang_code = "ml-IN"
             mode = "codemix"
@@ -1349,7 +1351,6 @@ async def transcribe_audio(
             lang_code = "en-IN"
             mode = "transcribe"
 
-        # 4. Send to Sarvam
         with open(temp_filename, "rb") as audio_file:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
@@ -1372,7 +1373,7 @@ async def transcribe_audio(
         return {"transcript": transcript}
 
     except HTTPException:
-        raise   
+        raise
     except Exception as e:
         logger.error(f"Transcription failed: {e}")
         raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
