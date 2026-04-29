@@ -5,14 +5,11 @@
  *
  * ALL logic comes from useChatCore(). This file contains ZERO API
  * calls, zero state management beyond what useChatCore returns.
- *
- * Design: Emerald header, slate chat area, rounded-full input,
- *         large mic button, bilingual (EN / ML) suggestion chips.
  * ─────────────────────────────────────────────────────────────────
  */
 
 import 'regenerator-runtime/runtime';
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Mic, MicOff, Send, Zap, Activity, Loader2, AlertCircle } from 'lucide-react';
 import ChatMessage from './ChatMessage';
 import { useChatCore } from '../../components/common/ChatCore';
@@ -21,32 +18,62 @@ interface ChatProps {
   hospitalId: string;
 }
 
+// ── 1. Strict Types (No more 'any') ────────────────────────────
+type MicState = 'idle' | 'recording' | 'transcribing';
+type Language = 'en' | 'ml';
+
+interface ChatMessageData {
+  role: 'user' | 'assistant';
+  content: string;
+  isStreaming?: boolean;
+}
+
+interface ChatCoreReturn {
+  language: Language;
+  setLanguage: React.Dispatch<React.SetStateAction<Language>>;
+  messages: ChatMessageData[];
+  isStreaming: boolean;
+  inputText: string;
+  setInputText: (text: string) => void;
+  micState: MicState;
+  micError: string | null;
+  suggestions: { en: string[]; ml: string[] };
+  handleSend: (text?: string) => Promise<void>;
+  toggleMic: () => void;
+  vadLoading: boolean;
+}
+
 const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
+  // ── 2. Destructure with our strict interface ──────────────────
   const {
-    language, setLanguage,
-    messages, isStreaming,
+    language, setLanguage, messages, isStreaming,
     inputText, setInputText,
     micState, micError,
     suggestions,
     handleSend, toggleMic,
-    vadLoading,
-    scrollRef,
-  } = useChatCore(hospitalId);
+    vadLoading
+  } = useChatCore(hospitalId) as ChatCoreReturn;
 
-  // ── Mic button appearance ─────────────────────────────────────
-  const micBtnClass = {
+  // ── 3. Bring back the Scroll Ref (UI logic belongs here) ──────
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // ── 4. Mic button appearance ──────────────────────────────────
+  const micBtnClass: Record<MicState, string> = {
     idle:         'bg-emerald-50 text-emerald-600 hover:bg-emerald-100',
     recording:    'bg-red-500 text-white ring-4 ring-red-100 animate-pulse',
     transcribing: 'bg-emerald-600 text-white opacity-80',
-  }[micState];
+  };
 
-  const micLabel = {
+  const micLabel: Record<MicState, string> = {
     idle:         vadLoading
                     ? (language === 'en' ? 'Loading AI…' : 'ലോഡുചെയ്യുന്നു…')
                     : (language === 'en' ? 'Tap to speak' : 'സംസാരിക്കുക'),
     recording:    language === 'en' ? 'Listening…'   : 'ശ്രദ്ധിക്കുന്നു…',
     transcribing: language === 'en' ? 'Translating…' : 'വിവർത്തനം ചെയ്യുന്നു…',
-  }[micState];
+  };
 
   // ── Render ────────────────────────────────────────────────────
   return (
@@ -65,7 +92,7 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
             <Activity className="w-4 h-4" /> Ask Arogya
           </h3>
           <button
-            onClick={() => setLanguage((l: string) => l === 'en' ? 'ml' : 'en')}
+            onClick={() => setLanguage(l => l === 'en' ? 'ml' : 'en')}
             disabled={micState !== 'idle'}
             className="bg-emerald-700 px-3 py-1 rounded-md text-xs font-bold border border-white/20 disabled:opacity-50 ml-text"
           >
@@ -99,7 +126,7 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
       {/* ── Suggestion chips ─────────────────────────────────────── */}
       <div className="px-4 py-2 bg-slate-50 border-t border-slate-100">
         <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-          {suggestions[language].map((text: string, i: number) => (
+          {suggestions[language].map((text, i) => (
             <button
               key={i}
               disabled={isStreaming || micState !== 'idle'}
@@ -146,8 +173,8 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
             type="button"
             onClick={toggleMic}
             disabled={isStreaming || micState === 'transcribing' || vadLoading}
-            className={`p-4 rounded-full transition-all transform active:scale-90 shadow-lg disabled:opacity-50 flex items-center justify-center ${micBtnClass}`}
-            aria-label={micLabel}
+            className={`p-4 rounded-full transition-all transform active:scale-90 shadow-lg disabled:opacity-50 flex items-center justify-center ${micBtnClass[micState]}`}
+            aria-label={micLabel[micState]}
           >
             {vadLoading          ? <Loader2 className="w-6 h-6 animate-spin" /> :
              micState === 'recording'    ? <MicOff className="w-6 h-6" /> :
@@ -155,7 +182,7 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
                                            <Mic className="w-6 h-6" />}
           </button>
           <p className="text-[9px] uppercase tracking-widest text-slate-400 font-black mt-2 text-center ml-text">
-            {micLabel}
+            {micLabel[micState]}
           </p>
         </div>
       </div>
