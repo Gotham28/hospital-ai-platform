@@ -14,7 +14,6 @@ import 'regenerator-runtime/runtime';
 import React from 'react';
 import Chat from './Chat';
 import { ShieldCheck } from 'lucide-react';
-import './arogya-specialty.css';
 
 interface ArogyaThemeProps {
   hospitalId?: number;
