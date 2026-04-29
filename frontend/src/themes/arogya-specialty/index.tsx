@@ -30,10 +30,12 @@ const ArogyaTheme: React.FC<ArogyaThemeProps> = ({ hospitalId, hospitalName }) =
           <div className="w-10 h-10 bg-emerald-600 rounded-lg flex items-center justify-center text-white font-bold text-xl shadow-md">
             A
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-800">
-            {hospitalName || 'Arogya'}{' '}
-            <span className="text-emerald-600">Specialty</span>
-          </h1>
+
+<h1 className="text-2xl font-bold tracking-tight text-slate-800">
+  {hospitalName || (
+    <>Arogya <span className="text-emerald-600">Specialty</span></>
+  )}
+</h1>
         </div>
         <div className="hidden md:flex items-center gap-2 text-xs text-slate-500 font-medium">
           <ShieldCheck className="w-4 h-4 text-emerald-500" />
