@@ -1,50 +1,71 @@
-import React, { useEffect, useRef } from 'react';
-import ChatMessage from './ChatMessage';
-import { Mic, MicOff, Send, Zap, Activity, Loader2, AlertCircle } from 'lucide-react';
-import { useHospitalChat } from '../../hooks/useHospitalChat'; // Import the "brain"
+/**
+ * arogya-specialty/Chat.tsx
+ * ─────────────────────────────────────────────────────────────────
+ * AROGYA THEME — full chat widget UI (voice + text + suggestions).
+ *
+ * ALL logic comes from useChatCore(). This file contains ZERO API
+ * calls, zero state management beyond what useChatCore returns.
+ *
+ * Design: Emerald header, slate chat area, rounded-full input,
+ *         large mic button, bilingual (EN / ML) suggestion chips.
+ * ─────────────────────────────────────────────────────────────────
+ */
 
-interface ChatProps { hospitalId: string; }
+import 'regenerator-runtime/runtime';
+import React from 'react';
+import { Mic, MicOff, Send, Zap, Activity, Loader2, AlertCircle } from 'lucide-react';
+import ChatMessage from './ChatMessage';
+import { useChatCore } from '../../components/common/ChatCore';
+
+interface ChatProps {
+  hospitalId: string;
+}
 
 const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
-  // Plug the UI into the brain
   const {
-  language, setLanguage, messages, isStreaming, inputText, setInputText,
-  micState, micError, suggestions, handleSend, toggleMic, vadLoading  // ✅ vad → vadLoading
-} = useHospitalChat(hospitalId);
+    language, setLanguage,
+    messages, isStreaming,
+    inputText, setInputText,
+    micState, micError,
+    suggestions,
+    handleSend, toggleMic,
+    vadLoading,
+    scrollRef,
+  } = useChatCore(hospitalId);
 
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
-
+  // ── Mic button appearance ─────────────────────────────────────
   const micBtnClass = {
-    idle: 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100',
-    recording: 'bg-red-500 text-white ring-4 ring-red-100 animate-pulse',
+    idle:         'bg-emerald-50 text-emerald-600 hover:bg-emerald-100',
+    recording:    'bg-red-500 text-white ring-4 ring-red-100 animate-pulse',
     transcribing: 'bg-emerald-600 text-white opacity-80',
   }[micState];
 
   const micLabel = {
-    idle: vadLoading 
-            ? (language === 'en' ? 'Loading AI...' : 'ലോഡുചെയ്യുന്നു...') 
-            : (language === 'en' ? 'Tap to speak' : 'സംസാരിക്കുക'),
-    recording: language === 'en' ? 'Listening...' : 'ശ്രദ്ധിക്കുന്നു...',
-    transcribing: language === 'en' ? 'Translating...' : 'വിവർത്തനം ചെയ്യുന്നു...',
+    idle:         vadLoading
+                    ? (language === 'en' ? 'Loading AI…' : 'ലോഡുചെയ്യുന്നു…')
+                    : (language === 'en' ? 'Tap to speak' : 'സംസാരിക്കുക'),
+    recording:    language === 'en' ? 'Listening…'   : 'ശ്രദ്ധിക്കുന്നു…',
+    transcribing: language === 'en' ? 'Translating…' : 'വിവർത്തനം ചെയ്യുന്നു…',
   }[micState];
 
+  // ── Render ────────────────────────────────────────────────────
   return (
     <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 flex flex-col h-[650px]">
+
+      {/* Malayalam font import */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Malayalam:wght@400;500;700&display=swap');
         .ml-text { font-family: 'Noto Sans Malayalam', sans-serif !important; }
       `}</style>
 
-      {/* Header (Arogya Theme Colors) */}
+      {/* ── Header ──────────────────────────────────────────────── */}
       <div className="bg-emerald-600 p-4 text-white shrink-0 shadow-md">
         <div className="flex justify-between items-center">
           <h3 className="font-bold flex items-center gap-2">
             <Activity className="w-4 h-4" /> Ask Arogya
           </h3>
           <button
-            onClick={() => setLanguage(l => l === 'en' ? 'ml' : 'en')}
+            onClick={() => setLanguage((l: string) => l === 'en' ? 'ml' : 'en')}
             disabled={micState !== 'idle'}
             className="bg-emerald-700 px-3 py-1 rounded-md text-xs font-bold border border-white/20 disabled:opacity-50 ml-text"
           >
@@ -53,35 +74,46 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
         </div>
       </div>
 
-      {/* Chat area */}
+      {/* ── Messages ─────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
         {messages.map((msg, idx) => (
-          <ChatMessage key={idx} role={msg.role} content={msg.content} isStreaming={msg.isStreaming} language={language} />
+          <ChatMessage
+            key={idx}
+            role={msg.role}
+            content={msg.content}
+            isStreaming={msg.isStreaming}
+            language={language}
+          />
         ))}
         {isStreaming && messages[messages.length - 1]?.content === '' && (
           <div className="flex items-center gap-2 text-emerald-600 p-2 bg-white rounded-lg w-fit shadow-sm border border-slate-100">
             <Loader2 className="w-4 h-4 animate-spin" />
             <span className="text-[10px] font-bold ml-text">
-              {language === 'ml' ? 'ആരോഗ്യ പരിശോധിക്കുന്നു...' : 'Arogya is checking...'}
+              {language === 'ml' ? 'ആരോഗ്യ പരിശോധിക്കുന്നു…' : 'Arogya is checking…'}
             </span>
           </div>
         )}
         <div ref={scrollRef} />
       </div>
 
-      {/* Suggestion chips */}
+      {/* ── Suggestion chips ─────────────────────────────────────── */}
       <div className="px-4 py-2 bg-slate-50 border-t border-slate-100">
         <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-          {suggestions[language].map((text, i) => (
-            <button key={i} disabled={isStreaming || micState !== 'idle'} onClick={() => handleSend(text)}
-              className="flex-none bg-white border border-emerald-100 text-emerald-700 text-[11px] px-3 py-1.5 rounded-full shadow-sm hover:bg-emerald-50 active:scale-95 transition-all disabled:opacity-40 whitespace-nowrap ml-text">
-              <Zap className="w-3 h-3 text-amber-400 fill-amber-400 inline mr-1" />{text}
+          {suggestions[language].map((text: string, i: number) => (
+            <button
+              key={i}
+              disabled={isStreaming || micState !== 'idle'}
+              onClick={() => handleSend(text)}
+              className="flex-none bg-white border border-emerald-100 text-emerald-700 text-[11px] px-3 py-1.5 rounded-full shadow-sm hover:bg-emerald-50 active:scale-95 transition-all disabled:opacity-40 whitespace-nowrap ml-text"
+            >
+              <Zap className="w-3 h-3 text-amber-400 fill-amber-400 inline mr-1" />
+              {text}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Input + mic */}
+      {/* ── Input + mic ──────────────────────────────────────────── */}
       <div className="p-4 border-t bg-white shrink-0 space-y-3">
         {micError && (
           <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
@@ -91,32 +123,39 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
         )}
 
         <div className="flex items-center gap-2">
-          <input type="text" value={inputText} onChange={e => setInputText(e.target.value)}
+          <input
+            type="text"
+            value={inputText}
+            onChange={e => setInputText(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !isStreaming && handleSend()}
             placeholder={language === 'en' ? 'Ask anything…' : 'ചോദിക്കൂ…'}
             disabled={isStreaming || micState !== 'idle'}
-            className="flex-1 bg-slate-100 border-none rounded-full px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-60 ml-text" />
-          <button onClick={() => handleSend()} disabled={isStreaming || !inputText.trim() || micState !== 'idle'}
-            className="p-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-700 disabled:opacity-40">
+            className="flex-1 bg-slate-100 border-none rounded-full px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-60 ml-text"
+          />
+          <button
+            onClick={() => handleSend()}
+            disabled={isStreaming || !inputText.trim() || micState !== 'idle'}
+            className="p-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-700 disabled:opacity-40"
+          >
             <Send className="w-4 h-4" />
           </button>
         </div>
 
-<div className="flex flex-col items-center">
-          <button type="button" onClick={toggleMic} 
+        <div className="flex flex-col items-center">
+          <button
+            type="button"
+            onClick={toggleMic}
             disabled={isStreaming || micState === 'transcribing' || vadLoading}
             className={`p-4 rounded-full transition-all transform active:scale-90 shadow-lg disabled:opacity-50 flex items-center justify-center ${micBtnClass}`}
-            aria-label={micLabel}>
-            
-            {/* Show a spinner if VAD is downloading its files */}
-            {vadLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : 
-             micState === 'recording' ? <MicOff className="w-6 h-6" /> : 
-             micState === 'transcribing' ? <Loader2 className="w-6 h-6 animate-spin" /> : 
-             <Mic className="w-6 h-6" />}
-             
+            aria-label={micLabel}
+          >
+            {vadLoading          ? <Loader2 className="w-6 h-6 animate-spin" /> :
+             micState === 'recording'    ? <MicOff className="w-6 h-6" /> :
+             micState === 'transcribing' ? <Loader2 className="w-6 h-6 animate-spin" /> :
+                                           <Mic className="w-6 h-6" />}
           </button>
           <p className="text-[9px] uppercase tracking-widest text-slate-400 font-black mt-2 text-center ml-text">
-             {micLabel}
+            {micLabel}
           </p>
         </div>
       </div>

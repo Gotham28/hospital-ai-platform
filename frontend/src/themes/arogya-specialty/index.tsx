@@ -1,48 +1,123 @@
-import 'regenerator-runtime/runtime'; 
+/**
+ * bkm-hospital-payannur/index.tsx
+ * ─────────────────────────────────────────────────────────────────
+ * BKM HOSPITAL THEME — page wrapper / landing layout.
+ *
+ * Design: Sapphire & Amber dark mode.
+ * Uses SharedChat (from common) for the chat widget — no custom
+ * Chat component needed because BKM uses text-only chat.
+ *
+ * To add voice/mic to BKM in future: create bkm-hospital-payannur/Chat.tsx
+ * using useChatCore(), and replace <SharedChat> below with <Chat>.
+ *
+ * ⚠️  ONLY UI here. Zero logic, zero API calls.
+ * ─────────────────────────────────────────────────────────────────
+ */
+
 import React from 'react';
-import Chat from './Chat'; 
-import { ShieldCheck, Activity } from 'lucide-react';
+import { SharedChat } from '../../components/common/SharedChat';
+import './bkm-hospital.css';
 
-// REMOVE: import ReactDOM from 'react-dom/client'; <-- This belongs in main.tsx, not here.
-
-interface ArogyaThemeProps {
+interface BkmThemeProps {
   hospitalId?: number;
   hospitalName?: string;
 }
 
-const ArogyaTheme: React.FC<ArogyaThemeProps> = ({ hospitalId, hospitalName }) => {
+const BkmTheme: React.FC<BkmThemeProps> = ({ hospitalId, hospitalName }) => {
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
-      <header className="bg-white border-b px-8 py-4 flex justify-between items-center sticky top-0 z-10">
-        <div className="flex items-center gap-2">
-          <div className="w-10 h-10 bg-emerald-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">A</div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-800">
-            {hospitalName || 'Arogya'} <span className="text-emerald-600">Specialty</span>
-          </h1>
+    <div className="bkm-theme-wrapper">
+
+      {/* ── Header ──────────────────────────────────────────────── */}
+      <header className="bkm-header flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {/* Logo mark */}
+          <div
+            style={{
+              width: 44, height: 44,
+              background: 'linear-gradient(135deg, #1e3a8a, #06b6d4)',
+              borderRadius: 10,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontWeight: 900, fontSize: 20, color: '#f8fafc',
+              boxShadow: '0 0 16px rgba(6,182,212,0.35)',
+            }}
+          >
+            B
+          </div>
+          <div>
+            <div className="bkm-logo-text">
+              {hospitalName ?? 'BKM Hospital'}{' '}
+              <span className="bkm-logo-accent">Payannur</span>
+            </div>
+            <div className="bkm-header-tagline">AI Patient Assistant</div>
+          </div>
+        </div>
+
+        {/* Status pill */}
+        <div className="bkm-badge" style={{ fontSize: '0.7rem', letterSpacing: '0.06em' }}>
+          ● Online
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-12 grid lg:grid-cols-2 gap-12 items-center">
-        <div className="space-y-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-medium">
-            <ShieldCheck className="w-4 h-4" /> Powered by Gothos Labs
+      {/* ── Main content ─────────────────────────────────────────── */}
+      <main
+        style={{
+          maxWidth: 1100,
+          margin: '0 auto',
+          padding: '3rem 1.5rem',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          gap: '2rem',
+          alignItems: 'start',
+        }}
+      >
+        {/* Left — info cards */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+          <div className="bkm-card">
+            <div className="bkm-card-header">
+              <span className="bkm-card-title">About</span>
+              <span className="bkm-badge">Established</span>
+            </div>
+            <p style={{ fontSize: '0.875rem', color: 'var(--bkm-text-muted)', lineHeight: 1.7 }}>
+              BKM Hospital, Payannur — a trusted multi-specialty hospital serving
+              North Kerala. Ask our AI assistant about doctors, availability,
+              appointments, and more.
+            </p>
           </div>
-          <h2 className="text-5xl font-extrabold leading-tight">
-            Advanced Care, <br />
-            <span className="text-emerald-600">Voice-Enabled AI.</span>
-          </h2>
-          <p className="text-lg text-slate-600">
-            Welcome to the official portal for {hospitalName}. Experience the future of healthcare with our regional voice assistant.
-          </p>
+
+          <div className="bkm-card">
+            <div className="bkm-card-header">
+              <span className="bkm-card-title">Quick Actions</span>
+            </div>
+            <ul style={{ fontSize: '0.875rem', color: 'var(--bkm-text-muted)', lineHeight: 2 }}>
+              {[
+                '🩺 Check doctor availability',
+                '📅 Book an appointment',
+                '💊 Pharmacy enquiry',
+                '🔬 Lab test information',
+              ].map(item => <li key={item}>{item}</li>)}
+            </ul>
+          </div>
+
+          <div className="bkm-card">
+            <div className="bkm-card-header">
+              <span className="bkm-card-title">Contact</span>
+              <span className="bkm-badge priority">Reception</span>
+            </div>
+            <p style={{ fontSize: '0.875rem', color: 'var(--bkm-text-muted)' }}>
+              For urgent enquiries, call the reception desk directly.
+              The AI assistant handles general queries 24 × 7.
+            </p>
+          </div>
         </div>
 
-        <div className="flex flex-col items-center">
-          {/* Ensure hospitalId is passed correctly to the Chat logic */}
-          <Chat hospitalId={hospitalId?.toString() || ""} />
+        {/* Right — Chat */}
+        <div style={{ height: '70vh', minHeight: 480 }}>
+          <SharedChat hospitalId={hospitalId ?? 0} />
         </div>
       </main>
     </div>
   );
 };
 
-export default ArogyaTheme;
+export default BkmTheme;
