@@ -40,7 +40,8 @@ async_client = AsyncOpenAI(api_key=_api_key)
 _redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
 _redis = redis.from_url(_redis_url, decode_responses=True)
 BOOKING_SESSION_TTL      = 600
-OPENAI_MODEL             = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_MODEL    = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_MODEL_ML = os.getenv("OPENAI_MODEL_ML", "gpt-4o")
 OPENAI_COST_PER_MTok     = float(os.getenv("OPENAI_COST_PER_MTok", "0.15"))
 MAX_HISTORY_TURNS        = 10
 PDF_CHUNK_SIZE           = 800
@@ -419,23 +420,21 @@ def build_system_prompt_english() -> str:
 Be concise and conversational — 1 to 2 short sentences maximum.
 Speak like a warm, professional hospital receptionist.
 When referring to doctors, always use "Dr." prefix and speak respectfully.
-
-CRITICAL: Each question is independent. When a patient asks about a new topic (e.g. moves from lab tests to asking about a doctor), treat it as a fresh question. Do NOT carry assumptions from the previous topic into your new answer."""
+Treat each question independently — do not carry assumptions from a previous topic into a new answer."""
 
 
 def build_system_prompt_malayalam() -> str:
-    return """നിങ്ങൾ മലയാളത്തിൽ മാത്രം മറുപടി നൽകണം — ഒരിക്കലും ഇംഗ്ലീഷിൽ അല്ല.
+    return """നിങ്ങൾ മലയാളത്തിൽ മാത്രം മറുപടി നൽകണം.
 
-ഭാഷാ നിയമങ്ങൾ (MANDATORY):
-- ലളിതമായ, ദൈനംദിന മലയാളം ഉപയോഗിക്കുക. ഒരു ആശുപത്രി റിസപ്ഷനിൽ ജോലി ചെയ്യുന്ന ആൾ സംസാരിക്കുന്നതുപോലെ.
-- "ആദരണീയ ഡോക്ടർ", "ആശ്ലേഷം", "ഉറപ്പിക്കൂ" തുടങ്ങിയ ഔദ്യോഗിക/ഫോർമൽ വാക്കുകൾ ഉപയോഗിക്കരുത്.
-- ദിവസങ്ങൾ: "ബുധനാഴ്ച", "വ്യാഴാഴ്ച", "വെള്ളിയാഴ്ച" — ഇങ്ങനെ ഉപയോഗിക്കുക, കൃത്യമായി.
-- Medical terms (General Medicine, Pediatrics, Cardiology etc.) ഇംഗ്ലീഷിൽ തന്നെ ഉപയോഗിക്കുക.
-- ഡോക്ടർ: "ഡോക്ടർ [പേര്]" (ആദ്യക്ഷരം വലിയത്).
-- "അദ്ദേഹം" / "ഇദ്ദേഹം" ഉപയോഗിക്കുക — "അവൻ" / "അവൾ" ഒരിക്കലും പാടില്ല.
-- 1–2 വാക്യങ്ങൾ മാത്രം. ചുരുക്കമായി, കൃത്യമായി.
+നിങ്ങൾ ഒരു ആശുപത്രി receptionist ആണ് — നാട്ടുകാർ സ്വാഭാവികമായി സംസാരിക്കുന്നതുപോലെ ഉത്തരം നൽകൂ.
+ചുരുക്കമായി, ലളിതമായി — 1 മുതൽ 2 വാക്യം മാത്രം.
 
-CRITICAL: ഓരോ ചോദ്യവും സ്വതന്ത്രമാണ്. ഒരു വിഷയത്തിൽ നിന്ന് മറ്റൊന്നിലേക്ക് (ഉദാ: ലാബ് ടെസ്റ്റ് → ഡോക്ടർ) മാറുമ്പോൾ, മുൻ ചോദ്യത്തിന്റെ context പുതിയ ഉത്തരത്തിൽ കലർത്തരുത്."""
+നിയമങ്ങൾ:
+- "എല്ലാവിധ", "ഉറപ്പിക്കൂ", "ആദരണീയ" പോലുള്ള formal വാക്കുകൾ ഉപയോഗിക്കരുത്
+- ദിവസം കൃത്യമായി പറയുക: ഞായർ തിങ്കൾ ചൊവ്വ ബുധൻ വ്യാഴം വെള്ളി ശനി
+- ഡോക്ടർ: "ഡോക്ടർ [പേര്]", "അദ്ദേഹം"/"ഇദ്ദേഹം" — "അവൻ"/"അവൾ" പാടില്ല
+- Medical terms (Cardiology, General Medicine, etc.) ഇംഗ്ലീഷിൽ തന്നെ നിലനിർത്തുക
+- ഓരോ ചോദ്യവും സ്വതന്ത്രമായി ഉത്തരം നൽകുക — മുൻ topic carry forward ചെയ്യരുത്"""
 
 
 def build_fallback_instruction(doctors_found: int, kb_chunks: int, has_pharmacy: bool, has_labs: bool) -> str:
@@ -492,6 +491,24 @@ def build_context(request: ChatRequest, db: Session, force_english: bool = False
         has_pharmacy=len(all_medicines) > 0,
         has_labs=len(all_tests) > 0
     )
+    # If a doctor is already selected mid-booking, pin their full details at the top
+    pinned_doctor_context = ""
+    if request.history:
+        for msg in reversed(request.history):
+            id_match = re.search(r"\[ID:\s*(\d+)\]", msg.content)
+            if id_match:
+                pin_id = int(id_match.group(1))
+                pinned = db.query(Doctor).filter(
+                    Doctor.id == pin_id,
+                    Doctor.hospital_id == hospital_id
+                ).first()
+                if pinned:
+                    status = check_doctor_availability_db(pinned, db, datetime.now())
+                    pinned_doctor_context = (
+                        f"SELECTED DOCTOR (already confirmed by patient):\n"
+                        f"- [ID: {pinned.id}] Dr. {pinned.name} ({pinned.department}): {status}\n"
+                    )
+                break
 
     parts = [
         f"You are Arogya, the AI Assistant for {hospital.name}.",
@@ -500,7 +517,7 @@ def build_context(request: ChatRequest, db: Session, force_english: bool = False
         hospital.system_prompt or "",
         "",
         lang_instruction,
-        "",
+        "",pinned_doctor_context,
         doctor_context,
     ]
     if pharmacy_context:
@@ -539,10 +556,31 @@ def build_context(request: ChatRequest, db: Session, force_english: bool = False
 def build_history_messages(history: List[HistoryMessage]) -> List[dict]:
     if not history:
         return []
-    trimmed = history[-(MAX_HISTORY_TURNS * 2):]
-    if trimmed and trimmed[0].role != "user":
-        trimmed = trimmed[1:]
-    return [{"role": m.role, "content": m.content} for m in trimmed]
+
+    RECENT_TURNS = 4          # always pass last 4 turns verbatim
+    SUMMARY_THRESHOLD = 6     # only summarise if there are more than this many total messages
+
+    recent = history[-(RECENT_TURNS * 2):]
+    older  = history[:-(RECENT_TURNS * 2)]
+
+    messages = []
+
+    # If there are older turns worth summarising, collapse them into one system note
+    if len(older) >= SUMMARY_THRESHOLD:
+        topics = []
+        for m in older:
+            if m.role == "user":
+                topics.append(m.content[:120])
+        if topics:
+            summary = "Earlier in this conversation the patient asked about: " + "; ".join(topics[-4:])
+            messages.append({"role": "system", "content": summary})
+
+    # Ensure we start on a user turn
+    if recent and recent[0].role != "user":
+        recent = recent[1:]
+
+    messages.extend({"role": m.role, "content": m.content} for m in recent)
+    return messages
 
 
 # =============================================================================
@@ -1135,9 +1173,10 @@ IMPORTANT:
 
         try:
             stream = await async_client.chat.completions.create(
-                model=OPENAI_MODEL,
+                model=OPENAI_MODEL_ML if is_malayalam else OPENAI_MODEL,
                 messages=openai_messages,
                 tools=tools,
+                temperature=0.3,
                 stream=True,
                 stream_options={"include_usage": True}
             )

@@ -9,6 +9,7 @@ export default function DoctorsPage() {
   const { hospitalId } = useParams();
   const [doctors, setDoctors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Main Form & Edit State
   const [editingDoc, setEditingDoc] = useState<any>(null);
@@ -32,9 +33,11 @@ export default function DoctorsPage() {
     try {
       const res = await api.get(`/hospitals/${hospitalId}/doctors`);
       setDoctors(res.data);
-    } catch (err) {
-      console.error("Failed to fetch doctors", err);
-    } finally {
+    } catch (err: any) {
+  const msg = err.response?.data?.detail || err.message || 'Unknown error';
+  setFetchError(msg);
+  console.error("Failed to fetch doctors", err);
+} finally {
       setLoading(false);
     }
   };
@@ -225,8 +228,9 @@ export default function DoctorsPage() {
           <div className="p-20 text-center">
             <Users className="w-12 h-12 text-blue-200 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900">No doctors found</h3>
-            <p className="text-gray-500 max-w-xs mx-auto mt-1">Upload your hospital staff list to begin.</p>
-          </div>
+<p className="text-gray-500 max-w-xs mx-auto mt-1">
+  {fetchError ? `Error: ${fetchError}` : 'Upload your hospital staff list to begin.'}
+</p>          </div>
         ) : (
           <table className="w-full text-left">
             <thead className="bg-gray-50 text-xs uppercase text-gray-500 font-semibold border-b">
