@@ -137,14 +137,25 @@ def update_specific_hospital(
     db.commit()
     db.refresh(hospital)
     return {"status": "success", "message": f"Settings for {hospital.name} updated."}
-
 @router.get("/{hospital_id}/doctors")
 def get_hospital_doctors(
     hospital_id: int,
     db: Session = Depends(get_db)
 ):
     """Fetch the staff directory for a specific hospital."""
-    return db.query(Doctor).filter(Doctor.hospital_id == hospital_id).all()
+    doctors = db.query(Doctor).filter(Doctor.hospital_id == hospital_id).all()
+    
+    # Return a formatted dict, leaving behind the 'embedding' column
+    return [
+        {
+            "id": d.id,
+            "doctor_id": d.doctor_id,
+            "name": d.name,
+            "department": d.department,
+            "base_schedule": d.base_schedule,
+        }
+        for d in doctors
+    ]
 
 @router.post("/{hospital_id}/doctors")
 def add_doctor(hospital_id: int, payload: dict = Body(...), db: Session = Depends(get_db)):
@@ -172,8 +183,13 @@ def add_doctor(hospital_id: int, payload: dict = Body(...), db: Session = Depend
 
     db.commit()
     db.refresh(new_doc)
-    return new_doc
-
+    return {
+        "id": new_doc.id,
+        "doctor_id": new_doc.doctor_id,
+        "name": new_doc.name,
+        "department": new_doc.department,
+        "base_schedule": new_doc.base_schedule,
+    }
 @router.post("/{hospital_id}/doctors/bulk-upload")
 async def bulk_upload_and_sync(
     hospital_id: int,

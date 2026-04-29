@@ -114,8 +114,7 @@ frontend/src/assets/react.svg
 frontend/src/components/AppointmentsTab.tsx
 frontend/src/components/BookingConfigPanel.tsx
 frontend/src/components/ChatPreview.tsx
-frontend/src/components/common/Chat.tsx
-frontend/src/components/common/ChatMessage.tsx
+frontend/src/components/common/ChatCore.tsx
 frontend/src/components/common/SharedChat.tsx
 frontend/src/components/CreateHospitalModal.tsx
 frontend/src/components/HospitalStats.tsx
@@ -135,7 +134,8 @@ frontend/src/pages/Settings.tsx
 frontend/src/themes/arogya-specialty/Chat.tsx
 frontend/src/themes/arogya-specialty/ChatMessage.tsx
 frontend/src/themes/arogya-specialty/index.tsx
-frontend/src/themes/bkm-hospital-payannur/bkm-hospital.css
+frontend/src/themes/bkm-hospital-payannur/Chat.tsx
+frontend/src/themes/bkm-hospital-payannur/ChatMessage.tsx
 frontend/src/themes/bkm-hospital-payannur/index.tsx
 frontend/src/themes/README.txt
 frontend/src/themes/registry.ts
@@ -597,6 +597,35 @@ class UsageLedger(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 </file>
 
+<file path="backend/app/schemas/hospital.py">
+from typing import Optional
+from datetime import datetime
+from pydantic import BaseModel
+
+class HospitalBase(BaseModel):
+    name: str
+    slug: str
+    address: Optional[str] = None
+    is_active: Optional[bool] = True
+    # YOU MUST ADD THESE TWO:
+    system_prompt: Optional[str] = "You are Arogya, a helpful assistant."
+    google_sheet_id: Optional[str] = None
+
+class HospitalCreate(HospitalBase):
+    pass
+
+class HospitalUpdate(HospitalBase):
+    name: Optional[str] = None
+    slug: Optional[str] = None
+
+class Hospital(HospitalBase):
+    id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+</file>
+
 <file path="backend/app/schemas/user.py">
 from typing import Optional
 from pydantic import BaseModel, EmailStr
@@ -910,191 +939,6 @@ export default defineConfig([
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="35.93" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 228"><path fill="#00D8FF" d="M210.483 73.824a171.49 171.49 0 0 0-8.24-2.597c.465-1.9.893-3.777 1.273-5.621c6.238-30.281 2.16-54.676-11.769-62.708c-13.355-7.7-35.196.329-57.254 19.526a171.23 171.23 0 0 0-6.375 5.848a155.866 155.866 0 0 0-4.241-3.917C100.759 3.829 77.587-4.822 63.673 3.233C50.33 10.957 46.379 33.89 51.995 62.588a170.974 170.974 0 0 0 1.892 8.48c-3.28.932-6.445 1.924-9.474 2.98C17.309 83.498 0 98.307 0 113.668c0 15.865 18.582 31.778 46.812 41.427a145.52 145.52 0 0 0 6.921 2.165a167.467 167.467 0 0 0-2.01 9.138c-5.354 28.2-1.173 50.591 12.134 58.266c13.744 7.926 36.812-.22 59.273-19.855a145.567 145.567 0 0 0 5.342-4.923a168.064 168.064 0 0 0 6.92 6.314c21.758 18.722 43.246 26.282 56.54 18.586c13.731-7.949 18.194-32.003 12.4-61.268a145.016 145.016 0 0 0-1.535-6.842c1.62-.48 3.21-.974 4.76-1.488c29.348-9.723 48.443-25.443 48.443-41.52c0-15.417-17.868-30.326-45.517-39.844Zm-6.365 70.984c-1.4.463-2.836.91-4.3 1.345c-3.24-10.257-7.612-21.163-12.963-32.432c5.106-11 9.31-21.767 12.459-31.957c2.619.758 5.16 1.557 7.61 2.4c23.69 8.156 38.14 20.213 38.14 29.504c0 9.896-15.606 22.743-40.946 31.14Zm-10.514 20.834c2.562 12.94 2.927 24.64 1.23 33.787c-1.524 8.219-4.59 13.698-8.382 15.893c-8.067 4.67-25.32-1.4-43.927-17.412a156.726 156.726 0 0 1-6.437-5.87c7.214-7.889 14.423-17.06 21.459-27.246c12.376-1.098 24.068-2.894 34.671-5.345a134.17 134.17 0 0 1 1.386 6.193ZM87.276 214.515c-7.882 2.783-14.16 2.863-17.955.675c-8.075-4.657-11.432-22.636-6.853-46.752a156.923 156.923 0 0 1 1.869-8.499c10.486 2.32 22.093 3.988 34.498 4.994c7.084 9.967 14.501 19.128 21.976 27.15a134.668 134.668 0 0 1-4.877 4.492c-9.933 8.682-19.886 14.842-28.658 17.94ZM50.35 144.747c-12.483-4.267-22.792-9.812-29.858-15.863c-6.35-5.437-9.555-10.836-9.555-15.216c0-9.322 13.897-21.212 37.076-29.293c2.813-.98 5.757-1.905 8.812-2.773c3.204 10.42 7.406 21.315 12.477 32.332c-5.137 11.18-9.399 22.249-12.634 32.792a134.718 134.718 0 0 1-6.318-1.979Zm12.378-84.26c-4.811-24.587-1.616-43.134 6.425-47.789c8.564-4.958 27.502 2.111 47.463 19.835a144.318 144.318 0 0 1 3.841 3.545c-7.438 7.987-14.787 17.08-21.808 26.988c-12.04 1.116-23.565 2.908-34.161 5.309a160.342 160.342 0 0 1-1.76-7.887Zm110.427 27.268a347.8 347.8 0 0 0-7.785-12.803c8.168 1.033 15.994 2.404 23.343 4.08c-2.206 7.072-4.956 14.465-8.193 22.045a381.151 381.151 0 0 0-7.365-13.322Zm-45.032-43.861c5.044 5.465 10.096 11.566 15.065 18.186a322.04 322.04 0 0 0-30.257-.006c4.974-6.559 10.069-12.652 15.192-18.18ZM82.802 87.83a323.167 323.167 0 0 0-7.227 13.238c-3.184-7.553-5.909-14.98-8.134-22.152c7.304-1.634 15.093-2.97 23.209-3.984a321.524 321.524 0 0 0-7.848 12.897Zm8.081 65.352c-8.385-.936-16.291-2.203-23.593-3.793c2.26-7.3 5.045-14.885 8.298-22.6a321.187 321.187 0 0 0 7.257 13.246c2.594 4.48 5.28 8.868 8.038 13.147Zm37.542 31.03c-5.184-5.592-10.354-11.779-15.403-18.433c4.902.192 9.899.29 14.978.29c5.218 0 10.376-.117 15.453-.343c-4.985 6.774-10.018 12.97-15.028 18.486Zm52.198-57.817c3.422 7.8 6.306 15.345 8.596 22.52c-7.422 1.694-15.436 3.058-23.88 4.071a382.417 382.417 0 0 0 7.859-13.026a347.403 347.403 0 0 0 7.425-13.565Zm-16.898 8.101a358.557 358.557 0 0 1-12.281 19.815a329.4 329.4 0 0 1-23.444.823c-7.967 0-15.716-.248-23.178-.732a310.202 310.202 0 0 1-12.513-19.846h.001a307.41 307.41 0 0 1-10.923-20.627a310.278 310.278 0 0 1 10.89-20.637l-.001.001a307.318 307.318 0 0 1 12.413-19.761c7.613-.576 15.42-.876 23.31-.876H128c7.926 0 15.743.303 23.354.883a329.357 329.357 0 0 1 12.335 19.695a358.489 358.489 0 0 1 11.036 20.54a329.472 329.472 0 0 1-11 20.722Zm22.56-122.124c8.572 4.944 11.906 24.881 6.52 51.026c-.344 1.668-.73 3.367-1.15 5.09c-10.622-2.452-22.155-4.275-34.23-5.408c-7.034-10.017-14.323-19.124-21.64-27.008a160.789 160.789 0 0 1 5.888-5.4c18.9-16.447 36.564-22.941 44.612-18.3ZM128 90.808c12.625 0 22.86 10.235 22.86 22.86s-10.235 22.86-22.86 22.86s-22.86-10.235-22.86-22.86s10.235-22.86 22.86-22.86Z"></path></svg>
 </file>
 
-<file path="frontend/src/components/common/Chat.tsx">
-import React, { useState } from 'react';
-import ChatMessage from './ChatMessage';
-import api from '../../../api/axios';
-
-interface ChatProps {
-  hospitalId: number;
-}
-
-const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
-  const [messages, setMessages] = useState<{role: 'user'|'assistant', content: string}[]>([]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const sendMessage = async () => {
-    if (!input.trim()) return;
-    
-    const userMsg = input;
-    setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
-    setInput('');
-    setLoading(true);
-
-    try {
-      // Logic remains identical, we only changed the UI classes
-      const res = await api.post('/ai/chat', {
-        hospital_id: hospitalId,
-        message: userMsg,
-        history: messages
-      });
-      
-      setMessages(prev => [...prev, { role: 'assistant', content: res.data.response }]);
-    } catch (error) {
-      console.error("Chat error:", error);
-      setMessages(prev => [...prev, { role: 'assistant', content: "Sorry, I am having trouble connecting to the hospital servers." }]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="chat-layout flex flex-col h-full w-full rounded-xl overflow-hidden shadow-2xl">
-      {/* Message History Area */}
-      <div className="chat-messages-area flex-1 overflow-y-auto p-4">
-        {messages.length === 0 && (
-          <div className="flex h-full items-center justify-center opacity-50">
-            <p>How can I help you today?</p>
-          </div>
-        )}
-        {messages.map((msg, idx) => (
-          <ChatMessage key={idx} role={msg.role} content={msg.content} />
-        ))}
-        {loading && <div className="text-sm italic opacity-70 mt-2">Generating response...</div>}
-      </div>
-
-      {/* Input Area */}
-      <div className="chat-input-area p-4 border-t flex gap-2">
-        <input 
-          type="text"
-          className="chat-input flex-1 px-4 py-2 rounded-lg outline-none"
-          placeholder="Type your message..."
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-        />
-        <button 
-          className="chat-send-btn px-6 py-2 rounded-lg font-bold transition-transform active:scale-95"
-          onClick={sendMessage}
-          disabled={loading}
-        >
-          Send
-        </button>
-      </div>
-    </div>
-  );
-};
-
-export default Chat;
-</file>
-
-<file path="frontend/src/components/common/ChatMessage.tsx">
-import React from 'react';
-
-interface ChatMessageProps {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-}
-
-const ChatMessage: React.FC<ChatMessageProps> = ({ role, content }) => {
-  const isUser = role === 'user';
-
-  return (
-    <div className={`flex w-full mb-4 ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <div className={`max-w-[75%] px-4 py-3 shadow-md ${isUser ? 'message-user' : 'message-ai'}`}>
-        <p className="whitespace-pre-wrap text-sm">{content}</p>
-      </div>
-    </div>
-  );
-};
-
-export default ChatMessage;
-</file>
-
-<file path="frontend/src/components/common/SharedChat.tsx">
-import React, { useState } from 'react';
-import api from '../../api/axios'; // Adjust path if needed
-
-interface SharedChatProps {
-  hospitalId: number;
-}
-
-export const SharedChat: React.FC<SharedChatProps> = ({ hospitalId }) => {
-  const [messages, setMessages] = useState<{role: 'user'|'assistant', content: string}[]>([]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const sendMessage = async () => {
-    if (!input.trim()) return;
-    
-    const userMsg = input;
-    setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
-    setInput('');
-    setLoading(true);
-
-    try {
-      const res = await api.post('/ai/chat', {
-        hospital_id: hospitalId,
-        message: userMsg,
-        history: messages
-      });
-      setMessages(prev => [...prev, { role: 'assistant', content: res.data.response }]);
-    } catch (error) {
-      console.error("Chat error:", error);
-      setMessages(prev => [...prev, { role: 'assistant', content: "Connection error." }]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="shared-chat-container flex flex-col h-full w-full overflow-hidden">
-      
-      {/* Messages Area */}
-      <div className="shared-chat-messages flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.length === 0 && (
-          <div className="empty-state opacity-50 flex justify-center items-center h-full">
-            How can I help you today?
-          </div>
-        )}
-        
-        {messages.map((msg, idx) => {
-          const isUser = msg.role === 'user';
-          return (
-            <div key={idx} className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'}`}>
-              <div className={`message-bubble max-w-[75%] px-4 py-3 shadow-sm ${isUser ? 'user-bubble' : 'bot-bubble'}`}>
-                <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
-              </div>
-            </div>
-          );
-        })}
-        {loading && <div className="loading-state text-sm italic opacity-70">Thinking...</div>}
-      </div>
-
-      {/* Input Area */}
-      <div className="shared-chat-input-area p-4 border-t flex gap-2">
-        <input 
-          type="text"
-          className="shared-input flex-1 px-4 py-2 outline-none"
-          placeholder="Type your message..."
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-        />
-        <button 
-          className="shared-send-btn px-6 py-2 transition-transform active:scale-95"
-          onClick={sendMessage}
-          disabled={loading}
-        >
-          Send
-        </button>
-      </div>
-    </div>
-  );
-};
-</file>
-
 <file path="frontend/src/components/UsageStats.tsx">
 import React, { useEffect, useState } from 'react';
 import api from '../api/axios';
@@ -1127,57 +971,6 @@ const UsageStats = () => {
 };
 
 export default UsageStats;
-</file>
-
-<file path="frontend/src/themes/arogya-specialty/index.tsx">
-import 'regenerator-runtime/runtime'; 
-import React from 'react';
-import Chat from './Chat'; 
-import { ShieldCheck, Activity } from 'lucide-react';
-
-// REMOVE: import ReactDOM from 'react-dom/client'; <-- This belongs in main.tsx, not here.
-
-interface ArogyaThemeProps {
-  hospitalId?: number;
-  hospitalName?: string;
-}
-
-const ArogyaTheme: React.FC<ArogyaThemeProps> = ({ hospitalId, hospitalName }) => {
-  return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
-      <header className="bg-white border-b px-8 py-4 flex justify-between items-center sticky top-0 z-10">
-        <div className="flex items-center gap-2">
-          <div className="w-10 h-10 bg-emerald-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">A</div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-800">
-            {hospitalName || 'Arogya'} <span className="text-emerald-600">Specialty</span>
-          </h1>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-6 py-12 grid lg:grid-cols-2 gap-12 items-center">
-        <div className="space-y-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-medium">
-            <ShieldCheck className="w-4 h-4" /> Powered by Gothos Labs
-          </div>
-          <h2 className="text-5xl font-extrabold leading-tight">
-            Advanced Care, <br />
-            <span className="text-emerald-600">Voice-Enabled AI.</span>
-          </h2>
-          <p className="text-lg text-slate-600">
-            Welcome to the official portal for {hospitalName}. Experience the future of healthcare with our regional voice assistant.
-          </p>
-        </div>
-
-        <div className="flex flex-col items-center">
-          {/* Ensure hospitalId is passed correctly to the Chat logic */}
-          <Chat hospitalId={hospitalId?.toString() || ""} />
-        </div>
-      </main>
-    </div>
-  );
-};
-
-export default ArogyaTheme;
 </file>
 
 <file path="frontend/src/themes/README.txt">
@@ -1419,16 +1212,6 @@ export default {
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
-</file>
-
-<file path="vite.config.ts">
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-
-// https://vite.dev/config/
-export default defineConfig({
-  plugins: [react()],
-})
 </file>
 
 <file path="backend/alembic/versions/b2c3d4e5f6a7_add_user_role.py">
@@ -1705,35 +1488,6 @@ class DoctorLeaveCreate(DoctorLeaveBase):
 class DoctorLeave(DoctorLeaveBase):
     id: int
     doctor_id: int
-
-    class Config:
-        from_attributes = True
-</file>
-
-<file path="backend/app/schemas/hospital.py">
-from typing import Optional
-from datetime import datetime
-from pydantic import BaseModel
-
-class HospitalBase(BaseModel):
-    name: str
-    slug: str
-    address: Optional[str] = None
-    is_active: Optional[bool] = True
-    # YOU MUST ADD THESE TWO:
-    system_prompt: Optional[str] = "You are Arogya, a helpful assistant."
-    google_sheet_id: Optional[str] = None
-
-class HospitalCreate(HospitalBase):
-    pass
-
-class HospitalUpdate(HospitalBase):
-    name: Optional[str] = None
-    slug: Optional[str] = None
-
-class Hospital(HospitalBase):
-    id: int
-    created_at: datetime
 
     class Config:
         from_attributes = True
@@ -2424,6 +2178,43 @@ for (const [src, filename] of copies) {
 }
 </file>
 
+<file path="frontend/src/api/axios.ts">
+import axios from 'axios';
+
+const baseURL = import.meta.env.VITE_API_URL
+  || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:8000/api/v1'
+    : 'https://hospital-ai-platform.onrender.com/api/v1');
+
+const api = axios.create({
+  baseURL,
+  headers: { 'Content-Type': 'application/json' },
+});
+
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) config.headers.Authorization = `Bearer ${token}`;
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('bookingSessionToken');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
+export default api;
+</file>
+
 <file path="frontend/src/components/BookingConfigPanel.tsx">
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
@@ -2778,6 +2569,180 @@ const ChatPreview: React.FC<ChatPreviewProps> = ({ hospitalId }) => {
 export default ChatPreview;
 </file>
 
+<file path="frontend/src/components/common/ChatCore.tsx">
+/**
+ * ChatCore.tsx
+ * ─────────────────────────────────────────────────────────────────
+ * Single source of truth for ALL chat logic shared across every
+ * hospital theme. Themes import this and only supply their own UI.
+ *
+ * Exports:
+ *   useChatCore(hospitalId)   – the shared logic hook
+ *   ChatCoreProps             – interface for theme wrapper components
+ * ─────────────────────────────────────────────────────────────────
+ */
+
+import { useState, useEffect, useRef } from 'react';
+import { useHospitalChat } from '../../hooks/useHospitalChat';
+
+// ── Types ────────────────────────────────────────────────────────
+
+export interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+  isStreaming?: boolean;
+}
+
+export type MicState = 'idle' | 'recording' | 'transcribing';
+export type Language = 'en' | 'ml';
+
+/** Props every theme's Chat component receives from its parent index.tsx */
+export interface ChatCoreProps {
+  hospitalId: string;
+}
+
+// ── Hook ─────────────────────────────────────────────────────────
+
+/**
+ * useChatCore
+ *
+ * Wraps useHospitalChat and exposes a typed, stable surface for
+ * any theme to consume.  All business logic (API calls, VAD, STT,
+ * streaming, translation) lives in useHospitalChat; this hook
+ * simply re-exports it with clear typing.
+ */
+export function useChatCore(hospitalId: string) {
+  const chat = useHospitalChat(hospitalId);
+
+  // Auto-scroll ref — each theme can attach this to their scroll target
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chat.messages]);
+
+  return {
+    // State
+    language: chat.language as Language,
+    setLanguage: chat.setLanguage,
+    messages: chat.messages as Message[],
+    isStreaming: chat.isStreaming,
+    inputText: chat.inputText,
+    setInputText: chat.setInputText,
+    micState: chat.micState as MicState,
+    micError: chat.micError,
+    suggestions: chat.suggestions as { en: string[]; ml: string[] },
+    vadLoading: chat.vadLoading,
+
+    // Actions
+    handleSend: chat.handleSend,
+    toggleMic: chat.toggleMic,
+
+    // Utility
+    scrollRef,
+  };
+}
+</file>
+
+<file path="frontend/src/components/common/SharedChat.tsx">
+/**
+ * SharedChat.tsx
+ * ─────────────────────────────────────────────────────────────────
+ * Shared chat UI shell used by themes that want the default
+ * structure without writing their own Chat component from scratch.
+ *
+ * The component is UNSTYLED by design — it emits semantic class
+ * names that each theme's CSS file targets.  Themes that need
+ * richer customisation (e.g. Arogya with voice/mic and Malayalam)
+ * should write their own Chat.tsx instead and use useChatCore().
+ *
+ * Class names emitted (for CSS targeting):
+ *   .shared-chat-container
+ *   .shared-chat-messages
+ *   .shared-chat-empty-state
+ *   .shared-chat-message-row  (.is-user / .is-bot)
+ *   .shared-chat-bubble       (.is-user / .is-bot)
+ *   .shared-chat-loading
+ *   .shared-chat-input-area
+ *   .shared-chat-input
+ *   .shared-chat-send-btn
+ * ─────────────────────────────────────────────────────────────────
+ */
+
+import React from 'react';
+import { useChatCore } from './ChatCore';
+
+interface SharedChatProps {
+  hospitalId: number | string;
+}
+
+export const SharedChat: React.FC<SharedChatProps> = ({ hospitalId }) => {
+  const {
+    messages,
+    isStreaming,
+    inputText,
+    setInputText,
+    handleSend,
+    scrollRef,
+  } = useChatCore(String(hospitalId));
+
+  return (
+    <div className="shared-chat-container flex flex-col h-full w-full overflow-hidden">
+
+      {/* Messages */}
+      <div className="shared-chat-messages flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.length === 0 && (
+          <div className="shared-chat-empty-state opacity-50 flex justify-center items-center h-full">
+            How can I help you today?
+          </div>
+        )}
+
+        {messages.map((msg, idx) => {
+          const isUser = msg.role === 'user';
+          return (
+            <div
+              key={idx}
+              className={`shared-chat-message-row flex w-full ${isUser ? 'justify-end is-user' : 'justify-start is-bot'}`}
+            >
+              <div className={`shared-chat-bubble max-w-[75%] px-4 py-3 shadow-sm ${isUser ? 'is-user' : 'is-bot'}`}>
+                <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
+              </div>
+            </div>
+          );
+        })}
+
+        {isStreaming && (
+          <div className="shared-chat-loading text-sm italic opacity-70">
+            Thinking…
+          </div>
+        )}
+
+        <div ref={scrollRef} />
+      </div>
+
+      {/* Input */}
+      <div className="shared-chat-input-area p-4 border-t flex gap-2">
+        <input
+          type="text"
+          className="shared-chat-input flex-1 px-4 py-2 outline-none"
+          placeholder="Type your message…"
+          value={inputText}
+          onChange={e => setInputText(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSend()}
+          disabled={isStreaming}
+        />
+        <button
+          className="shared-chat-send-btn px-6 py-2 transition-transform active:scale-95"
+          onClick={() => handleSend()}
+          disabled={isStreaming || !inputText.trim()}
+        >
+          Send
+        </button>
+      </div>
+    </div>
+  );
+};
+</file>
+
 <file path="frontend/src/components/CreateHospitalModal.tsx">
 import { useState } from 'react';
 import api from '../api/axios'; // Use your centralized API config
@@ -2951,188 +2916,107 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 );
 </file>
 
-<file path="frontend/src/themes/bkm-hospital-payannur/bkm-hospital.css">
-/* =========================================================
-   BKM Hospital Payannur - Custom UI Theme
-   Theme: Sapphire & Amber (Dark Mode)
-   ========================================================= */
+<file path="frontend/src/pages/Dashboard.tsx">
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom'; 
+import api from '../api/axios';
+import KnowledgeBaseUpload from './KnowledgeBase'; 
+import ChatPreview from '../components/ChatPreview'; 
+// NEW: Import the Billing Component we designed
+import HospitalStats from '../components/HospitalStats'; 
 
-:root {
-  /* Core Color Palette */
-  --bkm-primary: #1e3a8a;       /* Sapphire Blue */
-  --bkm-secondary: #06b6d4;     /* Cyan */
-  --bkm-accent: #f59e0b;        /* Amber/Gold */
-  
-  /* Backgrounds */
-  --bkm-bg-dark: #0f172a;       /* Very Dark Blue/Slate */
-  --bkm-bg-card: #1e293b;       /* Card Background */
-  --bkm-bg-hover: #334155;      /* Lighter Card Background */
-  
-  /* Typography */
-  --bkm-text-main: #f8fafc;     /* White/Light Gray */
-  --bkm-text-muted: #94a3b8;    /* Muted Slate */
-  
-  /* Status Colors */
-  --bkm-status-good: #10b981;   /* Emerald */
-  --bkm-status-warn: #f59e0b;   /* Amber */
-  --bkm-status-critical: #ef4444; /* Red */
-}
+const Dashboard = () => {
+  const { hospitalId } = useParams(); 
+  const navigate = useNavigate();
+  const [hospital, setHospital] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-/* ---------------------------------------------------------
-   Base Layout & Overrides
-   --------------------------------------------------------- */
-.bkm-theme-wrapper {
-  background-color: var(--bkm-bg-dark);
-  color: var(--bkm-text-main);
-  min-height: 100vh;
-  font-family: 'Inter', system-ui, sans-serif;
-}
+  useEffect(() => {
+    if (!hospitalId) {
+      navigate('/hospitals');
+      return;
+    }
 
-.bkm-theme-wrapper .bkm-header {
-  background-color: var(--bkm-bg-card);
-  border-bottom: 2px solid var(--bkm-primary);
-  padding: 1rem 2rem;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-}
+    setLoading(true);
+    api.get(`/hospitals/${hospitalId}`)
+      .then(res => {
+        setHospital(res.data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Dashboard Fetch Error:", err);
+        setHospital(null);
+        setLoading(false);
+      });
+  }, [hospitalId, navigate]);
 
-.bkm-theme-wrapper .bkm-logo-text {
-  color: var(--bkm-text-main);
-  font-size: 1.5rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-}
+  if (loading) return <div className="p-8 text-center animate-pulse">Loading Command Center...</div>;
 
-.bkm-theme-wrapper .bkm-logo-accent {
-  color: var(--bkm-secondary);
-}
+  if (!hospital) {
+    return (
+      <div className="p-8 text-center">
+        <h1 className="text-2xl font-bold text-red-600">Hospital Not Found</h1>
+        <p className="mt-2 text-gray-500">The hospital ID "{hospitalId}" does not exist in the cloud database.</p>
+        <button 
+          onClick={() => navigate('/hospitals')}
+          className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          Back to Hospital List
+        </button>
+      </div>
+    );
+  }
 
-/* ---------------------------------------------------------
-   Dashboard Cards (Departments, Stats)
-   --------------------------------------------------------- */
-.bkm-card {
-  background-color: var(--bkm-bg-card);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
-  padding: 1.5rem;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
-  transition: transform 0.2s ease, border-color 0.2s ease;
-}
+  return (
+    <div className="p-8 space-y-8 max-w-7xl mx-auto">
+      {/* HEADER SECTION */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Arogya Command Center</h1>
+          <p className="text-gray-600">
+            Managing: <span className="font-semibold text-blue-600">{hospital.name}</span>
+          </p>
+          <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider">ID: {hospital.id} | SLUG: {hospital.slug}</p>
+        </div>
+        <button 
+          onClick={() => navigate('/hospitals')}
+          className="text-sm font-medium text-gray-500 hover:text-blue-600 transition-colors"
+        >
+          &larr; Switch Hospital
+        </button>
+      </div>
 
-.bkm-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--bkm-secondary);
-}
+      {/* NEW: BILLING & ANALYTICS SECTION */}
+      {/* This component will fetch and show the monthly tokens, cost, and invoice */}
+      <section>
+        <h2 className="text-xl font-semibold text-gray-800 mb-4">Business Analytics</h2>
+        <HospitalStats hospitalId={Number(hospitalId)} />
+      </section>
 
-.bkm-card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid var(--bkm-bg-hover);
-  padding-bottom: 0.75rem;
-  margin-bottom: 1rem;
-}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* TRAINING SECTION */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">1</div>
+            <h2 className="text-xl font-semibold text-gray-700">Train Your AI</h2>
+          </div>
+          <KnowledgeBaseUpload hospitalId={hospitalId} />
+        </div>
 
-.bkm-card-title {
-  color: var(--bkm-text-muted);
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-}
+        {/* PREVIEW SECTION */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-bold">2</div>
+            <h2 className="text-xl font-semibold text-gray-700">Test Arogya Chat</h2>
+          </div>
+          <ChatPreview hospitalId={hospitalId} />
+        </div>
+      </div>
+    </div>
+  );
+};
 
-/* ---------------------------------------------------------
-   Data Visualization (Bars & Badges)
-   --------------------------------------------------------- */
-.bkm-progress-track {
-  background-color: var(--bkm-bg-hover);
-  border-radius: 9999px;
-  height: 8px;
-  width: 100%;
-  overflow: hidden;
-  margin-top: 0.5rem;
-}
-
-.bkm-progress-fill {
-  background-color: var(--bkm-secondary);
-  height: 100%;
-  transition: width 0.4s ease;
-}
-
-.bkm-progress-fill.priority-high {
-  background-color: var(--bkm-status-critical);
-}
-
-.bkm-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.25rem 0.75rem;
-  border-radius: 9999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  background-color: rgba(6, 182, 212, 0.1);
-  color: var(--bkm-secondary);
-}
-
-.bkm-badge.priority {
-  background-color: rgba(245, 158, 11, 0.1);
-  color: var(--bkm-accent);
-}
-
-/* ---------------------------------------------------------
-   Buttons & Interactive Elements
-   --------------------------------------------------------- */
-.bkm-btn-primary {
-  background-color: var(--bkm-primary);
-  color: var(--bkm-text-main);
-  border: 1px solid transparent;
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.bkm-btn-primary:hover {
-  background-color: #1d4ed8; /* Slightly lighter blue */
-  box-shadow: 0 0 10px rgba(30, 58, 138, 0.5);
-}
-
-.bkm-btn-accent {
-  background-color: var(--bkm-accent);
-  color: var(--bkm-bg-dark);
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
-
-.bkm-btn-accent:hover {
-  background-color: #d97706;
-}
-
-/* ---------------------------------------------------------
-   Chat UI Overrides for BKM
-   --------------------------------------------------------- */
-.bkm-chat-container {
-  background-color: var(--bkm-bg-card);
-  border: 1px solid var(--bkm-bg-hover);
-  border-radius: 16px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
-}
-
-.bkm-chat-bubble-ai {
-  background-color: var(--bkm-bg-hover);
-  color: var(--bkm-text-main);
-  border-radius: 16px 16px 16px 4px;
-}
-
-.bkm-chat-bubble-user {
-  background-color: var(--bkm-primary);
-  color: var(--bkm-text-main);
-  border-radius: 16px 16px 4px 16px;
-}
+export default Dashboard;
 </file>
 
 <file path="frontend/src/themes/registry.ts">
@@ -3237,6 +3121,27 @@ xxhash==3.6.0
 zstandard==0.25.0
 redis==7.2.0      # already there — just confirm it's present
 APScheduler==3.10.4
+</file>
+
+<file path="vite.config.ts">
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+  build: {
+    rollupOptions: {
+      onwarn(warning, warn) {
+        // Suppress "Module level directives cause errors when bundled" warnings
+        if (warning.code === 'MODULE_LEVEL_DIRECTIVE' && warning.message.includes('use client')) {
+          return;
+        }
+        // Pass through all other warnings
+        warn(warning);
+      }
+    }
+  }
+})
 </file>
 
 <file path="backend/alembic/versions/a1b2c3d4e5f6_add_appointments.py">
@@ -3944,109 +3849,6 @@ export function useAuth(): AuthContextValue {
 }
 </file>
 
-<file path="frontend/src/pages/Dashboard.tsx">
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom'; 
-import api from '../api/axios';
-import KnowledgeBaseUpload from './KnowledgeBase'; 
-import ChatPreview from '../components/ChatPreview'; 
-// NEW: Import the Billing Component we designed
-import HospitalStats from '../components/HospitalStats'; 
-
-const Dashboard = () => {
-  const { hospitalId } = useParams(); 
-  const navigate = useNavigate();
-  const [hospital, setHospital] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!hospitalId) {
-      navigate('/hospitals');
-      return;
-    }
-
-    setLoading(true);
-    api.get(`/hospitals/${hospitalId}`)
-      .then(res => {
-        setHospital(res.data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Dashboard Fetch Error:", err);
-        setHospital(null);
-        setLoading(false);
-      });
-  }, [hospitalId, navigate]);
-
-  if (loading) return <div className="p-8 text-center animate-pulse">Loading Command Center...</div>;
-
-  if (!hospital) {
-    return (
-      <div className="p-8 text-center">
-        <h1 className="text-2xl font-bold text-red-600">Hospital Not Found</h1>
-        <p className="mt-2 text-gray-500">The hospital ID "{hospitalId}" does not exist in the cloud database.</p>
-        <button 
-          onClick={() => navigate('/hospitals')}
-          className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          Back to Hospital List
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-8 space-y-8 max-w-7xl mx-auto">
-      {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Arogya Command Center</h1>
-          <p className="text-gray-600">
-            Managing: <span className="font-semibold text-blue-600">{hospital.name}</span>
-          </p>
-          <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider">ID: {hospital.id} | SLUG: {hospital.slug}</p>
-        </div>
-        <button 
-          onClick={() => navigate('/hospitals')}
-          className="text-sm font-medium text-gray-500 hover:text-blue-600 transition-colors"
-        >
-          &larr; Switch Hospital
-        </button>
-      </div>
-
-      {/* NEW: BILLING & ANALYTICS SECTION */}
-      {/* This component will fetch and show the monthly tokens, cost, and invoice */}
-      <section>
-        <h2 className="text-xl font-semibold text-gray-800 mb-4">Business Analytics</h2>
-        <HospitalStats hospitalId={Number(hospitalId)} />
-      </section>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* TRAINING SECTION */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">1</div>
-            <h2 className="text-xl font-semibold text-gray-700">Train Your AI</h2>
-          </div>
-          <KnowledgeBaseUpload hospitalId={hospitalId} />
-        </div>
-
-        {/* PREVIEW SECTION */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-bold">2</div>
-            <h2 className="text-xl font-semibold text-gray-700">Test Arogya Chat</h2>
-          </div>
-          <ChatPreview hospitalId={hospitalId} />
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default Dashboard;
-</file>
-
 <file path="frontend/src/pages/KnowledgeBase.tsx">
 import React, { useState } from 'react';
 import api from '../api/axios';
@@ -4316,29 +4118,6 @@ const KnowledgeBaseUpload = ({ hospitalId }: { hospitalId: string | undefined })
 };
 
 export default KnowledgeBaseUpload;
-</file>
-
-<file path="frontend/src/themes/bkm-hospital-payannur/index.tsx">
-import React from 'react';
-import { SharedChat } from '../../components/common/SharedChat';
-import './theme.css'; // BKM's unique CSS
-
-const BkmTheme = ({ hospitalId, hospitalName }) => {
-  return (
-    <div className="bkm-wrapper bg-blue-950 min-h-screen p-8 text-white">
-      <header className="mb-6 border-b-2 border-amber-500 pb-4">
-        <h1 className="text-3xl font-bold">{hospitalName}</h1>
-      </header>
-      
-      <main className="max-w-4xl mx-auto h-[70vh] bg-slate-900 rounded-xl shadow-2xl border border-slate-700">
-        {/* The single logic file handles the rest! */}
-        <SharedChat hospitalId={hospitalId} />
-      </main>
-    </div>
-  );
-};
-
-export default BkmTheme;
 </file>
 
 <file path="package.json">
@@ -5059,6 +4838,490 @@ export default function HospitalStats({ hospitalId }: { hospitalId: number }) {
 }
 </file>
 
+<file path="frontend/src/pages/Settings.tsx">
+import React, { useState } from 'react';
+import { useParams } from 'react-router-dom';
+import api from '../api/axios';
+import { UserPlus, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+
+export default function SettingsPage() {
+  const { hospitalId } = useParams();
+  const { role } = useAuth();
+  
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const handleCreateStaff = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      await api.post(`/hospitals/${hospitalId}/staff`, {
+        full_name: fullName,
+        email: email,
+        password: password
+      });
+
+      setSuccess(`Staff account for ${fullName} created successfully!`);
+      setFullName('');
+      setEmail('');
+      setPassword('');
+    } catch (err: any) {
+      console.error(err);
+      setError(err.response?.data?.detail || 'Failed to create staff account. Check the email format or try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-3xl space-y-8">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Hospital Settings</h2>
+        <p className="text-sm text-gray-500 mt-1">Manage configuration and staff access for this hospital.</p>
+      </div>
+
+      {/* Staff Creation Section - Only visible to Superadmin */}
+      {role === 'superadmin' && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="border-b border-gray-200 bg-gray-50 px-6 py-4">
+            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-blue-600" /> Add Staff Member
+            </h3>
+            <p className="text-sm text-gray-500 mt-1">
+              Create credentials for receptionists or admins to manage appointments. They will only have access to this hospital.
+            </p>
+          </div>
+
+          <form onSubmit={handleCreateStaff} className="p-6 space-y-4">
+            {error && (
+              <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm flex items-center gap-2 border border-red-100">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" /> {error}
+              </div>
+            )}
+            
+            {success && (
+              <div className="p-3 bg-emerald-50 text-emerald-700 rounded-lg text-sm flex items-center gap-2 border border-emerald-100">
+                <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> {success}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                <input 
+                  type="text" 
+                  required
+                  value={fullName}
+                  onChange={e => setFullName(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  placeholder="e.g. Front Desk"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                <input 
+                  type="email" 
+                  required
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  placeholder="staff@hospital.com"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Temporary Password</label>
+              <input 
+                type="password" 
+                required
+                minLength={6}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                placeholder="Minimum 6 characters"
+              />
+            </div>
+
+            <div className="pt-2">
+              <button 
+                type="submit" 
+                disabled={loading || !fullName || !email || !password}
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                Create Account
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
+</file>
+
+<file path="frontend/src/themes/bkm-hospital-payannur/Chat.tsx">
+/**
+ * bkm-hospital-payannur/Chat.tsx
+ */
+import 'regenerator-runtime/runtime';
+import React, { useEffect, useRef } from 'react';
+import { Mic, MicOff, Send, Zap, Activity, Loader2, AlertCircle } from 'lucide-react';
+import ChatMessage from './ChatMessage';
+import { useChatCore } from '../../components/common/ChatCore';
+
+interface ChatProps {
+  hospitalId: string;
+}
+
+type MicState = 'idle' | 'recording' | 'transcribing';
+type Language = 'en' | 'ml';
+
+interface ChatMessageData {
+  role: 'user' | 'assistant';
+  content: string;
+  isStreaming?: boolean;
+}
+
+interface ChatCoreReturn {
+  language: Language;
+  setLanguage: React.Dispatch<React.SetStateAction<Language>>;
+  messages: ChatMessageData[];
+  isStreaming: boolean;
+  inputText: string;
+  setInputText: (text: string) => void;
+  micState: MicState;
+  micError: string | null;
+  suggestions: { en: string[]; ml: string[] };
+  handleSend: (text?: string) => Promise<void>;
+  toggleMic: () => void;
+  vadLoading: boolean;
+}
+
+const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
+  const {
+    language, setLanguage, messages, isStreaming,
+    inputText, setInputText,
+    micState, micError,
+    suggestions,
+    handleSend, toggleMic,
+    vadLoading
+  } = useChatCore(hospitalId) as ChatCoreReturn;
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Calming Sky Blue states
+  const micBtnClass: Record<MicState, string> = {
+    idle:         'bg-sky-50 text-sky-600 hover:bg-sky-100',
+    recording:    'bg-red-500 text-white ring-4 ring-red-100 animate-pulse',
+    transcribing: 'bg-sky-500 text-white opacity-80',
+  };
+
+  const micLabel: Record<MicState, string> = {
+    idle:         vadLoading
+                    ? (language === 'en' ? 'Loading AI…' : 'ലോഡുചെയ്യുന്നു…')
+                    : (language === 'en' ? 'Tap to speak' : 'സംസാരിക്കുക'),
+    recording:    language === 'en' ? 'Listening…'   : 'ശ്രദ്ധിക്കുന്നു…',
+    transcribing: language === 'en' ? 'Translating…' : 'വിവർത്തനം ചെയ്യുന്നു…',
+  };
+
+  return (
+    <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 flex flex-col h-[650px]">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Malayalam:wght@400;500;700&display=swap');
+        .ml-text { font-family: 'Noto Sans Malayalam', sans-serif !important; }
+      `}</style>
+
+      {/* Header */}
+      <div className="bg-sky-500 p-4 text-white shrink-0 shadow-md">
+        <div className="flex justify-between items-center">
+          <h3 className="font-bold flex items-center gap-2">
+            <Activity className="w-4 h-4" /> Ask BKM
+          </h3>
+          <button
+            onClick={() => setLanguage(l => l === 'en' ? 'ml' : 'en')}
+            disabled={micState !== 'idle'}
+            className="bg-sky-600 px-3 py-1 rounded-md text-xs font-bold border border-white/20 disabled:opacity-50 ml-text"
+          >
+            {language === 'en' ? 'English' : 'മലയാളം'}
+          </button>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
+        {messages.map((msg, idx) => (
+          <ChatMessage
+            key={idx}
+            role={msg.role}
+            content={msg.content}
+            isStreaming={msg.isStreaming}
+            language={language}
+          />
+        ))}
+        {isStreaming && messages[messages.length - 1]?.content === '' && (
+          <div className="flex items-center gap-2 text-sky-500 p-2 bg-white rounded-lg w-fit shadow-sm border border-slate-100">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span className="text-[10px] font-bold ml-text">
+              {language === 'ml' ? 'വിവരങ്ങൾ പരിശോധിക്കുന്നു…' : 'BKM is checking…'}
+            </span>
+          </div>
+        )}
+        <div ref={scrollRef} />
+      </div>
+
+      {/* Suggestion chips */}
+      <div className="px-4 py-2 bg-slate-50 border-t border-slate-100">
+        <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+          {suggestions[language].map((text, i) => (
+            <button
+              key={i}
+              disabled={isStreaming || micState !== 'idle'}
+              onClick={() => handleSend(text)}
+              className="flex-none bg-white border border-sky-100 text-sky-700 text-[11px] px-3 py-1.5 rounded-full shadow-sm hover:bg-sky-50 active:scale-95 transition-all disabled:opacity-40 whitespace-nowrap ml-text"
+            >
+              <Zap className="w-3 h-3 text-amber-400 fill-amber-400 inline mr-1" />
+              {text}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Input + mic */}
+      <div className="p-4 border-t bg-white shrink-0 space-y-3">
+        {micError && (
+          <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+            <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+            <p className="text-xs text-red-700 ml-text">{micError}</p>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={inputText}
+            onChange={e => setInputText(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && !isStreaming && handleSend()}
+            placeholder={language === 'en' ? 'Ask anything…' : 'ചോദിക്കൂ…'}
+            disabled={isStreaming || micState !== 'idle'}
+            className="flex-1 bg-slate-100 border-none rounded-full px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-400 disabled:opacity-60 ml-text"
+          />
+          <button
+            onClick={() => handleSend()}
+            disabled={isStreaming || !inputText.trim() || micState !== 'idle'}
+            className="p-2 bg-sky-500 text-white rounded-full hover:bg-sky-600 disabled:opacity-40"
+          >
+            <Send className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex flex-col items-center">
+          <button
+            type="button"
+            onClick={toggleMic}
+            disabled={isStreaming || micState === 'transcribing' || vadLoading}
+            className={`p-4 rounded-full transition-all transform active:scale-90 shadow-lg disabled:opacity-50 flex items-center justify-center ${micBtnClass[micState]}`}
+            aria-label={micLabel[micState]}
+          >
+            {vadLoading          ? <Loader2 className="w-6 h-6 animate-spin" /> :
+             micState === 'recording'    ? <MicOff className="w-6 h-6" /> :
+             micState === 'transcribing' ? <Loader2 className="w-6 h-6 animate-spin" /> :
+                                           <Mic className="w-6 h-6" />}
+          </button>
+          <p className="text-[9px] uppercase tracking-widest text-slate-400 font-black mt-2 text-center ml-text">
+            {micLabel[micState]}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Chat;
+</file>
+
+<file path="frontend/src/themes/bkm-hospital-payannur/ChatMessage.tsx">
+/**
+ * bkm-hospital-payannur/ChatMessage.tsx
+ */
+import React from 'react';
+import ReactMarkdown from 'react-markdown';
+
+interface ChatMessageProps {
+  role: 'user' | 'assistant';
+  content: string;
+  isStreaming?: boolean;
+  language?: 'en' | 'ml';
+}
+
+const ChatMessage: React.FC<ChatMessageProps> = ({
+  role,
+  content,
+  isStreaming,
+  language = 'en',
+}) => {
+  const isUser = role === 'user';
+  const isMalayalam = language === 'ml';
+
+  const malayalamStyle = isMalayalam
+    ? { fontFamily: "'Noto Sans Malayalam', 'Manjari', 'Rachana', sans-serif", lineHeight: '1.9' }
+    : {};
+
+  return (
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
+
+      {/* Bot avatar */}
+      {!isUser && (
+        <div className="w-8 h-8 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center mr-2 text-xs font-bold border border-sky-200 shrink-0">
+          B
+        </div>
+      )}
+
+      {/* Bubble */}
+      <div
+        className={`max-w-[85%] p-4 rounded-2xl shadow-sm text-sm leading-relaxed ${
+          isUser
+            ? 'bg-sky-500 text-white rounded-tr-none'
+            : 'bg-white border border-gray-100 text-gray-800 rounded-tl-none'
+        }`}
+        style={malayalamStyle}
+      >
+        <div className="prose prose-sm max-w-none prose-blue" style={malayalamStyle}>
+          <ReactMarkdown
+            components={{
+              p:      ({ children }) => <p style={malayalamStyle}>{children}</p>,
+              li:     ({ children }) => <li style={malayalamStyle}>{children}</li>,
+              strong: ({ children }) => <strong style={malayalamStyle}>{children}</strong>,
+            }}
+          >
+            {content}
+          </ReactMarkdown>
+        </div>
+
+        {/* Streaming cursor */}
+        {isStreaming && !isUser && (
+          <span style={{
+            display: 'inline-block', width: '2px', height: '14px',
+            backgroundColor: '#0ea5e9', marginLeft: '2px', // sky-500 hex
+            verticalAlign: 'middle',
+            animation: 'blink 1s step-start infinite',
+          }} />
+        )}
+      </div>
+
+      {/* User avatar */}
+      {isUser && (
+        <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center ml-2 text-xs font-bold border border-gray-300 shrink-0">
+          U
+        </div>
+      )}
+
+      <style>{`@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }`}</style>
+    </div>
+  );
+};
+
+export default ChatMessage;
+</file>
+
+<file path="backend/app/api/deps.py">
+import os
+from typing import Generator
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from jose import jwt, JWTError
+from app.db.session import SessionLocal
+
+# FIX #1: Load SECRET_KEY from environment, never hardcode it.
+# Set JWT_SECRET in your .env and Render environment variables.
+SECRET_KEY = os.getenv("JWT_SECRET", "dev-secret-key-change-in-production")
+ALGORITHM = "HS256"
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login")
+
+def get_db() -> Generator:
+    try:
+        db = SessionLocal()
+        yield db
+    finally:
+        db.close()
+
+def get_current_tenant(token: str = Depends(oauth2_scheme)) -> int:
+    """
+    The Magic Key: Extracts the hospital_id from the JWT.
+    """
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        hospital_id = payload.get("hospital_id")
+        role = payload.get("role")
+        
+        # FIX: Allow superadmins to bypass the null tenant check
+        if hospital_id is None and role != "superadmin":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication credentials: No tenant ID found",
+            )
+        return hospital_id
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+        )
+def get_current_user_role(token: str = Depends(oauth2_scheme)) -> str:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload.get("role", "staff")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Could not validate credentials")
+
+def require_superadmin(role: str = Depends(get_current_user_role)):
+    if role != "superadmin":
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+def get_token_payload(token: str = Depends(oauth2_scheme)) -> dict:
+    """
+    Decodes the JWT and returns the payload (role, hospital_id, sub) 
+    so routes can verify permissions.
+    """
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+        )
+</file>
+
+<file path="backend/app/db/base.py">
+from app.db.base_class import Base  # noqa
+from app.models.hospital import Hospital  # noqa
+from app.models.doctor import Doctor  # noqa
+from app.models.user import User  # noqa
+from app.models.appointment import Appointment  # noqa
+from app.models.medicine import Medicine # noqa
+from app.models.lab_test import LabTest # noqa
+from app.models.doctor_availability import DoctorSchedule, DoctorLeave # noqa
+
+# Un-commented and fixed paths!
+from app.models.knowledge import KnowledgeBase # noqa
+from app.models.usage import UsageLedger # noqa
+</file>
+
 <file path="frontend/src/pages/Doctors.tsx">
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
@@ -5071,6 +5334,7 @@ export default function DoctorsPage() {
   const { hospitalId } = useParams();
   const [doctors, setDoctors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Main Form & Edit State
   const [editingDoc, setEditingDoc] = useState<any>(null);
@@ -5094,9 +5358,11 @@ export default function DoctorsPage() {
     try {
       const res = await api.get(`/hospitals/${hospitalId}/doctors`);
       setDoctors(res.data);
-    } catch (err) {
-      console.error("Failed to fetch doctors", err);
-    } finally {
+    } catch (err: any) {
+  const msg = err.response?.data?.detail || err.message || 'Unknown error';
+  setFetchError(msg);
+  console.error("Failed to fetch doctors", err);
+} finally {
       setLoading(false);
     }
   };
@@ -5287,8 +5553,9 @@ export default function DoctorsPage() {
           <div className="p-20 text-center">
             <Users className="w-12 h-12 text-blue-200 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900">No doctors found</h3>
-            <p className="text-gray-500 max-w-xs mx-auto mt-1">Upload your hospital staff list to begin.</p>
-          </div>
+<p className="text-gray-500 max-w-xs mx-auto mt-1">
+  {fetchError ? `Error: ${fetchError}` : 'Upload your hospital staff list to begin.'}
+</p>          </div>
         ) : (
           <table className="w-full text-left">
             <thead className="bg-gray-50 text-xs uppercase text-gray-500 font-semibold border-b">
@@ -5403,223 +5670,6 @@ export default function DoctorsPage() {
 }
 </file>
 
-<file path="frontend/src/pages/Settings.tsx">
-import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
-import api from '../api/axios';
-import { UserPlus, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-
-export default function SettingsPage() {
-  const { hospitalId } = useParams();
-  const { role } = useAuth();
-  
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-
-  const handleCreateStaff = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      await api.post(`/hospitals/${hospitalId}/staff`, {
-        full_name: fullName,
-        email: email,
-        password: password
-      });
-
-      setSuccess(`Staff account for ${fullName} created successfully!`);
-      setFullName('');
-      setEmail('');
-      setPassword('');
-    } catch (err: any) {
-      console.error(err);
-      setError(err.response?.data?.detail || 'Failed to create staff account. Check the email format or try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="max-w-3xl space-y-8">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">Hospital Settings</h2>
-        <p className="text-sm text-gray-500 mt-1">Manage configuration and staff access for this hospital.</p>
-      </div>
-
-      {/* Staff Creation Section - Only visible to Superadmin */}
-      {role === 'superadmin' && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="border-b border-gray-200 bg-gray-50 px-6 py-4">
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <UserPlus className="w-5 h-5 text-blue-600" /> Add Staff Member
-            </h3>
-            <p className="text-sm text-gray-500 mt-1">
-              Create credentials for receptionists or admins to manage appointments. They will only have access to this hospital.
-            </p>
-          </div>
-
-          <form onSubmit={handleCreateStaff} className="p-6 space-y-4">
-            {error && (
-              <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm flex items-center gap-2 border border-red-100">
-                <AlertCircle className="w-4 h-4 flex-shrink-0" /> {error}
-              </div>
-            )}
-            
-            {success && (
-              <div className="p-3 bg-emerald-50 text-emerald-700 rounded-lg text-sm flex items-center gap-2 border border-emerald-100">
-                <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> {success}
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                <input 
-                  type="text" 
-                  required
-                  value={fullName}
-                  onChange={e => setFullName(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  placeholder="e.g. Front Desk"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-                <input 
-                  type="email" 
-                  required
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  placeholder="staff@hospital.com"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Temporary Password</label>
-              <input 
-                type="password" 
-                required
-                minLength={6}
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                placeholder="Minimum 6 characters"
-              />
-            </div>
-
-            <div className="pt-2">
-              <button 
-                type="submit" 
-                disabled={loading || !fullName || !email || !password}
-                className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
-              >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-                Create Account
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-    </div>
-  );
-}
-</file>
-
-<file path="backend/app/api/deps.py">
-import os
-from typing import Generator
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from jose import jwt, JWTError
-from app.db.session import SessionLocal
-
-# FIX #1: Load SECRET_KEY from environment, never hardcode it.
-# Set JWT_SECRET in your .env and Render environment variables.
-SECRET_KEY = os.getenv("JWT_SECRET", "dev-secret-key-change-in-production")
-ALGORITHM = "HS256"
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login")
-
-def get_db() -> Generator:
-    try:
-        db = SessionLocal()
-        yield db
-    finally:
-        db.close()
-
-def get_current_tenant(token: str = Depends(oauth2_scheme)) -> int:
-    """
-    The Magic Key: Extracts the hospital_id from the JWT.
-    """
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        hospital_id = payload.get("hospital_id")
-        role = payload.get("role")
-        
-        # FIX: Allow superadmins to bypass the null tenant check
-        if hospital_id is None and role != "superadmin":
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid authentication credentials: No tenant ID found",
-            )
-        return hospital_id
-    except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-        )
-def get_current_user_role(token: str = Depends(oauth2_scheme)) -> str:
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload.get("role", "staff")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Could not validate credentials")
-
-def require_superadmin(role: str = Depends(get_current_user_role)):
-    if role != "superadmin":
-        raise HTTPException(status_code=403, detail="Access denied")
-    
-def get_token_payload(token: str = Depends(oauth2_scheme)) -> dict:
-    """
-    Decodes the JWT and returns the payload (role, hospital_id, sub) 
-    so routes can verify permissions.
-    """
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload
-    except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-        )
-</file>
-
-<file path="backend/app/db/base.py">
-from app.db.base_class import Base  # noqa
-from app.models.hospital import Hospital  # noqa
-from app.models.doctor import Doctor  # noqa
-from app.models.user import User  # noqa
-from app.models.appointment import Appointment  # noqa
-from app.models.medicine import Medicine # noqa
-from app.models.lab_test import LabTest # noqa
-from app.models.doctor_availability import DoctorSchedule, DoctorLeave # noqa
-
-# Un-commented and fixed paths!
-from app.models.knowledge import KnowledgeBase # noqa
-from app.models.usage import UsageLedger # noqa
-</file>
-
 <file path="frontend/src/pages/Login.tsx">
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -5719,80 +5769,160 @@ const Login = () => {
 export default Login;
 </file>
 
-<file path="frontend/src/themes/arogya-specialty/ChatMessage.tsx">
-import React from 'react';
-import ReactMarkdown from 'react-markdown';
+<file path="frontend/src/themes/arogya-specialty/index.tsx">
+/**
+ * arogya-specialty/index.tsx
+ * ─────────────────────────────────────────────────────────────────
+ * AROGYA THEME — page wrapper / landing layout.
+ *
+ * Receives hospitalId + hospitalName from ThemeLoader.
+ * Renders the branded header + hero section + Chat widget.
+ *
+ * ⚠️  Only UI here. No API calls. Logic lives in Chat → useChatCore.
+ * ─────────────────────────────────────────────────────────────────
+ */
 
-interface ChatMessageProps {
-  role: 'user' | 'assistant';
-  content: string;
-  isStreaming?: boolean;
-  language?: 'en' | 'ml';
+import 'regenerator-runtime/runtime';
+import React from 'react';
+import Chat from './Chat';
+import { ShieldCheck } from 'lucide-react';
+
+interface ArogyaThemeProps {
+  hospitalId?: number;
+  hospitalName?: string;
 }
 
-const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, isStreaming, language = 'en' }) => {
-  const isUser = role === 'user';
-  const isMalayalam = language === 'ml';
-
-  // Apply Malayalam font when in Malayalam mode
-  const malayalamStyle = isMalayalam
-    ? { fontFamily: "'Noto Sans Malayalam', 'Manjari', 'Rachana', sans-serif", lineHeight: '1.9' }
-    : {};
-
+const ArogyaTheme: React.FC<ArogyaThemeProps> = ({ hospitalId, hospitalName }) => {
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
-      {!isUser && (
-        <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mr-2 text-xs font-bold border border-emerald-200 shrink-0">
-          A
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
+
+      {/* ── Header ──────────────────────────────────────────────── */}
+      <header className="bg-white border-b px-8 py-4 flex justify-between items-center sticky top-0 z-10 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-emerald-600 rounded-lg flex items-center justify-center text-white font-bold text-xl shadow-md">
+            A
+          </div>
+
+<h1 className="text-2xl font-bold tracking-tight text-slate-800">
+  {hospitalName || (
+    <>Arogya <span className="text-emerald-600">Specialty</span></>
+  )}
+</h1>
         </div>
-      )}
+        <div className="hidden md:flex items-center gap-2 text-xs text-slate-500 font-medium">
+          <ShieldCheck className="w-4 h-4 text-emerald-500" />
+          Powered by Gothos Labs
+        </div>
+      </header>
 
-      <div className={`max-w-[85%] p-4 rounded-2xl shadow-sm text-sm leading-relaxed ${
-        isUser
-          ? 'bg-emerald-600 text-white rounded-tr-none'
-          : 'bg-white border border-gray-100 text-gray-800 rounded-tl-none'
-      }`} style={malayalamStyle}>
-        <div
-          className="prose prose-sm max-w-none prose-emerald"
-          style={malayalamStyle}
-        >
-          <ReactMarkdown
-            components={{
-              // Ensure paragraphs and list items also carry the font
-              p: ({ children }) => <p style={malayalamStyle}>{children}</p>,
-              li: ({ children }) => <li style={malayalamStyle}>{children}</li>,
-              strong: ({ children }) => <strong style={malayalamStyle}>{children}</strong>,
-            }}
-          >
-            {content}
-          </ReactMarkdown>
+      {/* ── Hero + Chat ──────────────────────────────────────────── */}
+      <main className="max-w-7xl mx-auto px-6 py-12 grid lg:grid-cols-2 gap-12 items-center">
+
+        {/* Left — copy */}
+        <div className="space-y-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-medium">
+            <ShieldCheck className="w-4 h-4" /> AI-Powered Reception
+          </div>
+          <h2 className="text-5xl font-extrabold leading-tight text-slate-800">
+            Advanced Care, <br />
+            <span className="text-emerald-600">Voice-Enabled AI.</span>
+          </h2>
+          <p className="text-lg text-slate-600 leading-relaxed">
+            Welcome to the official portal for{' '}
+            <strong>{hospitalName || 'Arogya Specialty'}</strong>.
+            Ask about doctors, book appointments, or check test details — in
+            English or Malayalam.
+          </p>
+          <ul className="space-y-2 text-sm text-slate-500">
+            {[
+              '🩺 Real-time doctor availability',
+              '📅 Book appointments by voice or text',
+              '💊 Pharmacy & lab test lookup',
+              '🌐 English & Malayalam support',
+            ].map(item => (
+              <li key={item} className="flex items-center gap-2">
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
         </div>
 
-        {isStreaming && !isUser && (
-          <span style={{
-            display: 'inline-block',
-            width: '2px',
-            height: '14px',
-            backgroundColor: '#059669',
-            marginLeft: '2px',
-            verticalAlign: 'middle',
-            animation: 'blink 1s step-start infinite',
-          }} />
-        )}
-      </div>
-
-      {isUser && (
-        <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center ml-2 text-xs font-bold border border-gray-300 shrink-0">
-          U
+        {/* Right — Chat widget */}
+        <div className="flex flex-col items-center">
+          <Chat hospitalId={hospitalId?.toString() ?? ''} />
         </div>
-      )}
-
-      <style>{`@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }`}</style>
+      </main>
     </div>
   );
 };
 
-export default ChatMessage;
+export default ArogyaTheme;
+</file>
+
+<file path="frontend/src/themes/bkm-hospital-payannur/index.tsx">
+/**
+ * bkm-hospital-payannur/index.tsx
+ */
+import 'regenerator-runtime/runtime';
+import React from 'react';
+import Chat from './Chat';
+import { ShieldCheck } from 'lucide-react';
+
+interface BkmThemeProps {
+  hospitalId?: number;
+  hospitalName?: string;
+}
+
+const BkmTheme: React.FC<BkmThemeProps> = ({ hospitalId, hospitalName }) => {
+  return (
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
+      {/* ── Header ──────────────────────────────────────────────── */}
+      <header className="bg-white border-b px-8 py-4 flex justify-between items-center sticky top-0 z-10 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-sky-500 rounded-lg flex items-center justify-center text-white font-bold text-xl shadow-md">
+            B
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-800">
+            {hospitalName || (
+              <>BKM <span className="text-sky-500">Hospital</span></>
+            )}
+          </h1>
+        </div>
+        <div className="hidden md:flex items-center gap-2 text-xs text-slate-500 font-medium">
+          <ShieldCheck className="w-4 h-4 text-sky-500" />
+          Powered by Gothos Labs
+        </div>
+      </header>
+
+      {/* ── Hero + Chat ──────────────────────────────────────────── */}
+      <main className="max-w-7xl mx-auto px-6 py-12 grid lg:grid-cols-2 gap-12 items-center">
+        {/* Left — Clean, minimal copy */}
+        <div className="space-y-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-sky-100 text-sky-700 rounded-full text-sm font-medium">
+            <ShieldCheck className="w-4 h-4" /> AI-Powered Reception
+          </div>
+          <h2 className="text-5xl font-extrabold leading-tight text-slate-800">
+            Calm & Compassionate Care, <br />
+            <span className="text-sky-500">Powered by AI.</span>
+          </h2>
+          <p className="text-lg text-slate-600 leading-relaxed">
+            Welcome to the official portal for{' '}
+            <strong>{hospitalName || 'BKM Hospital'}</strong>.
+            Ask about doctors, book appointments, or check test details — in
+            English or Malayalam.
+          </p>
+        </div>
+
+        {/* Right — Chat widget */}
+        <div className="flex flex-col items-center">
+          <Chat hospitalId={hospitalId?.toString() ?? ''} />
+        </div>
+      </main>
+    </div>
+  );
+};
+
+export default BkmTheme;
 </file>
 
 <file path="backend/app/api/v1/endpoints/lab_tests.py">
@@ -6788,41 +6918,95 @@ export default function PharmacyPage() {
 }
 </file>
 
-<file path="frontend/src/api/axios.ts">
-import axios from 'axios';
+<file path="frontend/src/themes/arogya-specialty/ChatMessage.tsx">
+/**
+ * arogya-specialty/ChatMessage.tsx
+ * ─────────────────────────────────────────────────────────────────
+ * AROGYA THEME — message bubble UI only.
+ * All data comes from useChatCore via the parent Chat.tsx.
+ *
+ * Palette: Emerald green (#059669) + slate
+ * ─────────────────────────────────────────────────────────────────
+ */
 
-const baseURL = import.meta.env.VITE_API_URL
-  || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:8000/api/v1'
-    : 'https://hospital-ai-platform.onrender.com/api/v1');
+import React from 'react';
+import ReactMarkdown from 'react-markdown';
 
-const api = axios.create({
-  baseURL,
-  headers: { 'Content-Type': 'application/json' },
-});
+interface ChatMessageProps {
+  role: 'user' | 'assistant';
+  content: string;
+  isStreaming?: boolean;
+  language?: 'en' | 'ml';
+}
 
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) config.headers.Authorization = `Bearer ${token}`;
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+const ChatMessage: React.FC<ChatMessageProps> = ({
+  role,
+  content,
+  isStreaming,
+  language = 'en',
+}) => {
+  const isUser = role === 'user';
+  const isMalayalam = language === 'ml';
 
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      sessionStorage.removeItem('bookingSessionToken');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
-);
+  const malayalamStyle = isMalayalam
+    ? { fontFamily: "'Noto Sans Malayalam', 'Manjari', 'Rachana', sans-serif", lineHeight: '1.9' }
+    : {};
 
-export default api;
+  return (
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
+
+      {/* Bot avatar */}
+      {!isUser && (
+        <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mr-2 text-xs font-bold border border-emerald-200 shrink-0">
+          A
+        </div>
+      )}
+
+      {/* Bubble */}
+      <div
+        className={`max-w-[85%] p-4 rounded-2xl shadow-sm text-sm leading-relaxed ${
+          isUser
+            ? 'bg-emerald-600 text-white rounded-tr-none'
+            : 'bg-white border border-gray-100 text-gray-800 rounded-tl-none'
+        }`}
+        style={malayalamStyle}
+      >
+        <div className="prose prose-sm max-w-none prose-emerald" style={malayalamStyle}>
+          <ReactMarkdown
+            components={{
+              p:      ({ children }) => <p style={malayalamStyle}>{children}</p>,
+              li:     ({ children }) => <li style={malayalamStyle}>{children}</li>,
+              strong: ({ children }) => <strong style={malayalamStyle}>{children}</strong>,
+            }}
+          >
+            {content}
+          </ReactMarkdown>
+        </div>
+
+        {/* Streaming cursor */}
+        {isStreaming && !isUser && (
+          <span style={{
+            display: 'inline-block', width: '2px', height: '14px',
+            backgroundColor: '#059669', marginLeft: '2px',
+            verticalAlign: 'middle',
+            animation: 'blink 1s step-start infinite',
+          }} />
+        )}
+      </div>
+
+      {/* User avatar */}
+      {isUser && (
+        <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center ml-2 text-xs font-bold border border-gray-300 shrink-0">
+          U
+        </div>
+      )}
+
+      <style>{`@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }`}</style>
+    </div>
+  );
+};
+
+export default ChatMessage;
 </file>
 
 <file path="backend/app/main.py">
@@ -7475,46 +7659,94 @@ return {
 </file>
 
 <file path="frontend/src/themes/arogya-specialty/Chat.tsx">
-import React, { useEffect, useRef } from 'react';
-import ChatMessage from './ChatMessage';
-import { Mic, MicOff, Send, Zap, Activity, Loader2, AlertCircle } from 'lucide-react';
-import { useHospitalChat } from '../../hooks/useHospitalChat'; // Import the "brain"
+/**
+ * arogya-specialty/Chat.tsx
+ * ─────────────────────────────────────────────────────────────────
+ * AROGYA THEME — full chat widget UI (voice + text + suggestions).
+ *
+ * ALL logic comes from useChatCore(). This file contains ZERO API
+ * calls, zero state management beyond what useChatCore returns.
+ * ─────────────────────────────────────────────────────────────────
+ */
 
-interface ChatProps { hospitalId: string; }
+import 'regenerator-runtime/runtime';
+import React, { useEffect, useRef } from 'react';
+import { Mic, MicOff, Send, Zap, Activity, Loader2, AlertCircle } from 'lucide-react';
+import ChatMessage from './ChatMessage';
+import { useChatCore } from '../../components/common/ChatCore';
+
+interface ChatProps {
+  hospitalId: string;
+}
+
+// ── 1. Strict Types (No more 'any') ────────────────────────────
+type MicState = 'idle' | 'recording' | 'transcribing';
+type Language = 'en' | 'ml';
+
+interface ChatMessageData {
+  role: 'user' | 'assistant';
+  content: string;
+  isStreaming?: boolean;
+}
+
+interface ChatCoreReturn {
+  language: Language;
+  setLanguage: React.Dispatch<React.SetStateAction<Language>>;
+  messages: ChatMessageData[];
+  isStreaming: boolean;
+  inputText: string;
+  setInputText: (text: string) => void;
+  micState: MicState;
+  micError: string | null;
+  suggestions: { en: string[]; ml: string[] };
+  handleSend: (text?: string) => Promise<void>;
+  toggleMic: () => void;
+  vadLoading: boolean;
+}
 
 const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
-  // Plug the UI into the brain
+  // ── 2. Destructure with our strict interface ──────────────────
   const {
-  language, setLanguage, messages, isStreaming, inputText, setInputText,
-  micState, micError, suggestions, handleSend, toggleMic, vadLoading  // ✅ vad → vadLoading
-} = useHospitalChat(hospitalId);
+    language, setLanguage, messages, isStreaming,
+    inputText, setInputText,
+    micState, micError,
+    suggestions,
+    handleSend, toggleMic,
+    vadLoading
+  } = useChatCore(hospitalId) as ChatCoreReturn;
 
+  // ── 3. Bring back the Scroll Ref (UI logic belongs here) ──────
   const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
-  useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
-
-  const micBtnClass = {
-    idle: 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100',
-    recording: 'bg-red-500 text-white ring-4 ring-red-100 animate-pulse',
+  // ── 4. Mic button appearance ──────────────────────────────────
+  const micBtnClass: Record<MicState, string> = {
+    idle:         'bg-emerald-50 text-emerald-600 hover:bg-emerald-100',
+    recording:    'bg-red-500 text-white ring-4 ring-red-100 animate-pulse',
     transcribing: 'bg-emerald-600 text-white opacity-80',
-  }[micState];
+  };
 
-  const micLabel = {
-    idle: vadLoading 
-            ? (language === 'en' ? 'Loading AI...' : 'ലോഡുചെയ്യുന്നു...') 
-            : (language === 'en' ? 'Tap to speak' : 'സംസാരിക്കുക'),
-    recording: language === 'en' ? 'Listening...' : 'ശ്രദ്ധിക്കുന്നു...',
-    transcribing: language === 'en' ? 'Translating...' : 'വിവർത്തനം ചെയ്യുന്നു...',
-  }[micState];
+  const micLabel: Record<MicState, string> = {
+    idle:         vadLoading
+                    ? (language === 'en' ? 'Loading AI…' : 'ലോഡുചെയ്യുന്നു…')
+                    : (language === 'en' ? 'Tap to speak' : 'സംസാരിക്കുക'),
+    recording:    language === 'en' ? 'Listening…'   : 'ശ്രദ്ധിക്കുന്നു…',
+    transcribing: language === 'en' ? 'Translating…' : 'വിവർത്തനം ചെയ്യുന്നു…',
+  };
 
+  // ── Render ────────────────────────────────────────────────────
   return (
     <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 flex flex-col h-[650px]">
+
+      {/* Malayalam font import */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Malayalam:wght@400;500;700&display=swap');
         .ml-text { font-family: 'Noto Sans Malayalam', sans-serif !important; }
       `}</style>
 
-      {/* Header (Arogya Theme Colors) */}
+      {/* ── Header ──────────────────────────────────────────────── */}
       <div className="bg-emerald-600 p-4 text-white shrink-0 shadow-md">
         <div className="flex justify-between items-center">
           <h3 className="font-bold flex items-center gap-2">
@@ -7530,35 +7762,46 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
         </div>
       </div>
 
-      {/* Chat area */}
+      {/* ── Messages ─────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
         {messages.map((msg, idx) => (
-          <ChatMessage key={idx} role={msg.role} content={msg.content} isStreaming={msg.isStreaming} language={language} />
+          <ChatMessage
+            key={idx}
+            role={msg.role}
+            content={msg.content}
+            isStreaming={msg.isStreaming}
+            language={language}
+          />
         ))}
         {isStreaming && messages[messages.length - 1]?.content === '' && (
           <div className="flex items-center gap-2 text-emerald-600 p-2 bg-white rounded-lg w-fit shadow-sm border border-slate-100">
             <Loader2 className="w-4 h-4 animate-spin" />
             <span className="text-[10px] font-bold ml-text">
-              {language === 'ml' ? 'ആരോഗ്യ പരിശോധിക്കുന്നു...' : 'Arogya is checking...'}
+              {language === 'ml' ? 'ആരോഗ്യ പരിശോധിക്കുന്നു…' : 'Arogya is checking…'}
             </span>
           </div>
         )}
         <div ref={scrollRef} />
       </div>
 
-      {/* Suggestion chips */}
+      {/* ── Suggestion chips ─────────────────────────────────────── */}
       <div className="px-4 py-2 bg-slate-50 border-t border-slate-100">
         <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
           {suggestions[language].map((text, i) => (
-            <button key={i} disabled={isStreaming || micState !== 'idle'} onClick={() => handleSend(text)}
-              className="flex-none bg-white border border-emerald-100 text-emerald-700 text-[11px] px-3 py-1.5 rounded-full shadow-sm hover:bg-emerald-50 active:scale-95 transition-all disabled:opacity-40 whitespace-nowrap ml-text">
-              <Zap className="w-3 h-3 text-amber-400 fill-amber-400 inline mr-1" />{text}
+            <button
+              key={i}
+              disabled={isStreaming || micState !== 'idle'}
+              onClick={() => handleSend(text)}
+              className="flex-none bg-white border border-emerald-100 text-emerald-700 text-[11px] px-3 py-1.5 rounded-full shadow-sm hover:bg-emerald-50 active:scale-95 transition-all disabled:opacity-40 whitespace-nowrap ml-text"
+            >
+              <Zap className="w-3 h-3 text-amber-400 fill-amber-400 inline mr-1" />
+              {text}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Input + mic */}
+      {/* ── Input + mic ──────────────────────────────────────────── */}
       <div className="p-4 border-t bg-white shrink-0 space-y-3">
         {micError && (
           <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
@@ -7568,32 +7811,39 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
         )}
 
         <div className="flex items-center gap-2">
-          <input type="text" value={inputText} onChange={e => setInputText(e.target.value)}
+          <input
+            type="text"
+            value={inputText}
+            onChange={e => setInputText(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !isStreaming && handleSend()}
             placeholder={language === 'en' ? 'Ask anything…' : 'ചോദിക്കൂ…'}
             disabled={isStreaming || micState !== 'idle'}
-            className="flex-1 bg-slate-100 border-none rounded-full px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-60 ml-text" />
-          <button onClick={() => handleSend()} disabled={isStreaming || !inputText.trim() || micState !== 'idle'}
-            className="p-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-700 disabled:opacity-40">
+            className="flex-1 bg-slate-100 border-none rounded-full px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-60 ml-text"
+          />
+          <button
+            onClick={() => handleSend()}
+            disabled={isStreaming || !inputText.trim() || micState !== 'idle'}
+            className="p-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-700 disabled:opacity-40"
+          >
             <Send className="w-4 h-4" />
           </button>
         </div>
 
-<div className="flex flex-col items-center">
-          <button type="button" onClick={toggleMic} 
+        <div className="flex flex-col items-center">
+          <button
+            type="button"
+            onClick={toggleMic}
             disabled={isStreaming || micState === 'transcribing' || vadLoading}
-            className={`p-4 rounded-full transition-all transform active:scale-90 shadow-lg disabled:opacity-50 flex items-center justify-center ${micBtnClass}`}
-            aria-label={micLabel}>
-            
-            {/* Show a spinner if VAD is downloading its files */}
-            {vadLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : 
-             micState === 'recording' ? <MicOff className="w-6 h-6" /> : 
-             micState === 'transcribing' ? <Loader2 className="w-6 h-6 animate-spin" /> : 
-             <Mic className="w-6 h-6" />}
-             
+            className={`p-4 rounded-full transition-all transform active:scale-90 shadow-lg disabled:opacity-50 flex items-center justify-center ${micBtnClass[micState]}`}
+            aria-label={micLabel[micState]}
+          >
+            {vadLoading          ? <Loader2 className="w-6 h-6 animate-spin" /> :
+             micState === 'recording'    ? <MicOff className="w-6 h-6" /> :
+             micState === 'transcribing' ? <Loader2 className="w-6 h-6 animate-spin" /> :
+                                           <Mic className="w-6 h-6" />}
           </button>
           <p className="text-[9px] uppercase tracking-widest text-slate-400 font-black mt-2 text-center ml-text">
-             {micLabel}
+            {micLabel[micState]}
           </p>
         </div>
       </div>
@@ -7622,7 +7872,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from app.core.config import settings  # ← add this if not already there
+from app.core.config import settings
 from app.api.deps import get_db
 from app.models.hospital import Hospital
 from app.models.knowledge import KnowledgeBase
@@ -7634,6 +7884,7 @@ from app.models.doctor_availability import DoctorSchedule, DoctorLeave
 import redis
 import uuid
 from app.models.appointment import Appointment
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
@@ -7645,9 +7896,10 @@ client = OpenAI(api_key=_api_key)
 async_client = AsyncOpenAI(api_key=_api_key)
 _redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
 _redis = redis.from_url(_redis_url, decode_responses=True)
-BOOKING_SESSION_TTL = 600
-OPENAI_MODEL        = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-OPENAI_COST_PER_MTok = float(os.getenv("OPENAI_COST_PER_MTok", "0.15"))
+BOOKING_SESSION_TTL      = 600
+OPENAI_MODEL    = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_MODEL_ML = os.getenv("OPENAI_MODEL_ML", "gpt-4o")
+OPENAI_COST_PER_MTok     = float(os.getenv("OPENAI_COST_PER_MTok", "0.15"))
 MAX_HISTORY_TURNS        = 10
 PDF_CHUNK_SIZE           = 800
 PDF_CHUNK_OVERLAP        = 100
@@ -7663,7 +7915,7 @@ VALID_LANGUAGES          = {"en", "ml"}
 
 
 # =============================================================================
-# GOOGLE TRANSLATE BRIDGE
+# GOOGLE TRANSLATE BRIDGE  (kept only for fallback / STT post-processing)
 # =============================================================================
 
 _GTRANSLATE_URL = "https://translate.googleapis.com/translate_a/single"
@@ -7696,8 +7948,6 @@ async def _translate_async(text: str, source: str, target: str) -> str:
     except Exception as e:
         logger.warning("Async translation failed (%s->%s): %s", source, target, e)
         return text
-
-
 
 
 # =============================================================================
@@ -7744,8 +7994,7 @@ class ChatRequest(BaseModel):
     hospital_id: int
     language: str = Field(default="en")
     history: Optional[List[HistoryMessage]] = None
-    session_token: str = Field(default="default")  # ← add this line
-
+    session_token: str = Field(default="default")
 
     @field_validator("language")
     @classmethod
@@ -7776,9 +8025,6 @@ class IngestRequest(BaseModel):
 # DOCTOR RELEVANCE FILTERING
 # =============================================================================
 
-# Synonym map — variants for common department name spellings/abbreviations.
-# Both directions are listed so matching works regardless of which side uses
-# which spelling.
 _DEPT_SYNONYMS: dict[str, list[str]] = {
     "orthopaedics":     ["orthopedics", "ortho", "orthopedic", "orthopaedic", "bone", "joint"],
     "orthopedics":      ["orthopaedics", "ortho", "orthopedic", "orthopaedic", "bone", "joint"],
@@ -7808,7 +8054,6 @@ _DEPT_SYNONYMS: dict[str, list[str]] = {
 }
 
 def _expand_with_synonyms(tokens: set) -> set:
-    """Expand a token set with department synonyms."""
     expanded = set(tokens)
     for token in tokens:
         for canonical, variants in _DEPT_SYNONYMS.items():
@@ -7819,7 +8064,6 @@ def _expand_with_synonyms(tokens: set) -> set:
 
 
 def normalize_name(text: str) -> str:
-    """Lowercase, strip Dr. prefix, keep only latin letters and spaces."""
     text = text.lower()
     text = re.sub(r"dr\.?\s*", "", text)
     text = re.sub(r"[^a-z\s]", "", text)
@@ -7827,13 +8071,6 @@ def normalize_name(text: str) -> str:
 
 
 def score_doctor_relevance(question: str, doctor: Doctor) -> float:
-    """
-    Score how relevant a doctor entry is to the (English) question.
-
-    Uses synonym expansion so spelling variants ("orthopedics" vs
-    "orthopaedics") and abbreviations ("ortho") all match correctly.
-    A substring fallback handles partial department names.
-    """
     q_norm = normalize_name(question)
     q_tokens = set(q_norm.split())
     if not q_tokens:
@@ -7841,7 +8078,6 @@ def score_doctor_relevance(question: str, doctor: Doctor) -> float:
 
     dept  = normalize_name(doctor.department or "")
     name  = normalize_name(doctor.name or "")
-    # Support both field names used across different versions of the model
     sched = normalize_name(
         getattr(doctor, "base_schedule", None)
         or getattr(doctor, "schedule", None)
@@ -7857,7 +8093,6 @@ def score_doctor_relevance(question: str, doctor: Doctor) -> float:
 
     token_score = len(q_expanded & d_expanded) / len(q_expanded)
 
-    # Substring fallback: "ortho" in "orthopaedics"
     substring_score = 0.0
     for qt in q_tokens:
         if len(qt) >= 4 and qt in dept:
@@ -7867,8 +8102,6 @@ def score_doctor_relevance(question: str, doctor: Doctor) -> float:
 
 
 def check_doctor_availability_db(doctor: Doctor, db: Session, target_date: datetime) -> str:
-    """Queries PostgreSQL to find out if the doctor is working today."""
-    # 1. Check for leaves first
     leave = db.query(DoctorLeave).filter(
         DoctorLeave.doctor_id == doctor.id,
         DoctorLeave.date == target_date.date()
@@ -7877,12 +8110,10 @@ def check_doctor_availability_db(doctor: Doctor, db: Session, target_date: datet
         reason = f" ({leave.reason})" if leave.reason else ""
         return f"ABSENT TODAY{reason}"
 
-    # 2. Check regular schedule
-    day_of_week = target_date.weekday() # 0=Monday, 6=Sunday
-    
-    # Check if ANY schedules exist for this doctor in the new system
+    day_of_week = target_date.weekday()
+
     has_any_schedule = db.query(DoctorSchedule).filter(DoctorSchedule.doctor_id == doctor.id).first() is not None
-    
+
     schedule = db.query(DoctorSchedule).filter(
         DoctorSchedule.doctor_id == doctor.id,
         DoctorSchedule.day_of_week == day_of_week,
@@ -7891,16 +8122,15 @@ def check_doctor_availability_db(doctor: Doctor, db: Session, target_date: datet
 
     if schedule:
         return f"Available today from {schedule.start_time} to {schedule.end_time}"
-    
+
     if has_any_schedule:
-        # They are using the new UI, but are just not scheduled today
         return "Not scheduled to work today"
     else:
-        # No new UI schedules exist yet! Fallback to the CSV base_schedule.
         base = getattr(doctor, "base_schedule", None)
         if base and base.lower() != "not specified":
             return f"Standard Timings: {base}"
         return "Timings not specified"
+
 
 def build_doctor_context(question: str, hospital_id: int, db: Session) -> tuple[str, int]:
     today = datetime.now()
@@ -7925,7 +8155,6 @@ def build_doctor_context(question: str, hospital_id: int, db: Session) -> tuple[
         except Exception as e:
             logger.warning(f"Embedding search failed: {e}")
 
-    # If broad query, embedding failed, or too few results — return ALL doctors
     if is_broad or len(doctors) < 3:
         doctors = (
             db.query(Doctor)
@@ -7946,11 +8175,12 @@ def build_doctor_context(question: str, hospital_id: int, db: Session) -> tuple[
         )
     return "".join(lines), len(doctors)
 
+
 def build_pharmacy_context(question: str, medicines: list) -> str:
-    """Matches user questions against the medicine database."""
     nq = normalize_name(question)
     q_tokens = set(nq.split())
-    if not q_tokens or not medicines: return ""
+    if not q_tokens or not medicines:
+        return ""
 
     scored = []
     for m in medicines:
@@ -7961,21 +8191,23 @@ def build_pharmacy_context(question: str, medicines: list) -> str:
             scored.append((score, m))
 
     scored.sort(key=lambda x: x[0], reverse=True)
-    if not scored: return ""
+    if not scored:
+        return ""
 
     lines = ["RELEVANT PHARMACY ITEMS:"]
-    for _, m in scored[:5]: # Top 5 closest matches
+    for _, m in scored[:5]:
         req_rx = "Prescription Required" if m.requires_prescription else "Over-the-counter"
         status = (m.stock_status or "in_stock").replace("_", " ").title()
         lines.append(f"- {m.name} ({m.brand_name or 'Generic'}): Status: {status}, Price: ₹{m.price or 'N/A'}, {req_rx}")
 
     return "\n".join(lines) + "\n"
 
+
 def build_lab_tests_context(question: str, tests: list) -> str:
-    """Matches user questions against lab test prerequisites."""
     nq = normalize_name(question)
     q_tokens = set(nq.split())
-    if not q_tokens or not tests: return ""
+    if not q_tokens or not tests:
+        return ""
 
     scored = []
     for t in tests:
@@ -7986,7 +8218,8 @@ def build_lab_tests_context(question: str, tests: list) -> str:
             scored.append((score, t))
 
     scored.sort(key=lambda x: x[0], reverse=True)
-    if not scored: return ""
+    if not scored:
+        return ""
 
     lines = ["RELEVANT LAB TESTS:"]
     for _, t in scored[:5]:
@@ -7996,6 +8229,7 @@ def build_lab_tests_context(question: str, tests: list) -> str:
             lines.append(f"  Preparation/Prerequisites: {t.prerequisites}")
 
     return "\n".join(lines) + "\n"
+
 
 def resolve_doctor_id(user_text: str, doctor_data: dict):
     nq = normalize_name(user_text)
@@ -8035,27 +8269,6 @@ def build_kb_context(results: list) -> tuple[str, int]:
 
 
 # =============================================================================
-# AVAILABILITY
-# =============================================================================
-
-def fetch_availability_context(question: str, sheet_id: str, hospital_id: int, today_str: str) -> str:
-    try:
-        data = get_doctor_availability(sheet_id=sheet_id)
-        doc_id, doc_name = resolve_doctor_id(question, data)
-        if not doc_id:
-            return ""
-        doc_info = data.get(doc_id, {})
-        absent = [d.strip() for d in str(doc_info.get("absent_dates", "")).split(",") if d.strip()]
-        if today_str in absent:
-            return (f"IMPORTANT LIVE STATUS: {doc_name} is ABSENT TODAY ({today_str}). "
-                    "Tell the patient they are unavailable and suggest calling reception.")
-        return f"LIVE STATUS: {doc_name} is available today ({today_str})."
-    except Exception as e:
-        logger.exception("[Availability] Unexpected error hospital_id=%s: %s", hospital_id, e)
-        return ""
-
-
-# =============================================================================
 # SYSTEM PROMPT BUILDER
 # =============================================================================
 
@@ -8063,18 +8276,22 @@ def build_system_prompt_english() -> str:
     return """You are responding in ENGLISH.
 Be concise and conversational — 1 to 2 short sentences maximum.
 Speak like a warm, professional hospital receptionist.
-When referring to doctors, always use "Dr." prefix and speak respectfully."""
+When referring to doctors, always use "Dr." prefix and speak respectfully.
+Treat each question independently — do not carry assumptions from a previous topic into a new answer."""
 
 
 def build_system_prompt_malayalam() -> str:
     return """നിങ്ങൾ മലയാളത്തിൽ മാത്രം മറുപടി നൽകണം.
-വളരെ ചുരുക്കമായി സംസാരിക്കുക — പരമാവധി 1-2 വാക്യങ്ങൾ മാത്രം.
-ഒരു ദയയുള്ള, മര്യാദയുള്ള ആശുപത്രി റിസപ്ഷനിസ്റ്റിനെ പോലെ സംസാരിക്കുക.
 
-ഡോക്ടർമാരെ പരാമർശിക്കുമ്പോൾ:
-- ആദരവോടെ "ഡോക്ടർ [പേര്]" എന്ന് ഉപയോഗിക്കുക
-- "ഇദ്ദേഹം" അല്ലെങ്കിൽ "അദ്ദേഹം" ഉപയോഗിക്കുക — ഒരിക്കലും "അവൻ" അല്ലെങ്കിൽ "അവൾ" ഉപയോഗിക്കരുത്
-- English medical terms (General Medicine, Pediatrics, etc.) അതേപടി ഉപയോഗിക്കുക, പരിഭാഷ വേണ്ട"""
+നിങ്ങൾ ഒരു ആശുപത്രി receptionist ആണ് — നാട്ടുകാർ സ്വാഭാവികമായി സംസാരിക്കുന്നതുപോലെ ഉത്തരം നൽകൂ.
+ചുരുക്കമായി, ലളിതമായി — 1 മുതൽ 2 വാക്യം മാത്രം.
+
+നിയമങ്ങൾ:
+- "എല്ലാവിധ", "ഉറപ്പിക്കൂ", "ആദരണീയ" പോലുള്ള formal വാക്കുകൾ ഉപയോഗിക്കരുത്
+- ദിവസം കൃത്യമായി പറയുക: ഞായർ തിങ്കൾ ചൊവ്വ ബുധൻ വ്യാഴം വെള്ളി ശനി
+- ഡോക്ടർ: "ഡോക്ടർ [പേര്]", "അദ്ദേഹം"/"ഇദ്ദേഹം" — "അവൻ"/"അവൾ" പാടില്ല
+- Medical terms (Cardiology, General Medicine, etc.) ഇംഗ്ലീഷിൽ തന്നെ നിലനിർത്തുക
+- ഓരോ ചോദ്യവും സ്വതന്ത്രമായി ഉത്തരം നൽകുക — മുൻ topic carry forward ചെയ്യരുത്"""
 
 
 def build_fallback_instruction(doctors_found: int, kb_chunks: int, has_pharmacy: bool, has_labs: bool) -> str:
@@ -8101,18 +8318,15 @@ departments, or services that appear in your context above."""
 def build_context(request: ChatRequest, db: Session, force_english: bool = False):
     hospital_id = request.hospital_id
     question = request.question
-    today_str = datetime.now().strftime("%d-%m-%Y")
     prompt_date_str = datetime.now().strftime("%A, %B %d, %Y")
 
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
     if not hospital:
         raise HTTPException(status_code=404, detail="Hospital not found")
 
-# Fetch all structured data from the DB
     all_medicines = db.query(Medicine).filter(Medicine.hospital_id == hospital_id).all()
     all_tests = db.query(LabTest).filter(LabTest.hospital_id == hospital_id).all()
 
-    # Build the context strings
     doctor_context, doctors_included = build_doctor_context(question, hospital_id, db)
     pharmacy_context = build_pharmacy_context(question, all_medicines)
     lab_tests_context = build_lab_tests_context(question, all_tests)
@@ -8126,14 +8340,32 @@ def build_context(request: ChatRequest, db: Session, force_english: bool = False
     )
     kb_context, chunks_included = build_kb_context(raw_results)
 
-    lang_instruction = build_system_prompt_malayalam() if request.language == "ml" else build_system_prompt_english()
+    lang_instruction = build_system_prompt_malayalam() if (request.language == "ml" and not force_english) else build_system_prompt_english()
 
     fallback_instruction = build_fallback_instruction(
-    doctors_found=doctors_included,
-    kb_chunks=chunks_included,
-    has_pharmacy=len(all_medicines) > 0,
-    has_labs=len(all_tests) > 0
-)
+        doctors_found=doctors_included,
+        kb_chunks=chunks_included,
+        has_pharmacy=len(all_medicines) > 0,
+        has_labs=len(all_tests) > 0
+    )
+    # If a doctor is already selected mid-booking, pin their full details at the top
+    pinned_doctor_context = ""
+    if request.history:
+        for msg in reversed(request.history):
+            id_match = re.search(r"\[ID:\s*(\d+)\]", msg.content)
+            if id_match:
+                pin_id = int(id_match.group(1))
+                pinned = db.query(Doctor).filter(
+                    Doctor.id == pin_id,
+                    Doctor.hospital_id == hospital_id
+                ).first()
+                if pinned:
+                    status = check_doctor_availability_db(pinned, db, datetime.now())
+                    pinned_doctor_context = (
+                        f"SELECTED DOCTOR (already confirmed by patient):\n"
+                        f"- [ID: {pinned.id}] Dr. {pinned.name} ({pinned.department}): {status}\n"
+                    )
+                break
 
     parts = [
         f"You are Arogya, the AI Assistant for {hospital.name}.",
@@ -8142,12 +8374,12 @@ def build_context(request: ChatRequest, db: Session, force_english: bool = False
         hospital.system_prompt or "",
         "",
         lang_instruction,
-        "",
+        "",pinned_doctor_context,
         doctor_context,
     ]
     if pharmacy_context:
         parts.extend(["", pharmacy_context])
-        
+
     if lab_tests_context:
         parts.extend(["", lab_tests_context])
 
@@ -8161,8 +8393,8 @@ def build_context(request: ChatRequest, db: Session, force_english: bool = False
     prompt_chars = len(system_prompt)
     if prompt_chars > SYSTEM_PROMPT_WARN_CHARS:
         logger.warning(
-            "System prompt over soft limit hospital_id=%s: %d chars (~%d tokens) doctors=%d/%d kb=%d",
-            hospital_id, prompt_chars, prompt_chars // 4, doctors_included, len(all_doctors), chunks_included,
+            "System prompt over soft limit hospital_id=%s: %d chars (~%d tokens) doctors=%d kb=%d",
+            hospital_id, prompt_chars, prompt_chars // 4, doctors_included, chunks_included,
         )
 
     history_messages = build_history_messages(request.history or [])
@@ -8181,10 +8413,31 @@ def build_context(request: ChatRequest, db: Session, force_english: bool = False
 def build_history_messages(history: List[HistoryMessage]) -> List[dict]:
     if not history:
         return []
-    trimmed = history[-(MAX_HISTORY_TURNS * 2):]
-    if trimmed and trimmed[0].role != "user":
-        trimmed = trimmed[1:]
-    return [{"role": m.role, "content": m.content} for m in trimmed]
+
+    RECENT_TURNS = 4          # always pass last 4 turns verbatim
+    SUMMARY_THRESHOLD = 6     # only summarise if there are more than this many total messages
+
+    recent = history[-(RECENT_TURNS * 2):]
+    older  = history[:-(RECENT_TURNS * 2)]
+
+    messages = []
+
+    # If there are older turns worth summarising, collapse them into one system note
+    if len(older) >= SUMMARY_THRESHOLD:
+        topics = []
+        for m in older:
+            if m.role == "user":
+                topics.append(m.content[:120])
+        if topics:
+            summary = "Earlier in this conversation the patient asked about: " + "; ".join(topics[-4:])
+            messages.append({"role": "system", "content": summary})
+
+    # Ensure we start on a user turn
+    if recent and recent[0].role != "user":
+        recent = recent[1:]
+
+    messages.extend({"role": m.role, "content": m.content} for m in recent)
+    return messages
 
 
 # =============================================================================
@@ -8295,7 +8548,6 @@ async def get_suggestions(hospital_id: int, db: Session = Depends(get_db)):
     en_suggestions = ["Which doctors are available today?"]
     ml_suggestions = ["ഇന്ന് ഏത് ഡോക്ടർ ഉണ്ട്?"]
 
-    # Pick 2 real departments for specific questions
     for dept in dept_names[:2]:
         en_suggestions.append(f"Is there a {dept} doctor today?")
         ml_suggestions.append(f"ഇന്ന് {dept} ഡോക്ടർ ഉണ്ടോ?")
@@ -8373,22 +8625,21 @@ async def upload_pdf(file: UploadFile = File(...), hospital_id: int = Form(...),
 
 @router.post("/chat")
 async def chat_with_arogya(request: ChatRequest, db: Session = Depends(get_db)):
-    is_malayalam = request.language == "ml"
+    # Non-streaming endpoint always responds in the requested language natively
+    _, openai_messages, _ = build_context(request, db, force_english=False)
 
-    english_question = request.question
-    if is_malayalam:
-        english_question = _translate(request.question, source="ml", target="en")
-        logger.info("[Translation] ml->en: %r -> %r", request.question[:80], english_question[:80])
-
-    translated_request = request.model_copy(update={"question": english_question})
-    _, openai_messages, _ = build_context(translated_request, db, force_english=True)
+    # For Malayalam, prepend the English question as a hidden note for context retrieval
+    # but the system prompt already instructs the model to reply in Malayalam
+    if request.language == "ml":
+        english_question = await _translate_async(request.question, "ml", "en")
+        openai_messages[-1]["content"] = (
+            f"[User asked in Malayalam: {request.question}]\n"
+            f"[English translation for your reference: {english_question}]\n"
+            f"Reply in Malayalam only."
+        )
 
     ai_response = client.chat.completions.create(model=OPENAI_MODEL, messages=openai_messages)
-    english_answer = ai_response.choices[0].message.content or ""
-
-    final_answer = english_answer
-    if is_malayalam:
-        final_answer = _translate(english_answer, source="en", target="ml")
+    answer = ai_response.choices[0].message.content or ""
 
     usage = ai_response.usage
     db.add(UsageLedger(
@@ -8397,33 +8648,18 @@ async def chat_with_arogya(request: ChatRequest, db: Session = Depends(get_db)):
         total_tokens=usage.total_tokens, estimated_cost=(usage.total_tokens / 1_000_000) * 0.15
     ))
     db.commit()
-    return {"answer": final_answer}
+    return {"answer": answer}
+
 
 # =============================================================================
-# COMPLETE REPLACEMENT for the chat_stream endpoint and classify_user_intent
-# in backend/app/api/v1/endpoints/ai.py
-#
-# Replace everything from:
-#   async def classify_user_intent(...)
-# through to the end of the file.
+# INTENT CLASSIFICATION
 # =============================================================================
+
 async def normalise_booking_input(
     raw_message: str,
     current_field: str,
     conversation_context: str = ""
 ) -> dict:
-    """
-    Uses the LLM to intelligently interpret and normalise a user's message
-    in the context of what field is currently being collected.
-
-    Returns a dict:
-    {
-        "intent": "provide" | "correct" | "cancel" | "unclear",
-        "field_to_correct": "phone" | "name" | "age" | "date" | "time" | "doctor" | null,
-        "normalised_value": "cleaned value ready to use" | null,
-        "reason": "brief explanation if unclear or correction"
-    }
-    """
     system_prompt = f"""You are a data extraction assistant for a hospital booking system.
 
 The assistant is currently collecting: {current_field}
@@ -8439,11 +8675,11 @@ Your job is to interpret what the user means and return a JSON object with these
 - "reason": brief note if intent is "unclear" or "correct"
 
 CRITICAL RULES for normalisation:
-- Phone numbers: Convert spoken/spaced digits to a single string of digits. "94 67 48 74 48" → "9467487448". "nine four six seven..." → "9467487448". Remove all spaces, dashes, brackets.
+- Phone numbers: Convert spoken/spaced digits to a single string of digits. "94 67 48 74 48" → "9467487448". Remove all spaces, dashes, brackets.
 - Names: Extract only the person's name. "Reetha and she is 50 years old" → "Reetha". "My name is John" → "John".
 - Ages: Extract only the number. "I am 45 years old" → "45". "forty five" → "45".
-- Corrections: "no my number is wrong" → intent=correct, field_to_correct=phone. "actually my name is..." → intent=correct, field_to_correct=name.
-- True cancellations: "I don't want to book anymore" → intent=cancel. "stop everything" → intent=cancel.
+- Corrections: "no my number is wrong" → intent=correct, field_to_correct=phone.
+- True cancellations: "I don't want to book anymore" → intent=cancel.
 - "no" alone during confirmation step: treat as intent=correct (patient wants to change something), NOT cancel.
 
 Return ONLY valid JSON, no markdown, no explanation."""
@@ -8460,7 +8696,6 @@ Return ONLY valid JSON, no markdown, no explanation."""
             ]
         )
         result = json.loads(resp.choices[0].message.content)
-        # Ensure all expected keys exist
         return {
             "intent": result.get("intent", "unclear"),
             "field_to_correct": result.get("field_to_correct"),
@@ -8469,21 +8704,19 @@ Return ONLY valid JSON, no markdown, no explanation."""
         }
     except Exception as e:
         logger.warning("normalise_booking_input failed: %s", e)
-        # Safe fallback: treat as a raw provide with the original message
         return {
             "intent": "provide",
             "field_to_correct": None,
             "normalised_value": raw_message,
             "reason": ""
         }
-    
+
+
 async def classify_user_intent(user_message: str, history: list = []) -> str:
     """
-    Uses a fast LLM call to semantically classify the user's intent.
-    Returns exactly one of: "STATUS", "BOOKING", "CANCEL", or "OTHER"
-    
-    This runs BEFORE build_context so we skip the expensive embedding
-    call entirely when the user is booking or cancelling.
+    Classifies user intent.  Importantly: if the user is mid-booking but asks
+    a general information question, this returns OTHER so that the topic switch
+    is respected and context bleed is avoided.
     """
     history_snippet = ""
     if history:
@@ -8498,12 +8731,14 @@ Read the conversation and the latest user message, then output exactly ONE word.
 
 Categories:
 STATUS  - User is asking to CHECK an existing appointment status or reference number.
-BOOKING - User wants to book/schedule an appointment, OR is providing booking details.
+BOOKING - User wants to book/schedule an appointment, OR is providing booking details (name, phone, age, date) in the middle of a booking flow.
 CANCEL  - User wants to cancel or stop an ongoing booking process.
-OTHER   - General hospital questions, asking about medicines, lab tests, timings, or doctors.
+OTHER   - General hospital questions: asking about doctors, medicines, lab tests, timings, availability, departments, or any informational question.
 
-RULES:
-- If the user changes the subject to ask a general question (e.g., about medicines, lab tests, or where something is), output: OTHER (Even if you were in the middle of booking).
+STRICT RULES:
+- If the user changes the subject to ask a general question (doctors, medicines, lab tests, timings), output: OTHER — even if you were in the middle of booking.
+- If the user asks "is there a doctor on Wednesday" or similar day/availability question, output: OTHER (not BOOKING).
+- Only output BOOKING if the user explicitly says they want to book, or is actively providing details (name/phone/age) for a booking that's already in progress.
 - Only output the single category word, nothing else."""
 
     context = (
@@ -8523,42 +8758,46 @@ RULES:
             ]
         )
         intent = resp.choices[0].message.content.strip().upper()
-        # Defensive: only accept known intents
         return intent if intent in {"STATUS", "BOOKING", "CANCEL", "OTHER"} else "OTHER"
     except Exception as e:
         logger.warning("Intent classification failed: %s", e)
         return "OTHER"
 
 
+# =============================================================================
+# CHAT STREAM
+# =============================================================================
+
 @router.post("/chat-stream")
 async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
     is_malayalam = request.language == "ml"
 
-    # Step 1: Translate input if Malayalam
+    # For Malayalam: translate to English for intent classification and context
+    # retrieval, but then generate the Malayalam response natively (no post-translate).
     english_question = request.question
     if is_malayalam:
         english_question = await _translate_async(request.question, "ml", "en")
         logger.info("[Translation] ml->en: %r -> %r", request.question[:60], english_question[:60])
 
-    # Step 2: Classify intent BEFORE any expensive DB/embedding calls
     intent = await classify_user_intent(english_question, request.history or [])
     logger.info("[Intent] %s -> %s", english_question[:60], intent)
 
     async def event_generator() -> AsyncGenerator[str, None]:
         pt = ct = tt = 0
-        
+
         # ── CANCEL ───────────────────────────────────────────────────────────
         if intent == "CANCEL":
-            msg = "Okay, I've cancelled any active requests. How else can I help you?"
-            if is_malayalam:
-                msg = await _translate_async(msg, "en", "ml")
+            msg = (
+                "ശരി, ഞാൻ ബുക്കിംഗ് നിർത്തി. മറ്റേതെങ്കിലും സഹായം വേണോ?"
+                if is_malayalam
+                else "Okay, I've cancelled any active requests. How else can I help you?"
+            )
             yield f"data: {json.dumps(msg)}\n\n"
             yield "data: [DONE]\n\n"
             return
 
         # ── STATUS CHECK ─────────────────────────────────────────────────────
         if intent == "STATUS":
-            # Look for a phone number across current message + recent history
             history_text = " ".join(
                 m.content for m in (request.history or [])[-6:]
             )
@@ -8567,11 +8806,10 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
 
             if not phone_match:
                 msg = (
-                    "I can check your appointment status! "
-                    "Please share the 10-digit phone number you used when booking."
+                    "അപ്പോയിന്റ്മെന്റ് സ്റ്റാറ്റസ് നോക്കാം! ബുക്ക് ചെയ്തപ്പോൾ ഉപയോഗിച്ച 10 അക്ക ഫോൺ നമ്പർ തരാമോ?"
+                    if is_malayalam
+                    else "I can check your appointment status! Please share the 10-digit phone number you used when booking."
                 )
-                if is_malayalam:
-                    msg = await _translate_async(msg, "en", "ml")
                 yield f"data: {json.dumps(msg)}\n\n"
                 yield "data: [DONE]\n\n"
                 return
@@ -8590,16 +8828,18 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
 
             if not appts:
                 msg = (
-                    f"I couldn't find any appointments for the number {extracted_phone}. "
-                    "Please double-check the number or contact the reception desk."
+                    f"{extracted_phone} എന്ന നമ്പരിൽ അപ്പോയിന്റ്മെന്റ് കണ്ടില്ല. നമ്പർ ശരിയാണോ എന്ന് ഒന്ന് നോക്കൂ, അല്ലെങ്കിൽ reception-ൽ വിളിക്കൂ."
+                    if is_malayalam
+                    else f"I couldn't find any appointments for the number {extracted_phone}. Please double-check or contact the reception desk."
                 )
-                if is_malayalam:
-                    msg = await _translate_async(msg, "en", "ml")
                 yield f"data: {json.dumps(msg)}\n\n"
                 yield "data: [DONE]\n\n"
                 return
 
-            reply_lines = ["Here is the status of your recent appointments:\n"]
+            reply_lines = [
+                "നിങ്ങളുടെ അപ്പോയിന്റ്മെന്റ് വിവരങ്ങൾ:\n" if is_malayalam
+                else "Here is the status of your recent appointments:\n"
+            ]
             for a in appts:
                 doc = db.query(Doctor).filter(Doctor.id == a.doctor_id).first()
                 doc_name = doc.name if doc else "Unknown"
@@ -8621,18 +8861,39 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
             yield "data: [DONE]\n\n"
             return
 
-        # ── BOOKING & GENERAL CHAT (BOOKING or OTHER) ─────────────────────────
-        translated_request = request.model_copy(update={"question": english_question})
+        # ── BOOKING & GENERAL CHAT ────────────────────────────────────────────
+        #
+        # For Malayalam: build context using the English translation, but instruct
+        # the model to generate its reply directly in Malayalam.
+        # This completely eliminates the Google Translate post-processing step
+        # and the garbled/unnatural phrasing it produces.
+        #
+        context_question = english_question if is_malayalam else request.question
+        translated_request = request.model_copy(update={
+            "question": context_question,
+            # Keep language="ml" so build_context uses the Malayalam system prompt
+            "language": request.language,
+        })
         system_prompt, openai_messages, hospital = build_context(
-            translated_request, db, force_english=True
+            translated_request, db, force_english=False
         )
+
+        # For Malayalam, replace the final user message with a bilingual hint so
+        # the model has the original Malayalam text for nuance AND the English for
+        # understanding structured data references.
+        if is_malayalam:
+            openai_messages[-1]["content"] = (
+                f"{request.question}\n"
+                f"[English reference: {english_question}]"
+            )
+
         booking_field_keywords = {
-            "phone": ["phone", "number", "mobile", "contact"],
-            "name":  ["name", "patient's full name", "full name"],
-            "age":   ["age", "how old", "date of birth"],
-            "date":  ["date", "prefer", "which day"],
-            "time":  ["morning", "afternoon", "evening", "time of day"],
-            "doctor":["doctor", "which doctor", "department"],
+            "phone":  ["phone", "number", "mobile", "contact"],
+            "name":   ["name", "patient's full name", "full name"],
+            "age":    ["age", "how old", "date of birth"],
+            "date":   ["date", "prefer", "which day"],
+            "time":   ["morning", "afternoon", "evening", "time of day"],
+            "doctor": ["doctor", "which doctor", "department"],
         }
         current_field = None
         if request.history:
@@ -8645,7 +8906,7 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
                     current_field = field
                     break
 
-        processed_question = english_question
+        processed_question = context_question
         if current_field and intent == "BOOKING":
             context_snippet = "\n".join(
                 f"{'Bot' if m.role == 'assistant' else 'Patient'}: {m.content}"
@@ -8658,15 +8919,18 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
                         current_field, normalised["intent"], normalised["normalised_value"])
 
             if normalised["intent"] == "cancel":
-                msg = "Okay, I've cancelled the booking process. Is there anything else I can help you with?"
-                if is_malayalam: msg = await _translate_async(msg, "en", "ml")
+                msg = (
+                    "ശരി, ബുക്കിംഗ് നിർത്തി. മറ്റേതെങ്കിലും സഹായം വേണോ?"
+                    if is_malayalam
+                    else "Okay, I've cancelled the booking process. Is there anything else I can help you with?"
+                )
                 yield f"data: {json.dumps(msg)}\n\n"
                 yield "data: [DONE]\n\n"
                 return
 
             if normalised["intent"] == "correct":
                 field = normalised.get("field_to_correct", current_field)
-                prompts = {
+                en_prompts = {
                     "phone":  "Of course! Please provide the correct phone number.",
                     "name":   "Of course! What is the correct patient name?",
                     "age":    "Of course! What is the correct age?",
@@ -8674,39 +8938,69 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
                     "time":   "Of course! Morning, afternoon, or evening?",
                     "doctor": "Of course! Which doctor would you like to see?",
                 }
-                msg = prompts.get(field, "Of course! Please provide the correct information.")
-                if is_malayalam: msg = await _translate_async(msg, "en", "ml")
+                ml_prompts = {
+                    "phone":  "ശരി! ശരിയായ ഫോൺ നമ്പർ പറയൂ.",
+                    "name":   "ശരി! രോഗിയുടെ ശരിയായ പേര് എന്താണ്?",
+                    "age":    "ശരി! ശരിയായ പ്രായം എത്ര?",
+                    "date":   "ശരി! ഏത് തീയതി വേണം?",
+                    "time":   "ശരി! രാവിലെ, ഉച്ചക്ക്, അതോ വൈകിട്ട്?",
+                    "doctor": "ശരി! ഏത് ഡോക്ടറെ കാണണം?",
+                }
+                msg = (ml_prompts if is_malayalam else en_prompts).get(
+                    field, "ശരി! ശരിയായ വിവരം പറയൂ." if is_malayalam else "Of course! Please provide the correct information."
+                )
                 yield f"data: {json.dumps(msg)}\n\n"
                 yield "data: [DONE]\n\n"
                 return
 
             if normalised["intent"] == "provide" and normalised["normalised_value"]:
                 processed_question = normalised["normalised_value"]
-                openai_messages[-1]["content"] = processed_question
+                openai_messages[-1]["content"] = (
+                    processed_question
+                    if not is_malayalam
+                    else f"{request.question}\n[English reference: {processed_question}]"
+                )
 
-        # Agent instructions injected into the system prompt
-        agent_instructions = """
+        # Agent instructions (language-aware)
+        if is_malayalam:
+            agent_instructions = """
+APPOINTMENT BOOKING CAPABILITY (for Malayalam conversations):
+You can book appointments. Collect these details one at a time, asking in simple natural Malayalam:
+1. Doctor (use [ID: X] from the doctor list to identify)
+2. Preferred date — ask for a specific date or day of the week
+3. Time of day (morning/afternoon/evening — use: രാവിലെ / ഉച്ചക്ക് / വൈകിട്ട്)
+4. Patient's full name
+5. Patient's age
+6. Phone number (10 digits)
+
+VALIDATION:
+- Phone: exactly 10 digits. If wrong, ask again in Malayalam.
+- Date: must be a future date. Correctly interpret day names: ഞായർ=Sunday, തിങ്കൾ=Monday, ചൊവ്വ=Tuesday, ബുധൻ=Wednesday, വ്യാഴം=Thursday, വെള്ളി=Friday, ശനി=Saturday.
+- Before confirming, show a summary in Malayalam and ask "ഈ വിവരങ്ങൾ ശരിയാണോ?" (Is this correct?)
+
+IMPORTANT: Answer all general questions (doctors, tests, medicines, timings) directly and helpfully.
+Only trigger 'book_appointment' after the patient confirms ALL 6 details."""
+        else:
+            agent_instructions = """
 APPOINTMENT BOOKING CAPABILITY:
 You can book appointments for patients. Collect these details naturally, one at a time:
 1. Doctor (use the [ID: X] from the doctor list above to identify them)
 2. Preferred date (ask for a specific date like "April 20" or "next Monday")
 3. Time of day (morning, afternoon, or evening)
-4. Patient's full name (name only — do not accept extra words)
+4. Patient's full name (name only)
 5. Patient's age (number only, 1-120)
 6. Phone number (must be exactly 10 digits for Indian numbers)
 
 VALIDATION RULES:
-- Phone: exactly 10 digits (or up to 15 with country code). If wrong length, ask again.
-- Name: extract only the name part; ignore extra words like "and she is 30 years old".
+- Phone: exactly 10 digits. If wrong length, ask again.
+- Name: extract only the name part.
 - Date: must be a future date.
 
 IMPORTANT:
 - Answer general questions normally using the knowledge base.
 - Only trigger 'book_appointment' once you have confirmed ALL 6 details with the patient.
-- Before triggering, show a confirmation summary and ask the patient to say 'yes' or 'no'.
+- Before triggering, show a confirmation summary and ask the patient to confirm."""
 
-- If they say no or want to change something, ask which detail to correct.
-"""
         openai_messages[0]["content"] += f"\n\n{agent_instructions}"
 
         tools = [{
@@ -8736,17 +9030,20 @@ IMPORTANT:
 
         try:
             stream = await async_client.chat.completions.create(
-                model=OPENAI_MODEL,
+                model=OPENAI_MODEL_ML if is_malayalam else OPENAI_MODEL,
                 messages=openai_messages,
                 tools=tools,
+                temperature=0.3,
                 stream=True,
                 stream_options={"include_usage": True}
             )
         except Exception as e:
             logger.exception("[chat-stream] OpenAI call failed: %s", e)
-            err = "Sorry, I'm having trouble connecting right now. Please try again."
-            if is_malayalam:
-                err = await _translate_async(err, "en", "ml")
+            err = (
+                "ക്ഷമിക്കണം, ഒരു ബന്ധ പ്രശ്നം ഉണ്ട്. ദയവായി വീണ്ടും ശ്രമിക്കൂ."
+                if is_malayalam
+                else "Sorry, I'm having trouble connecting right now. Please try again."
+            )
             yield f"data: {json.dumps(err)}\n\n"
             yield "data: [DONE]\n\n"
             return
@@ -8754,7 +9051,6 @@ IMPORTANT:
         tool_call_name = ""
         tool_call_args = ""
         is_tool_call = False
-        english_chunks: List[str] = []
 
         async for chunk in stream:
             if chunk.usage:
@@ -8774,11 +9070,9 @@ IMPORTANT:
                 if tc.function.arguments:
                     tool_call_args += tc.function.arguments
             elif delta.content and not is_tool_call:
-                token = delta.content
-                if is_malayalam:
-                    english_chunks.append(token)
-                else:
-                    yield f"data: {json.dumps(token)}\n\n"
+                # Stream tokens directly — no post-translation needed since
+                # the LLM generates Malayalam natively now.
+                yield f"data: {json.dumps(delta.content)}\n\n"
 
         # ── Handle tool call (booking) ────────────────────────────────────────
         if is_tool_call and tool_call_name == "book_appointment":
@@ -8788,25 +9082,24 @@ IMPORTANT:
 
                 args = json.loads(tool_call_args)
 
-                # Validate phone length
                 phone_digits = re.sub(r"\D", "", args.get("patient_phone", ""))
                 if len(phone_digits) < 7 or len(phone_digits) > 15:
                     err = (
-                        f"The phone number '{args.get('patient_phone')}' doesn't look right. "
-                        "Please ask the patient to provide their 10-digit mobile number again."
+                        f"ഫോൺ നമ്പർ '{args.get('patient_phone')}' ശരിയല്ല. ദയവായി 10 അക്ക മൊബൈൽ നമ്പർ വീണ്ടും തരൂ."
+                        if is_malayalam
+                        else f"The phone number '{args.get('patient_phone')}' doesn't look right. Please provide the 10-digit mobile number again."
                     )
-                    if is_malayalam:
-                        err = await _translate_async(err, "en", "ml")
                     yield f"data: {json.dumps(err)}\n\n"
                     yield "data: [DONE]\n\n"
                     return
 
-                # Validate age
                 age_str = re.sub(r"\D", "", str(args.get("patient_age", "")))
                 if not age_str or not (1 <= int(age_str) <= 120):
-                    err = "The age doesn't look right. Please ask the patient to confirm their age."
-                    if is_malayalam:
-                        err = await _translate_async(err, "en", "ml")
+                    err = (
+                        "പ്രായം ശരിയല്ല. ദയവായി വീണ്ടും പറയൂ."
+                        if is_malayalam
+                        else "The age doesn't look right. Please confirm the patient's age."
+                    )
                     yield f"data: {json.dumps(err)}\n\n"
                     yield "data: [DONE]\n\n"
                     return
@@ -8818,11 +9111,10 @@ IMPORTANT:
 
                 if not doctor:
                     err = (
-                        "I couldn't find that doctor in the system. "
-                        "Please ask the patient which doctor they'd like to see."
+                        "ആ ഡോക്ടറെ system-ൽ കണ്ടില്ല. ഏത് ഡോക്ടറെ കാണണം?"
+                        if is_malayalam
+                        else "I couldn't find that doctor in the system. Which doctor would you like to see?"
                     )
-                    if is_malayalam:
-                        err = await _translate_async(err, "en", "ml")
                     yield f"data: {json.dumps(err)}\n\n"
                     yield "data: [DONE]\n\n"
                     return
@@ -8864,42 +9156,44 @@ IMPORTANT:
                         time_of_day=appt.time_of_day,
                     )
 
-                success_msg = (
-                    f"✅ **Appointment Request Submitted!**\n\n"
-                    f"Reference: **{appt.reference_number}**\n"
-                    f"Doctor: {doctor.name} ({doctor.department})\n"
-                    f"Date: {appt.preferred_date} — {appt.time_of_day.title()}\n"
-                    f"Patient: {appt.patient_name}, age {appt.patient_age}\n\n"
-                    f"The hospital will call **{appt.patient_phone}** to confirm your slot."
-                )
                 if is_malayalam:
-                    success_msg = await _translate_async(success_msg, "en", "ml")
+                    success_msg = (
+                        f"✅ **അപ്പോയിന്റ്മെന്റ് അപേക്ഷ സ്വീകരിച്ചു!**\n\n"
+                        f"Reference: **{appt.reference_number}**\n"
+                        f"ഡോക്ടർ: {doctor.name} ({doctor.department})\n"
+                        f"തീയതി: {appt.preferred_date} — {appt.time_of_day}\n"
+                        f"രോഗി: {appt.patient_name}, {appt.patient_age} വയസ്സ്\n\n"
+                        f"ആശുപത്രി **{appt.patient_phone}** നമ്പരിൽ വിളിച്ച് slot confirm ചെയ്യും."
+                    )
+                else:
+                    success_msg = (
+                        f"✅ **Appointment Request Submitted!**\n\n"
+                        f"Reference: **{appt.reference_number}**\n"
+                        f"Doctor: {doctor.name} ({doctor.department})\n"
+                        f"Date: {appt.preferred_date} — {appt.time_of_day.title()}\n"
+                        f"Patient: {appt.patient_name}, age {appt.patient_age}\n\n"
+                        f"The hospital will call **{appt.patient_phone}** to confirm your slot."
+                    )
                 yield f"data: {json.dumps(success_msg)}\n\n"
-                yield "data: [DONE]\n\n"  # ← add this
-                return   
+                yield "data: [DONE]\n\n"
+                return
 
             except json.JSONDecodeError:
                 logger.error("[chat-stream] Failed to parse tool args: %r", tool_call_args)
-                err = "Something went wrong while booking. Please try again."
-                if is_malayalam:
-                    err = await _translate_async(err, "en", "ml")
+                err = (
+                    "ബുക്കിംഗ്-ൽ ഒരു error ഉണ്ടായി. ദയവായി വീണ്ടും ശ്രമിക്കൂ."
+                    if is_malayalam
+                    else "Something went wrong while booking. Please try again."
+                )
                 yield f"data: {json.dumps(err)}\n\n"
             except Exception as e:
                 logger.exception("[chat-stream] Tool execution error: %s", e)
-                err = "Sorry, there was a technical error. Please try again."
-                if is_malayalam:
-                    err = await _translate_async(err, "en", "ml")
+                err = (
+                    "ഒരു technical error ഉണ്ടായി. ദയവായി വീണ്ടും ശ്രമിക്കൂ."
+                    if is_malayalam
+                    else "Sorry, there was a technical error. Please try again."
+                )
                 yield f"data: {json.dumps(err)}\n\n"
-
-        else:
-            # Normal chat response — translate if needed
-            if is_malayalam and english_chunks:
-                full_english = "".join(english_chunks)
-                full_malayalam = await _translate_async(full_english, "en", "ml")
-                sentences = re.split(r'(?<=[.!?।\n])\s*', full_malayalam)
-                for sentence in sentences:
-                    if sentence.strip():
-                        yield f"data: {json.dumps(sentence + ' ')}\n\n"
 
         yield "data: [DONE]\n\n"
 
@@ -8923,6 +9217,8 @@ IMPORTANT:
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"}
     )
+
+
 @router.post("/transcribe")
 async def transcribe_audio(
     file: UploadFile = File(...),
@@ -8932,22 +9228,17 @@ async def transcribe_audio(
 ):
     temp_filename = f"temp_{uuid.uuid4().hex}_{file.filename}"
     try:
-        # 1. Save audio temporarily
         with open(temp_filename, "wb") as buffer:
             buffer.write(await file.read())
 
-        # 2. Reject clips that are too short — causes hallucinations
         file_size = os.path.getsize(temp_filename)
-        duration_seconds = file_size / (16000 * 2)  # 16kHz 16-bit mono
+        duration_seconds = file_size / (16000 * 2)
         if duration_seconds < 1.0:
             return {"transcript": ""}
-        if duration_seconds > 28.0:  # Sarvam limit is 30s, give 2s buffer
+        if duration_seconds > 28.0:
             return {"transcript": ""}
 
-        # 3. Pick the right model and language code
         if language == "ml":
-            # saaras:v3 with codemix mode = Malayalam script + English words in English
-            # This is exactly what you need for "ഇന്ന് pediatrician ഉണ്ടോ?"
             model = "saaras:v3"
             lang_code = "ml-IN"
             mode = "codemix"
@@ -8956,7 +9247,6 @@ async def transcribe_audio(
             lang_code = "en-IN"
             mode = "transcribe"
 
-        # 4. Send to Sarvam
         with open(temp_filename, "rb") as audio_file:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
@@ -8979,7 +9269,7 @@ async def transcribe_audio(
         return {"transcript": transcript}
 
     except HTTPException:
-        raise   
+        raise
     except Exception as e:
         logger.error(f"Transcription failed: {e}")
         raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
