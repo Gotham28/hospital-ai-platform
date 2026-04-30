@@ -763,7 +763,8 @@ async def upload_pdf(file: UploadFile = File(...), hospital_id: int = Form(...),
     try:
         for content, embedding in zip(chunks, embeddings):
 # ADD  entry_type=entry_type,  to the KnowledgeBase(...) call
-            db.add(KnowledgeBase(hospital_id=hospital_id, content=content, entry_type=entry_type, embedding=embedding, created_at=datetime.utcnow()))        db.commit()
+            db.add(KnowledgeBase(hospital_id=hospital_id, content=content, entry_type=entry_type, embedding=embedding, created_at=datetime.utcnow()))        
+            db.commit()
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
