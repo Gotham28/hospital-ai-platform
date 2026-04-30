@@ -7,7 +7,7 @@ import unicodedata
 import httpx
 import uuid
 from typing import List, Optional, AsyncGenerator
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel, Field, field_validator, model_validator
 from openai import OpenAI, AsyncOpenAI
 from sqlalchemy.orm import Session
@@ -440,7 +440,7 @@ def build_system_prompt_malayalam() -> str:
 നിയമങ്ങൾ:
 - "എല്ലാവിധ", "ഉറപ്പിക്കൂ", "ആദരണീയ" പോലുള്ള formal വാക്കുകൾ ഉപയോഗിക്കരുത്
 - ദിവസം കൃത്യമായി പറയുക: ഞായർ തിങ്കൾ ചൊവ്വ ബുധൻ വ്യാഴം വെള്ളി ശനി
-- ഡോക്ടർ: "ഡോക്ടർ [പേര്]", "അദ്ദേഹം"/"ഇദ്ദേഹം" — "അവൻ"/"അവൾ" പാടില്ല
+- ഡോക്ടർ: "ഡോക്ടർ [പേര്]" എന്ന് വിളിക്കുക. "അദ്ദേഹം" അല്ലെങ്കിൽ "ആ ഡോക്ടർ" എന്ന് ഉപയോഗിക്കുക. "അവൻ", "അവൾ", "ഇവൻ", "ഇവൾ" എന്നിവ ഒരിക്കലും ഉപയോഗിക്കരുത്.
 - Medical terms (Cardiology, General Medicine, etc.) ഇംഗ്ലീഷിൽ തന്നെ നിലനിർത്തുക
 - ഓരോ ചോദ്യവും സ്വതന്ത്രമായി ഉത്തരം നൽകുക — മുൻ topic carry forward ചെയ്യരുത്"""
 
