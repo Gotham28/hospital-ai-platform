@@ -86,7 +86,8 @@ function StaffGuard({ children }: { children: React.ReactNode }) {
 
   // If staff tries to access a different hospital's URL, kick them back to their own
   if (role === 'staff' && String(hospitalId) !== String(routeHospitalId)) {
-    return <Navigate to={`/hospitals/${hospitalId}/settings`} replace />;
+    return <Navigate to={`/hospitals/${hospitalId}/appointments`} replace />;
+
   }
   
   return <>{children}</>;
@@ -117,7 +118,8 @@ export default function App() {
           path="/" 
           element={
             role === 'staff' && hospitalId ? (
-              <Navigate to={`/hospitals/${hospitalId}/settings`} replace />
+              <Navigate to={`/hospitals/${hospitalId}/appointments`} replace />
+
             ) : (
               <HospitalList />
             )
