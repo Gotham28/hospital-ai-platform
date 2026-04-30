@@ -162,6 +162,14 @@ class ChatRequest(BaseModel):
 class IngestRequest(BaseModel):
     hospital_id: int
     text: str
+    entry_type: str = "fact"
+    @field_validator("entry_type")
+    @classmethod
+    def entry_type_valid(cls, v: str) -> str:
+        if v not in {"fact", "instruction"}:
+            raise ValueError("entry_type must be 'fact' or 'instruction'")
+        return v
+
 
 
 # =============================================================================
@@ -716,6 +724,7 @@ async def ingest_knowledge(request: IngestRequest, db: Session = Depends(get_db)
         db.add(KnowledgeBase(
             hospital_id=request.hospital_id,
             content=request.text,
+            entry_type=request.entry_type,   # ← add this line
             embedding=resp.data[0].embedding,
             created_at=datetime.utcnow()
         ))
@@ -727,7 +736,7 @@ async def ingest_knowledge(request: IngestRequest, db: Session = Depends(get_db)
 
 
 @router.post("/upload-pdf")
-async def upload_pdf(file: UploadFile = File(...), hospital_id: int = Form(...), db: Session = Depends(get_db)):
+async def upload_pdf(file: UploadFile = File(...), hospital_id: int = Form(...), entry_type: str = Form("fact"),db: Session = Depends(get_db)):
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=422, detail="Only PDF files are accepted.")
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
@@ -753,8 +762,8 @@ async def upload_pdf(file: UploadFile = File(...), hospital_id: int = Form(...),
         raise HTTPException(status_code=500, detail=f"Embedding failed: {e}")
     try:
         for content, embedding in zip(chunks, embeddings):
-            db.add(KnowledgeBase(hospital_id=hospital_id, content=content, embedding=embedding, created_at=datetime.utcnow()))
-        db.commit()
+# ADD  entry_type=entry_type,  to the KnowledgeBase(...) call
+            db.add(KnowledgeBase(hospital_id=hospital_id, content=content, entry_type=entry_type, embedding=embedding, created_at=datetime.utcnow()))        db.commit()
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
@@ -1419,3 +1428,63 @@ async def transcribe_audio(
     finally:
         if os.path.exists(temp_filename):
             os.remove(temp_filename)
+
+@router.get("/knowledge/{hospital_id}")
+async def list_knowledge(hospital_id: int, db: Session = Depends(get_db)):
+    entries = (
+        db.query(KnowledgeBase)
+        .filter(KnowledgeBase.hospital_id == hospital_id)
+        .order_by(KnowledgeBase.created_at.desc())
+        .all()
+    )
+    return [
+        {
+            "id": e.id,
+            "content": e.content,
+            "entry_type": getattr(e, "entry_type", "fact") or "fact",
+            "created_at": e.created_at.isoformat() if e.created_at else None,
+        }
+        for e in entries
+    ]
+
+
+class UpdateKnowledgeRequest(BaseModel):
+    content: str
+
+    @field_validator("content")
+    @classmethod
+    def content_not_empty(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("content cannot be empty")
+        return v
+
+
+@router.patch("/knowledge/entry/{entry_id}")
+async def update_knowledge_entry(entry_id: int, request: UpdateKnowledgeRequest, db: Session = Depends(get_db)):
+    entry = db.query(KnowledgeBase).filter(KnowledgeBase.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Knowledge entry not found")
+    try:
+        resp = client.embeddings.create(input=request.content, model="text-embedding-3-small")
+        entry.content = request.content
+        entry.embedding = resp.data[0].embedding
+        db.commit()
+        return {"status": "success", "message": "Entry updated"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/knowledge/entry/{entry_id}")
+async def delete_knowledge_entry(entry_id: int, db: Session = Depends(get_db)):
+    entry = db.query(KnowledgeBase).filter(KnowledgeBase.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Knowledge entry not found")
+    try:
+        db.delete(entry)
+        db.commit()
+        return {"status": "success", "message": "Entry deleted"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))

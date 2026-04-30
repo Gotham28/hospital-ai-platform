@@ -51,7 +51,6 @@ export function useHospitalChat(hospitalId: string) {
     if (!hospitalId) return;
     const token = localStorage.getItem('token');
     
-    // Set initial loading message
     setMessages([{ role: 'assistant', content: language === 'ml' ? "വിവരങ്ങൾ ലോഡ് ചെയ്യുന്നു..." : "Loading info...", isWelcome: true }]);
 
     fetch(`${getBaseURL()}/ai/welcome/${hospitalId}`, {
@@ -73,7 +72,6 @@ export function useHospitalChat(hospitalId: string) {
       .catch(() => {});
   }, [hospitalId]);
 
-  // Update welcome message if language toggles
   useEffect(() => {
     setMessages(prev => {
       if (!prev.length || !prev[0].isWelcome || !welcomeCache.current) return prev;
@@ -151,84 +149,98 @@ export function useHospitalChat(hospitalId: string) {
 
   useEffect(() => { handleSendRef.current = handleSend; }, [handleSend]);
 
-  // --- 3. The Silero VAD Mic Logic ---
-// --- 3. The Silero VAD Mic Logic ---
-const vadOptions = useMemo(() => ({
-  startOnLoad: false,
-  baseAssetPath: "/vad-assets/",
-  onnxWASMBasePath: "/vad-assets/",
-  model: "legacy" as const,
-  positiveSpeechThreshold: 0.6,
-  negativeSpeechThreshold: 0.35,
-  minSpeechMs: 250,
-  redemptionMs: 1500,
-  onSpeechStart: () => {
-    if (micActiveRef.current) setMicState('recording');
-  },
-  onSpeechEnd: async (audio) => {
-    if (!micActiveRef.current) return;
-  
-  micActiveRef.current = false;  // ← ADD: lock it immediately
-  vadPause();                     // ← ADD: stop VAD right away
-  setMicState('transcribing');
-  
-    try {
-      const wavBuffer = utils.encodeWAV(audio);
-      const audioBlob = new Blob([wavBuffer], { type: 'audio/wav' });
-      const formData = new FormData();
-      formData.append('file', audioBlob, 'recording.wav');
-      formData.append('language', language);
-      formData.append('hospital_id', String(parseInt(hospitalId) || 0));
-      const token = localStorage.getItem('token');
-      const res = await fetch(`${getBaseURL()}/ai/transcribe`, {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: formData
-      });
-      if (!res.ok) throw new Error("Transcription failed");
-      const data = await res.json();
-      setMicState('idle');
-      if (data.transcript?.trim() && handleSendRef.current) {
-        handleSendRef.current(data.transcript.trim());
+  // --- 3. Improved VAD Mic Logic ---
+  // Key improvements:
+  //   • preSpeechPadFrames: 15 — captures ~250ms before VAD triggers, so the
+  //     first syllable of a sentence is never clipped.
+  //   • positiveSpeechThreshold lowered to 0.50 — fires sooner on quiet phones.
+  //   • negativeSpeechThreshold lowered to 0.30 — less likely to cut off mid-word.
+  //   • minSpeechFrames: 4 — ignores very short noise bursts while still being
+  //     responsive; at 16kHz / 512-sample frames that's ~128ms.
+  //   • redemptionFrames set explicitly to 12 (~384ms) — gives a comfortable
+  //     natural pause before triggering onSpeechEnd.
+  const vadOptions = useMemo(() => ({
+    startOnLoad: false,
+    baseAssetPath: "/vad-assets/",
+    onnxWASMBasePath: "/vad-assets/",
+    model: "legacy" as const,
+
+    // --- Sensitivity tuning (fixes "doesn't hear first part") ---
+    positiveSpeechThreshold: 0.50,   // was 0.60 — detects speech sooner
+    negativeSpeechThreshold: 0.30,   // was 0.35 — less eager to cut off
+    minSpeechFrames: 4,              // ~128ms at 16kHz / 512 frames
+    preSpeechPadFrames: 15,          // ~480ms pre-roll captured before trigger
+
+    // --- End-of-speech timing ---
+    redemptionFrames: 12,            // ~384ms silence before onSpeechEnd fires
+
+    onSpeechStart: () => {
+      if (micActiveRef.current) setMicState('recording');
+    },
+    onSpeechEnd: async (audio: Float32Array) => {
+      if (!micActiveRef.current) return;
+
+      micActiveRef.current = false;  // lock immediately
+      vadPause();                    // stop VAD right away
+      setMicState('transcribing');
+
+      try {
+        const wavBuffer = utils.encodeWAV(audio);
+        const audioBlob = new Blob([wavBuffer], { type: 'audio/wav' });
+        const formData = new FormData();
+        formData.append('file', audioBlob, 'recording.wav');
+        formData.append('language', languageRef.current);
+        formData.append('hospital_id', String(parseInt(hospitalId) || 0));
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${getBaseURL()}/ai/transcribe`, {
+          method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: formData
+        });
+        if (!res.ok) throw new Error("Transcription failed");
+        const data = await res.json();
+        setMicState('idle');
+        if (data.transcript?.trim() && handleSendRef.current) {
+          handleSendRef.current(data.transcript.trim());
+        }
+      } catch {
+        setMicError(languageRef.current === 'ml' ? 'ശബ്ദം മനസ്സിലാക്കാൻ കഴിഞ്ഞില്ല.' : 'Failed to transcribe audio.');
+        setMicState('idle');
       }
-    } catch (error) {
-      setMicError(language === 'ml' ? 'ശബ്ദം മനസ്സിലാക്കാൻ കഴിഞ്ഞില്ല.' : 'Failed to transcribe audio.');
+    },
+    onVADMisfire: () => {
+      if (!micActiveRef.current) return;
       setMicState('idle');
     }
-  },
-  onVADMisfire: () => {
-    if (!micActiveRef.current) return;
-    setMicState('idle');
-  }
-}), []); // empty — refs and setters are stable, language captured via ref below
+  }), []); // stable — language & handlers accessed via refs
 
-const { loading: vadLoading, errored: vadErrored, start: vadStart, pause: vadPause } = useMicVAD(vadOptions);
+  const { loading: vadLoading, errored: vadErrored, start: vadStart, pause: vadPause } = useMicVAD(vadOptions);
 
-const toggleMic = () => {
-  setMicError(null);
-  if (micState === 'recording' || micState === 'transcribing') {
-    micActiveRef.current = false;
-    vadPause();           // ✅ top-level, not vad.pause()
-    setMicState('idle');
-  } else {
-    if (vadLoading) {
-      setMicError(language === 'en' ? 'Voice AI is still loading...' : 'ശബ്ദ AI ലോഡുചെയ്യുന്നു...');
-      return;
+  const toggleMic = useCallback(() => {
+    setMicError(null);
+    if (micState === 'recording' || micState === 'transcribing') {
+      micActiveRef.current = false;
+      vadPause();
+      setMicState('idle');
+    } else {
+      if (vadLoading) {
+        setMicError(language === 'en' ? 'Voice AI is still loading...' : 'ശബ്ദ AI ലോഡുചെയ്യുന്നു...');
+        return;
+      }
+      if (vadErrored) {
+        setMicError(language === 'en' ? 'Microphone access failed. Please allow microphone permission and try again.' : 'മൈക്ക് ആക്സസ് ലഭ്യമായില്ല. അനുമതി നൽകി വീണ്ടും ശ്രമിക്കൂ.');
+        return;
+      }
+      micActiveRef.current = true;
+      vadStart();
+      setMicState('recording');
     }
-    if (vadErrored) {
-      setMicError(language === 'en' ? 'Voice AI failed to load.' : 'ശബ്ദ AI പരാജയപ്പെട്ടു.');
-      return;
-    }
-    micActiveRef.current = true;
-    vadStart();           // ✅ top-level, not vad.start()
-    setMicState('recording');
-  }
-};
+  }, [micState, vadLoading, vadErrored, language, vadStart, vadPause]);
 
-// Update the return value — remove `vad`, expose vadLoading instead
-return {
-  language, setLanguage, messages, isStreaming,
-  inputText, setInputText, micState, micError,
-  suggestions, handleSend, toggleMic,
-  vadLoading  // ✅ replaces `vad` in the return
-};}
+  return {
+    language, setLanguage, messages, isStreaming,
+    inputText, setInputText, micState, micError,
+    suggestions, handleSend, toggleMic,
+    vadLoading
+  };
+}
