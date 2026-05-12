@@ -105,10 +105,11 @@ export default function App() {
     <Routes>
       {/* Public patient-facing route */}
 {/* Iris Hospital dedicated route - must be before /p/:hospitalSlug */}
-<Route path="/iris" element={<IrisPage />} />
+
 
 {/* Public patient-facing route */}
 <Route path="/p/:hospitalSlug" element={<ThemeLoader />} />
+<Route path="/iris" element={<IrisPage />} />
 
 {/* Auth route */}
 <Route
