@@ -50,6 +50,7 @@ backend/alembic/versions/a1b2c3d4e5f6_add_appointments.py
 backend/alembic/versions/b2c3d4e5f6a7_add_user_role.py
 backend/alembic/versions/cadd3b177e0d_add_embedding_to_doctors.py
 backend/alembic/versions/cea080e631b8_add_pharmacy_labs_and_doctor_.py
+backend/alembic/versions/d1e2f3a4b5c6_add_entry_type_to_knowledge.py
 backend/app/api/__init__.py
 backend/app/api/deps.py
 backend/app/api/v1/endpoints/__init__.py
@@ -98,6 +99,7 @@ frontend/eslint.config.js
 frontend/index.html
 frontend/package.json
 frontend/postcss.config.js
+frontend/public/logonewiris.png
 frontend/public/vad-assets/ort-wasm-simd-threaded.asyncify.mjs
 frontend/public/vad-assets/ort-wasm-simd-threaded.asyncify.wasm
 frontend/public/vad-assets/ort-wasm-simd-threaded.mjs
@@ -118,6 +120,10 @@ frontend/src/components/common/ChatCore.tsx
 frontend/src/components/common/SharedChat.tsx
 frontend/src/components/CreateHospitalModal.tsx
 frontend/src/components/HospitalStats.tsx
+frontend/src/components/iris/animated-intro.tsx
+frontend/src/components/iris/chat-bot-ui.tsx
+frontend/src/components/iris/chat-message.tsx
+frontend/src/components/iris/typing-indicator.tsx
 frontend/src/components/UsageStats.tsx
 frontend/src/context/AuthContext.tsx
 frontend/src/hooks/useHospitalChat.tsx
@@ -126,6 +132,7 @@ frontend/src/layouts/DashboardLayout.tsx
 frontend/src/main.tsx
 frontend/src/pages/Dashboard.tsx
 frontend/src/pages/Doctors.tsx
+frontend/src/pages/IrisPage.tsx
 frontend/src/pages/KnowledgeBase.tsx
 frontend/src/pages/LabTests.tsx
 frontend/src/pages/Login.tsx
@@ -560,25 +567,6 @@ class Base:
 
 </file>
 
-<file path="backend/app/models/knowledge.py">
-from sqlalchemy import Column, Integer, Text, ForeignKey, DateTime
-from sqlalchemy.sql import func
-from pgvector.sqlalchemy import Vector
-from app.db.base_class import Base
-
-class KnowledgeBase(Base):
-    __tablename__ = "knowledge_base"
-
-    id = Column(Integer, primary_key=True, index=True)
-    hospital_id = Column(Integer, ForeignKey("hospital.id"), nullable=False)
-    content = Column(Text, nullable=False) # The actual text (e.g., Doctor timings)
-    
-    # Vector column: 1536 dimensions for OpenAI's text-embedding-3-small
-    embedding = Column(Vector(1536)) 
-    
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-</file>
-
 <file path="backend/app/models/usage.py">
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
 from datetime import datetime, timezone
@@ -939,6 +927,836 @@ export default defineConfig([
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="35.93" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 228"><path fill="#00D8FF" d="M210.483 73.824a171.49 171.49 0 0 0-8.24-2.597c.465-1.9.893-3.777 1.273-5.621c6.238-30.281 2.16-54.676-11.769-62.708c-13.355-7.7-35.196.329-57.254 19.526a171.23 171.23 0 0 0-6.375 5.848a155.866 155.866 0 0 0-4.241-3.917C100.759 3.829 77.587-4.822 63.673 3.233C50.33 10.957 46.379 33.89 51.995 62.588a170.974 170.974 0 0 0 1.892 8.48c-3.28.932-6.445 1.924-9.474 2.98C17.309 83.498 0 98.307 0 113.668c0 15.865 18.582 31.778 46.812 41.427a145.52 145.52 0 0 0 6.921 2.165a167.467 167.467 0 0 0-2.01 9.138c-5.354 28.2-1.173 50.591 12.134 58.266c13.744 7.926 36.812-.22 59.273-19.855a145.567 145.567 0 0 0 5.342-4.923a168.064 168.064 0 0 0 6.92 6.314c21.758 18.722 43.246 26.282 56.54 18.586c13.731-7.949 18.194-32.003 12.4-61.268a145.016 145.016 0 0 0-1.535-6.842c1.62-.48 3.21-.974 4.76-1.488c29.348-9.723 48.443-25.443 48.443-41.52c0-15.417-17.868-30.326-45.517-39.844Zm-6.365 70.984c-1.4.463-2.836.91-4.3 1.345c-3.24-10.257-7.612-21.163-12.963-32.432c5.106-11 9.31-21.767 12.459-31.957c2.619.758 5.16 1.557 7.61 2.4c23.69 8.156 38.14 20.213 38.14 29.504c0 9.896-15.606 22.743-40.946 31.14Zm-10.514 20.834c2.562 12.94 2.927 24.64 1.23 33.787c-1.524 8.219-4.59 13.698-8.382 15.893c-8.067 4.67-25.32-1.4-43.927-17.412a156.726 156.726 0 0 1-6.437-5.87c7.214-7.889 14.423-17.06 21.459-27.246c12.376-1.098 24.068-2.894 34.671-5.345a134.17 134.17 0 0 1 1.386 6.193ZM87.276 214.515c-7.882 2.783-14.16 2.863-17.955.675c-8.075-4.657-11.432-22.636-6.853-46.752a156.923 156.923 0 0 1 1.869-8.499c10.486 2.32 22.093 3.988 34.498 4.994c7.084 9.967 14.501 19.128 21.976 27.15a134.668 134.668 0 0 1-4.877 4.492c-9.933 8.682-19.886 14.842-28.658 17.94ZM50.35 144.747c-12.483-4.267-22.792-9.812-29.858-15.863c-6.35-5.437-9.555-10.836-9.555-15.216c0-9.322 13.897-21.212 37.076-29.293c2.813-.98 5.757-1.905 8.812-2.773c3.204 10.42 7.406 21.315 12.477 32.332c-5.137 11.18-9.399 22.249-12.634 32.792a134.718 134.718 0 0 1-6.318-1.979Zm12.378-84.26c-4.811-24.587-1.616-43.134 6.425-47.789c8.564-4.958 27.502 2.111 47.463 19.835a144.318 144.318 0 0 1 3.841 3.545c-7.438 7.987-14.787 17.08-21.808 26.988c-12.04 1.116-23.565 2.908-34.161 5.309a160.342 160.342 0 0 1-1.76-7.887Zm110.427 27.268a347.8 347.8 0 0 0-7.785-12.803c8.168 1.033 15.994 2.404 23.343 4.08c-2.206 7.072-4.956 14.465-8.193 22.045a381.151 381.151 0 0 0-7.365-13.322Zm-45.032-43.861c5.044 5.465 10.096 11.566 15.065 18.186a322.04 322.04 0 0 0-30.257-.006c4.974-6.559 10.069-12.652 15.192-18.18ZM82.802 87.83a323.167 323.167 0 0 0-7.227 13.238c-3.184-7.553-5.909-14.98-8.134-22.152c7.304-1.634 15.093-2.97 23.209-3.984a321.524 321.524 0 0 0-7.848 12.897Zm8.081 65.352c-8.385-.936-16.291-2.203-23.593-3.793c2.26-7.3 5.045-14.885 8.298-22.6a321.187 321.187 0 0 0 7.257 13.246c2.594 4.48 5.28 8.868 8.038 13.147Zm37.542 31.03c-5.184-5.592-10.354-11.779-15.403-18.433c4.902.192 9.899.29 14.978.29c5.218 0 10.376-.117 15.453-.343c-4.985 6.774-10.018 12.97-15.028 18.486Zm52.198-57.817c3.422 7.8 6.306 15.345 8.596 22.52c-7.422 1.694-15.436 3.058-23.88 4.071a382.417 382.417 0 0 0 7.859-13.026a347.403 347.403 0 0 0 7.425-13.565Zm-16.898 8.101a358.557 358.557 0 0 1-12.281 19.815a329.4 329.4 0 0 1-23.444.823c-7.967 0-15.716-.248-23.178-.732a310.202 310.202 0 0 1-12.513-19.846h.001a307.41 307.41 0 0 1-10.923-20.627a310.278 310.278 0 0 1 10.89-20.637l-.001.001a307.318 307.318 0 0 1 12.413-19.761c7.613-.576 15.42-.876 23.31-.876H128c7.926 0 15.743.303 23.354.883a329.357 329.357 0 0 1 12.335 19.695a358.489 358.489 0 0 1 11.036 20.54a329.472 329.472 0 0 1-11 20.722Zm22.56-122.124c8.572 4.944 11.906 24.881 6.52 51.026c-.344 1.668-.73 3.367-1.15 5.09c-10.622-2.452-22.155-4.275-34.23-5.408c-7.034-10.017-14.323-19.124-21.64-27.008a160.789 160.789 0 0 1 5.888-5.4c18.9-16.447 36.564-22.941 44.612-18.3ZM128 90.808c12.625 0 22.86 10.235 22.86 22.86s-10.235 22.86-22.86 22.86s-22.86-10.235-22.86-22.86s10.235-22.86 22.86-22.86Z"></path></svg>
 </file>
 
+<file path="frontend/src/components/CreateHospitalModal.tsx">
+import { useState } from 'react';
+import api from '../api/axios'; // Use your centralized API config
+import { X } from 'lucide-react';
+
+interface Props {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void; 
+}
+
+export default function CreateHospitalModal({ isOpen, onClose, onSuccess }: Props) {
+  const [formData, setFormData] = useState({
+    name: '',
+    slug: '',
+    address: '',
+    is_active: true,
+    // Ensure these match your new Backend Schema (HospitalCreate)
+    system_prompt: 'You are Arogya, a helpful assistant for this hospital.',
+    google_sheet_id: ''
+  });
+  
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      // Logic: This will now use https://hospital-ai-platform.onrender.com/api/v1/hospitals/
+      await api.post('/hospitals/', formData);
+      
+      onSuccess(); // Refresh the list
+      onClose();   // Close the modal
+      
+      // Reset form
+      setFormData({ 
+        name: '', 
+        slug: '', 
+        address: '', 
+        is_active: true,
+        system_prompt: 'You are Arogya, a helpful assistant for this hospital.',
+        google_sheet_id: ''
+      });
+    } catch (err: any) {
+      console.error("Submission Error:", err.response?.data);
+      // If the backend returns a specific error (like 'Slug already exists'), show it
+      const errorMessage = err.response?.data?.detail;
+      setError(Array.isArray(errorMessage) ? 'Validation Error' : (errorMessage || 'Failed to create hospital'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+          <h3 className="font-semibold text-gray-800">Add New Hospital</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {error && (
+            <div className="p-3 bg-red-50 text-red-600 text-sm rounded-md">
+              {error}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Hospital Name</label>
+            <input
+              required
+              type="text"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={formData.name}
+              onChange={e => setFormData({ ...formData, name: e.target.value })}
+              placeholder="e.g. Arogya Specialty"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Slug (Unique ID)</label>
+            <input
+              required
+              type="text"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={formData.slug}
+              onChange={e => setFormData({ ...formData, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })}
+              placeholder="e.g. arogya-specialty"
+            />
+            <p className="text-xs text-gray-400 mt-1">Must be unique. No spaces.</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+            <textarea
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={formData.address}
+              onChange={e => setFormData({ ...formData, address: e.target.value })}
+              rows={2}
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-md"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
+            >
+              {loading ? 'Connecting to Cloud...' : 'Create Hospital'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="frontend/src/components/iris/animated-intro.tsx">
+import { useState, useEffect, useRef } from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import { ChatMessage } from "./chat-message"
+import { TypingIndicator } from "./typing-indicator"
+
+const LOGO_URL = "D:\Hospital\hospital-ai-platform\frontend\public\logonewiris.png"
+
+const demoConversation = [
+  { isUser: true, message: "Is Dr. Surendran available today?" },
+  { isUser: false, message: "Yes! Dr. Surendran is available today from 9am to 1pm 😊" },
+  { isUser: true, message: "Can I book an appointment?" },
+  { isUser: false, message: "Of course! Just tell me your name and preferred time 🗓️" },
+  { isUser: true, message: "What are the OPD timings?" },
+  { isUser: false, message: "OPD is open Monday to Saturday, 8am to 6pm. Emergency is 24/7 🏥" },
+]
+
+interface AnimatedIntroProps {
+  onComplete: () => void
+}
+
+export function AnimatedIntro({ onComplete }: AnimatedIntroProps) {
+  const [phase, setPhase] = useState<"logo" | "text" | "chat" | "transition" | "complete">("logo")
+  const [visibleMessages, setVisibleMessages] = useState<typeof demoConversation>([])
+  const [showTyping, setShowTyping] = useState(false)
+  const [showCTA, setShowCTA] = useState(false)
+  const chatContainerRef = useRef<HTMLDivElement>(null)
+
+  // Phase transitions
+  useEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = []
+
+
+    // Logo animation complete, show text
+    timers.push(setTimeout(() => setPhase("text"), 1800))
+
+    // Text shown, start chat demo
+    timers.push(setTimeout(() => setPhase("chat"), 3500))
+
+    return () => timers.forEach(clearTimeout)
+  }, [])
+
+  // Chat demo sequence
+  useEffect(() => {
+    if (phase !== "chat") return
+
+    let messageIndex = 0
+    const showNextMessage = () => {
+      if (messageIndex >= demoConversation.length) {
+        setTimeout(() => setShowCTA(true), 300)
+        setTimeout(() => setPhase("transition"), 2000)
+        return
+      }
+
+      const currentMsg = demoConversation[messageIndex]
+
+      if (!currentMsg.isUser) {
+        // Show typing indicator before AI message
+        setShowTyping(true)
+        setTimeout(() => {
+          setShowTyping(false)
+          setVisibleMessages((prev) => [...prev, currentMsg])
+          messageIndex++
+          setTimeout(showNextMessage, 500)
+        }, 800)
+      } else {
+        setVisibleMessages((prev) => [...prev, currentMsg])
+        messageIndex++
+        setTimeout(showNextMessage, 400)
+      }
+    }
+
+    const startTimer = setTimeout(showNextMessage, 500)
+    return () => clearTimeout(startTimer)
+  }, [phase])
+
+  // Auto-scroll chat
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
+    }
+  }, [visibleMessages, showTyping])
+
+  // Transition to main app
+  useEffect(() => {
+    if (phase === "transition") {
+      setTimeout(onComplete, 1500)
+    }
+  }, [phase, onComplete])
+
+  const letterVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: (i: number) => ({
+      opacity: 1,
+      y: 0,
+      transition: { delay: i * 0.1, duration: 0.5 },
+    }),
+  }
+
+  const titleText = "IRIS HOSPITAL"
+
+  return (
+    <motion.div
+      className="fixed inset-0 bg-gradient-to-b from-[#0f172a] to-[#1E40AF] flex flex-col items-center justify-center overflow-hidden z-50"
+      animate={phase === "transition" ? { scale: 1.1, opacity: 0 } : { scale: 1, opacity: 1 }}
+      transition={{ duration: 1, ease: "easeInOut" }}
+    >
+      {/* Logo section */}
+      <motion.div
+        className="flex flex-col items-center"
+        animate={
+          phase === "chat" || phase === "transition"
+            ? { scale: 0.5, y: -180, opacity: phase === "transition" ? 0 : 1 }
+            : { scale: 1, y: 0 }
+        }
+        transition={{ duration: 0.8, type: "spring", stiffness: 100 }}
+      >
+        {/* Animated IRIS Logo Image */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ 
+            opacity: 1, 
+            y: 0 
+          }}
+          transition={{ 
+            duration: 1.2, 
+            ease: [0.25, 0.46, 0.45, 0.94]
+          }}
+          className="relative"
+        >
+          {/* Subtle glow effect behind logo */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.15 }}
+            transition={{ duration: 1.5, delay: 0.5 }}
+            className="absolute inset-0 bg-white rounded-3xl blur-2xl -z-10"
+            style={{ transform: "scale(1.2)" }}
+          />
+          
+          {/* Main logo image */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 1, delay: 0.3 }}
+            className="bg-white rounded-xl p-6 shadow-[0_4px_40px_rgba(255,255,255,0.1)]"
+          >
+            <img
+              src={LOGO_URL}
+              alt="IRIS - Institute for Rheumatology and Immunology Sciences"
+              width={300}
+              height={108}
+              className="object-contain"
+              priority
+            />
+          </motion.div>
+        </motion.div>
+
+        <AnimatePresence>
+          {(phase === "text" || phase === "chat" || phase === "transition") && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.8 }}
+              className="mt-6 text-center"
+            >
+              <motion.p
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3, duration: 0.8 }}
+                className="text-[#93c5fd] text-sm md:text-base tracking-wide"
+              >
+                Compassionate Care. Intelligent Support.
+              </motion.p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+
+      {/* Chat demo section */}
+      <AnimatePresence>
+        {(phase === "chat" || phase === "transition") && (
+          <motion.div
+            initial={{ y: 300, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ scale: 1.5, opacity: 0 }}
+            transition={{ duration: 0.8, type: "spring", stiffness: 100 }}
+            className="absolute bottom-0 left-0 right-0 h-[65vh] flex flex-col items-center px-4"
+          >
+            {/* Phone frame */}
+            <div className="relative w-full max-w-sm bg-[#0f172a] rounded-t-[2.5rem] border-4 border-gray-700 shadow-2xl overflow-hidden h-full">
+              {/* Phone notch */}
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 w-24 h-5 bg-black rounded-full z-10" />
+
+              {/* Chat header */}
+              <div className="bg-[#1E40AF] px-4 py-4 pt-8 flex items-center gap-3">
+                <div className="bg-white rounded-lg p-1">
+                  <img
+                    src={LOGO_URL}
+                    alt="IRIS"
+                    width={80}
+                    height={28}
+                    className="object-contain"
+                  />
+                </div>
+                <span className="text-white font-semibold">Iris AI</span>
+              </div>
+
+              {/* Chat messages */}
+              <div
+                ref={chatContainerRef}
+                className="bg-[#EFF6FF] h-[calc(100%-8rem)] overflow-y-auto p-4 space-y-3 scroll-smooth"
+              >
+                {visibleMessages.map((msg, i) => (
+                  <ChatMessage key={i} message={msg.message} isUser={msg.isUser} isDemo />
+                ))}
+                {showTyping && <TypingIndicator />}
+              </div>
+
+              {/* Input bar placeholder */}
+              <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 flex items-center gap-2">
+                <div className="flex-1 bg-gray-100 rounded-full px-4 py-2 text-sm text-gray-400">
+                  Type a message...
+                </div>
+                <div className="w-10 h-10 bg-[#1E40AF] rounded-full flex items-center justify-center">
+                  <svg
+                    className="w-5 h-5 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                    />
+                  </svg>
+                </div>
+              </div>
+
+              {/* CTA overlay */}
+              <AnimatePresence>
+                {showCTA && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 bg-[#1E40AF]/80 backdrop-blur-sm flex items-center justify-center"
+                  >
+                    <motion.p
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ type: "spring", stiffness: 300 }}
+                      className="text-white text-xl md:text-2xl font-bold text-center px-6"
+                    >
+                      Ask Iris AI anything →
+                    </motion.p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  )
+}
+</file>
+
+<file path="frontend/src/components/iris/chat-bot-ui.tsx">
+import { useState, useRef, useEffect, useCallback } from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import { ChatMessage } from "./chat-message"
+import { TypingIndicator } from "./typing-indicator"
+
+const LOGO_URL = "D:\Hospital\hospital-ai-platform\frontend\public\logonewiris.png"
+
+// ── Change this to the actual Iris Hospital ID from your database ──
+const IRIS_HOSPITAL_ID = 2
+
+const BASE_URL =
+  (import.meta as any).env?.VITE_API_URL ||
+  "https://hospital-ai-platform.onrender.com/api/v1"
+
+type Language = "en" | "ml"
+
+interface Message {
+  id: string
+  text: string
+  isUser: boolean
+  isStreaming?: boolean
+}
+
+const translations = {
+  en: {
+    title: "Iris AI",
+    placeholder: "Type your message...",
+    suggestions: ["Doctor availability", "Book appointment", "Pharmacy", "Lab tests"],
+    empty: "Start a conversation with Iris AI",
+    micError: "Microphone not supported on this browser.",
+    connError: "Connection error. Please try again.",
+  },
+  ml: {
+    title: "ഐറിസ് AI",
+    placeholder: "നിങ്ങളുടെ സന്ദേശം ടൈപ്പ് ചെയ്യുക...",
+    suggestions: ["ഡോക്ടർ ലഭ്യത", "അപ്പോയിന്റ്മെന്റ് ബുക്ക്", "ഫാർമസി", "ലാബ് ടെസ്റ്റുകൾ"],
+    empty: "ഐറിസ് AI-യുമായി സംഭാഷണം ആരംഭിക്കുക",
+    micError: "ഈ ബ്രൗസറിൽ മൈക്ക് പ്രവർത്തിക്കുന്നില്ല.",
+    connError: "കണക്ഷൻ പ്രശ്‌നം. വീണ്ടും ശ്രമിക്കൂ.",
+  },
+}
+
+function getSessionToken(): string {
+  const key = "irisSessionToken"
+  let token = sessionStorage.getItem(key)
+  if (!token) {
+    token = crypto.randomUUID()
+    sessionStorage.setItem(key, token)
+  }
+  return token
+}
+
+export function ChatBotUI() {
+  const [language, setLanguage] = useState<Language>("en")
+  const [messages, setMessages] = useState<Message[]>([])
+  const [inputValue, setInputValue] = useState("")
+  const [isTyping, setIsTyping] = useState(false)
+  const [isMicActive, setIsMicActive] = useState(false)
+  const [isStreaming, setIsStreaming] = useState(false)
+
+  const chatContainerRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const speechRecogRef = useRef<any>(null)
+  const abortRef = useRef<AbortController | null>(null)
+  const languageRef = useRef(language)
+
+  useEffect(() => { languageRef.current = language }, [language])
+
+  const t = translations[language]
+
+  // Auto-scroll to bottom
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
+    }
+  }, [messages, isTyping])
+
+  // ── SEND MESSAGE WITH REAL STREAMING BACKEND ─────────────────────────────
+  const handleSend = useCallback(async (overrideText?: string) => {
+    const text = (overrideText ?? inputValue).trim()
+    if (!text || isStreaming) return
+
+    abortRef.current?.abort()
+    abortRef.current = new AbortController()
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      text,
+      isUser: true,
+    }
+
+    const historySnapshot = messages
+      .filter(m => !m.isStreaming)
+      .map(m => ({ role: m.isUser ? "user" : "assistant", content: m.text }))
+
+    setMessages(prev => [...prev, userMessage])
+    setInputValue("")
+    setIsTyping(true)
+    setIsStreaming(true)
+
+    try {
+      const response = await fetch(`${BASE_URL}/ai/chat-stream`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: text,
+          hospital_id: IRIS_HOSPITAL_ID,
+          language: languageRef.current,
+          history: historySnapshot,
+          session_token: getSessionToken(),
+        }),
+        signal: abortRef.current.signal,
+      })
+
+      if (!response.ok || !response.body) throw new Error("Stream failed")
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ""
+      const streamId = (Date.now() + 1).toString()
+
+      setIsTyping(false)
+      setMessages(prev => [...prev, { id: streamId, text: "", isUser: false, isStreaming: true }])
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const frames = buffer.split("\n\n")
+        buffer = frames.pop() ?? ""
+        for (const frame of frames) {
+          if (!frame.startsWith("data: ")) continue
+          const payload = frame.slice(6)
+          if (payload === "[DONE]") {
+            setMessages(prev =>
+              prev.map(m => m.id === streamId ? { ...m, isStreaming: false } : m)
+            )
+            break
+          }
+          try {
+            const chunk = JSON.parse(payload)
+            setMessages(prev =>
+              prev.map(m => m.id === streamId ? { ...m, text: m.text + chunk } : m)
+            )
+          } catch { /* skip malformed chunks */ }
+        }
+      }
+    } catch (err: any) {
+      if (err?.name === "AbortError") return
+      setIsTyping(false)
+      setMessages(prev => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          text: translations[languageRef.current].connError,
+          isUser: false,
+        },
+      ])
+    } finally {
+      setIsStreaming(false)
+      setIsTyping(false)
+    }
+  }, [inputValue, isStreaming, messages])
+
+  // ── SUGGESTION CHIPS ──────────────────────────────────────────────────────
+  const handleSuggestionClick = (suggestion: string) => {
+    handleSend(suggestion)
+  }
+
+  // ── KEYBOARD ──────────────────────────────────────────────────────────────
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault()
+      handleSend()
+    }
+  }
+
+  // ── MIC — Web Speech API with graceful fallback message ───────────────────
+  const toggleMic = useCallback(() => {
+    if (isMicActive) {
+      speechRecogRef.current?.stop()
+      speechRecogRef.current = null
+      setIsMicActive(false)
+      return
+    }
+
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+
+    if (!SpeechRecognition) {
+      alert(translations[languageRef.current].micError)
+      return
+    }
+
+    const recog = new SpeechRecognition()
+    recog.lang = languageRef.current === "ml" ? "ml-IN" : "en-IN"
+    recog.interimResults = false
+    recog.maxAlternatives = 1
+    speechRecogRef.current = recog
+    setIsMicActive(true)
+
+    recog.onresult = (e: any) => {
+      const transcript = e.results[0]?.[0]?.transcript?.trim()
+      setIsMicActive(false)
+      speechRecogRef.current = null
+      if (transcript) {
+        handleSend(transcript)
+      }
+    }
+    recog.onerror = () => {
+      setIsMicActive(false)
+      speechRecogRef.current = null
+    }
+    recog.onend = () => {
+      setIsMicActive(false)
+      speechRecogRef.current = null
+    }
+    recog.start()
+  }, [isMicActive, handleSend])
+
+  // ── RENDER ────────────────────────────────────────────────────────────────
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.5 }}
+      className="h-screen flex flex-col bg-[#EFF6FF]"
+    >
+      {/* Header */}
+      <header className="bg-[#1E40AF] px-4 py-4 flex items-center justify-between shadow-lg relative">
+        <div
+          className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#3B82F6] to-transparent opacity-50"
+          style={{ boxShadow: "0 0 20px 5px rgba(59, 130, 246, 0.3)" }}
+        />
+        <div className="flex items-center gap-3">
+          <div className="bg-white rounded-lg p-1.5">
+            <img
+              src={LOGO_URL}
+              alt="IRIS"
+              style={{ width: 100, height: 36 }}
+              className="object-contain"
+            />
+          </div>
+          <span className="text-white font-semibold text-lg">
+            {t.title}
+          </span>
+        </div>
+        <button
+          onClick={() => setLanguage(language === "en" ? "ml" : "en")}
+          className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-full text-sm font-medium transition-colors"
+        >
+          {language === "en" ? "മല" : "EN"}
+        </button>
+      </header>
+
+      {/* Chat area */}
+      <div
+        ref={chatContainerRef}
+        className="flex-1 overflow-y-auto p-4 space-y-4 relative"
+      >
+        {/* Watermark when empty */}
+        {messages.length === 0 && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center opacity-20 pointer-events-none">
+            <img
+              src={LOGO_URL}
+              alt="IRIS"
+              style={{ width: 200, height: 72 }}
+              className="object-contain"
+            />
+            <p className="mt-4 text-[#1E40AF] text-lg">{t.empty}</p>
+          </div>
+        )}
+
+        {/* Messages */}
+        <AnimatePresence>
+          {messages.map((msg) => (
+            <ChatMessage key={msg.id} message={msg.text} isUser={msg.isUser} />
+          ))}
+        </AnimatePresence>
+
+        {/* Typing indicator */}
+        {isTyping && <TypingIndicator />}
+      </div>
+
+      {/* Suggestion chips — only shown before any conversation */}
+      {messages.length === 0 && (
+        <div className="px-4 pb-2">
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            {t.suggestions.map((suggestion, i) => (
+              <motion.button
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.1 }}
+                onClick={() => handleSuggestionClick(suggestion)}
+                className="flex-shrink-0 bg-white border border-[#3B82F6] text-[#1E40AF] px-4 py-2 rounded-full text-sm font-medium hover:bg-[#3B82F6] hover:text-white transition-colors"
+              >
+                {suggestion}
+              </motion.button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Input area */}
+      <div className="bg-white border-t border-gray-200 px-4 py-3 flex items-center gap-3">
+        <div className="flex-1 relative">
+          <input
+            ref={inputRef}
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder={t.placeholder}
+            disabled={isStreaming}
+            className="w-full bg-gray-100 rounded-full px-5 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#3B82F6] transition-shadow disabled:opacity-50"
+          />
+        </div>
+
+        {/* Mic button */}
+        <motion.button
+          onClick={toggleMic}
+          className={`relative w-12 h-12 rounded-full flex items-center justify-center transition-colors ${
+            isMicActive ? "bg-red-500" : "bg-[#1E40AF]"
+          }`}
+          animate={isMicActive ? { scale: [1, 1.1, 1] } : {}}
+          transition={isMicActive ? { repeat: Infinity, duration: 1 } : {}}
+        >
+          {isMicActive && (
+            <motion.div
+              className="absolute w-12 h-12 rounded-full border-2 border-red-400"
+              animate={{ scale: [1, 1.5], opacity: [0.8, 0] }}
+              transition={{ repeat: Infinity, duration: 1 }}
+            />
+          )}
+          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+            />
+          </svg>
+        </motion.button>
+
+        {/* Send button */}
+        <motion.button
+          onClick={() => handleSend()}
+          whileTap={{ scale: 0.95 }}
+          disabled={!inputValue.trim() || isStreaming}
+          className="w-12 h-12 bg-[#1E40AF] rounded-full flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#1E3A8A] transition-colors"
+        >
+          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+            />
+          </svg>
+        </motion.button>
+      </div>
+    </motion.div>
+  )
+}
+</file>
+
+<file path="frontend/src/components/iris/chat-message.tsx">
+import { motion } from "framer-motion"
+
+interface ChatMessageProps {
+  message: string
+  isUser: boolean
+  isDemo?: boolean
+}
+
+export function ChatMessage({ message, isUser, isDemo = false }: ChatMessageProps) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+      className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+    >
+      <div
+        className={`max-w-[80%] ${
+          isUser
+            ? "bg-[#1E40AF] text-white rounded-2xl rounded-br-md"
+            : "bg-white text-gray-800 rounded-2xl rounded-bl-md shadow-md"
+        } px-4 py-3 ${isDemo ? "text-sm" : "text-base"}`}
+      >
+        {!isUser && (
+          <div className="flex items-center gap-1.5 mb-1">
+            <div className="w-1.5 h-1.5 bg-[#3B82F6] rounded-full animate-pulse" />
+            <span className="text-xs font-medium text-[#3B82F6]">Iris AI</span>
+          </div>
+        )}
+        <p className="leading-relaxed">{message}</p>
+      </div>
+    </motion.div>
+  )
+}
+</file>
+
+<file path="frontend/src/components/iris/typing-indicator.tsx">
+import { motion } from "framer-motion"
+
+export function TypingIndicator() {
+  return (
+    <div className="flex items-center gap-1 px-4 py-3 bg-white rounded-2xl rounded-bl-md shadow-md w-fit">
+      {[0, 1, 2].map((i) => (
+        <motion.div
+          key={i}
+          className="w-2 h-2 bg-[#3B82F6] rounded-full"
+          animate={{
+            y: [0, -6, 0],
+          }}
+          transition={{
+            duration: 0.6,
+            repeat: Infinity,
+            delay: i * 0.15,
+            ease: "easeInOut",
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+</file>
+
 <file path="frontend/src/components/UsageStats.tsx">
 import React, { useEffect, useState } from 'react';
 import api from '../api/axios';
@@ -971,6 +1789,130 @@ const UsageStats = () => {
 };
 
 export default UsageStats;
+</file>
+
+<file path="frontend/src/pages/Dashboard.tsx">
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom'; 
+import api from '../api/axios';
+import KnowledgeBaseUpload from './KnowledgeBase'; 
+import ChatPreview from '../components/ChatPreview'; 
+// NEW: Import the Billing Component we designed
+import HospitalStats from '../components/HospitalStats'; 
+
+const Dashboard = () => {
+  const { hospitalId } = useParams(); 
+  const navigate = useNavigate();
+  const [hospital, setHospital] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!hospitalId) {
+      navigate('/hospitals');
+      return;
+    }
+
+    setLoading(true);
+    api.get(`/hospitals/${hospitalId}`)
+      .then(res => {
+        setHospital(res.data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Dashboard Fetch Error:", err);
+        setHospital(null);
+        setLoading(false);
+      });
+  }, [hospitalId, navigate]);
+
+  if (loading) return <div className="p-8 text-center animate-pulse">Loading Command Center...</div>;
+
+  if (!hospital) {
+    return (
+      <div className="p-8 text-center">
+        <h1 className="text-2xl font-bold text-red-600">Hospital Not Found</h1>
+        <p className="mt-2 text-gray-500">The hospital ID "{hospitalId}" does not exist in the cloud database.</p>
+        <button 
+          onClick={() => navigate('/hospitals')}
+          className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          Back to Hospital List
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-8 space-y-8 max-w-7xl mx-auto">
+      {/* HEADER SECTION */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Arogya Command Center</h1>
+          <p className="text-gray-600">
+            Managing: <span className="font-semibold text-blue-600">{hospital.name}</span>
+          </p>
+          <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider">ID: {hospital.id} | SLUG: {hospital.slug}</p>
+        </div>
+        <button 
+          onClick={() => navigate('/hospitals')}
+          className="text-sm font-medium text-gray-500 hover:text-blue-600 transition-colors"
+        >
+          &larr; Switch Hospital
+        </button>
+      </div>
+
+      {/* NEW: BILLING & ANALYTICS SECTION */}
+      {/* This component will fetch and show the monthly tokens, cost, and invoice */}
+      <section>
+        <h2 className="text-xl font-semibold text-gray-800 mb-4">Business Analytics</h2>
+        <HospitalStats hospitalId={Number(hospitalId)} />
+      </section>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* TRAINING SECTION */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">1</div>
+            <h2 className="text-xl font-semibold text-gray-700">Train Your AI</h2>
+          </div>
+          <KnowledgeBaseUpload hospitalId={hospitalId} />
+        </div>
+
+        {/* PREVIEW SECTION */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-bold">2</div>
+            <h2 className="text-xl font-semibold text-gray-700">Test Arogya Chat</h2>
+          </div>
+          <ChatPreview hospitalId={hospitalId} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;
+</file>
+
+<file path="frontend/src/pages/IrisPage.tsx">
+import { useState } from 'react'
+import { AnimatePresence } from 'framer-motion'
+import { AnimatedIntro } from '../components/iris/animated-intro'
+import { ChatBotUI } from '../components/iris/chat-bot-ui'
+
+export default function IrisPage() {
+  const [showIntro, setShowIntro] = useState(true)
+  return (
+    <main className="h-screen w-screen overflow-hidden">
+      <AnimatePresence mode="wait">
+        {showIntro
+          ? <AnimatedIntro key="intro" onComplete={() => setShowIntro(false)} />
+          : <ChatBotUI key="chat" />
+        }
+      </AnimatePresence>
+    </main>
+  )
+}
 </file>
 
 <file path="frontend/src/themes/README.txt">
@@ -1389,6 +2331,28 @@ class Hospital(Base):
     users = relationship("User", back_populates="hospital")
     # Inside your Hospital class in app/models/hospital.py
     doctors = relationship("Doctor", back_populates="hospital", cascade="all, delete-orphan")
+</file>
+
+<file path="backend/app/models/knowledge.py">
+from sqlalchemy import Column, Integer, Text, String, ForeignKey, DateTime
+from sqlalchemy.sql import func
+from pgvector.sqlalchemy import Vector
+from app.db.base_class import Base
+
+class KnowledgeBase(Base):
+    __tablename__ = "knowledge_base"
+
+    id = Column(Integer, primary_key=True, index=True)
+    hospital_id = Column(Integer, ForeignKey("hospital.id"), nullable=False)
+    content = Column(Text, nullable=False)
+
+    # "fact" = hospital info/rules/FAQs; "instruction" = AI behaviour directive
+    entry_type = Column(String(20), nullable=False, server_default="fact")
+
+    # Vector column: 1536 dimensions for OpenAI's text-embedding-3-small
+    embedding = Column(Vector(1536))
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 </file>
 
 <file path="backend/app/models/lab_test.py">
@@ -1968,6 +2932,53 @@ def start_reminder_scheduler() -> None:
 def stop_reminder_scheduler() -> None:
     if _scheduler.running:
         _scheduler.shutdown()
+</file>
+
+<file path="frontend/package.json">
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@ricky0123/vad-react": "^0.0.36",
+    "@ricky0123/vad-web": "^0.0.30",
+    "axios": "^1.13.5",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.575.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "^7.13.1",
+    "react-speech-recognition": "^4.0.1",
+    "regenerator-runtime": "^0.14.1",
+    "tailwind-merge": "^3.5.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@tailwindcss/postcss": "^4.2.1",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "autoprefixer": "^10.4.27",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.2.1",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.48.0",
+    "vite": "^7.3.1"
+  }
+}
 </file>
 
 <file path="frontend/public/vad-assets/ort-wasm-simd-threaded.asyncify.mjs">
@@ -2743,141 +3754,6 @@ export const SharedChat: React.FC<SharedChatProps> = ({ hospitalId }) => {
 };
 </file>
 
-<file path="frontend/src/components/CreateHospitalModal.tsx">
-import { useState } from 'react';
-import api from '../api/axios'; // Use your centralized API config
-import { X } from 'lucide-react';
-
-interface Props {
-  isOpen: boolean;
-  onClose: () => void;
-  onSuccess: () => void; 
-}
-
-export default function CreateHospitalModal({ isOpen, onClose, onSuccess }: Props) {
-  const [formData, setFormData] = useState({
-    name: '',
-    slug: '',
-    address: '',
-    is_active: true,
-    // Ensure these match your new Backend Schema (HospitalCreate)
-    system_prompt: 'You are Arogya, a helpful assistant for this hospital.',
-    google_sheet_id: ''
-  });
-  
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  if (!isOpen) return null;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-
-    try {
-      // Logic: This will now use https://hospital-ai-platform.onrender.com/api/v1/hospitals/
-      await api.post('/hospitals/', formData);
-      
-      onSuccess(); // Refresh the list
-      onClose();   // Close the modal
-      
-      // Reset form
-      setFormData({ 
-        name: '', 
-        slug: '', 
-        address: '', 
-        is_active: true,
-        system_prompt: 'You are Arogya, a helpful assistant for this hospital.',
-        google_sheet_id: ''
-      });
-    } catch (err: any) {
-      console.error("Submission Error:", err.response?.data);
-      // If the backend returns a specific error (like 'Slug already exists'), show it
-      const errorMessage = err.response?.data?.detail;
-      setError(Array.isArray(errorMessage) ? 'Validation Error' : (errorMessage || 'Failed to create hospital'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-          <h3 className="font-semibold text-gray-800">Add New Hospital</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {error && (
-            <div className="p-3 bg-red-50 text-red-600 text-sm rounded-md">
-              {error}
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Hospital Name</label>
-            <input
-              required
-              type="text"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={formData.name}
-              onChange={e => setFormData({ ...formData, name: e.target.value })}
-              placeholder="e.g. Arogya Specialty"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Slug (Unique ID)</label>
-            <input
-              required
-              type="text"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={formData.slug}
-              onChange={e => setFormData({ ...formData, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })}
-              placeholder="e.g. arogya-specialty"
-            />
-            <p className="text-xs text-gray-400 mt-1">Must be unique. No spaces.</p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-            <textarea
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={formData.address}
-              onChange={e => setFormData({ ...formData, address: e.target.value })}
-              rows={2}
-            />
-          </div>
-
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-md"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
-            >
-              {loading ? 'Connecting to Cloud...' : 'Create Hospital'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-</file>
-
 <file path="frontend/src/index.css">
 @import "tailwindcss";
 
@@ -2914,109 +3790,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </BrowserRouter>
   </React.StrictMode>,
 );
-</file>
-
-<file path="frontend/src/pages/Dashboard.tsx">
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom'; 
-import api from '../api/axios';
-import KnowledgeBaseUpload from './KnowledgeBase'; 
-import ChatPreview from '../components/ChatPreview'; 
-// NEW: Import the Billing Component we designed
-import HospitalStats from '../components/HospitalStats'; 
-
-const Dashboard = () => {
-  const { hospitalId } = useParams(); 
-  const navigate = useNavigate();
-  const [hospital, setHospital] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!hospitalId) {
-      navigate('/hospitals');
-      return;
-    }
-
-    setLoading(true);
-    api.get(`/hospitals/${hospitalId}`)
-      .then(res => {
-        setHospital(res.data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Dashboard Fetch Error:", err);
-        setHospital(null);
-        setLoading(false);
-      });
-  }, [hospitalId, navigate]);
-
-  if (loading) return <div className="p-8 text-center animate-pulse">Loading Command Center...</div>;
-
-  if (!hospital) {
-    return (
-      <div className="p-8 text-center">
-        <h1 className="text-2xl font-bold text-red-600">Hospital Not Found</h1>
-        <p className="mt-2 text-gray-500">The hospital ID "{hospitalId}" does not exist in the cloud database.</p>
-        <button 
-          onClick={() => navigate('/hospitals')}
-          className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          Back to Hospital List
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-8 space-y-8 max-w-7xl mx-auto">
-      {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Arogya Command Center</h1>
-          <p className="text-gray-600">
-            Managing: <span className="font-semibold text-blue-600">{hospital.name}</span>
-          </p>
-          <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider">ID: {hospital.id} | SLUG: {hospital.slug}</p>
-        </div>
-        <button 
-          onClick={() => navigate('/hospitals')}
-          className="text-sm font-medium text-gray-500 hover:text-blue-600 transition-colors"
-        >
-          &larr; Switch Hospital
-        </button>
-      </div>
-
-      {/* NEW: BILLING & ANALYTICS SECTION */}
-      {/* This component will fetch and show the monthly tokens, cost, and invoice */}
-      <section>
-        <h2 className="text-xl font-semibold text-gray-800 mb-4">Business Analytics</h2>
-        <HospitalStats hospitalId={Number(hospitalId)} />
-      </section>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* TRAINING SECTION */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">1</div>
-            <h2 className="text-xl font-semibold text-gray-700">Train Your AI</h2>
-          </div>
-          <KnowledgeBaseUpload hospitalId={hospitalId} />
-        </div>
-
-        {/* PREVIEW SECTION */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-bold">2</div>
-            <h2 className="text-xl font-semibold text-gray-700">Test Arogya Chat</h2>
-          </div>
-          <ChatPreview hospitalId={hospitalId} />
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default Dashboard;
 </file>
 
 <file path="frontend/src/themes/registry.ts">
@@ -3235,6 +4008,40 @@ def downgrade() -> None:
     # ### end Alembic commands ###
 </file>
 
+<file path="backend/alembic/versions/d1e2f3a4b5c6_add_entry_type_to_knowledge.py">
+"""add entry_type to knowledge_base
+
+Revision ID: d1e2f3a4b5c6
+Revises: cea080e631b8
+Create Date: 2025-01-01 00:00:00.000000
+
+"""
+from alembic import op
+import sqlalchemy as sa
+
+# revision identifiers, used by Alembic.
+revision = 'd1e2f3a4b5c6'
+down_revision = 'cadd3b177e0d'
+branch_labels = None
+depends_on = None
+
+
+def upgrade() -> None:
+    op.add_column(
+        'knowledge_base',
+        sa.Column(
+            'entry_type',
+            sa.String(length=20),
+            nullable=False,
+            server_default='fact',
+        )
+    )
+
+
+def downgrade() -> None:
+    op.drop_column('knowledge_base', 'entry_type')
+</file>
+
 <file path="backend/app/api/v1/endpoints/__init__.py">
 # Location: D:\Hospital\hospital-ai-platform\backend\app\api\v1\endpoints\__init__.py
 from .hospitals import router as hospitals
@@ -3435,53 +4242,6 @@ class Doctor(Base):
     hospital = relationship("Hospital", back_populates="doctors")
     schedules = relationship("DoctorSchedule", back_populates="doctor", cascade="all, delete-orphan")
     leaves = relationship("DoctorLeave", back_populates="doctor", cascade="all, delete-orphan")
-</file>
-
-<file path="frontend/package.json">
-{
-  "name": "frontend",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "@ricky0123/vad-react": "^0.0.36",
-    "@ricky0123/vad-web": "^0.0.30",
-    "axios": "^1.13.5",
-    "clsx": "^2.1.1",
-    "lucide-react": "^0.575.0",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "react-markdown": "^10.1.0",
-    "react-router-dom": "^7.13.1",
-    "react-speech-recognition": "^4.0.1",
-    "regenerator-runtime": "^0.14.1",
-    "tailwind-merge": "^3.5.0"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.39.1",
-    "@tailwindcss/postcss": "^4.2.1",
-    "@types/node": "^24.10.1",
-    "@types/react": "^19.2.7",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.1.1",
-    "autoprefixer": "^10.4.27",
-    "eslint": "^9.39.1",
-    "eslint-plugin-react-hooks": "^7.0.1",
-    "eslint-plugin-react-refresh": "^0.4.24",
-    "globals": "^16.5.0",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^4.2.1",
-    "typescript": "~5.9.3",
-    "typescript-eslint": "^8.48.0",
-    "vite": "^7.3.1"
-  }
-}
 </file>
 
 <file path="frontend/src/components/AppointmentsTab.tsx">
@@ -3786,6 +4546,101 @@ export default function AppointmentsTab() {
 }
 </file>
 
+<file path="frontend/src/components/HospitalStats.tsx">
+import { useEffect, useState } from 'react';
+import api from '../api/axios';
+import { Activity, CreditCard, TrendingUp, RefreshCw } from 'lucide-react';
+
+export default function HospitalStats({ hospitalId }: { hospitalId: number }) {
+  const [billing, setBilling] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
+
+  const fetchBilling = async () => {
+    try {
+      const res = await api.get(`/hospitals/${hospitalId}/billing`);
+      setBilling(res.data);
+      setError(null);
+    } catch (err) {
+      setError("Could not load billing data.");
+    }
+  };
+
+  useEffect(() => {
+    if (hospitalId) fetchBilling();
+  }, [hospitalId]);
+
+  const handleReset = async () => {
+    if (!confirm("Are you sure you want to reset all usage data for this billing cycle?")) return;
+    setResetting(true);
+    try {
+      await api.delete(`/hospitals/${hospitalId}/billing/reset`);
+      await fetchBilling();
+    } catch (err) {
+      alert("Failed to reset billing.");
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  if (!billing && !error) return <div className="p-8 text-center animate-pulse">Calculating usage...</div>;
+
+  return (
+    <div className="relative">
+      <div className="absolute -top-12 right-0">
+         <button 
+           onClick={handleReset} 
+           disabled={resetting}
+           className="flex items-center gap-2 text-sm text-gray-500 hover:text-red-600 transition-colors"
+         >
+           <RefreshCw className={`w-4 h-4 ${resetting ? 'animate-spin' : ''}`} />
+           Reset Billing Cycle
+         </button>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        {/* Activity Card */}
+        <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+          <div className="flex items-center gap-3 text-blue-600 mb-4">
+            <Activity size={20} />
+            <h4 className="font-semibold text-gray-700">Monthly Usage</h4>
+          </div>
+          <div className="space-y-1">
+            <p className="text-2xl font-bold text-gray-900">{billing?.usage?.total_chats ?? 0}</p>
+            <p className="text-xs text-gray-400 font-medium uppercase">{(billing?.usage?.tokens_consumed ?? 0).toLocaleString()} tokens</p>
+          </div>
+        </div>
+
+        {/* Cost Card */}
+        <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+          <div className="flex items-center gap-3 text-orange-600 mb-4">
+            <TrendingUp size={20} />
+            <h4 className="font-semibold text-gray-700">OpenAI Overhead</h4>
+          </div>
+          <div className="space-y-1">
+             {/* Changed to Rupees */}
+            <p className="text-2xl font-bold text-gray-900">₹{(billing?.usage?.raw_cost_usd * 83).toFixed(2) ?? "0.00"}</p>
+            <p className="text-xs text-gray-400 font-medium uppercase">Raw API Cost</p>
+          </div>
+        </div>
+
+        {/* Invoice Card */}
+        <div className="bg-blue-600 p-6 rounded-xl shadow-lg text-white">
+          <div className="flex items-center gap-3 mb-4 opacity-90">
+            <CreditCard size={20} />
+            <h4 className="font-semibold">Current Invoice</h4>
+          </div>
+          <div className="space-y-1">
+            <p className="text-3xl font-bold">₹{(billing?.invoice?.total_due_inr ?? 0).toLocaleString()}</p>
+            <p className="text-xs opacity-75 font-medium uppercase">Platform: ₹{billing?.invoice?.platform_fee ?? 0} + Usage</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+</file>
+
 <file path="frontend/src/context/AuthContext.tsx">
 import React, { createContext, useContext, useState, useCallback } from 'react';
 
@@ -3850,9 +4705,12 @@ export function useAuth(): AuthContextValue {
 </file>
 
 <file path="frontend/src/pages/KnowledgeBase.tsx">
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../api/axios';
-import { FileText, Send, Upload, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import {
+  FileText, Send, Upload, CheckCircle, AlertCircle, Loader2,
+  Trash2, Pencil, X, Check, BookOpen, Lightbulb, RefreshCw
+} from 'lucide-react';
 
 interface UploadResult {
   filename: string;
@@ -3862,23 +4720,77 @@ interface UploadResult {
   message: string;
 }
 
+interface KnowledgeEntry {
+  id: number;
+  content: string;
+  entry_type: 'instruction' | 'fact';
+  created_at: string;
+}
+
+const ENTRY_TYPE_OPTIONS = [
+  {
+    value: 'fact' as const,
+    label: 'Fact / Rule',
+    icon: BookOpen,
+    description: 'Hospital info, schedules, policies, FAQs',
+    color: 'blue',
+  },
+  {
+    value: 'instruction' as const,
+    label: 'Instruction',
+    icon: Lightbulb,
+    description: 'How the AI should behave or respond',
+    color: 'purple',
+  },
+];
+
 const KnowledgeBaseUpload = ({ hospitalId }: { hospitalId: string | undefined }) => {
   const [text, setText] = useState('');
+  const [entryType, setEntryType] = useState<'fact' | 'instruction'>('fact');
   const [loading, setLoading] = useState(false);
   const [uploadType, setUploadType] = useState<'text' | 'pdf'>('text');
 
-  // Replaced alert() with inline status so the user gets real feedback
-  // without a browser dialog that blocks the UI and shows no detail.
   const [status, setStatus] = useState<{
     type: 'success' | 'error';
     message: string;
     detail?: UploadResult;
   } | null>(null);
 
+  // --- Knowledge entries list ---
+  const [entries, setEntries] = useState<KnowledgeEntry[]>([]);
+  const [entriesLoading, setEntriesLoading] = useState(false);
+  const [entriesError, setEntriesError] = useState<string | null>(null);
+
+  // --- Edit state ---
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editContent, setEditContent] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+
+  // --- Delete state ---
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
   const clearStatus = () => setStatus(null);
 
-  // ── TEXT UPLOAD ────────────────────────────────────────────────────────────
+  // ── FETCH ENTRIES ────────────────────────────────────────────────────────────
+  const fetchEntries = useCallback(async () => {
+    if (!hospitalId) return;
+    setEntriesLoading(true);
+    setEntriesError(null);
+    try {
+      const res = await api.get(`/ai/knowledge/${hospitalId}`);
+      setEntries(res.data || []);
+    } catch {
+      setEntriesError('Failed to load knowledge entries.');
+    } finally {
+      setEntriesLoading(false);
+    }
+  }, [hospitalId]);
 
+  useEffect(() => {
+    fetchEntries();
+  }, [fetchEntries]);
+
+  // ── TEXT UPLOAD ────────────────────────────────────────────────────────────
   const handleTextUpload = async () => {
     if (!hospitalId) {
       setStatus({ type: 'error', message: 'No hospital selected.' });
@@ -3896,9 +4808,11 @@ const KnowledgeBaseUpload = ({ hospitalId }: { hospitalId: string | undefined })
       await api.post('/ai/ingest', {
         text: text.trim(),
         hospital_id: Number(hospitalId),
+        entry_type: entryType,
       });
       setStatus({ type: 'success', message: 'Knowledge synced to Arogya\'s brain successfully.' });
       setText('');
+      fetchEntries(); // Refresh the list
     } catch (err: any) {
       const detail = err.response?.data?.detail;
       setStatus({
@@ -3913,12 +4827,10 @@ const KnowledgeBaseUpload = ({ hospitalId }: { hospitalId: string | undefined })
   };
 
   // ── PDF UPLOAD ─────────────────────────────────────────────────────────────
-
   const handlePdfUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !hospitalId) return;
 
-    // Client-side type check before hitting the network
     if (!file.name.toLowerCase().endsWith('.pdf')) {
       setStatus({ type: 'error', message: 'Only PDF files are accepted.' });
       event.target.value = '';
@@ -3928,25 +4840,18 @@ const KnowledgeBaseUpload = ({ hospitalId }: { hospitalId: string | undefined })
     setLoading(true);
     clearStatus();
 
-    // hospital_id must be a FormData field (not JSON body) because this is
-    // a multipart request. The backend declares it as Form(...) and coerces
-    // the string to int automatically.
     const formData = new FormData();
     formData.append('file', file);
     formData.append('hospital_id', hospitalId);
+    formData.append('entry_type', entryType);
 
     try {
       const response = await api.post('/ai/upload-pdf', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-
-      // Backend returns a structured result — show it to the admin
       const result: UploadResult = response.data;
-      setStatus({
-        type: 'success',
-        message: result.message,
-        detail: result,
-      });
+      setStatus({ type: 'success', message: result.message, detail: result });
+      fetchEntries();
     } catch (err: any) {
       const detail = err.response?.data?.detail;
       setStatus({
@@ -3957,160 +4862,359 @@ const KnowledgeBaseUpload = ({ hospitalId }: { hospitalId: string | undefined })
       });
     } finally {
       setLoading(false);
-      // Reset the file input so the same file can be re-uploaded if needed
       event.target.value = '';
     }
   };
 
-  // ── RENDER ─────────────────────────────────────────────────────────────────
+  // ── DELETE ─────────────────────────────────────────────────────────────────
+  const handleDelete = async (id: number) => {
+    setDeletingId(id);
+    try {
+      await api.delete(`/ai/knowledge/entry/${id}`);
+      setEntries(prev => prev.filter(e => e.id !== id));
+    } catch {
+      alert('Failed to delete entry. Please try again.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
+  // ── EDIT ───────────────────────────────────────────────────────────────────
+  const startEdit = (entry: KnowledgeEntry) => {
+    setEditingId(entry.id);
+    setEditContent(entry.content);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditContent('');
+  };
+
+  const saveEdit = async (id: number) => {
+    if (!editContent.trim()) return;
+    setEditSaving(true);
+    try {
+      await api.patch(`/ai/knowledge/entry/${id}`, { content: editContent.trim() });
+      setEntries(prev => prev.map(e => e.id === id ? { ...e, content: editContent.trim() } : e));
+      setEditingId(null);
+    } catch {
+      alert('Failed to save changes. Please try again.');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  // ── RENDER ─────────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-4xl bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-      {/* Tab switcher */}
-      <div className="flex border-b border-gray-100">
-        <button
-          onClick={() => { setUploadType('text'); clearStatus(); }}
-          className={`flex-1 p-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
-            uploadType === 'text'
-              ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30'
-              : 'text-gray-500 hover:bg-gray-50'
-          }`}
-        >
-          <Send className="w-4 h-4" /> Manual Text
-        </button>
-        <button
-          onClick={() => { setUploadType('pdf'); clearStatus(); }}
-          className={`flex-1 p-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
-            uploadType === 'pdf'
-              ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30'
-              : 'text-gray-500 hover:bg-gray-50'
-          }`}
-        >
-          <FileText className="w-4 h-4" /> Upload PDF
-        </button>
+    <div className="max-w-4xl space-y-6">
+
+      {/* ── Upload card ─────────────────────────────────────────────────────── */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        {/* Tab switcher */}
+        <div className="flex border-b border-gray-100">
+          <button
+            onClick={() => { setUploadType('text'); clearStatus(); }}
+            className={`flex-1 p-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+              uploadType === 'text'
+                ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30'
+                : 'text-gray-500 hover:bg-gray-50'
+            }`}
+          >
+            <Send className="w-4 h-4" /> Manual Text
+          </button>
+          <button
+            onClick={() => { setUploadType('pdf'); clearStatus(); }}
+            className={`flex-1 p-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+              uploadType === 'pdf'
+                ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30'
+                : 'text-gray-500 hover:bg-gray-50'
+            }`}
+          >
+            <FileText className="w-4 h-4" /> Upload PDF
+          </button>
+        </div>
+
+        <div className="p-8">
+
+          {/* Entry type selector */}
+          <div className="mb-6">
+            <p className="text-sm font-medium text-gray-700 mb-3">Entry Type</p>
+            <div className="grid grid-cols-2 gap-3">
+              {ENTRY_TYPE_OPTIONS.map(opt => {
+                const Icon = opt.icon;
+                const isSelected = entryType === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setEntryType(opt.value)}
+                    className={`flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all ${
+                      isSelected
+                        ? opt.color === 'blue'
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-purple-500 bg-purple-50'
+                        : 'border-gray-200 hover:border-gray-300 bg-white'
+                    }`}
+                  >
+                    <Icon className={`w-5 h-5 mt-0.5 shrink-0 ${
+                      isSelected
+                        ? opt.color === 'blue' ? 'text-blue-600' : 'text-purple-600'
+                        : 'text-gray-400'
+                    }`} />
+                    <div>
+                      <p className={`text-sm font-semibold ${
+                        isSelected
+                          ? opt.color === 'blue' ? 'text-blue-700' : 'text-purple-700'
+                          : 'text-gray-700'
+                      }`}>{opt.label}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{opt.description}</p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Inline status banner */}
+          {status && (
+            <div className={`mb-6 p-4 rounded-xl flex gap-3 items-start border ${
+              status.type === 'success'
+                ? 'bg-green-50 border-green-100 text-green-800'
+                : 'bg-red-50 border-red-100 text-red-800'
+            }`}>
+              {status.type === 'success'
+                ? <CheckCircle className="w-5 h-5 mt-0.5 shrink-0 text-green-600" />
+                : <AlertCircle className="w-5 h-5 mt-0.5 shrink-0 text-red-600" />
+              }
+              <div className="flex-1">
+                <p className="text-sm font-medium">{status.message}</p>
+                {status.type === 'success' && status.detail && (
+                  <div className="mt-3 grid grid-cols-3 gap-3">
+                    <div className="bg-white rounded-lg p-3 border border-green-100 text-center">
+                      <p className="text-xl font-bold text-green-700">{status.detail.pages_processed}</p>
+                      <p className="text-xs text-green-600 mt-0.5">Pages read</p>
+                    </div>
+                    <div className="bg-white rounded-lg p-3 border border-green-100 text-center">
+                      <p className="text-xl font-bold text-green-700">{status.detail.chunks_stored}</p>
+                      <p className="text-xs text-green-600 mt-0.5">Chunks stored</p>
+                    </div>
+                    <div className="bg-white rounded-lg p-3 border border-green-100 text-center">
+                      <p className="text-xl font-bold text-green-700">{status.detail.total_characters.toLocaleString()}</p>
+                      <p className="text-xs text-green-600 mt-0.5">Characters ingested</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Text upload panel */}
+          {uploadType === 'text' && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-bold text-gray-800">Train with Text</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  {entryType === 'fact'
+                    ? 'Paste FAQs, schedules, policies, or any hospital information for Arogya to learn.'
+                    : 'Enter instructions for how Arogya should behave — tone, rules, what to avoid, etc.'}
+                </p>
+              </div>
+              <textarea
+                className="w-full h-48 p-4 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm leading-relaxed resize-none"
+                placeholder={entryType === 'fact'
+                  ? "e.g. 'The OPD is open Monday to Saturday, 8am to 6pm. Emergency is open 24 hours.'"
+                  : "e.g. 'Always recommend calling reception for billing questions. Never share doctor personal numbers.'"}
+                value={text}
+                onChange={e => setText(e.target.value)}
+                disabled={loading}
+              />
+              <button
+                onClick={handleTextUpload}
+                disabled={loading || !text.trim()}
+                className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 font-semibold transition-colors flex items-center justify-center gap-2"
+              >
+                {loading
+                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Syncing...</>
+                  : 'Sync to AI Brain'
+                }
+              </button>
+            </div>
+          )}
+
+          {/* PDF upload panel */}
+          {uploadType === 'pdf' && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-bold text-gray-800">Upload Hospital PDF</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Brochures, staff directories, policy documents — Arogya will read and
+                  index every page automatically. PDF must contain selectable text (not scanned images).
+                </p>
+              </div>
+
+              <div className={`py-12 text-center border-2 border-dashed rounded-xl transition-colors ${
+                loading ? 'border-blue-200 bg-blue-50/30' : 'border-gray-200 bg-gray-50/50 hover:border-blue-300'
+              }`}>
+                {loading ? (
+                  <div className="flex flex-col items-center gap-3">
+                    <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
+                    <p className="text-sm font-medium text-blue-600">Reading and indexing PDF...</p>
+                    <p className="text-xs text-gray-400">This may take a few seconds for large documents</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Upload className="w-8 h-8 text-blue-600" />
+                    </div>
+                    <p className="text-sm text-gray-600 mb-1 font-medium">Drop a PDF or click to select</p>
+                    <p className="text-xs text-gray-400 mb-4">Max recommended size: 10MB</p>
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      onChange={handlePdfUpload}
+                      id="pdf-input"
+                      className="hidden"
+                      disabled={loading}
+                    />
+                    <label
+                      htmlFor="pdf-input"
+                      className="cursor-pointer px-8 py-3 bg-white border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 font-medium transition-all inline-block"
+                    >
+                      Select PDF
+                    </label>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="p-8">
+      {/* ── Knowledge entries list ───────────────────────────────────────────── */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="border-b border-gray-100 px-6 py-4 flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">Stored Knowledge</h3>
+            <p className="text-xs text-gray-500 mt-0.5">All information Arogya has learned for this hospital</p>
+          </div>
+          <button
+            onClick={fetchEntries}
+            disabled={entriesLoading}
+            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-blue-600 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${entriesLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
 
-        {/* Inline status banner — replaces all alert() calls */}
-        {status && (
-          <div className={`mb-6 p-4 rounded-xl flex gap-3 items-start border ${
-            status.type === 'success'
-              ? 'bg-green-50 border-green-100 text-green-800'
-              : 'bg-red-50 border-red-100 text-red-800'
-          }`}>
-            {status.type === 'success'
-              ? <CheckCircle className="w-5 h-5 mt-0.5 shrink-0 text-green-600" />
-              : <AlertCircle className="w-5 h-5 mt-0.5 shrink-0 text-red-600" />
-            }
-            <div className="flex-1">
-              <p className="text-sm font-medium">{status.message}</p>
-
-              {/* PDF upload success shows the chunk breakdown */}
-              {status.type === 'success' && status.detail && (
-                <div className="mt-3 grid grid-cols-3 gap-3">
-                  <div className="bg-white rounded-lg p-3 border border-green-100 text-center">
-                    <p className="text-xl font-bold text-green-700">
-                      {status.detail.pages_processed}
-                    </p>
-                    <p className="text-xs text-green-600 mt-0.5">Pages read</p>
-                  </div>
-                  <div className="bg-white rounded-lg p-3 border border-green-100 text-center">
-                    <p className="text-xl font-bold text-green-700">
-                      {status.detail.chunks_stored}
-                    </p>
-                    <p className="text-xs text-green-600 mt-0.5">Chunks stored</p>
-                  </div>
-                  <div className="bg-white rounded-lg p-3 border border-green-100 text-center">
-                    <p className="text-xl font-bold text-green-700">
-                      {status.detail.total_characters.toLocaleString()}
-                    </p>
-                    <p className="text-xs text-green-600 mt-0.5">Characters ingested</p>
-                  </div>
-                </div>
-              )}
-            </div>
+        {entriesLoading && (
+          <div className="flex items-center justify-center py-12 gap-2 text-gray-400">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span className="text-sm">Loading entries...</span>
           </div>
         )}
 
-        {/* Text upload panel */}
-        {uploadType === 'text' && (
-          <div className="space-y-4">
-            <h3 className="text-lg font-bold text-gray-800">Train with Text</h3>
-            <p className="text-sm text-gray-500">
-              Paste FAQs, rules, or any hospital information for Arogya to learn.
-            </p>
-            <textarea
-              className="w-full h-48 p-4 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm leading-relaxed resize-none"
-              placeholder="Enter knowledge here — e.g. 'The OPD is open Monday to Saturday, 8am to 6pm. Emergency is open 24 hours.'"
-              value={text}
-              onChange={e => setText(e.target.value)}
-              disabled={loading}
-            />
-            <button
-              onClick={handleTextUpload}
-              disabled={loading || !text.trim()}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 font-semibold transition-colors flex items-center justify-center gap-2"
-            >
-              {loading
-                ? <><Loader2 className="w-4 h-4 animate-spin" /> Syncing...</>
-                : 'Sync to AI Brain'
-              }
-            </button>
+        {entriesError && !entriesLoading && (
+          <div className="flex items-center gap-2 m-6 p-3 bg-red-50 text-red-700 rounded-lg text-sm border border-red-100">
+            <AlertCircle className="w-4 h-4 shrink-0" /> {entriesError}
           </div>
         )}
 
-        {/* PDF upload panel */}
-        {uploadType === 'pdf' && (
-          <div className="space-y-4">
-            <h3 className="text-lg font-bold text-gray-800">Upload Hospital PDF</h3>
-            <p className="text-sm text-gray-500">
-              Brochures, staff directories, policy documents — Arogya will read and
-              index every page automatically. PDF must contain selectable text (not scanned images).
-            </p>
-
-            <div className={`py-12 text-center border-2 border-dashed rounded-xl transition-colors ${
-              loading ? 'border-blue-200 bg-blue-50/30' : 'border-gray-200 bg-gray-50/50 hover:border-blue-300'
-            }`}>
-              {loading ? (
-                <div className="flex flex-col items-center gap-3">
-                  <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
-                  <p className="text-sm font-medium text-blue-600">
-                    Reading and indexing PDF...
-                  </p>
-                  <p className="text-xs text-gray-400">
-                    This may take a few seconds for large documents
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Upload className="w-8 h-8 text-blue-600" />
-                  </div>
-                  <p className="text-sm text-gray-600 mb-1 font-medium">
-                    Drop a PDF or click to select
-                  </p>
-                  <p className="text-xs text-gray-400 mb-4">
-                    Max recommended size: 10MB
-                  </p>
-                  <input
-                    type="file"
-                    accept=".pdf"
-                    onChange={handlePdfUpload}
-                    id="pdf-input"
-                    className="hidden"
-                    disabled={loading}
-                  />
-                  <label
-                    htmlFor="pdf-input"
-                    className="cursor-pointer px-8 py-3 bg-white border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 font-medium transition-all inline-block"
-                  >
-                    Select PDF
-                  </label>
-                </>
-              )}
-            </div>
+        {!entriesLoading && !entriesError && entries.length === 0 && (
+          <div className="text-center py-16 text-gray-400">
+            <BookOpen className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <p className="text-sm font-medium">No knowledge entries yet</p>
+            <p className="text-xs mt-1">Add text or upload a PDF above to get started.</p>
           </div>
+        )}
+
+        {!entriesLoading && entries.length > 0 && (
+          <ul className="divide-y divide-gray-50">
+            {entries.map(entry => {
+              const isEditing = editingId === entry.id;
+              const isDeleting = deletingId === entry.id;
+              const typeOpt = ENTRY_TYPE_OPTIONS.find(o => o.value === entry.entry_type) ?? ENTRY_TYPE_OPTIONS[0];
+              const TypeIcon = typeOpt.icon;
+
+              return (
+                <li key={entry.id} className="px-6 py-4 hover:bg-gray-50/50 transition-colors">
+                  <div className="flex items-start gap-3">
+                    {/* Type badge */}
+                    <span className={`mt-0.5 shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${
+                      entry.entry_type === 'instruction'
+                        ? 'bg-purple-100 text-purple-700'
+                        : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      <TypeIcon className="w-2.5 h-2.5" />
+                      {typeOpt.label}
+                    </span>
+
+                    {/* Content / edit area */}
+                    <div className="flex-1 min-w-0">
+                      {isEditing ? (
+                        <textarea
+                          className="w-full p-2 text-sm border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none resize-none leading-relaxed"
+                          rows={Math.min(8, editContent.split('\n').length + 2)}
+                          value={editContent}
+                          onChange={e => setEditContent(e.target.value)}
+                          autoFocus
+                        />
+                      ) : (
+                        <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap break-words">
+                          {entry.content}
+                        </p>
+                      )}
+                      <p className="text-[11px] text-gray-400 mt-1.5">
+                        Added {new Date(entry.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </p>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {isEditing ? (
+                        <>
+                          <button
+                            onClick={() => saveEdit(entry.id)}
+                            disabled={editSaving || !editContent.trim()}
+                            className="p-1.5 rounded-lg text-green-600 hover:bg-green-50 disabled:opacity-40 transition-colors"
+                            title="Save"
+                          >
+                            {editSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                          </button>
+                          <button
+                            onClick={cancelEdit}
+                            disabled={editSaving}
+                            className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition-colors"
+                            title="Cancel"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => startEdit(entry)}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                            title="Edit"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(entry.id)}
+                            disabled={isDeleting}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-40 transition-colors"
+                            title="Delete"
+                          >
+                            {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         )}
       </div>
     </div>
@@ -4743,234 +5847,6 @@ finally:
     db.close()
 </file>
 
-<file path="frontend/src/components/HospitalStats.tsx">
-import { useEffect, useState } from 'react';
-import api from '../api/axios';
-import { Activity, CreditCard, TrendingUp, RefreshCw } from 'lucide-react';
-
-export default function HospitalStats({ hospitalId }: { hospitalId: number }) {
-  const [billing, setBilling] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [resetting, setResetting] = useState(false);
-
-  const fetchBilling = async () => {
-    try {
-      const res = await api.get(`/hospitals/${hospitalId}/billing`);
-      setBilling(res.data);
-      setError(null);
-    } catch (err) {
-      setError("Could not load billing data.");
-    }
-  };
-
-  useEffect(() => {
-    if (hospitalId) fetchBilling();
-  }, [hospitalId]);
-
-  const handleReset = async () => {
-    if (!confirm("Are you sure you want to reset all usage data for this billing cycle?")) return;
-    setResetting(true);
-    try {
-      await api.delete(`/hospitals/${hospitalId}/billing/reset`);
-      await fetchBilling();
-    } catch (err) {
-      alert("Failed to reset billing.");
-    } finally {
-      setResetting(false);
-    }
-  };
-
-  if (!billing && !error) return <div className="p-8 text-center animate-pulse">Calculating usage...</div>;
-
-  return (
-    <div className="relative">
-      <div className="absolute -top-12 right-0">
-         <button 
-           onClick={handleReset} 
-           disabled={resetting}
-           className="flex items-center gap-2 text-sm text-gray-500 hover:text-red-600 transition-colors"
-         >
-           <RefreshCw className={`w-4 h-4 ${resetting ? 'animate-spin' : ''}`} />
-           Reset Billing Cycle
-         </button>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        {/* Activity Card */}
-        <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-          <div className="flex items-center gap-3 text-blue-600 mb-4">
-            <Activity size={20} />
-            <h4 className="font-semibold text-gray-700">Monthly Usage</h4>
-          </div>
-          <div className="space-y-1">
-            <p className="text-2xl font-bold text-gray-900">{billing?.usage?.total_chats ?? 0}</p>
-            <p className="text-xs text-gray-400 font-medium uppercase">{(billing?.usage?.tokens_consumed ?? 0).toLocaleString()} tokens</p>
-          </div>
-        </div>
-
-        {/* Cost Card */}
-        <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-          <div className="flex items-center gap-3 text-orange-600 mb-4">
-            <TrendingUp size={20} />
-            <h4 className="font-semibold text-gray-700">OpenAI Overhead</h4>
-          </div>
-          <div className="space-y-1">
-             {/* Changed to Rupees */}
-            <p className="text-2xl font-bold text-gray-900">₹{(billing?.usage?.raw_cost_usd * 83).toFixed(2) ?? "0.00"}</p>
-            <p className="text-xs text-gray-400 font-medium uppercase">Raw API Cost</p>
-          </div>
-        </div>
-
-        {/* Invoice Card */}
-        <div className="bg-blue-600 p-6 rounded-xl shadow-lg text-white">
-          <div className="flex items-center gap-3 mb-4 opacity-90">
-            <CreditCard size={20} />
-            <h4 className="font-semibold">Current Invoice</h4>
-          </div>
-          <div className="space-y-1">
-            <p className="text-3xl font-bold">₹{(billing?.invoice?.total_due_inr ?? 0).toLocaleString()}</p>
-            <p className="text-xs opacity-75 font-medium uppercase">Platform: ₹{billing?.invoice?.platform_fee ?? 0} + Usage</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="frontend/src/pages/Settings.tsx">
-import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
-import api from '../api/axios';
-import { UserPlus, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-
-export default function SettingsPage() {
-  const { hospitalId } = useParams();
-  const { role } = useAuth();
-  
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-
-  const handleCreateStaff = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      await api.post(`/hospitals/${hospitalId}/staff`, {
-        full_name: fullName,
-        email: email,
-        password: password
-      });
-
-      setSuccess(`Staff account for ${fullName} created successfully!`);
-      setFullName('');
-      setEmail('');
-      setPassword('');
-    } catch (err: any) {
-      console.error(err);
-      setError(err.response?.data?.detail || 'Failed to create staff account. Check the email format or try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="max-w-3xl space-y-8">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">Hospital Settings</h2>
-        <p className="text-sm text-gray-500 mt-1">Manage configuration and staff access for this hospital.</p>
-      </div>
-
-      {/* Staff Creation Section - Only visible to Superadmin */}
-      {role === 'superadmin' && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="border-b border-gray-200 bg-gray-50 px-6 py-4">
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <UserPlus className="w-5 h-5 text-blue-600" /> Add Staff Member
-            </h3>
-            <p className="text-sm text-gray-500 mt-1">
-              Create credentials for receptionists or admins to manage appointments. They will only have access to this hospital.
-            </p>
-          </div>
-
-          <form onSubmit={handleCreateStaff} className="p-6 space-y-4">
-            {error && (
-              <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm flex items-center gap-2 border border-red-100">
-                <AlertCircle className="w-4 h-4 flex-shrink-0" /> {error}
-              </div>
-            )}
-            
-            {success && (
-              <div className="p-3 bg-emerald-50 text-emerald-700 rounded-lg text-sm flex items-center gap-2 border border-emerald-100">
-                <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> {success}
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                <input 
-                  type="text" 
-                  required
-                  value={fullName}
-                  onChange={e => setFullName(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  placeholder="e.g. Front Desk"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-                <input 
-                  type="email" 
-                  required
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  placeholder="staff@hospital.com"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Temporary Password</label>
-              <input 
-                type="password" 
-                required
-                minLength={6}
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                placeholder="Minimum 6 characters"
-              />
-            </div>
-
-            <div className="pt-2">
-              <button 
-                type="submit" 
-                disabled={loading || !fullName || !email || !password}
-                className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
-              >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-                Create Account
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-    </div>
-  );
-}
-</file>
-
 <file path="frontend/src/themes/bkm-hospital-payannur/Chat.tsx">
 /**
  * bkm-hospital-payannur/Chat.tsx
@@ -5320,6 +6196,65 @@ from app.models.doctor_availability import DoctorSchedule, DoctorLeave # noqa
 # Un-commented and fixed paths!
 from app.models.knowledge import KnowledgeBase # noqa
 from app.models.usage import UsageLedger # noqa
+</file>
+
+<file path="backend/app/main.py">
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.db.base import Base
+from app.api.v1.endpoints.auth import router as auth_router
+from app.api.v1.endpoints.hospitals import router as hospitals_router
+from app.api.v1.endpoints.ai import router as ai_router
+from app.db.session import engine
+from app.api.v1.endpoints.appointments import router as appointments_router
+from app.services.reminders import start_reminder_scheduler, stop_reminder_scheduler
+from app.api.v1.endpoints.medicines import router as medicines_router
+from app.api.v1.endpoints.lab_tests import router as lab_tests_router
+from app.api.v1.endpoints.doctor_availability import router as availability_router
+import os
+
+app = FastAPI(title="Hospital AI Platform")
+Base.metadata.create_all(bind=engine)
+
+# Single source of truth for allowed origins
+ALLOWED_ORIGINS = [
+    o.strip() for o in os.getenv(
+        "ALLOWED_ORIGINS",
+        "https://hospital-ai-platform.vercel.app,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
+    ).split(",") if o.strip()
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(auth_router,         prefix="/api/v1/auth",         tags=["auth"])
+app.include_router(hospitals_router,    prefix="/api/v1/hospitals",    tags=["hospitals"])
+app.include_router(ai_router,           prefix="/api/v1/ai",           tags=["AI"])
+app.include_router(appointments_router, prefix="/api/v1/appointments", tags=["Appointments"])
+app.include_router(medicines_router, prefix="/api/v1/medicines", tags=["Medicines"])
+app.include_router(lab_tests_router, prefix="/api/v1/lab-tests", tags=["Lab Tests"])
+app.include_router(availability_router, prefix="/api/v1/availability", tags=["Doctor Availability"])
+
+@app.on_event("startup")
+def on_startup():
+    start_reminder_scheduler()
+
+@app.on_event("shutdown")
+def on_shutdown():
+    stop_reminder_scheduler()
+
+@app.get("/")
+def read_root():
+    return {
+        "status": "online",
+        "message": "Welcome to the Hospital AI Platform API",
+        "version": "v1.0.0"
+    }
 </file>
 
 <file path="frontend/src/pages/Doctors.tsx">
@@ -5767,6 +6702,216 @@ const Login = () => {
 };
 
 export default Login;
+</file>
+
+<file path="frontend/src/pages/Settings.tsx">
+import React, { useState } from 'react';
+import { useParams } from 'react-router-dom';
+import api from '../api/axios';
+import { UserPlus, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+
+export default function SettingsPage() {
+  const { hospitalId } = useParams();
+  const { role } = useAuth();
+
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const handleCreateStaff = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    try {
+      await api.post(`/hospitals/${hospitalId}/staff`, {
+        full_name: fullName,
+        email,
+        password,
+      });
+      setSuccess(`Staff account for ${fullName} created successfully!`);
+      setFullName('');
+      setEmail('');
+      setPassword('');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to create staff account.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-3xl space-y-8">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Hospital Settings</h2>
+        <p className="text-sm text-gray-500 mt-1">Manage configuration and staff access for this hospital.</p>
+      </div>
+
+      {role === 'superadmin' && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="border-b border-gray-200 bg-gray-50 px-6 py-4">
+            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-blue-600" /> Add Staff Member
+            </h3>
+            <p className="text-sm text-gray-500 mt-1">
+              Create credentials for receptionists or admins to manage appointments.
+            </p>
+          </div>
+
+          <form onSubmit={handleCreateStaff} className="p-6 space-y-4">
+            {error && (
+              <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm flex items-center gap-2 border border-red-100">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" /> {error}
+              </div>
+            )}
+            {success && (
+              <div className="p-3 bg-emerald-50 text-emerald-700 rounded-lg text-sm flex items-center gap-2 border border-emerald-100">
+                <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> {success}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                <input
+                  type="text" required value={fullName}
+                  onChange={e => setFullName(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  placeholder="e.g. Front Desk"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                <input
+                  type="email" required value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  placeholder="staff@hospital.com"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Temporary Password</label>
+              <input
+                type="password" required minLength={6} value={password}
+                onChange={e => setPassword(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                placeholder="Minimum 6 characters"
+              />
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="submit"
+                disabled={loading || !fullName || !email || !password}
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                Create Account
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
+</file>
+
+<file path="frontend/src/themes/arogya-specialty/ChatMessage.tsx">
+/**
+ * arogya-specialty/ChatMessage.tsx
+ * ─────────────────────────────────────────────────────────────────
+ * AROGYA THEME — message bubble UI only.
+ * All data comes from useChatCore via the parent Chat.tsx.
+ *
+ * Palette: Emerald green (#059669) + slate
+ * ─────────────────────────────────────────────────────────────────
+ */
+
+import React from 'react';
+import ReactMarkdown from 'react-markdown';
+
+interface ChatMessageProps {
+  role: 'user' | 'assistant';
+  content: string;
+  isStreaming?: boolean;
+  language?: 'en' | 'ml';
+}
+
+const ChatMessage: React.FC<ChatMessageProps> = ({
+  role,
+  content,
+  isStreaming,
+  language = 'en',
+}) => {
+  const isUser = role === 'user';
+  const isMalayalam = language === 'ml';
+
+  const malayalamStyle = isMalayalam
+    ? { fontFamily: "'Noto Sans Malayalam', 'Manjari', 'Rachana', sans-serif", lineHeight: '1.9' }
+    : {};
+
+  return (
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
+
+      {/* Bot avatar */}
+      {!isUser && (
+        <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mr-2 text-xs font-bold border border-emerald-200 shrink-0">
+          A
+        </div>
+      )}
+
+      {/* Bubble */}
+      <div
+        className={`max-w-[85%] p-4 rounded-2xl shadow-sm text-sm leading-relaxed ${
+          isUser
+            ? 'bg-emerald-600 text-white rounded-tr-none'
+            : 'bg-white border border-gray-100 text-gray-800 rounded-tl-none'
+        }`}
+        style={malayalamStyle}
+      >
+        <div className="prose prose-sm max-w-none prose-emerald" style={malayalamStyle}>
+          <ReactMarkdown
+            components={{
+              p:      ({ children }) => <p style={malayalamStyle}>{children}</p>,
+              li:     ({ children }) => <li style={malayalamStyle}>{children}</li>,
+              strong: ({ children }) => <strong style={malayalamStyle}>{children}</strong>,
+            }}
+          >
+            {content}
+          </ReactMarkdown>
+        </div>
+
+        {/* Streaming cursor */}
+        {isStreaming && !isUser && (
+          <span style={{
+            display: 'inline-block', width: '2px', height: '14px',
+            backgroundColor: '#059669', marginLeft: '2px',
+            verticalAlign: 'middle',
+            animation: 'blink 1s step-start infinite',
+          }} />
+        )}
+      </div>
+
+      {/* User avatar */}
+      {isUser && (
+        <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center ml-2 text-xs font-bold border border-gray-300 shrink-0">
+          U
+        </div>
+      )}
+
+      <style>{`@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }`}</style>
+    </div>
+  );
+};
+
+export default ChatMessage;
 </file>
 
 <file path="frontend/src/themes/arogya-specialty/index.tsx">
@@ -6253,170 +7398,6 @@ def update_medicine(
     return db_item
 </file>
 
-<file path="frontend/src/App.tsx">
-import { Routes, Route, Navigate, Link, useParams } from 'react-router-dom';
-import DashboardLayout from './layouts/DashboardLayout';
-import CreateHospitalModal from './components/CreateHospitalModal';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import DoctorsPage from './pages/Doctors';
-import SettingsPage from './pages/Settings';
-import ThemeLoader from './themes/ThemeLoader';
-import api from './api/axios';
-import { useEffect, useState } from 'react';
-import { Plus } from 'lucide-react';
-import { useAuth } from './context/AuthContext';
-import AppointmentsTab from './components/AppointmentsTab';
-import PharmacyPage from './pages/Pharmacy';
-import LabTestsPage from './pages/LabTests';
-
-function HospitalList() {
-  const [hospitals, setHospitals] = useState<any[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const fetchHospitals = () => {
-    api.get('/hospitals/')
-      .then(res => setHospitals(res.data))
-      .catch(console.error);
-  };
-
-  useEffect(() => { fetchHospitals(); }, []);
-
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Hospital Management</h2>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" /> Add Hospital
-        </button>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-3">
-        {hospitals.map((h: any) => (
-          <div key={h.id} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-            <h3 className="font-bold text-gray-900 text-lg">{h.name}</h3>
-            <p className="text-xs text-gray-400 mb-4">Slug: {h.slug}</p>
-
-            <div className="flex gap-2 border-t pt-4">
-              <Link
-                to={`/hospitals/${h.id}/appointments`}
-                className="flex-1 text-center text-xs bg-emerald-600 text-white py-2 rounded-md font-medium hover:bg-emerald-700"
-              >
-                Appointments
-              </Link>
-              <Link
-                to={`/hospitals/${h.id}/training`}
-                className="flex-1 text-center text-xs bg-blue-600 text-white py-2 rounded-md font-medium hover:bg-blue-700"
-              >
-                Train AI
-              </Link>
-              <Link
-                to={`/hospitals/${h.id}/settings`}
-                className="flex-1 text-center text-xs border border-gray-300 text-gray-600 py-2 rounded-md font-medium hover:bg-gray-50"
-              >
-                Settings
-              </Link>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <CreateHospitalModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSuccess={fetchHospitals}
-      />
-    </div>
-  );
-}
-
-// ==========================================
-// NEW: Security Guard Component
-// ==========================================
-function StaffGuard({ children }: { children: React.ReactNode }) {
-  const { role, hospitalId } = useAuth();
-  const { hospitalId: routeHospitalId } = useParams();
-
-  // If staff tries to access a different hospital's URL, kick them back to their own
-  if (role === 'staff' && String(hospitalId) !== String(routeHospitalId)) {
-    return <Navigate to={`/hospitals/${hospitalId}/settings`} replace />;
-  }
-  
-  return <>{children}</>;
-}
-
-// ==========================================
-// MAIN APP ROUTER
-// ==========================================
-export default function App() {
-  const { isAuthenticated, role, hospitalId } = useAuth();
-
-  return (
-    <Routes>
-      {/* Public patient-facing route */}
-      <Route path="/p/:hospitalSlug" element={<ThemeLoader />} />
-
-      {/* Auth route */}
-      <Route
-        path="/login"
-        element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
-      />
-
-      {/* Protected admin routes */}
-      <Route element={isAuthenticated ? <DashboardLayout /> : <Navigate to="/login" replace />}>
-        
-        {/* Root Route: Redirect Staff directly to Settings, Show list to Superadmin */}
-        <Route 
-          path="/" 
-          element={
-            role === 'staff' && hospitalId ? (
-              <Navigate to={`/hospitals/${hospitalId}/settings`} replace />
-            ) : (
-              <HospitalList />
-            )
-          } 
-        />
-
-        {/* Common Routes (Secured by StaffGuard so they can't swap IDs) */}
-        <Route 
-          path="/hospitals/:hospitalId/appointments" 
-          element={<StaffGuard><AppointmentsTab /></StaffGuard>} 
-        />
-        <Route 
-          path="/hospitals/:hospitalId/doctors" 
-          element={<StaffGuard><DoctorsPage /></StaffGuard>} 
-        />
-        <Route 
-          path="/hospitals/:hospitalId/settings" 
-          element={<StaffGuard><SettingsPage /></StaffGuard>} 
-        />
-        <Route 
-          path="/hospitals/:hospitalId/pharmacy" 
-          element={<StaffGuard><PharmacyPage /></StaffGuard>} 
-        />
-        <Route 
-          path="/hospitals/:hospitalId/lab-tests" 
-          element={<StaffGuard><LabTestsPage /></StaffGuard>} 
-        />
-
-        {/* Superadmin Only Routes */}
-        <Route 
-          path="/hospitals/:hospitalId/training" 
-          element={role === 'superadmin' ? <Dashboard /> : <Navigate to="/" replace />} 
-        />
-
-      </Route>
-
-      {/* Catch-all redirects to root, which will cleanly re-route based on role */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  );
-}
-</file>
-
 <file path="frontend/src/layouts/DashboardLayout.tsx">
 import { Outlet, Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Users, Building2, Settings, LogOut, BrainCircuit, CalendarCheck, Pill, TestTube } from 'lucide-react';
@@ -6442,7 +7423,7 @@ export default function DashboardLayout() {
       <aside className="w-64 bg-white border-r border-gray-200 flex flex-col shadow-sm">
         <div className="p-6 border-b">
           <h2 className="text-xl font-bold text-blue-600 flex items-center gap-2">
-            <Building2 className="w-6 h-6" /> Corvus Labs
+            <Building2 className="w-6 h-6" /> Gothos Labs
           </h2>
         </div>
 
@@ -6918,154 +7899,174 @@ export default function PharmacyPage() {
 }
 </file>
 
-<file path="frontend/src/themes/arogya-specialty/ChatMessage.tsx">
-/**
- * arogya-specialty/ChatMessage.tsx
- * ─────────────────────────────────────────────────────────────────
- * AROGYA THEME — message bubble UI only.
- * All data comes from useChatCore via the parent Chat.tsx.
- *
- * Palette: Emerald green (#059669) + slate
- * ─────────────────────────────────────────────────────────────────
- */
+<file path="frontend/src/App.tsx">
+import { Routes, Route, Navigate, Link, useParams } from 'react-router-dom';
+import DashboardLayout from './layouts/DashboardLayout';
+import CreateHospitalModal from './components/CreateHospitalModal';
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import DoctorsPage from './pages/Doctors';
+import SettingsPage from './pages/Settings';
+import ThemeLoader from './themes/ThemeLoader';
+import api from './api/axios';
+import { useEffect, useState } from 'react';
+import { Plus } from 'lucide-react';
+import { useAuth } from './context/AuthContext';
+import AppointmentsTab from './components/AppointmentsTab';
+import PharmacyPage from './pages/Pharmacy';
+import LabTestsPage from './pages/LabTests';
+import IrisPage from './pages/IrisPage'
 
-import React from 'react';
-import ReactMarkdown from 'react-markdown';
 
-interface ChatMessageProps {
-  role: 'user' | 'assistant';
-  content: string;
-  isStreaming?: boolean;
-  language?: 'en' | 'ml';
-}
+function HospitalList() {
+  const [hospitals, setHospitals] = useState<any[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-const ChatMessage: React.FC<ChatMessageProps> = ({
-  role,
-  content,
-  isStreaming,
-  language = 'en',
-}) => {
-  const isUser = role === 'user';
-  const isMalayalam = language === 'ml';
+  const fetchHospitals = () => {
+    api.get('/hospitals/')
+      .then(res => setHospitals(res.data))
+      .catch(console.error);
+  };
 
-  const malayalamStyle = isMalayalam
-    ? { fontFamily: "'Noto Sans Malayalam', 'Manjari', 'Rachana', sans-serif", lineHeight: '1.9' }
-    : {};
+  useEffect(() => { fetchHospitals(); }, []);
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
-
-      {/* Bot avatar */}
-      {!isUser && (
-        <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mr-2 text-xs font-bold border border-emerald-200 shrink-0">
-          A
-        </div>
-      )}
-
-      {/* Bubble */}
-      <div
-        className={`max-w-[85%] p-4 rounded-2xl shadow-sm text-sm leading-relaxed ${
-          isUser
-            ? 'bg-emerald-600 text-white rounded-tr-none'
-            : 'bg-white border border-gray-100 text-gray-800 rounded-tl-none'
-        }`}
-        style={malayalamStyle}
-      >
-        <div className="prose prose-sm max-w-none prose-emerald" style={malayalamStyle}>
-          <ReactMarkdown
-            components={{
-              p:      ({ children }) => <p style={malayalamStyle}>{children}</p>,
-              li:     ({ children }) => <li style={malayalamStyle}>{children}</li>,
-              strong: ({ children }) => <strong style={malayalamStyle}>{children}</strong>,
-            }}
-          >
-            {content}
-          </ReactMarkdown>
-        </div>
-
-        {/* Streaming cursor */}
-        {isStreaming && !isUser && (
-          <span style={{
-            display: 'inline-block', width: '2px', height: '14px',
-            backgroundColor: '#059669', marginLeft: '2px',
-            verticalAlign: 'middle',
-            animation: 'blink 1s step-start infinite',
-          }} />
-        )}
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-gray-900">Hospital Management</h2>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          <Plus className="w-4 h-4" /> Add Hospital
+        </button>
       </div>
 
-      {/* User avatar */}
-      {isUser && (
-        <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center ml-2 text-xs font-bold border border-gray-300 shrink-0">
-          U
-        </div>
-      )}
+      <div className="grid gap-6 md:grid-cols-3">
+        {hospitals.map((h: any) => (
+          <div key={h.id} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+            <h3 className="font-bold text-gray-900 text-lg">{h.name}</h3>
+            <p className="text-xs text-gray-400 mb-4">Slug: {h.slug}</p>
 
-      <style>{`@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }`}</style>
+            <div className="flex gap-2 border-t pt-4">
+              <Link
+                to={`/hospitals/${h.id}/appointments`}
+                className="flex-1 text-center text-xs bg-emerald-600 text-white py-2 rounded-md font-medium hover:bg-emerald-700"
+              >
+                Appointments
+              </Link>
+              <Link
+                to={`/hospitals/${h.id}/training`}
+                className="flex-1 text-center text-xs bg-blue-600 text-white py-2 rounded-md font-medium hover:bg-blue-700"
+              >
+                Train AI
+              </Link>
+              <Link
+                to={`/hospitals/${h.id}/settings`}
+                className="flex-1 text-center text-xs border border-gray-300 text-gray-600 py-2 rounded-md font-medium hover:bg-gray-50"
+              >
+                Settings
+              </Link>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <CreateHospitalModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={fetchHospitals}
+      />
     </div>
   );
-};
+}
 
-export default ChatMessage;
-</file>
+// ==========================================
+// NEW: Security Guard Component
+// ==========================================
+function StaffGuard({ children }: { children: React.ReactNode }) {
+  const { role, hospitalId } = useAuth();
+  const { hospitalId: routeHospitalId } = useParams();
 
-<file path="backend/app/main.py">
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from app.db.base import Base
-from app.api.v1.endpoints.auth import router as auth_router
-from app.api.v1.endpoints.hospitals import router as hospitals_router
-from app.api.v1.endpoints.ai import router as ai_router
-from app.db.session import engine
-from app.api.v1.endpoints.appointments import router as appointments_router
-from app.services.reminders import start_reminder_scheduler, stop_reminder_scheduler
-from app.api.v1.endpoints.medicines import router as medicines_router
-from app.api.v1.endpoints.lab_tests import router as lab_tests_router
-from app.api.v1.endpoints.doctor_availability import router as availability_router
-import os
+  // If staff tries to access a different hospital's URL, kick them back to their own
+  if (role === 'staff' && String(hospitalId) !== String(routeHospitalId)) {
+    return <Navigate to={`/hospitals/${hospitalId}/appointments`} replace />;
 
-app = FastAPI(title="Hospital AI Platform")
-Base.metadata.create_all(bind=engine)
+  }
+  
+  return <>{children}</>;
+}
 
-# Single source of truth for allowed origins
-ALLOWED_ORIGINS = [
-    o.strip() for o in os.getenv(
-        "ALLOWED_ORIGINS",
-        "https://hospital-ai-platform.vercel.app,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
-    ).split(",") if o.strip()
-]
+// ==========================================
+// MAIN APP ROUTER
+// ==========================================
+export default function App() {
+  const { isAuthenticated, role, hospitalId } = useAuth();
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+  return (
+    <Routes>
+      {/* Public patient-facing route */}
+      <Route path="/p/:hospitalSlug" element={<ThemeLoader />} />
 
-app.include_router(auth_router,         prefix="/api/v1/auth",         tags=["auth"])
-app.include_router(hospitals_router,    prefix="/api/v1/hospitals",    tags=["hospitals"])
-app.include_router(ai_router,           prefix="/api/v1/ai",           tags=["AI"])
-app.include_router(appointments_router, prefix="/api/v1/appointments", tags=["Appointments"])
-app.include_router(medicines_router, prefix="/api/v1/medicines", tags=["Medicines"])
-app.include_router(lab_tests_router, prefix="/api/v1/lab-tests", tags=["Lab Tests"])
-app.include_router(availability_router, prefix="/api/v1/availability", tags=["Doctor Availability"])
+      {/* Auth route */}
+      <Route
+        path="/login"
+        element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
+      />
+      <Route path="/iris" element={<IrisPage />} />
 
-@app.on_event("startup")
-def on_startup():
-    start_reminder_scheduler()
 
-@app.on_event("shutdown")
-def on_shutdown():
-    stop_reminder_scheduler()
+      {/* Protected admin routes */}
+      <Route element={isAuthenticated ? <DashboardLayout /> : <Navigate to="/login" replace />}>
+        
+        {/* Root Route: Redirect Staff directly to Settings, Show list to Superadmin */}
+        <Route 
+          path="/" 
+          element={
+            role === 'staff' && hospitalId ? (
+              <Navigate to={`/hospitals/${hospitalId}/appointments`} replace />
 
-@app.get("/")
-def read_root():
-    return {
-        "status": "online",
-        "message": "Welcome to the Hospital AI Platform API",
-        "version": "v1.0.0"
-    }
+            ) : (
+              <HospitalList />
+            )
+          } 
+        />
+
+        {/* Common Routes (Secured by StaffGuard so they can't swap IDs) */}
+        <Route 
+          path="/hospitals/:hospitalId/appointments" 
+          element={<StaffGuard><AppointmentsTab /></StaffGuard>} 
+        />
+        <Route 
+          path="/hospitals/:hospitalId/doctors" 
+          element={<StaffGuard><DoctorsPage /></StaffGuard>} 
+        />
+        <Route 
+          path="/hospitals/:hospitalId/settings" 
+          element={<StaffGuard><SettingsPage /></StaffGuard>} 
+        />
+        <Route 
+          path="/hospitals/:hospitalId/pharmacy" 
+          element={<StaffGuard><PharmacyPage /></StaffGuard>} 
+        />
+        <Route 
+          path="/hospitals/:hospitalId/lab-tests" 
+          element={<StaffGuard><LabTestsPage /></StaffGuard>} 
+        />
+
+        {/* Superadmin Only Routes */}
+        <Route 
+          path="/hospitals/:hospitalId/training" 
+          element={role === 'superadmin' ? <Dashboard /> : <Navigate to="/" replace />} 
+        />
+
+      </Route>
+
+      {/* Catch-all redirects to root, which will cleanly re-route based on role */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
 </file>
 
 <file path="backend/app/api/v1/endpoints/hospitals.py">
@@ -7208,14 +8209,25 @@ def update_specific_hospital(
     db.commit()
     db.refresh(hospital)
     return {"status": "success", "message": f"Settings for {hospital.name} updated."}
-
 @router.get("/{hospital_id}/doctors")
 def get_hospital_doctors(
     hospital_id: int,
     db: Session = Depends(get_db)
 ):
     """Fetch the staff directory for a specific hospital."""
-    return db.query(Doctor).filter(Doctor.hospital_id == hospital_id).all()
+    doctors = db.query(Doctor).filter(Doctor.hospital_id == hospital_id).all()
+    
+    # Return a formatted dict, leaving behind the 'embedding' column
+    return [
+        {
+            "id": d.id,
+            "doctor_id": d.doctor_id,
+            "name": d.name,
+            "department": d.department,
+            "base_schedule": d.base_schedule,
+        }
+        for d in doctors
+    ]
 
 @router.post("/{hospital_id}/doctors")
 def add_doctor(hospital_id: int, payload: dict = Body(...), db: Session = Depends(get_db)):
@@ -7243,8 +8255,13 @@ def add_doctor(hospital_id: int, payload: dict = Body(...), db: Session = Depend
 
     db.commit()
     db.refresh(new_doc)
-    return new_doc
-
+    return {
+        "id": new_doc.id,
+        "doctor_id": new_doc.doctor_id,
+        "name": new_doc.name,
+        "department": new_doc.department,
+        "base_schedule": new_doc.base_schedule,
+    }
 @router.post("/{hospital_id}/doctors/bulk-upload")
 async def bulk_upload_and_sync(
     hospital_id: int,
@@ -7475,7 +8492,6 @@ export function useHospitalChat(hospitalId: string) {
     if (!hospitalId) return;
     const token = localStorage.getItem('token');
     
-    // Set initial loading message
     setMessages([{ role: 'assistant', content: language === 'ml' ? "വിവരങ്ങൾ ലോഡ് ചെയ്യുന്നു..." : "Loading info...", isWelcome: true }]);
 
     fetch(`${getBaseURL()}/ai/welcome/${hospitalId}`, {
@@ -7497,7 +8513,6 @@ export function useHospitalChat(hospitalId: string) {
       .catch(() => {});
   }, [hospitalId]);
 
-  // Update welcome message if language toggles
   useEffect(() => {
     setMessages(prev => {
       if (!prev.length || !prev[0].isWelcome || !welcomeCache.current) return prev;
@@ -7575,87 +8590,101 @@ export function useHospitalChat(hospitalId: string) {
 
   useEffect(() => { handleSendRef.current = handleSend; }, [handleSend]);
 
-  // --- 3. The Silero VAD Mic Logic ---
-// --- 3. The Silero VAD Mic Logic ---
-const vadOptions = useMemo(() => ({
-  startOnLoad: false,
-  baseAssetPath: "/vad-assets/",
-  onnxWASMBasePath: "/vad-assets/",
-  model: "legacy" as const,
-  positiveSpeechThreshold: 0.6,
-  negativeSpeechThreshold: 0.35,
-  minSpeechMs: 250,
-  redemptionMs: 1500,
-  onSpeechStart: () => {
-    if (micActiveRef.current) setMicState('recording');
-  },
-  onSpeechEnd: async (audio) => {
-    if (!micActiveRef.current) return;
-  
-  micActiveRef.current = false;  // ← ADD: lock it immediately
-  vadPause();                     // ← ADD: stop VAD right away
-  setMicState('transcribing');
-  
-    try {
-      const wavBuffer = utils.encodeWAV(audio);
-      const audioBlob = new Blob([wavBuffer], { type: 'audio/wav' });
-      const formData = new FormData();
-      formData.append('file', audioBlob, 'recording.wav');
-      formData.append('language', language);
-      formData.append('hospital_id', String(parseInt(hospitalId) || 0));
-      const token = localStorage.getItem('token');
-      const res = await fetch(`${getBaseURL()}/ai/transcribe`, {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: formData
-      });
-      if (!res.ok) throw new Error("Transcription failed");
-      const data = await res.json();
-      setMicState('idle');
-      if (data.transcript?.trim() && handleSendRef.current) {
-        handleSendRef.current(data.transcript.trim());
+  // --- 3. Improved VAD Mic Logic ---
+  // Key improvements:
+  //   • preSpeechPadFrames: 15 — captures ~250ms before VAD triggers, so the
+  //     first syllable of a sentence is never clipped.
+  //   • positiveSpeechThreshold lowered to 0.50 — fires sooner on quiet phones.
+  //   • negativeSpeechThreshold lowered to 0.30 — less likely to cut off mid-word.
+  //   • minSpeechFrames: 4 — ignores very short noise bursts while still being
+  //     responsive; at 16kHz / 512-sample frames that's ~128ms.
+  //   • redemptionFrames set explicitly to 12 (~384ms) — gives a comfortable
+  //     natural pause before triggering onSpeechEnd.
+  const vadOptions = useMemo(() => ({
+    startOnLoad: false,
+    baseAssetPath: "/vad-assets/",
+    onnxWASMBasePath: "/vad-assets/",
+    model: "legacy" as const,
+
+    // --- Sensitivity tuning (fixes "doesn't hear first part") ---
+    positiveSpeechThreshold: 0.50,   // was 0.60 — detects speech sooner
+    negativeSpeechThreshold: 0.30,   // was 0.35 — less eager to cut off
+    minSpeechFrames: 4,              // ~128ms at 16kHz / 512 frames
+    preSpeechPadFrames: 15,          // ~480ms pre-roll captured before trigger
+
+    // --- End-of-speech timing ---
+    redemptionFrames: 12,            // ~384ms silence before onSpeechEnd fires
+
+    onSpeechStart: () => {
+      if (micActiveRef.current) setMicState('recording');
+    },
+    onSpeechEnd: async (audio: Float32Array) => {
+      if (!micActiveRef.current) return;
+
+      micActiveRef.current = false;  // lock immediately
+      vadPause();                    // stop VAD right away
+      setMicState('transcribing');
+
+      try {
+        const wavBuffer = utils.encodeWAV(audio);
+        const audioBlob = new Blob([wavBuffer], { type: 'audio/wav' });
+        const formData = new FormData();
+        formData.append('file', audioBlob, 'recording.wav');
+        formData.append('language', languageRef.current);
+        formData.append('hospital_id', String(parseInt(hospitalId) || 0));
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${getBaseURL()}/ai/transcribe`, {
+          method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: formData
+        });
+        if (!res.ok) throw new Error("Transcription failed");
+        const data = await res.json();
+        setMicState('idle');
+        if (data.transcript?.trim() && handleSendRef.current) {
+          handleSendRef.current(data.transcript.trim());
+        }
+      } catch {
+        setMicError(languageRef.current === 'ml' ? 'ശബ്ദം മനസ്സിലാക്കാൻ കഴിഞ്ഞില്ല.' : 'Failed to transcribe audio.');
+        setMicState('idle');
       }
-    } catch (error) {
-      setMicError(language === 'ml' ? 'ശബ്ദം മനസ്സിലാക്കാൻ കഴിഞ്ഞില്ല.' : 'Failed to transcribe audio.');
+    },
+    onVADMisfire: () => {
+      if (!micActiveRef.current) return;
       setMicState('idle');
     }
-  },
-  onVADMisfire: () => {
-    if (!micActiveRef.current) return;
-    setMicState('idle');
-  }
-}), []); // empty — refs and setters are stable, language captured via ref below
+  }), []); // stable — language & handlers accessed via refs
 
-const { loading: vadLoading, errored: vadErrored, start: vadStart, pause: vadPause } = useMicVAD(vadOptions);
+  const { loading: vadLoading, errored: vadErrored, start: vadStart, pause: vadPause } = useMicVAD(vadOptions);
 
-const toggleMic = () => {
-  setMicError(null);
-  if (micState === 'recording' || micState === 'transcribing') {
-    micActiveRef.current = false;
-    vadPause();           // ✅ top-level, not vad.pause()
-    setMicState('idle');
-  } else {
-    if (vadLoading) {
-      setMicError(language === 'en' ? 'Voice AI is still loading...' : 'ശബ്ദ AI ലോഡുചെയ്യുന്നു...');
-      return;
+  const toggleMic = useCallback(() => {
+    setMicError(null);
+    if (micState === 'recording' || micState === 'transcribing') {
+      micActiveRef.current = false;
+      vadPause();
+      setMicState('idle');
+    } else {
+      if (vadLoading) {
+        setMicError(language === 'en' ? 'Voice AI is still loading...' : 'ശബ്ദ AI ലോഡുചെയ്യുന്നു...');
+        return;
+      }
+      if (vadErrored) {
+        setMicError(language === 'en' ? 'Microphone access failed. Please allow microphone permission and try again.' : 'മൈക്ക് ആക്സസ് ലഭ്യമായില്ല. അനുമതി നൽകി വീണ്ടും ശ്രമിക്കൂ.');
+        return;
+      }
+      micActiveRef.current = true;
+      vadStart();
+      setMicState('recording');
     }
-    if (vadErrored) {
-      setMicError(language === 'en' ? 'Voice AI failed to load.' : 'ശബ്ദ AI പരാജയപ്പെട്ടു.');
-      return;
-    }
-    micActiveRef.current = true;
-    vadStart();           // ✅ top-level, not vad.start()
-    setMicState('recording');
-  }
-};
+  }, [micState, vadLoading, vadErrored, language, vadStart, vadPause]);
 
-// Update the return value — remove `vad`, expose vadLoading instead
-return {
-  language, setLanguage, messages, isStreaming,
-  inputText, setInputText, micState, micError,
-  suggestions, handleSend, toggleMic,
-  vadLoading  // ✅ replaces `vad` in the return
-};}
+  return {
+    language, setLanguage, messages, isStreaming,
+    inputText, setInputText, micState, micError,
+    suggestions, handleSend, toggleMic,
+    vadLoading
+  };
+}
 </file>
 
 <file path="frontend/src/themes/arogya-specialty/Chat.tsx">
@@ -7864,7 +8893,7 @@ import unicodedata
 import httpx
 import uuid
 from typing import List, Optional, AsyncGenerator
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel, Field, field_validator, model_validator
 from openai import OpenAI, AsyncOpenAI
 from sqlalchemy.orm import Session
@@ -8019,6 +9048,14 @@ class ChatRequest(BaseModel):
 class IngestRequest(BaseModel):
     hospital_id: int
     text: str
+    entry_type: str = "fact"
+    @field_validator("entry_type")
+    @classmethod
+    def entry_type_valid(cls, v: str) -> str:
+        if v not in {"fact", "instruction"}:
+            raise ValueError("entry_type must be 'fact' or 'instruction'")
+        return v
+
 
 
 # =============================================================================
@@ -8274,22 +9311,23 @@ def build_kb_context(results: list) -> tuple[str, int]:
 
 def build_system_prompt_english() -> str:
     return """You are responding in ENGLISH.
-Be concise and conversational — 1 to 2 short sentences maximum.
-Speak like a warm, professional hospital receptionist.
-When referring to doctors, always use "Dr." prefix and speak respectfully.
-Treat each question independently — do not carry assumptions from a previous topic into a new answer."""
+You are Arogya — a warm, cheerful hospital assistant who genuinely loves helping patients.
+Be friendly, positive and reassuring. Use a caring tone like a kind receptionist who is happy to help.
+Keep answers concise — 1 to 2 short sentences. Never sound robotic or cold.
+Always use "Dr." prefix for doctors and speak about them respectfully.
+If you can help, say so enthusiastically. If something is outside your knowledge, warmly suggest calling reception.
+Treat each question independently — do not carry assumptions from a previous topic."""
 
 
 def build_system_prompt_malayalam() -> str:
-    return """നിങ്ങൾ മലയാളത്തിൽ മാത്രം മറുപടി നൽകണം.
-
-നിങ്ങൾ ഒരു ആശുപത്രി receptionist ആണ് — നാട്ടുകാർ സ്വാഭാവികമായി സംസാരിക്കുന്നതുപോലെ ഉത്തരം നൽകൂ.
-ചുരുക്കമായി, ലളിതമായി — 1 മുതൽ 2 വാക്യം മാത്രം.
+    return """നിങ്ങൾ Arogya ആണ് — രോഗികളെ സഹായിക്കാൻ എപ്പോഴും സന്തോഷത്തോടെ തയ്യാറുള്ള ഒരു ആശുപത്രി സഹായി.
+സ്നേഹത്തോടെ, ഊഷ്മളമായി, ഉത്സാഹത്തോടെ മറുപടി നൽകൂ — അടുത്ത വീട്ടുകാരൻ സംസാരിക്കുന്നതുപോലെ.
+ചുരുക്കമായി — 1 മുതൽ 2 വാക്യം മാത്രം. സഹായിക്കാൻ കഴിഞ്ഞാൽ സന്തോഷത്തോടെ പറയൂ.
 
 നിയമങ്ങൾ:
 - "എല്ലാവിധ", "ഉറപ്പിക്കൂ", "ആദരണീയ" പോലുള്ള formal വാക്കുകൾ ഉപയോഗിക്കരുത്
 - ദിവസം കൃത്യമായി പറയുക: ഞായർ തിങ്കൾ ചൊവ്വ ബുധൻ വ്യാഴം വെള്ളി ശനി
-- ഡോക്ടർ: "ഡോക്ടർ [പേര്]", "അദ്ദേഹം"/"ഇദ്ദേഹം" — "അവൻ"/"അവൾ" പാടില്ല
+- ഡോക്ടർ: "ഡോക്ടർ [പേര്]" എന്ന് വിളിക്കുക. "അദ്ദേഹം" അല്ലെങ്കിൽ "ആ ഡോക്ടർ" എന്ന് ഉപയോഗിക്കുക. "അവൻ", "അവൾ", "ഇവൻ", "ഇവൾ" എന്നിവ ഒരിക്കലും ഉപയോഗിക്കരുത്.
 - Medical terms (Cardiology, General Medicine, etc.) ഇംഗ്ലീഷിൽ തന്നെ നിലനിർത്തുക
 - ഓരോ ചോദ്യവും സ്വതന്ത്രമായി ഉത്തരം നൽകുക — മുൻ topic carry forward ചെയ്യരുത്"""
 
@@ -8573,6 +9611,7 @@ async def ingest_knowledge(request: IngestRequest, db: Session = Depends(get_db)
         db.add(KnowledgeBase(
             hospital_id=request.hospital_id,
             content=request.text,
+            entry_type=request.entry_type,   # ← add this line
             embedding=resp.data[0].embedding,
             created_at=datetime.utcnow()
         ))
@@ -8584,7 +9623,7 @@ async def ingest_knowledge(request: IngestRequest, db: Session = Depends(get_db)
 
 
 @router.post("/upload-pdf")
-async def upload_pdf(file: UploadFile = File(...), hospital_id: int = Form(...), db: Session = Depends(get_db)):
+async def upload_pdf(file: UploadFile = File(...), hospital_id: int = Form(...), entry_type: str = Form("fact"),db: Session = Depends(get_db)):
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=422, detail="Only PDF files are accepted.")
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
@@ -8610,8 +9649,9 @@ async def upload_pdf(file: UploadFile = File(...), hospital_id: int = Form(...),
         raise HTTPException(status_code=500, detail=f"Embedding failed: {e}")
     try:
         for content, embedding in zip(chunks, embeddings):
-            db.add(KnowledgeBase(hospital_id=hospital_id, content=content, embedding=embedding, created_at=datetime.utcnow()))
-        db.commit()
+# ADD  entry_type=entry_type,  to the KnowledgeBase(...) call
+            db.add(KnowledgeBase(hospital_id=hospital_id, content=content, entry_type=entry_type, embedding=embedding, created_at=datetime.utcnow()))        
+            db.commit()
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
@@ -9276,6 +10316,66 @@ async def transcribe_audio(
     finally:
         if os.path.exists(temp_filename):
             os.remove(temp_filename)
+
+@router.get("/knowledge/{hospital_id}")
+async def list_knowledge(hospital_id: int, db: Session = Depends(get_db)):
+    entries = (
+        db.query(KnowledgeBase)
+        .filter(KnowledgeBase.hospital_id == hospital_id)
+        .order_by(KnowledgeBase.created_at.desc())
+        .all()
+    )
+    return [
+        {
+            "id": e.id,
+            "content": e.content,
+            "entry_type": getattr(e, "entry_type", "fact") or "fact",
+            "created_at": e.created_at.isoformat() if e.created_at else None,
+        }
+        for e in entries
+    ]
+
+
+class UpdateKnowledgeRequest(BaseModel):
+    content: str
+
+    @field_validator("content")
+    @classmethod
+    def content_not_empty(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("content cannot be empty")
+        return v
+
+
+@router.patch("/knowledge/entry/{entry_id}")
+async def update_knowledge_entry(entry_id: int, request: UpdateKnowledgeRequest, db: Session = Depends(get_db)):
+    entry = db.query(KnowledgeBase).filter(KnowledgeBase.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Knowledge entry not found")
+    try:
+        resp = client.embeddings.create(input=request.content, model="text-embedding-3-small")
+        entry.content = request.content
+        entry.embedding = resp.data[0].embedding
+        db.commit()
+        return {"status": "success", "message": "Entry updated"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/knowledge/entry/{entry_id}")
+async def delete_knowledge_entry(entry_id: int, db: Session = Depends(get_db)):
+    entry = db.query(KnowledgeBase).filter(KnowledgeBase.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Knowledge entry not found")
+    try:
+        db.delete(entry)
+        db.commit()
+        return {"status": "success", "message": "Entry deleted"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 </file>
 
 </files>

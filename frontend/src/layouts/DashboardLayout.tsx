@@ -22,7 +22,7 @@ export default function DashboardLayout() {
       <aside className="w-64 bg-white border-r border-gray-200 flex flex-col shadow-sm">
         <div className="p-6 border-b">
           <h2 className="text-xl font-bold text-blue-600 flex items-center gap-2">
-            <Building2 className="w-6 h-6" /> Corvus Labs
+            <Building2 className="w-6 h-6" /> Gothos Labs
           </h2>
         </div>
 

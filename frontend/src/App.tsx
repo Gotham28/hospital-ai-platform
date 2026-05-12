@@ -13,6 +13,8 @@ import { useAuth } from './context/AuthContext';
 import AppointmentsTab from './components/AppointmentsTab';
 import PharmacyPage from './pages/Pharmacy';
 import LabTestsPage from './pages/LabTests';
+import IrisPage from './pages/IrisPage'
+
 
 function HospitalList() {
   const [hospitals, setHospitals] = useState<any[]>([]);
@@ -109,6 +111,8 @@ export default function App() {
         path="/login"
         element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
       />
+      <Route path="/iris" element={<IrisPage />} />
+
 
       {/* Protected admin routes */}
       <Route element={isAuthenticated ? <DashboardLayout /> : <Navigate to="/login" replace />}>
