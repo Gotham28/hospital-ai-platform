@@ -104,14 +104,17 @@ export default function App() {
   return (
     <Routes>
       {/* Public patient-facing route */}
-      <Route path="/p/:hospitalSlug" element={<ThemeLoader />} />
+{/* Iris Hospital dedicated route - must be before /p/:hospitalSlug */}
+<Route path="/iris" element={<IrisPage />} />
 
-      {/* Auth route */}
-      <Route
-        path="/login"
-        element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
-      />
-      <Route path="/iris" element={<IrisPage />} />
+{/* Public patient-facing route */}
+<Route path="/p/:hospitalSlug" element={<ThemeLoader />} />
+
+{/* Auth route */}
+<Route
+  path="/login"
+  element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
+/>
 
 
       {/* Protected admin routes */}
