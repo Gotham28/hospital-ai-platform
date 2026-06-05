@@ -1,24 +1,15 @@
 /**
  * iris-hospitals/AnimatedIntro.tsx
- * ─────────────────────────────────────────────────────────────────
- * IRIS THEME — opening animation before the chat UI appears.
- *
- * Preserved exactly from the original animated-intro.tsx EXCEPT:
- *  1. Logo loaded from public path  →  /themes/iris-hospitals/logo.png
- *     (fixes the "Not allowed to load local resource: file://..." error)
- *  2. Demo conversation is in Malayalam (+ English fallback)
- *  3. Accepts hospitalName prop for dynamic branding
- *  4. Exported as default (matches ThemeLoader pattern)
- * ─────────────────────────────────────────────────────────────────
+ * Fixed: logo uses /logonewiris.png (already in public/) instead of
+ * the broken file:// path. Falls back gracefully if missing.
  */
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// ✅ Public path — no file:// errors
-const LOGO_URL = '/themes/iris-hospitals/logo.png';
+// ✅ logonewiris.png is already in frontend/public/ — just reference it directly
+const LOGO_URL = '/logonewiris.png';
 
-// Demo conversation shown during the intro animation
 const demoConversation = [
   { isUser: true,  message: 'ഡോ. സുരേന്ദ്രൻ ഇന്ന് ലഭ്യമാണോ?' },
   { isUser: false, message: 'അതെ! ഡോ. സുരേന്ദ്രൻ ഇന്ന് രാവിലെ 9 മുതൽ ഉച്ചവരെ ലഭ്യമാണ് 😊' },
@@ -35,8 +26,6 @@ interface AnimatedIntroProps {
   hospitalName?: string;
 }
 
-// ── Tiny inline components (previously imported from iris/chat-message etc) ──
-
 const DemoMsg: React.FC<{ msg: DemoMessage }> = ({ msg }) => (
   <motion.div
     initial={{ opacity: 0, y: 8 }}
@@ -48,9 +37,9 @@ const DemoMsg: React.FC<{ msg: DemoMessage }> = ({ msg }) => (
       style={{
         fontFamily: "'Noto Sans Malayalam', sans-serif",
         background: msg.isUser ? '#1E40AF' : 'white',
-        color:       msg.isUser ? 'white'   : '#1e293b',
+        color: msg.isUser ? 'white' : '#1e293b',
         borderTopRightRadius: msg.isUser ? '4px' : undefined,
-        borderTopLeftRadius:  !msg.isUser ? '4px' : undefined,
+        borderTopLeftRadius: !msg.isUser ? '4px' : undefined,
       }}
     >
       {msg.message}
@@ -69,29 +58,24 @@ const TypingDots: React.FC = () => (
         />
       ))}
     </div>
-    <style>{`
-      @keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-6px)} }
-    `}</style>
+    <style>{`@keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-6px)} }`}</style>
   </div>
 );
-
-// ── Main component ────────────────────────────────────────────────
 
 const AnimatedIntro: React.FC<AnimatedIntroProps> = ({ onComplete, hospitalName }) => {
   const [phase, setPhase] = useState<'logo' | 'text' | 'chat' | 'transition'>('logo');
   const [visibleMessages, setVisibleMessages] = useState<DemoMessage[]>([]);
   const [showTyping, setShowTyping] = useState(false);
   const [showCTA, setShowCTA] = useState(false);
+  const [logoError, setLogoError] = useState(false);
   const chatRef = useRef<HTMLDivElement>(null);
 
-  // Phase transitions
   useEffect(() => {
     const t1 = setTimeout(() => setPhase('text'), 1800);
     const t2 = setTimeout(() => setPhase('chat'), 3500);
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
-  // Chat demo sequence
   useEffect(() => {
     if (phase !== 'chat') return;
     let idx = 0;
@@ -120,12 +104,10 @@ const AnimatedIntro: React.FC<AnimatedIntroProps> = ({ onComplete, hospitalName 
     return () => clearTimeout(t);
   }, [phase]);
 
-  // Auto-scroll
   useEffect(() => {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
   }, [visibleMessages, showTyping]);
 
-  // Transition out
   useEffect(() => {
     if (phase === 'transition') setTimeout(onComplete, 1500);
   }, [phase, onComplete]);
@@ -137,10 +119,9 @@ const AnimatedIntro: React.FC<AnimatedIntroProps> = ({ onComplete, hospitalName 
       animate={phase === 'transition' ? { scale: 1.1, opacity: 0 } : { scale: 1, opacity: 1 }}
       transition={{ duration: 1, ease: 'easeInOut' }}
     >
-      {/* Malayalam font */}
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Malayalam:wght@400;600&display=swap');`}</style>
 
-      {/* ── Logo section ── */}
+      {/* Logo section */}
       <motion.div
         className="flex flex-col items-center"
         animate={
@@ -150,7 +131,6 @@ const AnimatedIntro: React.FC<AnimatedIntroProps> = ({ onComplete, hospitalName 
         }
         transition={{ duration: 0.8, type: 'spring', stiffness: 100 }}
       >
-        {/* Logo card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -170,26 +150,28 @@ const AnimatedIntro: React.FC<AnimatedIntroProps> = ({ onComplete, hospitalName 
             transition={{ duration: 1, delay: 0.3 }}
             className="bg-white rounded-xl p-6 shadow-[0_4px_40px_rgba(255,255,255,0.1)]"
           >
-            <img
-              src={LOGO_URL}
-              alt={hospitalName || 'IRIS Hospitals'}
-              width={300}
-              height={108}
-              className="object-contain"
-              onError={(e) => {
-                // Fallback text if logo file not yet placed
-                const el = e.currentTarget;
-                el.style.display = 'none';
-                const fallback = document.createElement('div');
-                fallback.textContent = 'IRIS';
-                fallback.style.cssText = 'font-size:2.5rem;font-weight:900;color:#1E40AF;letter-spacing:0.2em;padding:0.5rem 1.5rem';
-                el.parentNode?.appendChild(fallback);
-              }}
-            />
+            {logoError ? (
+              /* Styled fallback — shown only if image truly fails to load */
+              <div style={{
+                fontSize: '2.5rem', fontWeight: 900, color: '#1E40AF',
+                letterSpacing: '0.2em', padding: '0.5rem 1.5rem',
+                fontFamily: 'sans-serif'
+              }}>
+                IRIS
+              </div>
+            ) : (
+              <img
+                src={LOGO_URL}
+                alt={hospitalName || 'IRIS Hospitals'}
+                width={300}
+                height={108}
+                className="object-contain"
+                onError={() => setLogoError(true)}
+              />
+            )}
           </motion.div>
         </motion.div>
 
-        {/* Tagline */}
         <AnimatePresence>
           {(phase === 'text' || phase === 'chat' || phase === 'transition') && (
             <motion.div
@@ -210,7 +192,7 @@ const AnimatedIntro: React.FC<AnimatedIntroProps> = ({ onComplete, hospitalName 
         </AnimatePresence>
       </motion.div>
 
-      {/* ── Chat demo section ── */}
+      {/* Chat demo section */}
       <AnimatePresence>
         {(phase === 'chat' || phase === 'transition') && (
           <motion.div
@@ -220,22 +202,27 @@ const AnimatedIntro: React.FC<AnimatedIntroProps> = ({ onComplete, hospitalName 
             transition={{ duration: 0.8, type: 'spring', stiffness: 100 }}
             className="absolute bottom-0 left-0 right-0 h-[65vh] flex flex-col items-center px-4"
           >
-            {/* Phone frame */}
             <div className="relative w-full max-w-sm bg-[#0f172a] rounded-t-[2.5rem] border-4 border-gray-700 shadow-2xl overflow-hidden h-full">
-              {/* Notch */}
               <div className="absolute top-2 left-1/2 -translate-x-1/2 w-24 h-5 bg-black rounded-full z-10" />
 
-              {/* Chat header */}
               <div className="bg-[#1E40AF] px-4 py-4 pt-8 flex items-center gap-3">
-                <div className="bg-white rounded-lg p-1">
-                  <img src={LOGO_URL} alt="IRIS" width={80} height={28} className="object-contain"
-                    onError={e => { (e.currentTarget as HTMLImageElement).style.display='none'; }}
-                  />
-                </div>
+                {!logoError ? (
+                  <div className="bg-white rounded-lg p-1">
+                    <img
+                      src={LOGO_URL}
+                      alt="IRIS"
+                      width={80}
+                      height={28}
+                      className="object-contain"
+                      onError={() => setLogoError(true)}
+                    />
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-lg px-2 py-1 font-bold text-blue-800 text-sm">IRIS</div>
+                )}
                 <span className="text-white font-semibold">IRIS AI</span>
               </div>
 
-              {/* Messages */}
               <div
                 ref={chatRef}
                 className="bg-[#EFF6FF] h-[calc(100%-8rem)] overflow-y-auto p-4 space-y-3 scroll-smooth"
@@ -244,10 +231,11 @@ const AnimatedIntro: React.FC<AnimatedIntroProps> = ({ onComplete, hospitalName 
                 {showTyping && <TypingDots />}
               </div>
 
-              {/* Input bar placeholder */}
               <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 flex items-center gap-2">
-                <div className="flex-1 bg-gray-100 rounded-full px-4 py-2 text-sm text-gray-400"
-                  style={{ fontFamily: "'Noto Sans Malayalam', sans-serif" }}>
+                <div
+                  className="flex-1 bg-gray-100 rounded-full px-4 py-2 text-sm text-gray-400"
+                  style={{ fontFamily: "'Noto Sans Malayalam', sans-serif" }}
+                >
                   സന്ദേശം ടൈപ്പ് ചെയ്യുക...
                 </div>
                 <div className="w-10 h-10 bg-[#1E40AF] rounded-full flex items-center justify-center">
@@ -257,7 +245,6 @@ const AnimatedIntro: React.FC<AnimatedIntroProps> = ({ onComplete, hospitalName 
                 </div>
               </div>
 
-              {/* CTA overlay */}
               <AnimatePresence>
                 {showCTA && (
                   <motion.div
