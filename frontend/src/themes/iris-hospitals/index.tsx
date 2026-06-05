@@ -55,7 +55,7 @@ const IrisTheme: React.FC<IrisThemeProps> = ({ hospitalId, hospitalName }) => {
             hospitalName={hospitalName}
           />
         ) : (
-            <main key="chat" className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+<main key="chat" className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 pb-8">
               <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
 
                 {/* Left — hero copy: hidden on mobile, visible on desktop */}

@@ -76,7 +76,8 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
 
   return (
     <div
-      className="w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[650px] border"
+      className="w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[85vh] max-h-[650px] border"
+
       style={{ background: '#0f172a', borderColor: 'rgba(99,102,241,0.3)' }}
     >
       {/* Malayalam font import */}
