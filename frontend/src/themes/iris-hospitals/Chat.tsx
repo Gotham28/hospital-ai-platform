@@ -76,7 +76,7 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
 
   return (
     <div
-      className="w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[85vh] max-h-[650px] border"
+className="w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col border"
 
       style={{ background: '#0f172a', borderColor: 'rgba(99,102,241,0.3)' }}
     >
@@ -108,7 +108,8 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
       </div>
 
       {/* ── Messages ─────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 iris-scrollbar" style={{ background: '#0f172a' }}>
+      <div className="overflow-y-auto p-4 space-y-4 iris-scrollbar"
+style={{ height: '400px' }}>
         {messages.map((msg, idx) => (
           <ChatMessage
             key={idx}
