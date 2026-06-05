@@ -55,11 +55,11 @@ const IrisTheme: React.FC<IrisThemeProps> = ({ hospitalId, hospitalName }) => {
             hospitalName={hospitalName}
           />
         ) : (
-          <main key="chat" className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-            <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+            <main key="chat" className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+              <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
 
-              {/* Left — hero copy */}
-              <div className="space-y-5 order-2 lg:order-1">
+                {/* Left — hero copy: hidden on mobile, visible on desktop */}
+                <div className="space-y-5 hidden lg:block">
                 <div
                   className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium"
                   style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc' }}
@@ -89,9 +89,9 @@ const IrisTheme: React.FC<IrisThemeProps> = ({ hospitalId, hospitalName }) => {
               </div>
 
               {/* Right — Chat widget */}
-              <div className="flex flex-col items-center order-1 lg:order-2">
-                <Chat hospitalId={hospitalId?.toString() ?? ''} />
-              </div>
+    <div className="flex flex-col items-center lg:col-auto col-span-full">
+      <Chat hospitalId={hospitalId?.toString() ?? ''} />
+    </div>
             </div>
           </main>
         )}
