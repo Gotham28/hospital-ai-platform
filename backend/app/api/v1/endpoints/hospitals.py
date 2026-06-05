@@ -364,3 +364,52 @@ def reset_hospital_billing(hospital_id: int, db: Session = Depends(get_db)):
     db.query(UsageLedger).filter(UsageLedger.hospital_id == hospital_id).delete()
     db.commit()
     return {"status": "success", "message": "Billing cycle reset successfully"}
+
+"""
+ADD THIS ENDPOINT to backend/app/api/v1/endpoints/hospitals.py
+
+Place it in the "PARAMETERISED ROUTES" section, after the existing
+@router.delete("/{hospital_id}/billing/reset") endpoint.
+
+It hard-deletes a hospital and all its related data (doctors,
+knowledge base, appointments, users) using a single CASCADE-aware
+DELETE. Only a superadmin can call this.
+"""
+
+@router.delete("/{hospital_id}")
+def delete_hospital(
+    hospital_id: int,
+    db: Session = Depends(get_db),
+    _: str = Depends(require_superadmin),   # superadmin only
+):
+    """
+    Permanently delete a hospital and ALL its associated data:
+    doctors, knowledge base entries, appointments, and staff accounts.
+    
+    This is irreversible. The frontend must show a confirmation dialog.
+    """
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+
+    # Manually delete related data for tables that don't have
+    # cascade="all, delete-orphan" set on the Hospital model yet.
+    # (Doctors already have cascade, but the others may not.)
+    from app.models.appointment import Appointment
+    from app.models.knowledge import KnowledgeBase
+    from app.models.user import User
+    from app.models.usage import UsageLedger
+
+    db.query(Appointment).filter(Appointment.hospital_id == hospital_id).delete()
+    db.query(KnowledgeBase).filter(KnowledgeBase.hospital_id == hospital_id).delete()
+    db.query(UsageLedger).filter(UsageLedger.hospital_id == hospital_id).delete()
+    # Delete staff accounts linked to this hospital
+    db.query(User).filter(User.hospital_id == hospital_id).delete()
+    # Doctors are cascade-deleted via the Hospital relationship,
+    # but deleting explicitly here is safer for raw SQL DBs.
+    db.query(Doctor).filter(Doctor.hospital_id == hospital_id).delete()
+
+    db.delete(hospital)
+    db.commit()
+
+    return {"status": "success", "message": f"Hospital '{hospital.name}' deleted."}
