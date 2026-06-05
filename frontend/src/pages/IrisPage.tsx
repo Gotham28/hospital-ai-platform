@@ -1,18 +1,18 @@
-import { useState } from 'react'
-import { AnimatePresence } from 'framer-motion'
-import { AnimatedIntro } from '../components/iris/animated-intro'
-import { ChatBotUI } from '../components/iris/chat-bot-ui'
+/**
+ * IrisPage.tsx
+ * ─────────────────────────────────────────────────────────────────
+ * NOTE: With the new themes/iris-hospitals/ folder in place, the
+ * canonical IRIS URL is now:  /p/iris-hospitals
+ * (served by ThemeLoader, exactly like arogya and bkm)
+ *
+ * This page is kept as a redirect so any existing bookmarks to
+ * /iris continue to work.
+ * ─────────────────────────────────────────────────────────────────
+ */
+
+import { Navigate } from 'react-router-dom';
 
 export default function IrisPage() {
-  const [showIntro, setShowIntro] = useState(true)
-  return (
-    <main className="h-screen w-screen overflow-hidden">
-      <AnimatePresence mode="wait">
-        {showIntro
-          ? <AnimatedIntro key="intro" onComplete={() => setShowIntro(false)} />
-          : <ChatBotUI key="chat" />
-        }
-      </AnimatePresence>
-    </main>
-  )
+  // Redirect legacy /iris URL → canonical theme URL
+  return <Navigate to="/p/iris-hospitals" replace />;
 }
