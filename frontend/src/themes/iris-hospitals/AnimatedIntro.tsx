@@ -11,8 +11,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 const LOGO_URL = '/logonewiris.png';
 
 const demoConversation = [
-  { isUser: true,  message: 'ഡോ. സുരേന്ദ്രൻ ഇന്ന് ലഭ്യമാണോ?' },
-  { isUser: false, message: 'അതെ! ഡോ. സുരേന്ദ്രൻ ഇന്ന് രാവിലെ 9 മുതൽ ഉച്ചവരെ ലഭ്യമാണ് 😊' },
+  { isUser: true,  message: 'ഡോ. വിഷാദ് ഇന്ന് ലഭ്യമാണോ?' },
+  { isUser: false, message: 'അതെ! ഡോ. വിഷാദ് ഇന്ന് രാവിലെ 9 മുതൽ ഉച്ചവരെ ലഭ്യമാണ് 😊' },
   { isUser: true,  message: 'അപ്പോയിന്റ്മെന്റ് ബുക്ക് ചെയ്യാമോ?' },
   { isUser: false, message: 'തീർച്ചയായും! നിങ്ങളുടെ പേരും ഇഷ്ടപ്പെട്ട സമയവും പറഞ്ഞാൽ മതി 🗓️' },
   { isUser: true,  message: 'OPD സമയം എന്താണ്?' },
