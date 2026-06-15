@@ -225,7 +225,8 @@ export function ChatBotUI() {
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.5 }}
       // FIX: added w-full overflow-hidden to prevent any child from blowing out layout
-      className="h-screen w-full overflow-hidden flex flex-col bg-[#EFF6FF]"
+      className="h-screen w-full max-w-full overflow-x-hidden flex flex-col bg-[#EFF6FF]"
+
     >
       {/* Header */}
       <header className="bg-[#1E40AF] px-4 py-4 flex items-center justify-between shadow-lg relative flex-shrink-0">

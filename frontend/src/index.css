@@ -1,5 +1,8 @@
 @import "tailwindcss";
-
+html, body, #root {
+  max-width: 100%;
+  overflow-x: hidden;
+}
 /* Hides scrollbar on the suggestion chips row while keeping scroll functionality */
 .no-scrollbar {
   scrollbar-width: none;        /* Firefox */
