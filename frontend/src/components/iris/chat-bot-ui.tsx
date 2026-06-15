@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { ChatMessage } from "./chat-message"
 import { TypingIndicator } from "./typing-indicator"
 
-const LOGO_URL = "D:\Hospital\hospital-ai-platform\frontend\public\logonewiris.png"
+const LOGO_URL = "D:\\Hospital\\hospital-ai-platform\\frontend\\public\\logonewiris.png"
 
 // ── Change this to the actual Iris Hospital ID from your database ──
 const IRIS_HOSPITAL_ID = 2
@@ -224,30 +224,35 @@ export function ChatBotUI() {
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.5 }}
-      className="h-screen flex flex-col bg-[#EFF6FF]"
+      // FIX: added w-full overflow-hidden to prevent any child from blowing out layout
+      className="h-screen w-full overflow-hidden flex flex-col bg-[#EFF6FF]"
     >
       {/* Header */}
-      <header className="bg-[#1E40AF] px-4 py-4 flex items-center justify-between shadow-lg relative">
+      <header className="bg-[#1E40AF] px-4 py-4 flex items-center justify-between shadow-lg relative flex-shrink-0">
         <div
           className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#3B82F6] to-transparent opacity-50"
           style={{ boxShadow: "0 0 20px 5px rgba(59, 130, 246, 0.3)" }}
         />
-        <div className="flex items-center gap-3">
-          <div className="bg-white rounded-lg p-1.5">
+        {/* FIX: min-w-0 + overflow-hidden so the left side shrinks instead of pushing toggle off-screen */}
+        <div className="flex items-center gap-3 min-w-0 overflow-hidden">
+          <div className="bg-white rounded-lg p-1.5 flex-shrink-0">
             <img
               src={LOGO_URL}
               alt="IRIS"
-              style={{ width: 100, height: 36 }}
+              // FIX: reduced logo width from 100→80 so it fits better on narrow screens
+              style={{ width: 80, height: 32 }}
               className="object-contain"
             />
           </div>
-          <span className="text-white font-semibold text-lg">
+          {/* FIX: truncate so long titles don't overflow */}
+          <span className="text-white font-semibold text-lg truncate">
             {t.title}
           </span>
         </div>
+        {/* FIX: flex-shrink-0 ensures the language toggle is never clipped */}
         <button
           onClick={() => setLanguage(language === "en" ? "ml" : "en")}
-          className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-full text-sm font-medium transition-colors"
+          className="flex-shrink-0 bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-full text-sm font-medium transition-colors ml-2"
         >
           {language === "en" ? "മല" : "EN"}
         </button>
@@ -256,7 +261,8 @@ export function ChatBotUI() {
       {/* Chat area */}
       <div
         ref={chatContainerRef}
-        className="flex-1 overflow-y-auto p-4 space-y-4 relative"
+        // FIX: min-h-0 is required so flex-1 actually scrolls inside a flex column
+        className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4 relative"
       >
         {/* Watermark when empty */}
         {messages.length === 0 && (
@@ -284,8 +290,10 @@ export function ChatBotUI() {
 
       {/* Suggestion chips — only shown before any conversation */}
       {messages.length === 0 && (
-        <div className="px-4 pb-2">
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+        <div className="px-4 pb-2 flex-shrink-0">
+          {/* FIX: was "scrollbar-hide" which doesn't exist in Tailwind — changed to "no-scrollbar"
+              which IS defined in index.css */}
+          <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
             {t.suggestions.map((suggestion, i) => (
               <motion.button
                 key={i}
@@ -303,8 +311,9 @@ export function ChatBotUI() {
       )}
 
       {/* Input area */}
-      <div className="bg-white border-t border-gray-200 px-4 py-3 flex items-center gap-3">
-        <div className="flex-1 relative">
+      {/* FIX: flex-shrink-0 keeps the bar from being squeezed; gap-2 tightens spacing on small screens */}
+      <div className="bg-white border-t border-gray-200 px-3 py-3 flex items-center gap-2 flex-shrink-0">
+        <div className="flex-1 min-w-0">
           <input
             ref={inputRef}
             type="text"
@@ -313,14 +322,16 @@ export function ChatBotUI() {
             onKeyPress={handleKeyPress}
             placeholder={t.placeholder}
             disabled={isStreaming}
-            className="w-full bg-gray-100 rounded-full px-5 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#3B82F6] transition-shadow disabled:opacity-50"
+            // FIX: w-full ensures input fills available space without overflowing
+            className="w-full bg-gray-100 rounded-full px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#3B82F6] transition-shadow disabled:opacity-50"
           />
         </div>
 
         {/* Mic button */}
         <motion.button
           onClick={toggleMic}
-          className={`relative w-12 h-12 rounded-full flex items-center justify-center transition-colors ${
+          // FIX: flex-shrink-0 so buttons don't shrink when input is long
+          className={`relative flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center transition-colors ${
             isMicActive ? "bg-red-500" : "bg-[#1E40AF]"
           }`}
           animate={isMicActive ? { scale: [1, 1.1, 1] } : {}}
@@ -328,7 +339,7 @@ export function ChatBotUI() {
         >
           {isMicActive && (
             <motion.div
-              className="absolute w-12 h-12 rounded-full border-2 border-red-400"
+              className="absolute w-11 h-11 rounded-full border-2 border-red-400"
               animate={{ scale: [1, 1.5], opacity: [0.8, 0] }}
               transition={{ repeat: Infinity, duration: 1 }}
             />
@@ -345,7 +356,8 @@ export function ChatBotUI() {
           onClick={() => handleSend()}
           whileTap={{ scale: 0.95 }}
           disabled={!inputValue.trim() || isStreaming}
-          className="w-12 h-12 bg-[#1E40AF] rounded-full flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#1E3A8A] transition-colors"
+          // FIX: flex-shrink-0 so send button is never clipped
+          className="flex-shrink-0 w-11 h-11 bg-[#1E40AF] rounded-full flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#1E3A8A] transition-colors"
         >
           <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
