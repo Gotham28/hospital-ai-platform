@@ -60,7 +60,172 @@ VALID_LANGUAGES          = {"en", "ml"}
 # =============================================================================
 # GOOGLE TRANSLATE BRIDGE  (kept only for fallback / STT post-processing)
 # =============================================================================
-
+PATIENT_CTX_TTL = 600   # matches BOOKING_SESSION_TTL; both keys expire together
+ 
+ 
+def _patient_ctx_key(hospital_id: int, session_token: str) -> str:
+    """Redis key for patient personalisation (separate from booking state)."""
+    return f"patient_ctx:{hospital_id}:{session_token}"
+ 
+ 
+def _load_patient_ctx(hospital_id: int, session_token: str) -> dict:
+    """
+    Return the current patient context dict, or {} if none exists yet.
+ 
+    Schema
+    ------
+    {
+      "doctor_id":   int | None,
+      "doctor_name": str | None,
+      "department":  str | None,      # canonical department string
+      "language":    "en" | "ml",
+      "seen_topics": list[str]        # e.g. ["pharmacy", "appointment"]
+    }
+    """
+    try:
+        raw = _redis.get(_patient_ctx_key(hospital_id, session_token))
+        if raw:
+            return json.loads(raw)
+    except Exception as exc:
+        logger.warning("[PatientCtx] load failed: %s", exc)
+    return {}
+ 
+ 
+def _save_patient_ctx(hospital_id: int, session_token: str, ctx: dict) -> None:
+    """Write (or refresh TTL of) the patient context in Redis."""
+    try:
+        _redis.setex(
+            _patient_ctx_key(hospital_id, session_token),
+            PATIENT_CTX_TTL,
+            json.dumps(ctx),
+        )
+    except Exception as exc:
+        logger.warning("[PatientCtx] save failed: %s", exc)
+ 
+ 
+def _update_patient_ctx(
+    hospital_id: int,
+    session_token: str,
+    *,
+    language: str,
+    question_en: str,
+    history: list,
+    db,
+) -> dict:
+    """
+    Deterministically update patient context from the current turn.
+    No LLM call — purely regex/keyword matching, so it adds < 1 ms.
+ 
+    Call this ONCE per request, outside event_generator(), so the context
+    is already updated before streaming begins.
+ 
+    Returns the updated context dict.
+    """
+    ctx = _load_patient_ctx(hospital_id, session_token)
+ 
+    # ── 1. Language preference ────────────────────────────────────────────
+    ctx["language"] = language   # always authoritative from the live request
+ 
+    # ── 2. Doctor / department from the most recent assistant turn ────────
+    # The doctor context lines we already inject look like:
+    #   "- [ID: 7] Dr. Priya (Cardiology): Available today from ..."
+    # Pick up the ID and hydrate name + department from the DB.
+    if history:
+        for msg in reversed(history):
+            if msg.role == "assistant":
+                id_match = re.search(r"\[ID:\s*(\d+)\]", msg.content)
+                if id_match:
+                    doctor_id = int(id_match.group(1))
+                    if ctx.get("doctor_id") != doctor_id:
+                        try:
+                            doc = (
+                                db.query(Doctor)
+                                .filter(
+                                    Doctor.id == doctor_id,
+                                    Doctor.hospital_id == hospital_id,  # tenant-scoped
+                                )
+                                .first()
+                            )
+                            if doc:
+                                ctx["doctor_id"]   = doc.id
+                                ctx["doctor_name"] = doc.name
+                                ctx["department"]  = doc.department
+                        except Exception as exc:
+                            logger.warning("[PatientCtx] doctor lookup failed: %s", exc)
+                break   # only look at the single most-recent assistant message
+ 
+    # ── 3. Department from the user question (fallback) ───────────────────
+    # Uses the existing _DEPT_SYNONYMS dict — no extra work needed.
+    if not ctx.get("department"):
+        q_lower = question_en.lower()
+        for canonical, variants in _DEPT_SYNONYMS.items():
+            if canonical in q_lower or any(v in q_lower for v in variants):
+                ctx["department"] = canonical
+                break
+ 
+    # ── 4. Seen-topics accumulation ───────────────────────────────────────
+    seen = set(ctx.get("seen_topics", []))
+    topic_keywords: dict[str, list[str]] = {
+        "pharmacy":     ["medicine", "pharmacy", "drug", "tablet", "pill"],
+        "lab_tests":    ["lab", "test", "blood", "scan", "diagnostic", "x-ray"],
+        "appointment":  ["book", "appointment", "schedule", "reserve"],
+        "availability": ["available", "availability", "timing", "when", "today"],
+    }
+    for topic, keywords in topic_keywords.items():
+        if any(kw in question_en.lower() for kw in keywords):
+            seen.add(topic)
+    ctx["seen_topics"] = list(seen)
+ 
+    _save_patient_ctx(hospital_id, session_token, ctx)
+    return ctx
+ 
+ 
+def _build_patient_ctx_block(ctx: dict) -> str:
+    """
+    Render the patient context as a concise system-prompt block.
+    Returns "" when ctx is empty (clean no-op for new sessions).
+    """
+    if not ctx:
+        return ""
+ 
+    lines = ["PATIENT CONTEXT THIS SESSION:"]
+ 
+    if ctx.get("doctor_name"):
+        dept_str = f" ({ctx['department']})" if ctx.get("department") else ""
+        lines.append(
+            f"  • The patient has already discussed Dr. {ctx['doctor_name']}"
+            f"{dept_str} [ID: {ctx['doctor_id']}] — reference this doctor"
+            f" without re-introducing them."
+        )
+    elif ctx.get("department"):
+        lines.append(
+            f"  • The patient is interested in the {ctx['department'].title()} department."
+        )
+ 
+    lang_label = {"ml": "Malayalam", "en": "English"}.get(
+        ctx.get("language", "en"), "English"
+    )
+    lines.append(f"  • Preferred language this session: {lang_label}.")
+ 
+    seen = ctx.get("seen_topics", [])
+    if seen:
+        readable_map = {
+            "pharmacy":     "pharmacy / medicines",
+            "lab_tests":    "lab tests",
+            "appointment":  "appointment booking",
+            "availability": "doctor availability",
+        }
+        readable = [readable_map.get(t, t) for t in seen]
+        lines.append(
+            f"  • Topics already covered this session: {', '.join(readable)}."
+        )
+        lines.append(
+            "    Do not repeat the same basic information; instead build on it."
+        )
+ 
+    lines.append("")   # trailing newline so the block is visually separated
+    return "\n".join(lines)
+ 
 _GTRANSLATE_URL = "https://translate.googleapis.com/translate_a/single"
 
 
@@ -467,22 +632,32 @@ that specific detail and suggest calling reception. Never refuse to answer about
 departments, or services that appear in your context above."""
 
 
-def build_context(request: ChatRequest, db: Session, force_english: bool = False):
+def build_context(
+    request: "ChatRequest",
+    db: "Session",
+    force_english: bool = False,
+    session_token: str = "default",   # ← NEW: carries the session's Redis key
+):
     hospital_id = request.hospital_id
-    question = request.question
+    question    = request.question
     prompt_date_str = datetime.now().strftime("%A, %B %d, %Y")
-
+ 
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
     if not hospital:
         raise HTTPException(status_code=404, detail="Hospital not found")
-
+ 
+    # Defence-in-depth: assert tenant isolation before building any context.
+    assert hospital.id == hospital_id, (
+        f"Cross-tenant leak: requested {hospital_id}, got {hospital.id}"
+    )
+ 
     all_medicines = db.query(Medicine).filter(Medicine.hospital_id == hospital_id).all()
-    all_tests = db.query(LabTest).filter(LabTest.hospital_id == hospital_id).all()
-
+    all_tests     = db.query(LabTest).filter(LabTest.hospital_id == hospital_id).all()
+ 
     doctor_context, doctors_included = build_doctor_context(question, hospital_id, db)
-    pharmacy_context = build_pharmacy_context(question, all_medicines)
+    pharmacy_context  = build_pharmacy_context(question, all_medicines)
     lab_tests_context = build_lab_tests_context(question, all_tests)
-
+ 
     embed_resp = client.embeddings.create(input=question, model="text-embedding-3-small")
     raw_results = (
         db.query(KnowledgeBase)
@@ -491,16 +666,21 @@ def build_context(request: ChatRequest, db: Session, force_english: bool = False
         .limit(3).all()
     )
     kb_context, chunks_included = build_kb_context(raw_results)
-
-    lang_instruction = build_system_prompt_malayalam() if (request.language == "ml" and not force_english) else build_system_prompt_english()
-
+ 
+    lang_instruction = (
+        build_system_prompt_malayalam()
+        if (request.language == "ml" and not force_english)
+        else build_system_prompt_english()
+    )
+ 
     fallback_instruction = build_fallback_instruction(
         doctors_found=doctors_included,
         kb_chunks=chunks_included,
         has_pharmacy=len(all_medicines) > 0,
-        has_labs=len(all_tests) > 0
+        has_labs=len(all_tests) > 0,
     )
-    # If a doctor is already selected mid-booking, pin their full details at the top
+ 
+    # ── Pinned doctor (mid-booking, existing logic unchanged) ─────────────
     pinned_doctor_context = ""
     if request.history:
         for msg in reversed(request.history):
@@ -509,16 +689,24 @@ def build_context(request: ChatRequest, db: Session, force_english: bool = False
                 pin_id = int(id_match.group(1))
                 pinned = db.query(Doctor).filter(
                     Doctor.id == pin_id,
-                    Doctor.hospital_id == hospital_id
+                    Doctor.hospital_id == hospital_id,   # always tenant-scoped
                 ).first()
                 if pinned:
                     status = check_doctor_availability_db(pinned, db, datetime.now())
                     pinned_doctor_context = (
                         f"SELECTED DOCTOR (already confirmed by patient):\n"
-                        f"- [ID: {pinned.id}] Dr. {pinned.name} ({pinned.department}): {status}\n"
+                        f"- [ID: {pinned.id}] Dr. {pinned.name} "
+                        f"({pinned.department}): {status}\n"
                     )
                 break
-
+ 
+    # ── NEW: Patient personalisation block ────────────────────────────────
+    patient_ctx       = _load_patient_ctx(hospital_id, session_token)
+    patient_ctx_block = _build_patient_ctx_block(patient_ctx)
+ 
+    # NOTE: hospital.system_prompt is already injected via `hospital.system_prompt or ""`
+    # below (Item 4 check — confirmed it is being used).
+ 
     parts = [
         f"You are Arogya, the AI Assistant for {hospital.name}.",
         f"Current Date: {prompt_date_str}",
@@ -526,29 +714,30 @@ def build_context(request: ChatRequest, db: Session, force_english: bool = False
         hospital.system_prompt or "",
         "",
         lang_instruction,
-        "",pinned_doctor_context,
+        "",
+        patient_ctx_block,          # ← NEW: injected here, before doctor context
+        pinned_doctor_context,
         doctor_context,
     ]
     if pharmacy_context:
         parts.extend(["", pharmacy_context])
-
     if lab_tests_context:
         parts.extend(["", lab_tests_context])
-
     if kb_context:
         parts.extend(["", "ADDITIONAL KNOWLEDGE BASE:", kb_context])
-
     parts.extend(["", fallback_instruction])
-
+ 
     system_prompt = "\n".join(parts)
-
+ 
     prompt_chars = len(system_prompt)
     if prompt_chars > SYSTEM_PROMPT_WARN_CHARS:
         logger.warning(
-            "System prompt over soft limit hospital_id=%s: %d chars (~%d tokens) doctors=%d kb=%d",
-            hospital_id, prompt_chars, prompt_chars // 4, doctors_included, chunks_included,
+            "System prompt over soft limit hospital_id=%s: %d chars (~%d tokens) "
+            "doctors=%d kb=%d",
+            hospital_id, prompt_chars, prompt_chars // 4,
+            doctors_included, chunks_included,
         )
-
+ 
     history_messages = build_history_messages(request.history or [])
     openai_messages = (
         [{"role": "system", "content": system_prompt}]
@@ -556,7 +745,6 @@ def build_context(request: ChatRequest, db: Session, force_english: bool = False
         + [{"role": "user", "content": question}]
     )
     return system_prompt, openai_messages, hospital
-
 
 # =============================================================================
 # HISTORY
@@ -934,6 +1122,17 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
         logger.info("[Translation] ml->en: %r -> %r", request.question[:60], english_question[:60])
 
     intent = await classify_user_intent(english_question, request.history or [])
+    _PATIENT_CTX_CALL = """
+    # Update patient context from this turn (deterministic, < 1 ms)
+    _update_patient_ctx(
+        request.hospital_id,
+        request.session_token,
+        language=request.language,
+        question_en=english_question,
+        history=request.history or [],
+        db=db,
+    )
+"""
     logger.info("[Intent] %s -> %s", english_question[:60], intent)
 
     async def event_generator() -> AsyncGenerator[str, None]:
@@ -1029,7 +1228,7 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
             "language": request.language,
         })
         system_prompt, openai_messages, hospital = build_context(
-            translated_request, db, force_english=False
+            translated_request, db, force_english=False, session_token=request.session_token
         )
 
         # For Malayalam, replace the final user message with a bilingual hint so
