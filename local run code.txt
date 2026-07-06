@@ -1,0 +1,8 @@
+git add .
+git commit -m "fix: remove duplicate table creations from alembic migration"
+git push origin main
+
+
+cd "D:\Hospital\hospital-ai-platform"
+
+npx repomix

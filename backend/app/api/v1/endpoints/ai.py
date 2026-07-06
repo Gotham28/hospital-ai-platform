@@ -5,6 +5,7 @@ import fitz
 import logging
 import unicodedata
 import httpx
+import time              # ← ADD
 import uuid
 from typing import List, Optional, AsyncGenerator
 from datetime import datetime, timezone, timedelta
@@ -124,9 +125,14 @@ def _update_patient_ctx(
     Returns the updated context dict.
     """
     ctx = _load_patient_ctx(hospital_id, session_token)
- 
+
+    # ── 0. Session timing / turn count (for task-completion metric) ───────
+    if "session_started_at" not in ctx:
+        ctx["session_started_at"] = time.time()
+    ctx["turn_count"] = ctx.get("turn_count", 0) + 1
+
     # ── 1. Language preference ────────────────────────────────────────────
-    ctx["language"] = language   # always authoritative from the live request
+    ctx["language"] = language   # always authoritative from the live request  # always authoritative from the live request
  
     # ── 2. Doctor / department from the most recent assistant turn ────────
     # The doctor context lines we already inject look like:
@@ -228,6 +234,24 @@ def _build_patient_ctx_block(ctx: dict) -> str:
     lines.append("")   # trailing newline so the block is visually separated
     return "\n".join(lines)
  
+def _log_task_completion(hospital_id: int, session_token: str, ctx: dict, outcome: str) -> None:
+    """
+    Log the task-completion metric for this session: turns and elapsed time
+    from first message to a terminal outcome (booking success so far;
+    'abandoned' can be logged the same way later if we add session-expiry
+    hooks). One structured log line per completed session — grep on
+    "[TaskCompletion]" to pull these for analysis, or ship them to whatever
+    log aggregation you already have. Deliberately not a new DB table yet;
+    the plan only asks that this be logged, not eyeballed.
+    """
+    started_at = ctx.get("session_started_at")
+    turns = ctx.get("turn_count", 0)
+    elapsed_seconds = round(time.time() - started_at, 1) if started_at else None
+    logger.info(
+        "[TaskCompletion] hospital_id=%s session=%s outcome=%s turns=%s elapsed_seconds=%s",
+        hospital_id, session_token, outcome, turns, elapsed_seconds,
+    )
+
 _GTRANSLATE_URL = "https://translate.googleapis.com/translate_a/single"
 
 
@@ -1132,8 +1156,11 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
         logger.info("[Translation] ml->en: %r -> %r", request.question[:60], english_question[:60])
 
     intent = await classify_user_intent(english_question, request.history or [])
-    _PATIENT_CTX_CALL = """
-    # Update patient context from this turn (deterministic, < 1 ms)
+
+    # Update patient context from this turn (deterministic, < 1 ms).
+    # NOTE: this was previously a dead string literal (_PATIENT_CTX_CALL) that
+    # was never executed, so patient context was never updated on the
+    # streaming path — only read. Fixed as part of §1.1.
     _update_patient_ctx(
         request.hospital_id,
         request.session_token,
@@ -1142,7 +1169,7 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
         history=request.history or [],
         db=db,
     )
-"""
+
     logger.info("[Intent] %s -> %s", english_question[:60], intent)
 
     async def event_generator() -> AsyncGenerator[str, None]:
@@ -1503,6 +1530,12 @@ IMPORTANT:
                 db.add(appt)
                 db.commit()
                 db.refresh(appt)
+                _log_task_completion(
+                    request.hospital_id,
+                    request.session_token,
+                    _load_patient_ctx(request.hospital_id, request.session_token),
+                    outcome="booking_success",
+                )
 
                 config = get_booking_config(hospital)
                 staff_email = config.get("notification_email", "")
