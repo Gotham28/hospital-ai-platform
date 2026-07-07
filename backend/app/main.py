@@ -1,3 +1,4 @@
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.base import Base
@@ -22,6 +23,11 @@ ALLOWED_ORIGINS = [
         "https://hospital-ai-platform.vercel.app,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
     ).split(",") if o.strip()
 ]
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+
 
 app.add_middleware(
     CORSMiddleware,
