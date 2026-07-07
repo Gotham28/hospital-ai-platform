@@ -736,6 +736,22 @@ def build_context(
     parts = [
         f"You are Arogya, the AI Assistant for {hospital.name}.",
         f"Current Date: {prompt_date_str}",
+        (
+            "DATE RESOLUTION RULES (follow these exactly, every time):\n"
+            f"- Treat \"{prompt_date_str}\" as ground truth for today. Ignore any other "
+            "notion of the current date or year.\n"
+            "- If the patient gives a date with NO year (e.g. \"July 10\", \"next Monday\", "
+            "\"the 15th\"), resolve it to the NEAREST occurrence of that date on or after "
+            "today's date above — this almost always means the current year, or next year "
+            "only if that month/day has already occurred this year.\n"
+            "- NEVER assume a year from your own training data (e.g. 2023, 2024, 2025) when "
+            "the patient doesn't state one. Only use a year the patient explicitly typed.\n"
+            "- Only tell a patient a date \"has already passed\" if it is chronologically "
+            "before the Current Date stated above — double check the year you inferred "
+            "before saying this.\n"
+            "- When calling book_appointment, preferred_date must be YYYY-MM-DD using the "
+            "year resolved by these rules."
+        ),
         "",
         hospital.system_prompt or "",
         "",
