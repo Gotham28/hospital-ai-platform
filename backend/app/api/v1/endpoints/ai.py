@@ -1052,7 +1052,11 @@ async def normalise_booking_input(
     current_field: str,
     conversation_context: str = ""
 ) -> dict:
+    today_str = datetime.now().strftime("%A, %B %d, %Y")
     system_prompt = f"""You are a data extraction assistant for a hospital booking system.
+
+Today's date is {today_str}. Use this as ground truth for any date reasoning below —
+never assume a year from your own training data.
 
 The assistant is currently collecting: {current_field}
 Recent conversation:
@@ -1063,13 +1067,18 @@ The user just said: "{raw_message}"
 Your job is to interpret what the user means and return a JSON object with these fields:
 - "intent": one of "provide" (giving the requested info), "correct" (wants to change something already given), "cancel" (wants to stop entirely), "unclear" (genuinely ambiguous)
 - "field_to_correct": if intent is "correct", which field they want to change. One of: phone, name, age, date, time, doctor. Otherwise null.
-- "normalised_value": if intent is "provide", the cleaned value ready to use. For phone numbers, return only digits. For names, return only the name part (strip "and she is X years old" etc). For age, return only the number. Otherwise null.
+- "normalised_value": if intent is "provide", the cleaned value ready to use. For phone numbers, return only digits. For names, return only the name part (strip "and she is X years old" etc). For age, return only the number. For dates, return YYYY-MM-DD (see date rules below). Otherwise null.
 - "reason": brief note if intent is "unclear" or "correct"
 
 CRITICAL RULES for normalisation:
 - Phone numbers: Convert spoken/spaced digits to a single string of digits. "94 67 48 74 48" → "9467487448". Remove all spaces, dashes, brackets.
 - Names: Extract only the person's name. "Reetha and she is 50 years old" → "Reetha". "My name is John" → "John".
 - Ages: Extract only the number. "I am 45 years old" → "45". "forty five" → "45".
+- Dates: If the user gives a date with NO year (e.g. "July 8", "8 july", "next Monday"), resolve
+  it to the NEAREST occurrence of that date on or after Today's date above (current year, or
+  next year only if that month/day has already occurred this year). NEVER assume a year from
+  your own training data. Return the result as YYYY-MM-DD. Only treat a date as being in the
+  past if it is chronologically before Today's date above once the year has been correctly resolved.
 - Corrections: "no my number is wrong" → intent=correct, field_to_correct=phone.
 - True cancellations: "I don't want to book anymore" → intent=cancel.
 - "no" alone during confirmation step: treat as intent=correct (patient wants to change something), NOT cancel.
@@ -1307,10 +1316,21 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
                 (m.content.lower() for m in reversed(request.history) if m.role == "assistant"),
                 ""
             )
-            for field, keywords in booking_field_keywords.items():
-                if any(kw in last_assistant for kw in keywords):
-                    current_field = field
-                    break
+            matched_fields = [
+                field for field, keywords in booking_field_keywords.items()
+                if any(kw in last_assistant for kw in keywords)
+            ]
+            # A genuine single-field question ("What's the patient's phone
+            # number?") matches exactly one category. A confirmation summary
+            # ("Name: X, Age: Y, Phone: Z... is this correct?") legitimately
+            # mentions several fields at once and was being misread as "still
+            # collecting phone" (first match in dict order) — which hijacked
+            # the user's confirmation reply ("yes correct") into the
+            # single-field normaliser instead of letting the main model
+            # handle it as a booking confirmation. Only treat this as an
+            # active single-field question when exactly one category matched.
+            if len(matched_fields) == 1:
+                current_field = matched_fields[0]
 
         processed_question = context_question
         if current_field and intent == "BOOKING":

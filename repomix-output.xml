@@ -486,6 +486,62 @@ def downgrade() -> None:
     # ### end Alembic commands ###
 </file>
 
+<file path="backend/alembic/versions/a1b2c3d4e5f6_add_appointments.py">
+"""add appointments table and booking_config
+
+Revision ID: a1b2c3d4e5f6
+Revises: 8e2627e5f8b9
+Create Date: 2026-04-12
+"""
+from alembic import op
+import sqlalchemy as sa
+
+revision = 'a1b2c3d4e5f6'
+down_revision = '8e2627e5f8b9'
+branch_labels = None
+depends_on = None
+
+
+def upgrade() -> None:
+    # 1. Add booking_config JSON column to hospital table
+    op.add_column(
+        'hospital',
+        sa.Column('booking_config', sa.Text(), nullable=True)
+    )
+
+    # 2. Create appointments table
+    op.create_table(
+        'appointments',
+        sa.Column('id',               sa.Integer(),  primary_key=True, index=True),
+        sa.Column('reference_number', sa.String(),   nullable=False, unique=True),
+        sa.Column('hospital_id',      sa.Integer(),  sa.ForeignKey('hospital.id'), nullable=False),
+        sa.Column('doctor_id',        sa.Integer(),  sa.ForeignKey('doctors.id'),  nullable=False),
+        sa.Column('patient_name',     sa.String(),   nullable=False),
+        sa.Column('patient_age',      sa.String(),   nullable=False),
+        sa.Column('patient_phone',    sa.String(),   nullable=False),
+        sa.Column('preferred_date',   sa.String(),   nullable=False),
+        sa.Column('time_of_day',      sa.String(),   nullable=False),
+        sa.Column('confirmed_time',   sa.String(),   nullable=True),
+        sa.Column('status',           sa.String(),   nullable=False, server_default='pending'),
+        sa.Column('rejection_reason', sa.String(),   nullable=True),
+        sa.Column('created_at',       sa.DateTime(), nullable=True),
+        sa.Column('updated_at',       sa.DateTime(), nullable=True),
+    )
+
+    # 3. Indexes for fast lookups
+    op.create_index('ix_appointments_hospital_id', 'appointments', ['hospital_id'])
+    op.create_index('ix_appointments_status',      'appointments', ['status'])
+    op.create_index('ix_appointments_doctor_date', 'appointments', ['doctor_id', 'preferred_date'])
+
+
+def downgrade() -> None:
+    op.drop_index('ix_appointments_doctor_date', table_name='appointments')
+    op.drop_index('ix_appointments_status',      table_name='appointments')
+    op.drop_index('ix_appointments_hospital_id', table_name='appointments')
+    op.drop_table('appointments')
+    op.drop_column('hospital', 'booking_config')
+</file>
+
 <file path="backend/app/api/__init__.py">
 
 </file>
@@ -590,6 +646,71 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 </file>
 
+<file path="backend/app/models/appointment.py">
+import uuid
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text, UniqueConstraint
+from sqlalchemy.orm import relationship
+from datetime import datetime, timezone
+from app.db.base_class import Base
+
+
+def _generate_ref():
+    return "APT-" + uuid.uuid4().hex[:6].upper()
+
+
+class Appointment(Base):
+    __tablename__ = "appointments"
+
+    id               = Column(Integer, primary_key=True, index=True)
+    reference_number = Column(String, unique=True, default=_generate_ref, nullable=False)
+    hospital_id      = Column(Integer, ForeignKey("hospital.id"), nullable=False, index=True)
+    doctor_id        = Column(Integer, ForeignKey("doctors.id"), nullable=False, index=True)
+    patient_name     = Column(String, nullable=False)
+    patient_age      = Column(String, nullable=False)   # stored as string ("32" or "32 years")
+    patient_phone    = Column(String, nullable=False)
+    preferred_date   = Column(String, nullable=False)   # "2026-04-15"
+    time_of_day      = Column(String, nullable=False)   # "morning" | "afternoon" | "evening"
+
+    # Staff fills these in when approving
+    confirmed_time   = Column(String, nullable=True)    # "10:30 AM"
+
+    # pending | approved | rejected
+    status           = Column(String, default="pending", nullable=False, index=True)
+    rejection_reason = Column(String, nullable=True)
+
+    created_at       = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at       = Column(DateTime, default=lambda: datetime.now(timezone.utc),
+                              onupdate=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    hospital = relationship("Hospital")
+    doctor   = relationship("Doctor")
+</file>
+
+<file path="backend/app/models/hospital.py">
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+from app.db.base_class import Base
+
+class Hospital(Base):
+    __tablename__ = "hospital"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, index=True)
+    slug = Column(String, unique=True, index=True, nullable=False) # e.g., "apollo-delhi" for URLs
+    address = Column(String, nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    system_prompt = Column(Text, default="You are Arogya, a helpful assistant for a specialty hospital.")
+    # Add this column to your existing Hospital class
+    google_sheet_id = Column(String, nullable=True)
+    booking_config = Column(Text, nullable=True)  # JSON string
+    # Relationship: One Hospital has many Users
+    users = relationship("User", back_populates="hospital")
+    # Inside your Hospital class in app/models/hospital.py
+    doctors = relationship("Doctor", back_populates="hospital", cascade="all, delete-orphan")
+</file>
+
 <file path="backend/app/models/usage.py">
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
 from datetime import datetime, timezone
@@ -665,6 +786,431 @@ class User(UserBase):
         from_attributes = True
 </file>
 
+<file path="backend/app/services/booking_rules.py">
+"""
+app/services/booking_rules.py
+
+Validates a booking request against per-hospital configuration stored
+in hospital.booking_config (JSON column).
+
+Default config (used when booking_config is None or missing a key):
+{
+    "bookable_departments": [],        # empty = all departments allowed
+    "min_advance_hours": 2,
+    "max_per_doctor_per_day": 20,
+    "notification_email": "",
+    "reminder_hours_before": 24
+}
+"""
+
+import json
+import logging
+from datetime import datetime, timezone, timedelta
+from typing import Optional
+
+from sqlalchemy.orm import Session
+from app.models.appointment import Appointment
+from app.models.doctor import Doctor
+from app.models.hospital import Hospital
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_CONFIG = {
+    "bookable_departments": [],
+    "min_advance_hours": 2,
+    "max_per_doctor_per_day": 20,
+    "notification_email": "",
+    "reminder_hours_before": 24,
+}
+
+
+def get_booking_config(hospital: Hospital) -> dict:
+    raw = getattr(hospital, "booking_config", None)
+    if not raw:
+        return DEFAULT_CONFIG.copy()
+    try:
+        cfg = json.loads(raw) if isinstance(raw, str) else raw
+        return {**DEFAULT_CONFIG, **cfg}
+    except Exception:
+        return DEFAULT_CONFIG.copy()
+
+
+def validate_booking(
+    hospital: Hospital,
+    doctor: Doctor,
+    preferred_date: str,   # "YYYY-MM-DD"
+    db: Session,
+) -> tuple[bool, Optional[str]]:
+    """
+    Returns (ok, error_message).
+    ok=True means the booking can proceed.
+    """
+    config = get_booking_config(hospital)
+
+    # 1. Check department is bookable
+    allowed_depts = config.get("bookable_departments", [])
+    if allowed_depts:
+        dept = (doctor.department or "").lower()
+        if not any(dept == a.lower() for a in allowed_depts):
+            return False, (
+                f"Online booking is not available for {doctor.department}. "
+                "Please call the reception desk."
+            )
+
+    # 2. Check minimum advance notice
+    min_hours = config.get("min_advance_hours", 2)
+    try:
+        appt_date = datetime.strptime(preferred_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+        if (appt_date - now) < timedelta(hours=min_hours):
+            return False, (
+                f"Appointments must be booked at least {min_hours} hours in advance. "
+                "Please choose a later date."
+            )
+    except ValueError:
+        return False, "Invalid date format. Please use YYYY-MM-DD."
+
+    # 3. Check doctor daily slot limit
+    max_per_day = config.get("max_per_doctor_per_day", 20)
+    existing_count = (
+        db.query(Appointment)
+        .filter(
+            Appointment.doctor_id == doctor.id,
+            Appointment.preferred_date == preferred_date,
+            Appointment.status != "rejected",
+        )
+        .count()
+    )
+    if existing_count >= max_per_day:
+        return False, (
+            f"Dr. {doctor.name} has no more slots available on {preferred_date}. "
+            "Please choose another date or doctor."
+        )
+
+    return True, None
+</file>
+
+<file path="backend/app/services/email.py">
+"""
+app/services/email.py
+
+Sends appointment notification emails using either:
+  - SMTP (default, zero dependencies)
+  - SendGrid API (set SENDGRID_API_KEY env var to switch)
+
+Environment variables:
+  SMTP_HOST          default: smtp.gmail.com
+  SMTP_PORT          default: 587
+  SMTP_USER          your Gmail / SMTP username
+  SMTP_PASSWORD      app password (not your login password)
+  EMAIL_FROM         displayed sender address
+  SENDGRID_API_KEY   if set, uses SendGrid instead of SMTP
+"""
+
+import os
+import smtplib
+import logging
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+logger = logging.getLogger(__name__)
+
+SMTP_HOST     = os.getenv("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT     = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER     = os.getenv("SMTP_USER", "")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+EMAIL_FROM    = os.getenv("EMAIL_FROM", SMTP_USER)
+
+
+def _send_smtp(to: str, subject: str, html: str) -> bool:
+    if not SMTP_USER or not SMTP_PASSWORD:
+        logger.warning("[Email] SMTP_USER / SMTP_PASSWORD not set — skipping email.")
+        return False
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"]    = EMAIL_FROM
+        msg["To"]      = to
+        msg.attach(MIMEText(html, "html"))
+
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            server.ehlo()
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.sendmail(EMAIL_FROM, to, msg.as_string())
+        logger.info("[Email] Sent to %s: %s", to, subject)
+        return True
+    except Exception as e:
+        logger.error("[Email] Failed to send to %s: %s", to, e)
+        return False
+
+
+def notify_staff_new_appointment(
+    staff_email: str,
+    hospital_name: str,
+    reference: str,
+    patient_name: str,
+    patient_age: str,
+    patient_phone: str,
+    doctor_name: str,
+    preferred_date: str,
+    time_of_day: str,
+) -> bool:
+    subject = f"[Arogya] New Appointment Request — {reference}"
+    html = f"""
+    <div style="font-family:sans-serif;max-width:600px;margin:auto;">
+      <div style="background:#059669;padding:20px;border-radius:8px 8px 0 0;">
+        <h2 style="color:white;margin:0;">New Appointment Request</h2>
+        <p style="color:#d1fae5;margin:4px 0 0;">{hospital_name}</p>
+      </div>
+      <div style="background:#f9fafb;padding:24px;border-radius:0 0 8px 8px;border:1px solid #e5e7eb;">
+        <table style="width:100%;border-collapse:collapse;">
+          <tr><td style="padding:8px;color:#6b7280;width:40%;">Reference</td>
+              <td style="padding:8px;font-weight:bold;">{reference}</td></tr>
+          <tr style="background:#fff;"><td style="padding:8px;color:#6b7280;">Patient Name</td>
+              <td style="padding:8px;">{patient_name}</td></tr>
+          <tr><td style="padding:8px;color:#6b7280;">Age</td>
+              <td style="padding:8px;">{patient_age}</td></tr>
+          <tr style="background:#fff;"><td style="padding:8px;color:#6b7280;">Phone</td>
+              <td style="padding:8px;">{patient_phone}</td></tr>
+          <tr><td style="padding:8px;color:#6b7280;">Doctor</td>
+              <td style="padding:8px;">{doctor_name}</td></tr>
+          <tr style="background:#fff;"><td style="padding:8px;color:#6b7280;">Preferred Date</td>
+              <td style="padding:8px;">{preferred_date}</td></tr>
+          <tr><td style="padding:8px;color:#6b7280;">Time of Day</td>
+              <td style="padding:8px;text-transform:capitalize;">{time_of_day}</td></tr>
+        </table>
+        <div style="margin-top:24px;padding:16px;background:#ecfdf5;border-radius:6px;border:1px solid #6ee7b7;">
+          <p style="margin:0;color:#065f46;">
+            Please log in to your <strong>Arogya Admin Dashboard</strong> to approve or reject this request.
+          </p>
+        </div>
+      </div>
+    </div>
+    """
+    return _send_smtp(staff_email, subject, html)
+
+
+def notify_patient_approved(
+    staff_email: str,        # we email staff to call patient since we may not have patient email
+    hospital_name: str,
+    reference: str,
+    patient_name: str,
+    patient_phone: str,
+    doctor_name: str,
+    confirmed_time: str,
+    preferred_date: str,
+) -> bool:
+    """
+    Notifies staff that they should call/SMS the patient with confirmed time.
+    In a future iteration this can be replaced with a direct Twilio SMS to the patient.
+    """
+    subject = f"[Arogya] Appointment Approved — Call Patient ({reference})"
+    html = f"""
+    <div style="font-family:sans-serif;max-width:600px;margin:auto;">
+      <div style="background:#2563eb;padding:20px;border-radius:8px 8px 0 0;">
+        <h2 style="color:white;margin:0;">Appointment Approved — Please Call Patient</h2>
+      </div>
+      <div style="background:#f9fafb;padding:24px;border-radius:0 0 8px 8px;border:1px solid #e5e7eb;">
+        <p>The following appointment has been approved. Please call the patient to confirm.</p>
+        <table style="width:100%;border-collapse:collapse;">
+          <tr><td style="padding:8px;color:#6b7280;width:40%;">Reference</td>
+              <td style="padding:8px;font-weight:bold;">{reference}</td></tr>
+          <tr style="background:#fff;"><td style="padding:8px;color:#6b7280;">Patient</td>
+              <td style="padding:8px;">{patient_name}</td></tr>
+          <tr><td style="padding:8px;color:#6b7280;">Phone</td>
+              <td style="padding:8px;font-weight:bold;color:#059669;">{patient_phone}</td></tr>
+          <tr style="background:#fff;"><td style="padding:8px;color:#6b7280;">Doctor</td>
+              <td style="padding:8px;">{doctor_name}</td></tr>
+          <tr><td style="padding:8px;color:#6b7280;">Date</td>
+              <td style="padding:8px;">{preferred_date}</td></tr>
+          <tr style="background:#fff;"><td style="padding:8px;color:#6b7280;">Confirmed Time</td>
+              <td style="padding:8px;font-weight:bold;">{confirmed_time}</td></tr>
+        </table>
+      </div>
+    </div>
+    """
+    return _send_smtp(staff_email, subject, html)
+</file>
+
+<file path="backend/app/services/reminders.py">
+"""
+app/services/reminders.py
+
+Background job that runs every hour and sends reminder emails to hospital
+staff for approved appointments happening within the next 24 hours.
+
+Staff then call/SMS the patient as a reminder.
+
+Setup: call start_reminder_scheduler() from app/main.py on startup.
+"""
+
+import logging
+from datetime import datetime, timezone, timedelta
+
+from apscheduler.schedulers.background import BackgroundScheduler
+from sqlalchemy.orm import Session
+
+from app.db.session import SessionLocal
+from app.models.appointment import Appointment
+from app.models.doctor import Doctor
+from app.models.hospital import Hospital
+from app.services.booking_rules import get_booking_config
+from app.services.email import _send_smtp
+
+logger = logging.getLogger(__name__)
+
+_scheduler = BackgroundScheduler()
+
+
+def _send_reminder_email(
+    staff_email: str,
+    hospital_name: str,
+    reference: str,
+    patient_name: str,
+    patient_phone: str,
+    doctor_name: str,
+    confirmed_time: str,
+    preferred_date: str,
+) -> bool:
+    subject = f"[Arogya] Appointment Reminder — {reference} ({preferred_date})"
+    html = f"""
+    <div style="font-family:sans-serif;max-width:600px;margin:auto;">
+      <div style="background:#7c3aed;padding:20px;border-radius:8px 8px 0 0;">
+        <h2 style="color:white;margin:0;">Appointment Reminder</h2>
+        <p style="color:#ede9fe;margin:4px 0 0;">{hospital_name}</p>
+      </div>
+      <div style="background:#f9fafb;padding:24px;border-radius:0 0 8px 8px;border:1px solid #e5e7eb;">
+        <p style="margin:0 0 16px;color:#374151;">
+          The following appointment is coming up. Please call the patient to remind them.
+        </p>
+        <table style="width:100%;border-collapse:collapse;">
+          <tr><td style="padding:8px;color:#6b7280;width:40%;">Reference</td>
+              <td style="padding:8px;font-weight:bold;">{reference}</td></tr>
+          <tr style="background:#fff;"><td style="padding:8px;color:#6b7280;">Patient</td>
+              <td style="padding:8px;">{patient_name}</td></tr>
+          <tr><td style="padding:8px;color:#6b7280;">Phone</td>
+              <td style="padding:8px;font-weight:bold;color:#7c3aed;">{patient_phone}</td></tr>
+          <tr style="background:#fff;"><td style="padding:8px;color:#6b7280;">Doctor</td>
+              <td style="padding:8px;">{doctor_name}</td></tr>
+          <tr><td style="padding:8px;color:#6b7280;">Date</td>
+              <td style="padding:8px;">{preferred_date}</td></tr>
+          <tr style="background:#fff;"><td style="padding:8px;color:#6b7280;">Confirmed Time</td>
+              <td style="padding:8px;font-weight:bold;">{confirmed_time}</td></tr>
+        </table>
+      </div>
+    </div>
+    """
+    return _send_smtp(staff_email, subject, html)
+
+
+def _run_reminders() -> None:
+    """
+    Called every hour by APScheduler.
+    Finds approved appointments within the next reminder_hours_before window
+    that haven't had a reminder sent yet, and emails staff.
+
+    We track whether a reminder was sent by checking if updated_at was
+    touched after approval — a lightweight approach that avoids needing
+    a separate reminder_sent column for now.
+    """
+    db: Session = SessionLocal()
+    try:
+        now = datetime.now(timezone.utc)
+
+        # Load all approved appointments
+        approved = (
+            db.query(Appointment)
+            .filter(Appointment.status == "approved")
+            .all()
+        )
+
+        for appt in approved:
+            try:
+                hospital = db.query(Hospital).filter(Hospital.id == appt.hospital_id).first()
+                if not hospital:
+                    continue
+
+                config = get_booking_config(hospital)
+                staff_email = config.get("notification_email", "")
+                reminder_hours = int(config.get("reminder_hours_before", 24))
+
+                if not staff_email:
+                    continue
+
+                # Parse appointment date + confirmed time to get exact datetime
+                try:
+                    appt_date = datetime.strptime(appt.preferred_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                except ValueError:
+                    continue
+
+                # Window: send reminder if appointment is within the next reminder_hours
+                # and the reminder hasn't been sent (updated_at hasn't been touched since
+                # approval — we add a reminder_sent flag by bumping updated_at again)
+                time_until = appt_date - now
+                if not (timedelta(hours=0) < time_until <= timedelta(hours=reminder_hours)):
+                    continue
+
+                # Simple dedup: skip if updated_at is more recent than 23 hours ago
+                # (meaning we already sent a reminder this cycle)
+                if appt.updated_at:
+                    updated_aware = appt.updated_at.replace(tzinfo=timezone.utc) if appt.updated_at.tzinfo is None else appt.updated_at
+                    if (now - updated_aware) < timedelta(hours=23):
+                        continue
+
+                doctor = db.query(Doctor).filter(Doctor.id == appt.doctor_id).first()
+
+                sent = _send_reminder_email(
+                    staff_email=staff_email,
+                    hospital_name=hospital.name,
+                    reference=appt.reference_number,
+                    patient_name=appt.patient_name,
+                    patient_phone=appt.patient_phone,
+                    doctor_name=doctor.name if doctor else "Doctor",
+                    confirmed_time=appt.confirmed_time or "TBD",
+                    preferred_date=appt.preferred_date,
+                )
+
+                if sent:
+                    # Bump updated_at so we don't send again this cycle
+                    from datetime import datetime as dt
+                    appt.updated_at = dt.now(timezone.utc)
+                    db.commit()
+                    logger.info("[Reminders] Sent reminder for %s", appt.reference_number)
+
+            except Exception as e:
+                logger.error("[Reminders] Error processing appointment %s: %s", appt.id, e)
+
+    except Exception as e:
+        logger.error("[Reminders] Job failed: %s", e)
+    finally:
+        db.close()
+
+
+def start_reminder_scheduler() -> None:
+    """
+    Call this from main.py on app startup.
+    Runs the reminder check every hour.
+    """
+    if _scheduler.running:
+        return
+    _scheduler.add_job(
+        _run_reminders,
+        trigger="interval",
+        hours=1,
+        id="appointment_reminders",
+        replace_existing=True,
+        next_run_time=datetime.now(),   # run immediately on startup too
+    )
+    _scheduler.start()
+    logger.info("[Reminders] Scheduler started — checking every hour.")
+
+
+def stop_reminder_scheduler() -> None:
+    if _scheduler.running:
+        _scheduler.shutdown()
+</file>
+
 <file path="backend/create_tables.py">
 from app.db.base import Base
 from app.db.session import engine
@@ -676,21 +1222,6 @@ from app.models.doctor import Doctor
 print("Creating database tables...")
 Base.metadata.create_all(bind=engine)
 print("Tables created successfully!")
-</file>
-
-<file path="backend/fix_column.py">
-import os
-from dotenv import load_dotenv
-load_dotenv()
-import psycopg2
-
-conn = psycopg2.connect(os.getenv('DATABASE_URL'))
-cur = conn.cursor()
-cur.execute("ALTER TABLE knowledge_base ADD COLUMN IF NOT EXISTS entry_type VARCHAR DEFAULT 'fact'")
-conn.commit()
-cur.close()
-conn.close()
-print('Done!')
 </file>
 
 <file path="backend/seed.py">
@@ -963,6 +1494,152 @@ export default defineConfig([
 
 <file path="frontend/src/assets/react.svg">
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="35.93" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 228"><path fill="#00D8FF" d="M210.483 73.824a171.49 171.49 0 0 0-8.24-2.597c.465-1.9.893-3.777 1.273-5.621c6.238-30.281 2.16-54.676-11.769-62.708c-13.355-7.7-35.196.329-57.254 19.526a171.23 171.23 0 0 0-6.375 5.848a155.866 155.866 0 0 0-4.241-3.917C100.759 3.829 77.587-4.822 63.673 3.233C50.33 10.957 46.379 33.89 51.995 62.588a170.974 170.974 0 0 0 1.892 8.48c-3.28.932-6.445 1.924-9.474 2.98C17.309 83.498 0 98.307 0 113.668c0 15.865 18.582 31.778 46.812 41.427a145.52 145.52 0 0 0 6.921 2.165a167.467 167.467 0 0 0-2.01 9.138c-5.354 28.2-1.173 50.591 12.134 58.266c13.744 7.926 36.812-.22 59.273-19.855a145.567 145.567 0 0 0 5.342-4.923a168.064 168.064 0 0 0 6.92 6.314c21.758 18.722 43.246 26.282 56.54 18.586c13.731-7.949 18.194-32.003 12.4-61.268a145.016 145.016 0 0 0-1.535-6.842c1.62-.48 3.21-.974 4.76-1.488c29.348-9.723 48.443-25.443 48.443-41.52c0-15.417-17.868-30.326-45.517-39.844Zm-6.365 70.984c-1.4.463-2.836.91-4.3 1.345c-3.24-10.257-7.612-21.163-12.963-32.432c5.106-11 9.31-21.767 12.459-31.957c2.619.758 5.16 1.557 7.61 2.4c23.69 8.156 38.14 20.213 38.14 29.504c0 9.896-15.606 22.743-40.946 31.14Zm-10.514 20.834c2.562 12.94 2.927 24.64 1.23 33.787c-1.524 8.219-4.59 13.698-8.382 15.893c-8.067 4.67-25.32-1.4-43.927-17.412a156.726 156.726 0 0 1-6.437-5.87c7.214-7.889 14.423-17.06 21.459-27.246c12.376-1.098 24.068-2.894 34.671-5.345a134.17 134.17 0 0 1 1.386 6.193ZM87.276 214.515c-7.882 2.783-14.16 2.863-17.955.675c-8.075-4.657-11.432-22.636-6.853-46.752a156.923 156.923 0 0 1 1.869-8.499c10.486 2.32 22.093 3.988 34.498 4.994c7.084 9.967 14.501 19.128 21.976 27.15a134.668 134.668 0 0 1-4.877 4.492c-9.933 8.682-19.886 14.842-28.658 17.94ZM50.35 144.747c-12.483-4.267-22.792-9.812-29.858-15.863c-6.35-5.437-9.555-10.836-9.555-15.216c0-9.322 13.897-21.212 37.076-29.293c2.813-.98 5.757-1.905 8.812-2.773c3.204 10.42 7.406 21.315 12.477 32.332c-5.137 11.18-9.399 22.249-12.634 32.792a134.718 134.718 0 0 1-6.318-1.979Zm12.378-84.26c-4.811-24.587-1.616-43.134 6.425-47.789c8.564-4.958 27.502 2.111 47.463 19.835a144.318 144.318 0 0 1 3.841 3.545c-7.438 7.987-14.787 17.08-21.808 26.988c-12.04 1.116-23.565 2.908-34.161 5.309a160.342 160.342 0 0 1-1.76-7.887Zm110.427 27.268a347.8 347.8 0 0 0-7.785-12.803c8.168 1.033 15.994 2.404 23.343 4.08c-2.206 7.072-4.956 14.465-8.193 22.045a381.151 381.151 0 0 0-7.365-13.322Zm-45.032-43.861c5.044 5.465 10.096 11.566 15.065 18.186a322.04 322.04 0 0 0-30.257-.006c4.974-6.559 10.069-12.652 15.192-18.18ZM82.802 87.83a323.167 323.167 0 0 0-7.227 13.238c-3.184-7.553-5.909-14.98-8.134-22.152c7.304-1.634 15.093-2.97 23.209-3.984a321.524 321.524 0 0 0-7.848 12.897Zm8.081 65.352c-8.385-.936-16.291-2.203-23.593-3.793c2.26-7.3 5.045-14.885 8.298-22.6a321.187 321.187 0 0 0 7.257 13.246c2.594 4.48 5.28 8.868 8.038 13.147Zm37.542 31.03c-5.184-5.592-10.354-11.779-15.403-18.433c4.902.192 9.899.29 14.978.29c5.218 0 10.376-.117 15.453-.343c-4.985 6.774-10.018 12.97-15.028 18.486Zm52.198-57.817c3.422 7.8 6.306 15.345 8.596 22.52c-7.422 1.694-15.436 3.058-23.88 4.071a382.417 382.417 0 0 0 7.859-13.026a347.403 347.403 0 0 0 7.425-13.565Zm-16.898 8.101a358.557 358.557 0 0 1-12.281 19.815a329.4 329.4 0 0 1-23.444.823c-7.967 0-15.716-.248-23.178-.732a310.202 310.202 0 0 1-12.513-19.846h.001a307.41 307.41 0 0 1-10.923-20.627a310.278 310.278 0 0 1 10.89-20.637l-.001.001a307.318 307.318 0 0 1 12.413-19.761c7.613-.576 15.42-.876 23.31-.876H128c7.926 0 15.743.303 23.354.883a329.357 329.357 0 0 1 12.335 19.695a358.489 358.489 0 0 1 11.036 20.54a329.472 329.472 0 0 1-11 20.722Zm22.56-122.124c8.572 4.944 11.906 24.881 6.52 51.026c-.344 1.668-.73 3.367-1.15 5.09c-10.622-2.452-22.155-4.275-34.23-5.408c-7.034-10.017-14.323-19.124-21.64-27.008a160.789 160.789 0 0 1 5.888-5.4c18.9-16.447 36.564-22.941 44.612-18.3ZM128 90.808c12.625 0 22.86 10.235 22.86 22.86s-10.235 22.86-22.86 22.86s-22.86-10.235-22.86-22.86s10.235-22.86 22.86-22.86Z"></path></svg>
+</file>
+
+<file path="frontend/src/components/BookingConfigPanel.tsx">
+import React, { useState, useEffect } from 'react';
+import api from '../api/axios';
+import { Save, Info } from 'lucide-react';
+
+interface BookingConfig {
+  bookable_departments: string[];
+  min_advance_hours: number;
+  max_per_doctor_per_day: number;
+  notification_email: string;
+  reminder_hours_before: number;
+}
+
+export default function BookingConfigPanel({ hospitalId, allDepartments }: {
+  hospitalId: number;
+  allDepartments: string[];   // pass in from parent (fetched from /hospitals/{id}/doctors)
+}) {
+  const [config, setConfig] = useState<BookingConfig>({
+    bookable_departments: [],
+    min_advance_hours: 2,
+    max_per_doctor_per_day: 20,
+    notification_email: '',
+    reminder_hours_before: 24,
+  });
+  const [loading, setLoading]   = useState(false);
+  const [saving, setSaving]     = useState(false);
+  const [saved, setSaved]       = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    api.get(`/appointments/config/${hospitalId}`)
+      .then(res => setConfig(res.data))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [hospitalId]);
+
+  const toggleDept = (dept: string) => {
+    setConfig(c => ({
+      ...c,
+      bookable_departments: c.bookable_departments.includes(dept)
+        ? c.bookable_departments.filter(d => d !== dept)
+        : [...c.bookable_departments, dept],
+    }));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await api.patch(`/appointments/config/${hospitalId}`, config);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (e) {
+      console.error('Save failed', e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <div className="text-gray-400 text-sm py-4">Loading booking config…</div>;
+
+  return (
+    <div className="space-y-6 max-w-2xl">
+      <div>
+        <h3 className="text-lg font-bold text-gray-900">Booking Configuration</h3>
+        <p className="text-sm text-gray-500 mt-1">
+          Control how Arogya handles appointment booking for this hospital.
+        </p>
+      </div>
+
+      {/* Notification email */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Staff Notification Email
+        </label>
+        <input type="email" value={config.notification_email}
+          onChange={e => setConfig(c => ({ ...c, notification_email: e.target.value }))}
+          placeholder="reception@hospital.com"
+          className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <p className="text-xs text-gray-400 mt-1">
+          New appointment requests and approvals will be emailed here.
+        </p>
+      </div>
+
+      {/* Bookable departments */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Bookable Departments
+        </label>
+        <div className="flex items-start gap-2 mb-3 p-3 bg-blue-50 rounded-lg">
+          <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+          <p className="text-xs text-blue-700">
+            Leave all unchecked to allow booking for all departments.
+            Check specific ones to restrict booking to only those.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {allDepartments.length === 0 && (
+            <p className="text-sm text-gray-400">No departments found. Add doctors first.</p>
+          )}
+          {allDepartments.map(dept => (
+            <button key={dept} onClick={() => toggleDept(dept)}
+              className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                config.bookable_departments.includes(dept)
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+              }`}>
+              {dept}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Min advance hours */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Minimum Advance Notice (hours)
+        </label>
+        <input type="number" min={0} max={72} value={config.min_advance_hours}
+          onChange={e => setConfig(c => ({ ...c, min_advance_hours: parseInt(e.target.value) || 0 }))}
+          className="w-32 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <p className="text-xs text-gray-400 mt-1">
+          Patients cannot book within this many hours of their preferred date.
+        </p>
+      </div>
+
+      {/* Max per doctor per day */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Max Appointments per Doctor per Day
+        </label>
+        <input type="number" min={1} max={100} value={config.max_per_doctor_per_day}
+          onChange={e => setConfig(c => ({ ...c, max_per_doctor_per_day: parseInt(e.target.value) || 1 }))}
+          className="w-32 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+
+      {/* Save */}
+      <button onClick={handleSave} disabled={saving}
+        className="flex items-center gap-2 px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 text-sm font-medium">
+        <Save className="w-4 h-4" />
+        {saving ? 'Saving…' : saved ? '✓ Saved!' : 'Save Configuration'}
+      </button>
+    </div>
+  );
+}
 </file>
 
 <file path="frontend/src/components/ChatPreview.tsx">
@@ -1711,15 +2388,82 @@ export default {
 }
 </file>
 
-<file path="local run code.txt">
-git add .
-git commit -m "fix: remove duplicate table creations from alembic migration"
-git push origin main
-
-
-cd "D:\Hospital\hospital-ai-platform"
-
-npx repomix
+<file path="requirements.txt">
+alembic==1.18.4
+annotated-doc==0.0.4
+annotated-types==0.7.0
+anyio==4.12.1
+bcrypt==4.0.1
+certifi==2026.1.4
+cffi==2.0.0
+charset-normalizer==3.4.4
+click==8.3.1
+colorama==0.4.6
+cryptography==46.0.5
+distro==1.9.0
+dnspython==2.8.0
+ecdsa==0.19.1
+email-validator==2.3.0
+fastapi==0.129.2
+google-auth==2.48.0
+google-auth-oauthlib==1.3.0
+greenlet==3.3.2
+gspread==6.2.1
+gunicorn==25.1.0
+h11==0.16.0
+httpcore==1.0.9
+httplib2==0.31.2
+httpx==0.28.1
+idna==3.11
+jiter==0.13.0
+jsonpatch==1.33
+jsonpointer==3.0.0
+langchain-core==1.2.16
+langchain-text-splitters==1.1.1
+langsmith==0.7.9
+Mako==1.3.10
+MarkupSafe==3.0.3
+numpy==2.4.2
+oauth2client==4.1.3
+oauthlib==3.3.1
+openai==2.21.0
+orjson==3.11.7
+packaging==26.0
+passlib==1.7.4
+pgvector==0.4.2
+psycopg2-binary==2.9.11
+pyasn1==0.6.2
+pyasn1_modules==0.4.2
+pycparser==3.0
+pydantic==2.12.5
+pydantic-settings==2.13.1
+pydantic_core==2.41.5
+PyMuPDF==1.27.1
+pyparsing==3.3.2
+python-dotenv==1.2.1
+python-jose==3.5.0
+python-multipart==0.0.22
+PyYAML==6.0.3
+redis==7.2.0
+requests==2.32.5
+requests-oauthlib==2.0.0
+requests-toolbelt==1.0.0
+rsa==4.9.1
+six==1.17.0
+sniffio==1.3.1
+SQLAlchemy==2.0.46
+starlette==0.52.1
+tenacity==9.1.4
+tqdm==4.67.3
+typing-inspection==0.4.2
+typing_extensions==4.15.0
+urllib3==2.6.3
+uuid_utils==0.14.1
+uvicorn==0.41.0
+xxhash==3.6.0
+zstandard==0.25.0
+redis==7.2.0      # already there — just confirm it's present
+APScheduler==3.10.4
 </file>
 
 <file path="backend/alembic/versions/b2c3d4e5f6a7_add_user_role.py">
@@ -1746,6 +2490,18 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_column('user', 'role')
+</file>
+
+<file path="backend/app/api/v1/endpoints/__init__.py">
+# Location: D:\Hospital\hospital-ai-platform\backend\app\api\v1\endpoints\__init__.py
+from .hospitals import router as hospitals
+from .auth import router as auth
+from .ai import router as ai
+from .appointments import router as appointments
+from .usage import router as usage
+from .medicines import router as medicines
+from .lab_tests import router as lab_tests
+from .doctor_availability import router as availability
 </file>
 
 <file path="backend/app/core/config.py">
@@ -1826,47 +2582,6 @@ def create_user(db: Session, user: UserCreate):
     return db_obj
 </file>
 
-<file path="backend/app/models/appointment.py">
-import uuid
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text, UniqueConstraint
-from sqlalchemy.orm import relationship
-from datetime import datetime, timezone
-from app.db.base_class import Base
-
-
-def _generate_ref():
-    return "APT-" + uuid.uuid4().hex[:6].upper()
-
-
-class Appointment(Base):
-    __tablename__ = "appointments"
-
-    id               = Column(Integer, primary_key=True, index=True)
-    reference_number = Column(String, unique=True, default=_generate_ref, nullable=False)
-    hospital_id      = Column(Integer, ForeignKey("hospital.id"), nullable=False, index=True)
-    doctor_id        = Column(Integer, ForeignKey("doctors.id"), nullable=False, index=True)
-    patient_name     = Column(String, nullable=False)
-    patient_age      = Column(String, nullable=False)   # stored as string ("32" or "32 years")
-    patient_phone    = Column(String, nullable=False)
-    preferred_date   = Column(String, nullable=False)   # "2026-04-15"
-    time_of_day      = Column(String, nullable=False)   # "morning" | "afternoon" | "evening"
-
-    # Staff fills these in when approving
-    confirmed_time   = Column(String, nullable=True)    # "10:30 AM"
-
-    # pending | approved | rejected
-    status           = Column(String, default="pending", nullable=False, index=True)
-    rejection_reason = Column(String, nullable=True)
-
-    created_at       = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at       = Column(DateTime, default=lambda: datetime.now(timezone.utc),
-                              onupdate=lambda: datetime.now(timezone.utc))
-
-    # Relationships
-    hospital = relationship("Hospital")
-    doctor   = relationship("Doctor")
-</file>
-
 <file path="backend/app/models/doctor_availability.py">
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Date
 from sqlalchemy.orm import relationship
@@ -1893,30 +2608,6 @@ class DoctorLeave(Base):
     reason = Column(String, nullable=True)
     
     doctor = relationship("Doctor", back_populates="leaves")
-</file>
-
-<file path="backend/app/models/hospital.py">
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
-from app.db.base_class import Base
-
-class Hospital(Base):
-    __tablename__ = "hospital"
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False, index=True)
-    slug = Column(String, unique=True, index=True, nullable=False) # e.g., "apollo-delhi" for URLs
-    address = Column(String, nullable=True)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    system_prompt = Column(Text, default="You are Arogya, a helpful assistant for a specialty hospital.")
-    # Add this column to your existing Hospital class
-    google_sheet_id = Column(String, nullable=True)
-    booking_config = Column(Text, nullable=True)  # JSON string
-    # Relationship: One Hospital has many Users
-    users = relationship("User", back_populates="hospital")
-    # Inside your Hospital class in app/models/hospital.py
-    doctors = relationship("Doctor", back_populates="hospital", cascade="all, delete-orphan")
 </file>
 
 <file path="backend/app/models/knowledge.py">
@@ -2095,429 +2786,19 @@ class Medicine(MedicineBase):
         from_attributes = True
 </file>
 
-<file path="backend/app/services/booking_rules.py">
-"""
-app/services/booking_rules.py
-
-Validates a booking request against per-hospital configuration stored
-in hospital.booking_config (JSON column).
-
-Default config (used when booking_config is None or missing a key):
-{
-    "bookable_departments": [],        # empty = all departments allowed
-    "min_advance_hours": 2,
-    "max_per_doctor_per_day": 20,
-    "notification_email": "",
-    "reminder_hours_before": 24
-}
-"""
-
-import json
-import logging
-from datetime import datetime, timezone, timedelta
-from typing import Optional
-
-from sqlalchemy.orm import Session
-from app.models.appointment import Appointment
-from app.models.doctor import Doctor
-from app.models.hospital import Hospital
-
-logger = logging.getLogger(__name__)
-
-DEFAULT_CONFIG = {
-    "bookable_departments": [],
-    "min_advance_hours": 2,
-    "max_per_doctor_per_day": 20,
-    "notification_email": "",
-    "reminder_hours_before": 24,
-}
-
-
-def get_booking_config(hospital: Hospital) -> dict:
-    raw = getattr(hospital, "booking_config", None)
-    if not raw:
-        return DEFAULT_CONFIG.copy()
-    try:
-        cfg = json.loads(raw) if isinstance(raw, str) else raw
-        return {**DEFAULT_CONFIG, **cfg}
-    except Exception:
-        return DEFAULT_CONFIG.copy()
-
-
-def validate_booking(
-    hospital: Hospital,
-    doctor: Doctor,
-    preferred_date: str,   # "YYYY-MM-DD"
-    db: Session,
-) -> tuple[bool, Optional[str]]:
-    """
-    Returns (ok, error_message).
-    ok=True means the booking can proceed.
-    """
-    config = get_booking_config(hospital)
-
-    # 1. Check department is bookable
-    allowed_depts = config.get("bookable_departments", [])
-    if allowed_depts:
-        dept = (doctor.department or "").lower()
-        if not any(dept == a.lower() for a in allowed_depts):
-            return False, (
-                f"Online booking is not available for {doctor.department}. "
-                "Please call the reception desk."
-            )
-
-    # 2. Check minimum advance notice
-    min_hours = config.get("min_advance_hours", 2)
-    try:
-        appt_date = datetime.strptime(preferred_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-        now = datetime.now(timezone.utc)
-        if (appt_date - now) < timedelta(hours=min_hours):
-            return False, (
-                f"Appointments must be booked at least {min_hours} hours in advance. "
-                "Please choose a later date."
-            )
-    except ValueError:
-        return False, "Invalid date format. Please use YYYY-MM-DD."
-
-    # 3. Check doctor daily slot limit
-    max_per_day = config.get("max_per_doctor_per_day", 20)
-    existing_count = (
-        db.query(Appointment)
-        .filter(
-            Appointment.doctor_id == doctor.id,
-            Appointment.preferred_date == preferred_date,
-            Appointment.status != "rejected",
-        )
-        .count()
-    )
-    if existing_count >= max_per_day:
-        return False, (
-            f"Dr. {doctor.name} has no more slots available on {preferred_date}. "
-            "Please choose another date or doctor."
-        )
-
-    return True, None
-</file>
-
-<file path="backend/app/services/email.py">
-"""
-app/services/email.py
-
-Sends appointment notification emails using either:
-  - SMTP (default, zero dependencies)
-  - SendGrid API (set SENDGRID_API_KEY env var to switch)
-
-Environment variables:
-  SMTP_HOST          default: smtp.gmail.com
-  SMTP_PORT          default: 587
-  SMTP_USER          your Gmail / SMTP username
-  SMTP_PASSWORD      app password (not your login password)
-  EMAIL_FROM         displayed sender address
-  SENDGRID_API_KEY   if set, uses SendGrid instead of SMTP
-"""
-
+<file path="backend/fix_column.py">
 import os
-import smtplib
-import logging
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+from dotenv import load_dotenv
+load_dotenv()
+import psycopg2
 
-logger = logging.getLogger(__name__)
-
-SMTP_HOST     = os.getenv("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT     = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER     = os.getenv("SMTP_USER", "")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
-EMAIL_FROM    = os.getenv("EMAIL_FROM", SMTP_USER)
-
-
-def _send_smtp(to: str, subject: str, html: str) -> bool:
-    if not SMTP_USER or not SMTP_PASSWORD:
-        logger.warning("[Email] SMTP_USER / SMTP_PASSWORD not set — skipping email.")
-        return False
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"]    = EMAIL_FROM
-        msg["To"]      = to
-        msg.attach(MIMEText(html, "html"))
-
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-            server.ehlo()
-            server.starttls()
-            server.login(SMTP_USER, SMTP_PASSWORD)
-            server.sendmail(EMAIL_FROM, to, msg.as_string())
-        logger.info("[Email] Sent to %s: %s", to, subject)
-        return True
-    except Exception as e:
-        logger.error("[Email] Failed to send to %s: %s", to, e)
-        return False
-
-
-def notify_staff_new_appointment(
-    staff_email: str,
-    hospital_name: str,
-    reference: str,
-    patient_name: str,
-    patient_age: str,
-    patient_phone: str,
-    doctor_name: str,
-    preferred_date: str,
-    time_of_day: str,
-) -> bool:
-    subject = f"[Arogya] New Appointment Request — {reference}"
-    html = f"""
-    <div style="font-family:sans-serif;max-width:600px;margin:auto;">
-      <div style="background:#059669;padding:20px;border-radius:8px 8px 0 0;">
-        <h2 style="color:white;margin:0;">New Appointment Request</h2>
-        <p style="color:#d1fae5;margin:4px 0 0;">{hospital_name}</p>
-      </div>
-      <div style="background:#f9fafb;padding:24px;border-radius:0 0 8px 8px;border:1px solid #e5e7eb;">
-        <table style="width:100%;border-collapse:collapse;">
-          <tr><td style="padding:8px;color:#6b7280;width:40%;">Reference</td>
-              <td style="padding:8px;font-weight:bold;">{reference}</td></tr>
-          <tr style="background:#fff;"><td style="padding:8px;color:#6b7280;">Patient Name</td>
-              <td style="padding:8px;">{patient_name}</td></tr>
-          <tr><td style="padding:8px;color:#6b7280;">Age</td>
-              <td style="padding:8px;">{patient_age}</td></tr>
-          <tr style="background:#fff;"><td style="padding:8px;color:#6b7280;">Phone</td>
-              <td style="padding:8px;">{patient_phone}</td></tr>
-          <tr><td style="padding:8px;color:#6b7280;">Doctor</td>
-              <td style="padding:8px;">{doctor_name}</td></tr>
-          <tr style="background:#fff;"><td style="padding:8px;color:#6b7280;">Preferred Date</td>
-              <td style="padding:8px;">{preferred_date}</td></tr>
-          <tr><td style="padding:8px;color:#6b7280;">Time of Day</td>
-              <td style="padding:8px;text-transform:capitalize;">{time_of_day}</td></tr>
-        </table>
-        <div style="margin-top:24px;padding:16px;background:#ecfdf5;border-radius:6px;border:1px solid #6ee7b7;">
-          <p style="margin:0;color:#065f46;">
-            Please log in to your <strong>Arogya Admin Dashboard</strong> to approve or reject this request.
-          </p>
-        </div>
-      </div>
-    </div>
-    """
-    return _send_smtp(staff_email, subject, html)
-
-
-def notify_patient_approved(
-    staff_email: str,        # we email staff to call patient since we may not have patient email
-    hospital_name: str,
-    reference: str,
-    patient_name: str,
-    patient_phone: str,
-    doctor_name: str,
-    confirmed_time: str,
-    preferred_date: str,
-) -> bool:
-    """
-    Notifies staff that they should call/SMS the patient with confirmed time.
-    In a future iteration this can be replaced with a direct Twilio SMS to the patient.
-    """
-    subject = f"[Arogya] Appointment Approved — Call Patient ({reference})"
-    html = f"""
-    <div style="font-family:sans-serif;max-width:600px;margin:auto;">
-      <div style="background:#2563eb;padding:20px;border-radius:8px 8px 0 0;">
-        <h2 style="color:white;margin:0;">Appointment Approved — Please Call Patient</h2>
-      </div>
-      <div style="background:#f9fafb;padding:24px;border-radius:0 0 8px 8px;border:1px solid #e5e7eb;">
-        <p>The following appointment has been approved. Please call the patient to confirm.</p>
-        <table style="width:100%;border-collapse:collapse;">
-          <tr><td style="padding:8px;color:#6b7280;width:40%;">Reference</td>
-              <td style="padding:8px;font-weight:bold;">{reference}</td></tr>
-          <tr style="background:#fff;"><td style="padding:8px;color:#6b7280;">Patient</td>
-              <td style="padding:8px;">{patient_name}</td></tr>
-          <tr><td style="padding:8px;color:#6b7280;">Phone</td>
-              <td style="padding:8px;font-weight:bold;color:#059669;">{patient_phone}</td></tr>
-          <tr style="background:#fff;"><td style="padding:8px;color:#6b7280;">Doctor</td>
-              <td style="padding:8px;">{doctor_name}</td></tr>
-          <tr><td style="padding:8px;color:#6b7280;">Date</td>
-              <td style="padding:8px;">{preferred_date}</td></tr>
-          <tr style="background:#fff;"><td style="padding:8px;color:#6b7280;">Confirmed Time</td>
-              <td style="padding:8px;font-weight:bold;">{confirmed_time}</td></tr>
-        </table>
-      </div>
-    </div>
-    """
-    return _send_smtp(staff_email, subject, html)
-</file>
-
-<file path="backend/app/services/reminders.py">
-"""
-app/services/reminders.py
-
-Background job that runs every hour and sends reminder emails to hospital
-staff for approved appointments happening within the next 24 hours.
-
-Staff then call/SMS the patient as a reminder.
-
-Setup: call start_reminder_scheduler() from app/main.py on startup.
-"""
-
-import logging
-from datetime import datetime, timezone, timedelta
-
-from apscheduler.schedulers.background import BackgroundScheduler
-from sqlalchemy.orm import Session
-
-from app.db.session import SessionLocal
-from app.models.appointment import Appointment
-from app.models.doctor import Doctor
-from app.models.hospital import Hospital
-from app.services.booking_rules import get_booking_config
-from app.services.email import _send_smtp
-
-logger = logging.getLogger(__name__)
-
-_scheduler = BackgroundScheduler()
-
-
-def _send_reminder_email(
-    staff_email: str,
-    hospital_name: str,
-    reference: str,
-    patient_name: str,
-    patient_phone: str,
-    doctor_name: str,
-    confirmed_time: str,
-    preferred_date: str,
-) -> bool:
-    subject = f"[Arogya] Appointment Reminder — {reference} ({preferred_date})"
-    html = f"""
-    <div style="font-family:sans-serif;max-width:600px;margin:auto;">
-      <div style="background:#7c3aed;padding:20px;border-radius:8px 8px 0 0;">
-        <h2 style="color:white;margin:0;">Appointment Reminder</h2>
-        <p style="color:#ede9fe;margin:4px 0 0;">{hospital_name}</p>
-      </div>
-      <div style="background:#f9fafb;padding:24px;border-radius:0 0 8px 8px;border:1px solid #e5e7eb;">
-        <p style="margin:0 0 16px;color:#374151;">
-          The following appointment is coming up. Please call the patient to remind them.
-        </p>
-        <table style="width:100%;border-collapse:collapse;">
-          <tr><td style="padding:8px;color:#6b7280;width:40%;">Reference</td>
-              <td style="padding:8px;font-weight:bold;">{reference}</td></tr>
-          <tr style="background:#fff;"><td style="padding:8px;color:#6b7280;">Patient</td>
-              <td style="padding:8px;">{patient_name}</td></tr>
-          <tr><td style="padding:8px;color:#6b7280;">Phone</td>
-              <td style="padding:8px;font-weight:bold;color:#7c3aed;">{patient_phone}</td></tr>
-          <tr style="background:#fff;"><td style="padding:8px;color:#6b7280;">Doctor</td>
-              <td style="padding:8px;">{doctor_name}</td></tr>
-          <tr><td style="padding:8px;color:#6b7280;">Date</td>
-              <td style="padding:8px;">{preferred_date}</td></tr>
-          <tr style="background:#fff;"><td style="padding:8px;color:#6b7280;">Confirmed Time</td>
-              <td style="padding:8px;font-weight:bold;">{confirmed_time}</td></tr>
-        </table>
-      </div>
-    </div>
-    """
-    return _send_smtp(staff_email, subject, html)
-
-
-def _run_reminders() -> None:
-    """
-    Called every hour by APScheduler.
-    Finds approved appointments within the next reminder_hours_before window
-    that haven't had a reminder sent yet, and emails staff.
-
-    We track whether a reminder was sent by checking if updated_at was
-    touched after approval — a lightweight approach that avoids needing
-    a separate reminder_sent column for now.
-    """
-    db: Session = SessionLocal()
-    try:
-        now = datetime.now(timezone.utc)
-
-        # Load all approved appointments
-        approved = (
-            db.query(Appointment)
-            .filter(Appointment.status == "approved")
-            .all()
-        )
-
-        for appt in approved:
-            try:
-                hospital = db.query(Hospital).filter(Hospital.id == appt.hospital_id).first()
-                if not hospital:
-                    continue
-
-                config = get_booking_config(hospital)
-                staff_email = config.get("notification_email", "")
-                reminder_hours = int(config.get("reminder_hours_before", 24))
-
-                if not staff_email:
-                    continue
-
-                # Parse appointment date + confirmed time to get exact datetime
-                try:
-                    appt_date = datetime.strptime(appt.preferred_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-                except ValueError:
-                    continue
-
-                # Window: send reminder if appointment is within the next reminder_hours
-                # and the reminder hasn't been sent (updated_at hasn't been touched since
-                # approval — we add a reminder_sent flag by bumping updated_at again)
-                time_until = appt_date - now
-                if not (timedelta(hours=0) < time_until <= timedelta(hours=reminder_hours)):
-                    continue
-
-                # Simple dedup: skip if updated_at is more recent than 23 hours ago
-                # (meaning we already sent a reminder this cycle)
-                if appt.updated_at:
-                    updated_aware = appt.updated_at.replace(tzinfo=timezone.utc) if appt.updated_at.tzinfo is None else appt.updated_at
-                    if (now - updated_aware) < timedelta(hours=23):
-                        continue
-
-                doctor = db.query(Doctor).filter(Doctor.id == appt.doctor_id).first()
-
-                sent = _send_reminder_email(
-                    staff_email=staff_email,
-                    hospital_name=hospital.name,
-                    reference=appt.reference_number,
-                    patient_name=appt.patient_name,
-                    patient_phone=appt.patient_phone,
-                    doctor_name=doctor.name if doctor else "Doctor",
-                    confirmed_time=appt.confirmed_time or "TBD",
-                    preferred_date=appt.preferred_date,
-                )
-
-                if sent:
-                    # Bump updated_at so we don't send again this cycle
-                    from datetime import datetime as dt
-                    appt.updated_at = dt.now(timezone.utc)
-                    db.commit()
-                    logger.info("[Reminders] Sent reminder for %s", appt.reference_number)
-
-            except Exception as e:
-                logger.error("[Reminders] Error processing appointment %s: %s", appt.id, e)
-
-    except Exception as e:
-        logger.error("[Reminders] Job failed: %s", e)
-    finally:
-        db.close()
-
-
-def start_reminder_scheduler() -> None:
-    """
-    Call this from main.py on app startup.
-    Runs the reminder check every hour.
-    """
-    if _scheduler.running:
-        return
-    _scheduler.add_job(
-        _run_reminders,
-        trigger="interval",
-        hours=1,
-        id="appointment_reminders",
-        replace_existing=True,
-        next_run_time=datetime.now(),   # run immediately on startup too
-    )
-    _scheduler.start()
-    logger.info("[Reminders] Scheduler started — checking every hour.")
-
-
-def stop_reminder_scheduler() -> None:
-    if _scheduler.running:
-        _scheduler.shutdown()
+conn = psycopg2.connect(os.getenv('DATABASE_URL'))
+cur = conn.cursor()
+cur.execute("ALTER TABLE knowledge_base ADD COLUMN IF NOT EXISTS entry_type VARCHAR DEFAULT 'fact'")
+conn.commit()
+cur.close()
+conn.close()
+print('Done!')
 </file>
 
 <file path="frontend/public/vad-assets/ort-wasm-simd-threaded.asyncify.mjs">
@@ -2763,152 +3044,6 @@ api.interceptors.response.use(
 );
 
 export default api;
-</file>
-
-<file path="frontend/src/components/BookingConfigPanel.tsx">
-import React, { useState, useEffect } from 'react';
-import api from '../api/axios';
-import { Save, Info } from 'lucide-react';
-
-interface BookingConfig {
-  bookable_departments: string[];
-  min_advance_hours: number;
-  max_per_doctor_per_day: number;
-  notification_email: string;
-  reminder_hours_before: number;
-}
-
-export default function BookingConfigPanel({ hospitalId, allDepartments }: {
-  hospitalId: number;
-  allDepartments: string[];   // pass in from parent (fetched from /hospitals/{id}/doctors)
-}) {
-  const [config, setConfig] = useState<BookingConfig>({
-    bookable_departments: [],
-    min_advance_hours: 2,
-    max_per_doctor_per_day: 20,
-    notification_email: '',
-    reminder_hours_before: 24,
-  });
-  const [loading, setLoading]   = useState(false);
-  const [saving, setSaving]     = useState(false);
-  const [saved, setSaved]       = useState(false);
-
-  useEffect(() => {
-    setLoading(true);
-    api.get(`/appointments/config/${hospitalId}`)
-      .then(res => setConfig(res.data))
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, [hospitalId]);
-
-  const toggleDept = (dept: string) => {
-    setConfig(c => ({
-      ...c,
-      bookable_departments: c.bookable_departments.includes(dept)
-        ? c.bookable_departments.filter(d => d !== dept)
-        : [...c.bookable_departments, dept],
-    }));
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      await api.patch(`/appointments/config/${hospitalId}`, config);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
-    } catch (e) {
-      console.error('Save failed', e);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (loading) return <div className="text-gray-400 text-sm py-4">Loading booking config…</div>;
-
-  return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <h3 className="text-lg font-bold text-gray-900">Booking Configuration</h3>
-        <p className="text-sm text-gray-500 mt-1">
-          Control how Arogya handles appointment booking for this hospital.
-        </p>
-      </div>
-
-      {/* Notification email */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Staff Notification Email
-        </label>
-        <input type="email" value={config.notification_email}
-          onChange={e => setConfig(c => ({ ...c, notification_email: e.target.value }))}
-          placeholder="reception@hospital.com"
-          className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        <p className="text-xs text-gray-400 mt-1">
-          New appointment requests and approvals will be emailed here.
-        </p>
-      </div>
-
-      {/* Bookable departments */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Bookable Departments
-        </label>
-        <div className="flex items-start gap-2 mb-3 p-3 bg-blue-50 rounded-lg">
-          <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
-          <p className="text-xs text-blue-700">
-            Leave all unchecked to allow booking for all departments.
-            Check specific ones to restrict booking to only those.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {allDepartments.length === 0 && (
-            <p className="text-sm text-gray-400">No departments found. Add doctors first.</p>
-          )}
-          {allDepartments.map(dept => (
-            <button key={dept} onClick={() => toggleDept(dept)}
-              className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
-                config.bookable_departments.includes(dept)
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
-              }`}>
-              {dept}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Min advance hours */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Minimum Advance Notice (hours)
-        </label>
-        <input type="number" min={0} max={72} value={config.min_advance_hours}
-          onChange={e => setConfig(c => ({ ...c, min_advance_hours: parseInt(e.target.value) || 0 }))}
-          className="w-32 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        <p className="text-xs text-gray-400 mt-1">
-          Patients cannot book within this many hours of their preferred date.
-        </p>
-      </div>
-
-      {/* Max per doctor per day */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Max Appointments per Doctor per Day
-        </label>
-        <input type="number" min={1} max={100} value={config.max_per_doctor_per_day}
-          onChange={e => setConfig(c => ({ ...c, max_per_doctor_per_day: parseInt(e.target.value) || 1 }))}
-          className="w-32 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-      </div>
-
-      {/* Save */}
-      <button onClick={handleSave} disabled={saving}
-        className="flex items-center gap-2 px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 text-sm font-medium">
-        <Save className="w-4 h-4" />
-        {saving ? 'Saving…' : saved ? '✓ Saved!' : 'Save Configuration'}
-      </button>
-    </div>
-  );
-}
 </file>
 
 <file path="frontend/src/components/common/ChatCore.tsx">
@@ -4315,82 +4450,15 @@ export const getThemeComponent = (slug: string) => {
 };
 </file>
 
-<file path="requirements.txt">
-alembic==1.18.4
-annotated-doc==0.0.4
-annotated-types==0.7.0
-anyio==4.12.1
-bcrypt==4.0.1
-certifi==2026.1.4
-cffi==2.0.0
-charset-normalizer==3.4.4
-click==8.3.1
-colorama==0.4.6
-cryptography==46.0.5
-distro==1.9.0
-dnspython==2.8.0
-ecdsa==0.19.1
-email-validator==2.3.0
-fastapi==0.129.2
-google-auth==2.48.0
-google-auth-oauthlib==1.3.0
-greenlet==3.3.2
-gspread==6.2.1
-gunicorn==25.1.0
-h11==0.16.0
-httpcore==1.0.9
-httplib2==0.31.2
-httpx==0.28.1
-idna==3.11
-jiter==0.13.0
-jsonpatch==1.33
-jsonpointer==3.0.0
-langchain-core==1.2.16
-langchain-text-splitters==1.1.1
-langsmith==0.7.9
-Mako==1.3.10
-MarkupSafe==3.0.3
-numpy==2.4.2
-oauth2client==4.1.3
-oauthlib==3.3.1
-openai==2.21.0
-orjson==3.11.7
-packaging==26.0
-passlib==1.7.4
-pgvector==0.4.2
-psycopg2-binary==2.9.11
-pyasn1==0.6.2
-pyasn1_modules==0.4.2
-pycparser==3.0
-pydantic==2.12.5
-pydantic-settings==2.13.1
-pydantic_core==2.41.5
-PyMuPDF==1.27.1
-pyparsing==3.3.2
-python-dotenv==1.2.1
-python-jose==3.5.0
-python-multipart==0.0.22
-PyYAML==6.0.3
-redis==7.2.0
-requests==2.32.5
-requests-oauthlib==2.0.0
-requests-toolbelt==1.0.0
-rsa==4.9.1
-six==1.17.0
-sniffio==1.3.1
-SQLAlchemy==2.0.46
-starlette==0.52.1
-tenacity==9.1.4
-tqdm==4.67.3
-typing-inspection==0.4.2
-typing_extensions==4.15.0
-urllib3==2.6.3
-uuid_utils==0.14.1
-uvicorn==0.41.0
-xxhash==3.6.0
-zstandard==0.25.0
-redis==7.2.0      # already there — just confirm it's present
-APScheduler==3.10.4
+<file path="local run code.txt">
+git add .
+git commit -m "fix: remove duplicate table creations from alembic migration"
+git push origin main
+
+
+cd "D:\Hospital\hospital-ai-platform"
+
+npx repomix
 </file>
 
 <file path="vite.config.ts">
@@ -4412,62 +4480,6 @@ export default defineConfig({
     }
   }
 })
-</file>
-
-<file path="backend/alembic/versions/a1b2c3d4e5f6_add_appointments.py">
-"""add appointments table and booking_config
-
-Revision ID: a1b2c3d4e5f6
-Revises: 8e2627e5f8b9
-Create Date: 2026-04-12
-"""
-from alembic import op
-import sqlalchemy as sa
-
-revision = 'a1b2c3d4e5f6'
-down_revision = '8e2627e5f8b9'
-branch_labels = None
-depends_on = None
-
-
-def upgrade() -> None:
-    # 1. Add booking_config JSON column to hospital table
-    op.add_column(
-        'hospital',
-        sa.Column('booking_config', sa.Text(), nullable=True)
-    )
-
-    # 2. Create appointments table
-    op.create_table(
-        'appointments',
-        sa.Column('id',               sa.Integer(),  primary_key=True, index=True),
-        sa.Column('reference_number', sa.String(),   nullable=False, unique=True),
-        sa.Column('hospital_id',      sa.Integer(),  sa.ForeignKey('hospital.id'), nullable=False),
-        sa.Column('doctor_id',        sa.Integer(),  sa.ForeignKey('doctors.id'),  nullable=False),
-        sa.Column('patient_name',     sa.String(),   nullable=False),
-        sa.Column('patient_age',      sa.String(),   nullable=False),
-        sa.Column('patient_phone',    sa.String(),   nullable=False),
-        sa.Column('preferred_date',   sa.String(),   nullable=False),
-        sa.Column('time_of_day',      sa.String(),   nullable=False),
-        sa.Column('confirmed_time',   sa.String(),   nullable=True),
-        sa.Column('status',           sa.String(),   nullable=False, server_default='pending'),
-        sa.Column('rejection_reason', sa.String(),   nullable=True),
-        sa.Column('created_at',       sa.DateTime(), nullable=True),
-        sa.Column('updated_at',       sa.DateTime(), nullable=True),
-    )
-
-    # 3. Indexes for fast lookups
-    op.create_index('ix_appointments_hospital_id', 'appointments', ['hospital_id'])
-    op.create_index('ix_appointments_status',      'appointments', ['status'])
-    op.create_index('ix_appointments_doctor_date', 'appointments', ['doctor_id', 'preferred_date'])
-
-
-def downgrade() -> None:
-    op.drop_index('ix_appointments_doctor_date', table_name='appointments')
-    op.drop_index('ix_appointments_status',      table_name='appointments')
-    op.drop_index('ix_appointments_hospital_id', table_name='appointments')
-    op.drop_table('appointments')
-    op.drop_column('hospital', 'booking_config')
 </file>
 
 <file path="backend/alembic/versions/cadd3b177e0d_add_embedding_to_doctors.py">
@@ -4539,16 +4551,355 @@ def downgrade() -> None:
     op.drop_column('knowledge_base', 'entry_type')
 </file>
 
-<file path="backend/app/api/v1/endpoints/__init__.py">
-# Location: D:\Hospital\hospital-ai-platform\backend\app\api\v1\endpoints\__init__.py
-from .hospitals import router as hospitals
-from .auth import router as auth
-from .ai import router as ai
-from .appointments import router as appointments
-from .usage import router as usage
-from .medicines import router as medicines
-from .lab_tests import router as lab_tests
-from .doctor_availability import router as availability
+<file path="backend/app/api/v1/endpoints/appointments.py">
+"""
+app/api/v1/endpoints/appointments.py
+
+All appointment-related REST endpoints consumed by:
+  - The admin dashboard (list, approve, reject, config)
+  - The chat bot via ai.py (create, status check)
+"""
+
+import json
+import logging
+from datetime import datetime, timezone
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Body
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+# FIX: Imported get_token_payload to enforce Tenant Isolation
+from app.api.deps import get_db, get_current_tenant, get_token_payload
+from app.models.appointment import Appointment
+from app.models.doctor import Doctor
+from app.models.hospital import Hospital
+from app.services.booking_rules import validate_booking, get_booking_config
+from app.services.email import notify_staff_new_appointment, notify_patient_approved
+
+logger = logging.getLogger(__name__)
+router = APIRouter()
+
+
+# =============================================================================
+# SCHEMAS
+# =============================================================================
+
+class AppointmentCreate(BaseModel):
+    hospital_id: int
+    doctor_id: int
+    patient_name: str
+    patient_age: str
+    patient_phone: str
+    preferred_date: str   # "YYYY-MM-DD"
+    time_of_day: str      # "morning" | "afternoon" | "evening"
+
+
+class ApprovePayload(BaseModel):
+    confirmed_time: str   # e.g. "10:30 AM"
+
+
+class RejectPayload(BaseModel):
+    reason: str
+
+
+class BookingConfigPayload(BaseModel):
+    bookable_departments: list[str] = []
+    min_advance_hours: int = 2
+    max_per_doctor_per_day: int = 20
+    notification_email: str = ""
+    reminder_hours_before: int = 24
+
+
+# =============================================================================
+# CREATE — called by the chatbot after patient confirms (Public)
+# =============================================================================
+
+@router.post("/")
+def create_appointment(payload: AppointmentCreate, db: Session = Depends(get_db)):
+    hospital = db.query(Hospital).filter(Hospital.id == payload.hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+
+    doctor = db.query(Doctor).filter(
+        Doctor.id == payload.doctor_id,
+        Doctor.hospital_id == payload.hospital_id
+    ).first()
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+
+    # Validate against per-hospital booking rules
+    ok, error = validate_booking(hospital, doctor, payload.preferred_date, db)
+    if not ok:
+        raise HTTPException(status_code=400, detail=error)
+
+    appt = Appointment(
+        hospital_id=payload.hospital_id,
+        doctor_id=payload.doctor_id,
+        patient_name=payload.patient_name,
+        patient_age=payload.patient_age,
+        patient_phone=payload.patient_phone,
+        preferred_date=payload.preferred_date,
+        time_of_day=payload.time_of_day,
+        status="pending",
+    )
+    db.add(appt)
+    db.commit()
+    db.refresh(appt)
+
+    # Fire staff notification email (non-blocking — failure doesn't break booking)
+    config = get_booking_config(hospital)
+    staff_email = config.get("notification_email", "")
+    if staff_email:
+        notify_staff_new_appointment(
+            staff_email=staff_email,
+            hospital_name=hospital.name,
+            reference=appt.reference_number,
+            patient_name=appt.patient_name,
+            patient_age=appt.patient_age,
+            patient_phone=appt.patient_phone,
+            doctor_name=doctor.name,
+            preferred_date=appt.preferred_date,
+            time_of_day=appt.time_of_day,
+        )
+
+    return {
+        "reference_number": appt.reference_number,
+        "status": appt.status,
+        "message": "Appointment request submitted. The hospital will call you to confirm.",
+    }
+
+
+# =============================================================================
+# LIST — admin dashboard (Secured)
+# =============================================================================
+
+@router.get("/hospital/{hospital_id}")
+def list_appointments(
+    hospital_id: int,
+    status: Optional[str] = None,   # filter: pending | approved | rejected
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant),
+    payload: dict = Depends(get_token_payload) # Inject token data
+):
+    # ==========================================
+    # THE BOUNCER: Security Check
+    # ==========================================
+    user_role = payload.get("role")
+    user_hospital = payload.get("hospital_id")
+
+    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied. You can only view data for your assigned hospital.")
+    # ==========================================
+
+    q = db.query(Appointment).filter(Appointment.hospital_id == hospital_id)
+    if status:
+        q = q.filter(Appointment.status == status)
+    appts = q.order_by(Appointment.created_at.desc()).all()
+
+    results = []
+    for a in appts:
+        doctor = db.query(Doctor).filter(Doctor.id == a.doctor_id).first()
+        results.append({
+            "id": a.id,
+            "reference_number": a.reference_number,
+            "patient_name": a.patient_name,
+            "patient_age": a.patient_age,
+            "patient_phone": a.patient_phone,
+            "doctor_name": doctor.name if doctor else "Unknown",
+            "doctor_department": doctor.department if doctor else "",
+            "preferred_date": a.preferred_date,
+            "time_of_day": a.time_of_day,
+            "status": a.status,
+            "confirmed_time": a.confirmed_time,
+            "rejection_reason": a.rejection_reason,
+            "created_at": a.created_at.isoformat() if a.created_at else None,
+        })
+    return results
+
+
+# =============================================================================
+# APPROVE (Secured)
+# =============================================================================
+
+@router.patch("/{appointment_id}/approve")
+def approve_appointment(
+    appointment_id: int,
+    body : ApprovePayload,
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant),
+    payload: dict = Depends(get_token_payload) # Inject token data
+):
+    appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    if not appt:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+
+    # ==========================================
+    # THE BOUNCER: Security Check
+    # ==========================================
+    user_role = payload.get("role")
+    user_hospital = payload.get("hospital_id")
+
+    if user_role != "superadmin" and str(user_hospital) != str(appt.hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied. You can only approve appointments for your assigned hospital.")
+    # ==========================================
+
+    if appt.status != "pending":
+        raise HTTPException(status_code=400, detail=f"Appointment is already {appt.status}")
+
+    appt.status = "approved"
+    appt.confirmed_time = body.confirmed_time
+    appt.updated_at = datetime.now(timezone.utc)
+    db.commit()
+
+    # Email staff to call patient
+    hospital = db.query(Hospital).filter(Hospital.id == appt.hospital_id).first()
+    doctor   = db.query(Doctor).filter(Doctor.id == appt.doctor_id).first()
+    if hospital:
+        config = get_booking_config(hospital)
+        staff_email = config.get("notification_email", "")
+        if staff_email:
+            notify_patient_approved(
+                staff_email=staff_email,
+                hospital_name=hospital.name,
+                reference=appt.reference_number,
+                patient_name=appt.patient_name,
+                patient_phone=appt.patient_phone,
+                doctor_name=doctor.name if doctor else "Doctor",
+                confirmed_time=body.confirmed_time,
+                preferred_date=appt.preferred_date,
+            )
+
+    return {"status": "approved", "confirmed_time": body.confirmed_time}
+
+
+# =============================================================================
+# REJECT (Secured)
+# =============================================================================
+
+@router.patch("/{appointment_id}/reject")
+def reject_appointment(
+    appointment_id: int,
+    body : RejectPayload,
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant),
+    payload: dict = Depends(get_token_payload) # Inject token data
+):
+    appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    if not appt:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+
+    # ==========================================
+    # THE BOUNCER: Security Check
+    # ==========================================
+    user_role = payload.get("role")
+    user_hospital = payload.get("hospital_id")
+
+    if user_role != "superadmin" and str(user_hospital) != str(appt.hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied. You can only reject appointments for your assigned hospital.")
+    # ==========================================
+
+    if appt.status != "pending":
+        raise HTTPException(status_code=400, detail=f"Appointment is already {appt.status}")
+
+    appt.status = "rejected"
+    appt.rejection_reason = body.reason
+    appt.updated_at = datetime.now(timezone.utc)
+    db.commit()
+
+    return {"status": "rejected", "reason": body.reason}
+
+
+# =============================================================================
+# STATUS CHECK — patient checks via bot using phone + hospital (Public)
+# =============================================================================
+
+@router.get("/status/{hospital_id}/{phone}")
+def get_appointment_status(
+    hospital_id: int,
+    phone: str,
+    db: Session = Depends(get_db),
+):
+    appts = (
+        db.query(Appointment)
+        .filter(
+            Appointment.hospital_id == hospital_id,
+            Appointment.patient_phone == phone,
+        )
+        .order_by(Appointment.created_at.desc())
+        .limit(3)
+        .all()
+    )
+    if not appts:
+        return {"found": False, "message": "No appointments found for this phone number."}
+
+    results = []
+    for a in appts:
+        doctor = db.query(Doctor).filter(Doctor.id == a.doctor_id).first()
+        results.append({
+            "reference_number": a.reference_number,
+            "doctor_name": doctor.name if doctor else "Unknown",
+            "preferred_date": a.preferred_date,
+            "time_of_day": a.time_of_day,
+            "status": a.status,
+            "confirmed_time": a.confirmed_time,
+            "rejection_reason": a.rejection_reason,
+        })
+
+    return {"found": True, "appointments": results}
+
+
+# =============================================================================
+# BOOKING CONFIG — per-hospital rules (Secured admin only)
+# =============================================================================
+
+@router.get("/config/{hospital_id}")
+def get_booking_config_endpoint(
+    hospital_id: int,
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant),
+    payload: dict = Depends(get_token_payload) # Inject token data
+):
+    # ==========================================
+    # THE BOUNCER: Security Check
+    # ==========================================
+    user_role = payload.get("role")
+    user_hospital = payload.get("hospital_id")
+
+    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied.")
+    # ==========================================
+
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+    return get_booking_config(hospital)
+
+
+@router.patch("/config/{hospital_id}")
+def update_booking_config(
+    hospital_id: int,
+    config_payload: BookingConfigPayload,
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant),
+    payload: dict = Depends(get_token_payload) # Inject token data
+):
+    # ==========================================
+    # THE BOUNCER: Security Check
+    # ==========================================
+    user_role = payload.get("role")
+    user_hospital = payload.get("hospital_id")
+
+    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied.")
+    # ==========================================
+
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+    hospital.booking_config = json.dumps(config_payload.model_dump())
+    db.commit()
+    return {"status": "success", "config": config_payload.model_dump()}
 </file>
 
 <file path="backend/app/api/v1/endpoints/auth.py">
@@ -5364,355 +5715,19 @@ def get_token_payload(token: str = Depends(oauth2_scheme)) -> dict:
         )
 </file>
 
-<file path="backend/app/api/v1/endpoints/appointments.py">
-"""
-app/api/v1/endpoints/appointments.py
+<file path="backend/app/db/base.py">
+from app.db.base_class import Base  # noqa
+from app.models.hospital import Hospital  # noqa
+from app.models.doctor import Doctor  # noqa
+from app.models.user import User  # noqa
+from app.models.appointment import Appointment  # noqa
+from app.models.medicine import Medicine # noqa
+from app.models.lab_test import LabTest # noqa
+from app.models.doctor_availability import DoctorSchedule, DoctorLeave # noqa
 
-All appointment-related REST endpoints consumed by:
-  - The admin dashboard (list, approve, reject, config)
-  - The chat bot via ai.py (create, status check)
-"""
-
-import json
-import logging
-from datetime import datetime, timezone
-from typing import Optional
-
-from fastapi import APIRouter, Depends, HTTPException, Body
-from pydantic import BaseModel
-from sqlalchemy.orm import Session
-
-# FIX: Imported get_token_payload to enforce Tenant Isolation
-from app.api.deps import get_db, get_current_tenant, get_token_payload
-from app.models.appointment import Appointment
-from app.models.doctor import Doctor
-from app.models.hospital import Hospital
-from app.services.booking_rules import validate_booking, get_booking_config
-from app.services.email import notify_staff_new_appointment, notify_patient_approved
-
-logger = logging.getLogger(__name__)
-router = APIRouter()
-
-
-# =============================================================================
-# SCHEMAS
-# =============================================================================
-
-class AppointmentCreate(BaseModel):
-    hospital_id: int
-    doctor_id: int
-    patient_name: str
-    patient_age: str
-    patient_phone: str
-    preferred_date: str   # "YYYY-MM-DD"
-    time_of_day: str      # "morning" | "afternoon" | "evening"
-
-
-class ApprovePayload(BaseModel):
-    confirmed_time: str   # e.g. "10:30 AM"
-
-
-class RejectPayload(BaseModel):
-    reason: str
-
-
-class BookingConfigPayload(BaseModel):
-    bookable_departments: list[str] = []
-    min_advance_hours: int = 2
-    max_per_doctor_per_day: int = 20
-    notification_email: str = ""
-    reminder_hours_before: int = 24
-
-
-# =============================================================================
-# CREATE — called by the chatbot after patient confirms (Public)
-# =============================================================================
-
-@router.post("/")
-def create_appointment(payload: AppointmentCreate, db: Session = Depends(get_db)):
-    hospital = db.query(Hospital).filter(Hospital.id == payload.hospital_id).first()
-    if not hospital:
-        raise HTTPException(status_code=404, detail="Hospital not found")
-
-    doctor = db.query(Doctor).filter(
-        Doctor.id == payload.doctor_id,
-        Doctor.hospital_id == payload.hospital_id
-    ).first()
-    if not doctor:
-        raise HTTPException(status_code=404, detail="Doctor not found")
-
-    # Validate against per-hospital booking rules
-    ok, error = validate_booking(hospital, doctor, payload.preferred_date, db)
-    if not ok:
-        raise HTTPException(status_code=400, detail=error)
-
-    appt = Appointment(
-        hospital_id=payload.hospital_id,
-        doctor_id=payload.doctor_id,
-        patient_name=payload.patient_name,
-        patient_age=payload.patient_age,
-        patient_phone=payload.patient_phone,
-        preferred_date=payload.preferred_date,
-        time_of_day=payload.time_of_day,
-        status="pending",
-    )
-    db.add(appt)
-    db.commit()
-    db.refresh(appt)
-
-    # Fire staff notification email (non-blocking — failure doesn't break booking)
-    config = get_booking_config(hospital)
-    staff_email = config.get("notification_email", "")
-    if staff_email:
-        notify_staff_new_appointment(
-            staff_email=staff_email,
-            hospital_name=hospital.name,
-            reference=appt.reference_number,
-            patient_name=appt.patient_name,
-            patient_age=appt.patient_age,
-            patient_phone=appt.patient_phone,
-            doctor_name=doctor.name,
-            preferred_date=appt.preferred_date,
-            time_of_day=appt.time_of_day,
-        )
-
-    return {
-        "reference_number": appt.reference_number,
-        "status": appt.status,
-        "message": "Appointment request submitted. The hospital will call you to confirm.",
-    }
-
-
-# =============================================================================
-# LIST — admin dashboard (Secured)
-# =============================================================================
-
-@router.get("/hospital/{hospital_id}")
-def list_appointments(
-    hospital_id: int,
-    status: Optional[str] = None,   # filter: pending | approved | rejected
-    db: Session = Depends(get_db),
-    _tenant: int = Depends(get_current_tenant),
-    payload: dict = Depends(get_token_payload) # Inject token data
-):
-    # ==========================================
-    # THE BOUNCER: Security Check
-    # ==========================================
-    user_role = payload.get("role")
-    user_hospital = payload.get("hospital_id")
-
-    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
-        raise HTTPException(status_code=403, detail="Access denied. You can only view data for your assigned hospital.")
-    # ==========================================
-
-    q = db.query(Appointment).filter(Appointment.hospital_id == hospital_id)
-    if status:
-        q = q.filter(Appointment.status == status)
-    appts = q.order_by(Appointment.created_at.desc()).all()
-
-    results = []
-    for a in appts:
-        doctor = db.query(Doctor).filter(Doctor.id == a.doctor_id).first()
-        results.append({
-            "id": a.id,
-            "reference_number": a.reference_number,
-            "patient_name": a.patient_name,
-            "patient_age": a.patient_age,
-            "patient_phone": a.patient_phone,
-            "doctor_name": doctor.name if doctor else "Unknown",
-            "doctor_department": doctor.department if doctor else "",
-            "preferred_date": a.preferred_date,
-            "time_of_day": a.time_of_day,
-            "status": a.status,
-            "confirmed_time": a.confirmed_time,
-            "rejection_reason": a.rejection_reason,
-            "created_at": a.created_at.isoformat() if a.created_at else None,
-        })
-    return results
-
-
-# =============================================================================
-# APPROVE (Secured)
-# =============================================================================
-
-@router.patch("/{appointment_id}/approve")
-def approve_appointment(
-    appointment_id: int,
-    body : ApprovePayload,
-    db: Session = Depends(get_db),
-    _tenant: int = Depends(get_current_tenant),
-    payload: dict = Depends(get_token_payload) # Inject token data
-):
-    appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
-    if not appt:
-        raise HTTPException(status_code=404, detail="Appointment not found")
-
-    # ==========================================
-    # THE BOUNCER: Security Check
-    # ==========================================
-    user_role = payload.get("role")
-    user_hospital = payload.get("hospital_id")
-
-    if user_role != "superadmin" and str(user_hospital) != str(appt.hospital_id):
-        raise HTTPException(status_code=403, detail="Access denied. You can only approve appointments for your assigned hospital.")
-    # ==========================================
-
-    if appt.status != "pending":
-        raise HTTPException(status_code=400, detail=f"Appointment is already {appt.status}")
-
-    appt.status = "approved"
-    appt.confirmed_time = body.confirmed_time
-    appt.updated_at = datetime.now(timezone.utc)
-    db.commit()
-
-    # Email staff to call patient
-    hospital = db.query(Hospital).filter(Hospital.id == appt.hospital_id).first()
-    doctor   = db.query(Doctor).filter(Doctor.id == appt.doctor_id).first()
-    if hospital:
-        config = get_booking_config(hospital)
-        staff_email = config.get("notification_email", "")
-        if staff_email:
-            notify_patient_approved(
-                staff_email=staff_email,
-                hospital_name=hospital.name,
-                reference=appt.reference_number,
-                patient_name=appt.patient_name,
-                patient_phone=appt.patient_phone,
-                doctor_name=doctor.name if doctor else "Doctor",
-                confirmed_time=body.confirmed_time,
-                preferred_date=appt.preferred_date,
-            )
-
-    return {"status": "approved", "confirmed_time": body.confirmed_time}
-
-
-# =============================================================================
-# REJECT (Secured)
-# =============================================================================
-
-@router.patch("/{appointment_id}/reject")
-def reject_appointment(
-    appointment_id: int,
-    body : RejectPayload,
-    db: Session = Depends(get_db),
-    _tenant: int = Depends(get_current_tenant),
-    payload: dict = Depends(get_token_payload) # Inject token data
-):
-    appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
-    if not appt:
-        raise HTTPException(status_code=404, detail="Appointment not found")
-
-    # ==========================================
-    # THE BOUNCER: Security Check
-    # ==========================================
-    user_role = payload.get("role")
-    user_hospital = payload.get("hospital_id")
-
-    if user_role != "superadmin" and str(user_hospital) != str(appt.hospital_id):
-        raise HTTPException(status_code=403, detail="Access denied. You can only reject appointments for your assigned hospital.")
-    # ==========================================
-
-    if appt.status != "pending":
-        raise HTTPException(status_code=400, detail=f"Appointment is already {appt.status}")
-
-    appt.status = "rejected"
-    appt.rejection_reason = body.reason
-    appt.updated_at = datetime.now(timezone.utc)
-    db.commit()
-
-    return {"status": "rejected", "reason": body.reason}
-
-
-# =============================================================================
-# STATUS CHECK — patient checks via bot using phone + hospital (Public)
-# =============================================================================
-
-@router.get("/status/{hospital_id}/{phone}")
-def get_appointment_status(
-    hospital_id: int,
-    phone: str,
-    db: Session = Depends(get_db),
-):
-    appts = (
-        db.query(Appointment)
-        .filter(
-            Appointment.hospital_id == hospital_id,
-            Appointment.patient_phone == phone,
-        )
-        .order_by(Appointment.created_at.desc())
-        .limit(3)
-        .all()
-    )
-    if not appts:
-        return {"found": False, "message": "No appointments found for this phone number."}
-
-    results = []
-    for a in appts:
-        doctor = db.query(Doctor).filter(Doctor.id == a.doctor_id).first()
-        results.append({
-            "reference_number": a.reference_number,
-            "doctor_name": doctor.name if doctor else "Unknown",
-            "preferred_date": a.preferred_date,
-            "time_of_day": a.time_of_day,
-            "status": a.status,
-            "confirmed_time": a.confirmed_time,
-            "rejection_reason": a.rejection_reason,
-        })
-
-    return {"found": True, "appointments": results}
-
-
-# =============================================================================
-# BOOKING CONFIG — per-hospital rules (Secured admin only)
-# =============================================================================
-
-@router.get("/config/{hospital_id}")
-def get_booking_config_endpoint(
-    hospital_id: int,
-    db: Session = Depends(get_db),
-    _tenant: int = Depends(get_current_tenant),
-    payload: dict = Depends(get_token_payload) # Inject token data
-):
-    # ==========================================
-    # THE BOUNCER: Security Check
-    # ==========================================
-    user_role = payload.get("role")
-    user_hospital = payload.get("hospital_id")
-
-    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
-        raise HTTPException(status_code=403, detail="Access denied.")
-    # ==========================================
-
-    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
-    if not hospital:
-        raise HTTPException(status_code=404, detail="Hospital not found")
-    return get_booking_config(hospital)
-
-
-@router.patch("/config/{hospital_id}")
-def update_booking_config(
-    hospital_id: int,
-    config_payload: BookingConfigPayload,
-    db: Session = Depends(get_db),
-    _tenant: int = Depends(get_current_tenant),
-    payload: dict = Depends(get_token_payload) # Inject token data
-):
-    # ==========================================
-    # THE BOUNCER: Security Check
-    # ==========================================
-    user_role = payload.get("role")
-    user_hospital = payload.get("hospital_id")
-
-    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
-        raise HTTPException(status_code=403, detail="Access denied.")
-    # ==========================================
-
-    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
-    if not hospital:
-        raise HTTPException(status_code=404, detail="Hospital not found")
-    hospital.booking_config = json.dumps(config_payload.model_dump())
-    db.commit()
-    return {"status": "success", "config": config_payload.model_dump()}
+# Un-commented and fixed paths!
+from app.models.knowledge import KnowledgeBase # noqa
+from app.models.usage import UsageLedger # noqa
 </file>
 
 <file path="backend/embed_doctors.py">
@@ -6997,22 +7012,8 @@ style={{ height: '400px' }}>
 export default Chat;
 </file>
 
-<file path="backend/app/db/base.py">
-from app.db.base_class import Base  # noqa
-from app.models.hospital import Hospital  # noqa
-from app.models.doctor import Doctor  # noqa
-from app.models.user import User  # noqa
-from app.models.appointment import Appointment  # noqa
-from app.models.medicine import Medicine # noqa
-from app.models.lab_test import LabTest # noqa
-from app.models.doctor_availability import DoctorSchedule, DoctorLeave # noqa
-
-# Un-commented and fixed paths!
-from app.models.knowledge import KnowledgeBase # noqa
-from app.models.usage import UsageLedger # noqa
-</file>
-
 <file path="backend/app/main.py">
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.base import Base
@@ -7037,6 +7038,11 @@ ALLOWED_ORIGINS = [
         "https://hospital-ai-platform.vercel.app,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
     ).split(",") if o.strip()
 ]
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -7069,6 +7075,119 @@ def read_root():
         "message": "Welcome to the Hospital AI Platform API",
         "version": "v1.0.0"
     }
+</file>
+
+<file path="frontend/src/layouts/DashboardLayout.tsx">
+import { Outlet, Link, useNavigate, useParams, useLocation } from 'react-router-dom';
+import { LayoutDashboard, Users, Building2, Settings, LogOut, BrainCircuit, CalendarCheck, Pill, TestTube } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+export default function DashboardLayout() {
+  const navigate = useNavigate();
+  const { hospitalId } = useParams();
+  const location = useLocation();
+  const { logout, role } = useAuth();
+
+  const handleSignOut = () => {
+    logout();
+    navigate('/login');
+  };
+
+  const isActive = (path: string) => location.pathname === path;
+  const linkBase = 'flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors';
+  const linkActive = 'bg-blue-50 text-blue-600';
+  const linkIdle = 'text-gray-700 hover:bg-blue-50';
+
+  return (
+    <div className="flex h-screen bg-gray-50">
+      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col shadow-sm">
+        <div className="p-6 border-b">
+          <h2 className="text-xl font-bold text-blue-600 flex items-center gap-2">
+            <Building2 className="w-6 h-6" /> Gothos Labs
+          </h2>
+        </div>
+
+        <nav className="flex-1 p-4 space-y-2">
+          {role === 'superadmin' && (
+            <Link
+              to="/"
+              className={`${linkBase} ${isActive('/') ? linkActive : linkIdle}`}
+            >
+              <LayoutDashboard className="w-5 h-5" /> Hospitals
+            </Link>
+          )}
+
+          {hospitalId && (
+            <>
+              <div className="mt-6 mb-2 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                Management
+              </div>
+
+              <Link
+                to={`/hospitals/${hospitalId}/appointments`}
+                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/appointments`) ? linkActive : linkIdle}`}
+              >
+                <CalendarCheck className="w-5 h-5 text-blue-500" /> Appointments
+              </Link>
+
+              <Link
+                to={`/hospitals/${hospitalId}/doctors`}
+                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/doctors`) ? linkActive : linkIdle}`}
+              >
+                <Users className="w-5 h-5 text-blue-500" /> Doctors
+              </Link>
+
+              {/* Settings is now visible to all roles */}
+              <Link
+                to={`/hospitals/${hospitalId}/settings`}
+                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/settings`) ? linkActive : linkIdle}`}
+              >
+                <Settings className="w-5 h-5 text-blue-500" /> Settings
+              </Link>
+              <Link
+                to={`/hospitals/${hospitalId}/pharmacy`}
+                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/pharmacy`) ? linkActive : linkIdle}`}
+              >
+                <Pill className="w-5 h-5 text-blue-500" /> Pharmacy
+              </Link>
+
+              <Link
+                to={`/hospitals/${hospitalId}/lab-tests`}
+                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/lab-tests`) ? linkActive : linkIdle}`}
+              >
+                <TestTube className="w-5 h-5 text-purple-500" /> Lab Tests
+              </Link>
+
+              {/* AI Training is Superadmin only */}
+              {role === 'superadmin' && (
+                <Link
+                  to={`/hospitals/${hospitalId}/training`}
+                  className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/training`) ? linkActive : linkIdle}`}
+                >
+                  <BrainCircuit className="w-5 h-5 text-blue-500" /> AI Training
+                </Link>
+              )}
+            </>
+          )}
+        </nav>
+
+        <div className="p-4 border-t">
+          <button
+            onClick={handleSignOut}
+            className="flex items-center gap-3 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium w-full transition-colors"
+          >
+            <LogOut className="w-5 h-5" /> Sign Out
+          </button>
+        </div>
+      </aside>
+
+      <main className="flex-1 overflow-auto bg-gray-50">
+        <div className="p-8">
+          <Outlet />
+        </div>
+      </main>
+    </div>
+  );
+}
 </file>
 
 <file path="frontend/src/pages/Doctors.tsx">
@@ -8128,119 +8247,6 @@ def update_medicine(
     return db_item
 </file>
 
-<file path="frontend/src/layouts/DashboardLayout.tsx">
-import { Outlet, Link, useNavigate, useParams, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Building2, Settings, LogOut, BrainCircuit, CalendarCheck, Pill, TestTube } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-export default function DashboardLayout() {
-  const navigate = useNavigate();
-  const { hospitalId } = useParams();
-  const location = useLocation();
-  const { logout, role } = useAuth();
-
-  const handleSignOut = () => {
-    logout();
-    navigate('/login');
-  };
-
-  const isActive = (path: string) => location.pathname === path;
-  const linkBase = 'flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors';
-  const linkActive = 'bg-blue-50 text-blue-600';
-  const linkIdle = 'text-gray-700 hover:bg-blue-50';
-
-  return (
-    <div className="flex h-screen bg-gray-50">
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col shadow-sm">
-        <div className="p-6 border-b">
-          <h2 className="text-xl font-bold text-blue-600 flex items-center gap-2">
-            <Building2 className="w-6 h-6" /> Gothos Labs
-          </h2>
-        </div>
-
-        <nav className="flex-1 p-4 space-y-2">
-          {role === 'superadmin' && (
-            <Link
-              to="/"
-              className={`${linkBase} ${isActive('/') ? linkActive : linkIdle}`}
-            >
-              <LayoutDashboard className="w-5 h-5" /> Hospitals
-            </Link>
-          )}
-
-          {hospitalId && (
-            <>
-              <div className="mt-6 mb-2 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                Management
-              </div>
-
-              <Link
-                to={`/hospitals/${hospitalId}/appointments`}
-                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/appointments`) ? linkActive : linkIdle}`}
-              >
-                <CalendarCheck className="w-5 h-5 text-blue-500" /> Appointments
-              </Link>
-
-              <Link
-                to={`/hospitals/${hospitalId}/doctors`}
-                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/doctors`) ? linkActive : linkIdle}`}
-              >
-                <Users className="w-5 h-5 text-blue-500" /> Doctors
-              </Link>
-
-              {/* Settings is now visible to all roles */}
-              <Link
-                to={`/hospitals/${hospitalId}/settings`}
-                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/settings`) ? linkActive : linkIdle}`}
-              >
-                <Settings className="w-5 h-5 text-blue-500" /> Settings
-              </Link>
-              <Link
-                to={`/hospitals/${hospitalId}/pharmacy`}
-                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/pharmacy`) ? linkActive : linkIdle}`}
-              >
-                <Pill className="w-5 h-5 text-blue-500" /> Pharmacy
-              </Link>
-
-              <Link
-                to={`/hospitals/${hospitalId}/lab-tests`}
-                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/lab-tests`) ? linkActive : linkIdle}`}
-              >
-                <TestTube className="w-5 h-5 text-purple-500" /> Lab Tests
-              </Link>
-
-              {/* AI Training is Superadmin only */}
-              {role === 'superadmin' && (
-                <Link
-                  to={`/hospitals/${hospitalId}/training`}
-                  className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/training`) ? linkActive : linkIdle}`}
-                >
-                  <BrainCircuit className="w-5 h-5 text-blue-500" /> AI Training
-                </Link>
-              )}
-            </>
-          )}
-        </nav>
-
-        <div className="p-4 border-t">
-          <button
-            onClick={handleSignOut}
-            className="flex items-center gap-3 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium w-full transition-colors"
-          >
-            <LogOut className="w-5 h-5" /> Sign Out
-          </button>
-        </div>
-      </aside>
-
-      <main className="flex-1 overflow-auto bg-gray-50">
-        <div className="p-8">
-          <Outlet />
-        </div>
-      </main>
-    </div>
-  );
-}
-</file>
-
 <file path="frontend/src/pages/LabTests.tsx">
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
@@ -8625,6 +8631,308 @@ export default function PharmacyPage() {
         )}
       </div>
     </div>
+  );
+}
+</file>
+
+<file path="frontend/src/App.tsx">
+import { Routes, Route, Navigate, Link, useParams } from 'react-router-dom';
+import DashboardLayout from './layouts/DashboardLayout';
+import CreateHospitalModal from './components/CreateHospitalModal';
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import DoctorsPage from './pages/Doctors';
+import SettingsPage from './pages/Settings';
+import ThemeLoader from './themes/ThemeLoader';
+import api from './api/axios';
+import { useEffect, useState } from 'react';
+import { Plus, Trash2 } from 'lucide-react';
+import { useAuth } from './context/AuthContext';
+import AppointmentsTab from './components/AppointmentsTab';
+import PharmacyPage from './pages/Pharmacy';
+import LabTestsPage from './pages/LabTests';
+import IrisPage from './pages/IrisPage'
+
+
+/**
+ * Replace the HospitalList function in frontend/src/App.tsx with this.
+ * 
+ * Changes:
+ *  - Adds a Delete button (trash icon) on each hospital card
+ *  - Shows a confirmation dialog before deleting
+ *  - Calls DELETE /hospitals/:id on confirm
+ *  - Refreshes the list after deletion
+ * 
+ * Also add this import at the top of App.tsx:
+ *   import { Plus, Trash2 } from 'lucide-react';
+ */
+
+
+
+// ── Confirmation dialog ──────────────────────────────────────────
+interface DeleteDialogProps {
+  hospital: { id: number; name: string } | null;
+  onConfirm: () => void;
+  onCancel: () => void;
+  isDeleting: boolean;
+}
+
+function DeleteConfirmDialog({ hospital, onConfirm, onCancel, isDeleting }: DeleteDialogProps) {
+  if (!hospital) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full mx-4 p-6">
+        <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Trash2 className="w-6 h-6 text-red-600" />
+        </div>
+        <h3 className="text-lg font-bold text-gray-900 text-center mb-2">Delete Hospital?</h3>
+        <p className="text-sm text-gray-500 text-center mb-1">
+          You are about to permanently delete
+        </p>
+        <p className="text-sm font-semibold text-gray-900 text-center mb-4">
+          "{hospital.name}"
+        </p>
+        <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2 text-center mb-6">
+          ⚠️ This will also delete all doctors, appointments, knowledge base entries,
+          and staff accounts for this hospital. This cannot be undone.
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            disabled={isDeleting}
+            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={isDeleting}
+            className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {isDeleting ? (
+              <>
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                </svg>
+                Deleting…
+              </>
+            ) : (
+              <>
+                <Trash2 className="w-4 h-4" /> Delete Permanently
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+// ── HospitalList ─────────────────────────────────────────────────
+function HospitalList() {
+  const [hospitals, setHospitals] = useState<any[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const fetchHospitals = () => {
+    api.get('/hospitals/')
+      .then(res => setHospitals(res.data))
+      .catch(console.error);
+  };
+
+  useEffect(() => { fetchHospitals(); }, []);
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await api.delete(`/hospitals/${deleteTarget.id}`);
+      setDeleteTarget(null);
+      fetchHospitals();
+    } catch (err: any) {
+      setDeleteError(
+        err?.response?.data?.detail || 'Failed to delete hospital. Please try again.'
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-gray-900">Hospital Management</h2>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          <Plus className="w-4 h-4" /> Add Hospital
+        </button>
+      </div>
+
+      {/* Error banner */}
+      {deleteError && (
+        <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex justify-between items-center">
+          {deleteError}
+          <button onClick={() => setDeleteError(null)} className="text-red-400 hover:text-red-600 ml-4 font-bold">×</button>
+        </div>
+      )}
+
+      {/* Hospital cards */}
+      <div className="grid gap-6 md:grid-cols-3">
+        {hospitals.map((h: any) => (
+          <div
+            key={h.id}
+            className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow relative group"
+          >
+            {/* Delete button — top-right corner, visible on hover */}
+            <button
+              onClick={() => setDeleteTarget({ id: h.id, name: h.name })}
+              title="Delete hospital"
+              className="absolute top-3 right-3 p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+
+            <h3 className="font-bold text-gray-900 text-lg pr-8">{h.name}</h3>
+            <p className="text-xs text-gray-400 mb-4">Slug: {h.slug}</p>
+
+            <div className="flex gap-2 border-t pt-4">
+              <Link
+                to={`/hospitals/${h.id}/appointments`}
+                className="flex-1 text-center text-xs bg-emerald-600 text-white py-2 rounded-md font-medium hover:bg-emerald-700"
+              >
+                Appointments
+              </Link>
+              <Link
+                to={`/hospitals/${h.id}/training`}
+                className="flex-1 text-center text-xs bg-blue-600 text-white py-2 rounded-md font-medium hover:bg-blue-700"
+              >
+                Train AI
+              </Link>
+              <Link
+                to={`/hospitals/${h.id}/settings`}
+                className="flex-1 text-center text-xs border border-gray-300 text-gray-600 py-2 rounded-md font-medium hover:bg-gray-50"
+              >
+                Settings
+              </Link>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Modals */}
+      <CreateHospitalModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={fetchHospitals}
+      />
+
+      <DeleteConfirmDialog
+        hospital={deleteTarget}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => { setDeleteTarget(null); setDeleteError(null); }}
+        isDeleting={isDeleting}
+      />
+    </div>
+  );
+}
+
+
+
+
+// ==========================================
+// NEW: Security Guard Component
+// ==========================================
+function StaffGuard({ children }: { children: React.ReactNode }) {
+  const { role, hospitalId } = useAuth();
+  const { hospitalId: routeHospitalId } = useParams();
+
+  // If staff tries to access a different hospital's URL, kick them back to their own
+  if (role === 'staff' && String(hospitalId) !== String(routeHospitalId)) {
+    return <Navigate to={`/hospitals/${hospitalId}/appointments`} replace />;
+
+  }
+  
+  return <>{children}</>;
+}
+
+// ==========================================
+// MAIN APP ROUTER
+// ==========================================
+export default function App() {
+  const { isAuthenticated, role, hospitalId } = useAuth();
+
+  return (
+    <Routes>
+      {/* Public patient-facing route */}
+{/* Iris Hospital dedicated route - must be before /p/:hospitalSlug */}
+
+
+{/* Public patient-facing route */}
+<Route path="/p/:hospitalSlug" element={<ThemeLoader />} />
+<Route path="/iris" element={<IrisPage />} />
+
+{/* Auth route */}
+<Route
+  path="/login"
+  element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
+/>
+
+
+      {/* Protected admin routes */}
+      <Route element={isAuthenticated ? <DashboardLayout /> : <Navigate to="/login" replace />}>
+        
+        {/* Root Route: Redirect Staff directly to Settings, Show list to Superadmin */}
+        <Route 
+          path="/" 
+          element={
+            role === 'staff' && hospitalId ? (
+              <Navigate to={`/hospitals/${hospitalId}/appointments`} replace />
+
+            ) : (
+              <HospitalList />
+            )
+          } 
+        />
+
+        {/* Common Routes (Secured by StaffGuard so they can't swap IDs) */}
+        <Route 
+          path="/hospitals/:hospitalId/appointments" 
+          element={<StaffGuard><AppointmentsTab /></StaffGuard>} 
+        />
+        <Route 
+          path="/hospitals/:hospitalId/doctors" 
+          element={<StaffGuard><DoctorsPage /></StaffGuard>} 
+        />
+        <Route 
+          path="/hospitals/:hospitalId/settings" 
+          element={<StaffGuard><SettingsPage /></StaffGuard>} 
+        />
+        <Route 
+          path="/hospitals/:hospitalId/pharmacy" 
+          element={<StaffGuard><PharmacyPage /></StaffGuard>} 
+        />
+        <Route 
+          path="/hospitals/:hospitalId/lab-tests" 
+          element={<StaffGuard><LabTestsPage /></StaffGuard>} 
+        />
+
+        {/* Superadmin Only Routes */}
+        <Route 
+          path="/hospitals/:hospitalId/training" 
+          element={role === 'superadmin' ? <Dashboard /> : <Navigate to="/" replace />} 
+        />
+
+      </Route>
+
+      {/* Catch-all redirects to root, which will cleanly re-route based on role */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
 </file>
@@ -9045,308 +9353,6 @@ def delete_hospital(
     db.commit()
 
     return {"status": "success", "message": f"Hospital '{hospital.name}' deleted."}
-</file>
-
-<file path="frontend/src/App.tsx">
-import { Routes, Route, Navigate, Link, useParams } from 'react-router-dom';
-import DashboardLayout from './layouts/DashboardLayout';
-import CreateHospitalModal from './components/CreateHospitalModal';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import DoctorsPage from './pages/Doctors';
-import SettingsPage from './pages/Settings';
-import ThemeLoader from './themes/ThemeLoader';
-import api from './api/axios';
-import { useEffect, useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
-import { useAuth } from './context/AuthContext';
-import AppointmentsTab from './components/AppointmentsTab';
-import PharmacyPage from './pages/Pharmacy';
-import LabTestsPage from './pages/LabTests';
-import IrisPage from './pages/IrisPage'
-
-
-/**
- * Replace the HospitalList function in frontend/src/App.tsx with this.
- * 
- * Changes:
- *  - Adds a Delete button (trash icon) on each hospital card
- *  - Shows a confirmation dialog before deleting
- *  - Calls DELETE /hospitals/:id on confirm
- *  - Refreshes the list after deletion
- * 
- * Also add this import at the top of App.tsx:
- *   import { Plus, Trash2 } from 'lucide-react';
- */
-
-
-
-// ── Confirmation dialog ──────────────────────────────────────────
-interface DeleteDialogProps {
-  hospital: { id: number; name: string } | null;
-  onConfirm: () => void;
-  onCancel: () => void;
-  isDeleting: boolean;
-}
-
-function DeleteConfirmDialog({ hospital, onConfirm, onCancel, isDeleting }: DeleteDialogProps) {
-  if (!hospital) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full mx-4 p-6">
-        <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <Trash2 className="w-6 h-6 text-red-600" />
-        </div>
-        <h3 className="text-lg font-bold text-gray-900 text-center mb-2">Delete Hospital?</h3>
-        <p className="text-sm text-gray-500 text-center mb-1">
-          You are about to permanently delete
-        </p>
-        <p className="text-sm font-semibold text-gray-900 text-center mb-4">
-          "{hospital.name}"
-        </p>
-        <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2 text-center mb-6">
-          ⚠️ This will also delete all doctors, appointments, knowledge base entries,
-          and staff accounts for this hospital. This cannot be undone.
-        </p>
-        <div className="flex gap-3">
-          <button
-            onClick={onCancel}
-            disabled={isDeleting}
-            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={isDeleting}
-            className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {isDeleting ? (
-              <>
-                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                </svg>
-                Deleting…
-              </>
-            ) : (
-              <>
-                <Trash2 className="w-4 h-4" /> Delete Permanently
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-// ── HospitalList ─────────────────────────────────────────────────
-function HospitalList() {
-  const [hospitals, setHospitals] = useState<any[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-
-  const fetchHospitals = () => {
-    api.get('/hospitals/')
-      .then(res => setHospitals(res.data))
-      .catch(console.error);
-  };
-
-  useEffect(() => { fetchHospitals(); }, []);
-
-  const handleDeleteConfirm = async () => {
-    if (!deleteTarget) return;
-    setIsDeleting(true);
-    setDeleteError(null);
-    try {
-      await api.delete(`/hospitals/${deleteTarget.id}`);
-      setDeleteTarget(null);
-      fetchHospitals();
-    } catch (err: any) {
-      setDeleteError(
-        err?.response?.data?.detail || 'Failed to delete hospital. Please try again.'
-      );
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  return (
-    <div>
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Hospital Management</h2>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" /> Add Hospital
-        </button>
-      </div>
-
-      {/* Error banner */}
-      {deleteError && (
-        <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex justify-between items-center">
-          {deleteError}
-          <button onClick={() => setDeleteError(null)} className="text-red-400 hover:text-red-600 ml-4 font-bold">×</button>
-        </div>
-      )}
-
-      {/* Hospital cards */}
-      <div className="grid gap-6 md:grid-cols-3">
-        {hospitals.map((h: any) => (
-          <div
-            key={h.id}
-            className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow relative group"
-          >
-            {/* Delete button — top-right corner, visible on hover */}
-            <button
-              onClick={() => setDeleteTarget({ id: h.id, name: h.name })}
-              title="Delete hospital"
-              className="absolute top-3 right-3 p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-
-            <h3 className="font-bold text-gray-900 text-lg pr-8">{h.name}</h3>
-            <p className="text-xs text-gray-400 mb-4">Slug: {h.slug}</p>
-
-            <div className="flex gap-2 border-t pt-4">
-              <Link
-                to={`/hospitals/${h.id}/appointments`}
-                className="flex-1 text-center text-xs bg-emerald-600 text-white py-2 rounded-md font-medium hover:bg-emerald-700"
-              >
-                Appointments
-              </Link>
-              <Link
-                to={`/hospitals/${h.id}/training`}
-                className="flex-1 text-center text-xs bg-blue-600 text-white py-2 rounded-md font-medium hover:bg-blue-700"
-              >
-                Train AI
-              </Link>
-              <Link
-                to={`/hospitals/${h.id}/settings`}
-                className="flex-1 text-center text-xs border border-gray-300 text-gray-600 py-2 rounded-md font-medium hover:bg-gray-50"
-              >
-                Settings
-              </Link>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Modals */}
-      <CreateHospitalModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSuccess={fetchHospitals}
-      />
-
-      <DeleteConfirmDialog
-        hospital={deleteTarget}
-        onConfirm={handleDeleteConfirm}
-        onCancel={() => { setDeleteTarget(null); setDeleteError(null); }}
-        isDeleting={isDeleting}
-      />
-    </div>
-  );
-}
-
-
-
-
-// ==========================================
-// NEW: Security Guard Component
-// ==========================================
-function StaffGuard({ children }: { children: React.ReactNode }) {
-  const { role, hospitalId } = useAuth();
-  const { hospitalId: routeHospitalId } = useParams();
-
-  // If staff tries to access a different hospital's URL, kick them back to their own
-  if (role === 'staff' && String(hospitalId) !== String(routeHospitalId)) {
-    return <Navigate to={`/hospitals/${hospitalId}/appointments`} replace />;
-
-  }
-  
-  return <>{children}</>;
-}
-
-// ==========================================
-// MAIN APP ROUTER
-// ==========================================
-export default function App() {
-  const { isAuthenticated, role, hospitalId } = useAuth();
-
-  return (
-    <Routes>
-      {/* Public patient-facing route */}
-{/* Iris Hospital dedicated route - must be before /p/:hospitalSlug */}
-
-
-{/* Public patient-facing route */}
-<Route path="/p/:hospitalSlug" element={<ThemeLoader />} />
-<Route path="/iris" element={<IrisPage />} />
-
-{/* Auth route */}
-<Route
-  path="/login"
-  element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
-/>
-
-
-      {/* Protected admin routes */}
-      <Route element={isAuthenticated ? <DashboardLayout /> : <Navigate to="/login" replace />}>
-        
-        {/* Root Route: Redirect Staff directly to Settings, Show list to Superadmin */}
-        <Route 
-          path="/" 
-          element={
-            role === 'staff' && hospitalId ? (
-              <Navigate to={`/hospitals/${hospitalId}/appointments`} replace />
-
-            ) : (
-              <HospitalList />
-            )
-          } 
-        />
-
-        {/* Common Routes (Secured by StaffGuard so they can't swap IDs) */}
-        <Route 
-          path="/hospitals/:hospitalId/appointments" 
-          element={<StaffGuard><AppointmentsTab /></StaffGuard>} 
-        />
-        <Route 
-          path="/hospitals/:hospitalId/doctors" 
-          element={<StaffGuard><DoctorsPage /></StaffGuard>} 
-        />
-        <Route 
-          path="/hospitals/:hospitalId/settings" 
-          element={<StaffGuard><SettingsPage /></StaffGuard>} 
-        />
-        <Route 
-          path="/hospitals/:hospitalId/pharmacy" 
-          element={<StaffGuard><PharmacyPage /></StaffGuard>} 
-        />
-        <Route 
-          path="/hospitals/:hospitalId/lab-tests" 
-          element={<StaffGuard><LabTestsPage /></StaffGuard>} 
-        />
-
-        {/* Superadmin Only Routes */}
-        <Route 
-          path="/hospitals/:hospitalId/training" 
-          element={role === 'superadmin' ? <Dashboard /> : <Navigate to="/" replace />} 
-        />
-
-      </Route>
-
-      {/* Catch-all redirects to root, which will cleanly re-route based on role */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  );
-}
 </file>
 
 <file path="frontend/src/hooks/useHospitalChat.tsx">
@@ -9802,6 +9808,7 @@ import fitz
 import logging
 import unicodedata
 import httpx
+import time              # ← ADD
 import uuid
 from typing import List, Optional, AsyncGenerator
 from datetime import datetime, timezone, timedelta
@@ -9921,9 +9928,14 @@ def _update_patient_ctx(
     Returns the updated context dict.
     """
     ctx = _load_patient_ctx(hospital_id, session_token)
- 
+
+    # ── 0. Session timing / turn count (for task-completion metric) ───────
+    if "session_started_at" not in ctx:
+        ctx["session_started_at"] = time.time()
+    ctx["turn_count"] = ctx.get("turn_count", 0) + 1
+
     # ── 1. Language preference ────────────────────────────────────────────
-    ctx["language"] = language   # always authoritative from the live request
+    ctx["language"] = language   # always authoritative from the live request  # always authoritative from the live request
  
     # ── 2. Doctor / department from the most recent assistant turn ────────
     # The doctor context lines we already inject look like:
@@ -10025,6 +10037,24 @@ def _build_patient_ctx_block(ctx: dict) -> str:
     lines.append("")   # trailing newline so the block is visually separated
     return "\n".join(lines)
  
+def _log_task_completion(hospital_id: int, session_token: str, ctx: dict, outcome: str) -> None:
+    """
+    Log the task-completion metric for this session: turns and elapsed time
+    from first message to a terminal outcome (booking success so far;
+    'abandoned' can be logged the same way later if we add session-expiry
+    hooks). One structured log line per completed session — grep on
+    "[TaskCompletion]" to pull these for analysis, or ship them to whatever
+    log aggregation you already have. Deliberately not a new DB table yet;
+    the plan only asks that this be logged, not eyeballed.
+    """
+    started_at = ctx.get("session_started_at")
+    turns = ctx.get("turn_count", 0)
+    elapsed_seconds = round(time.time() - started_at, 1) if started_at else None
+    logger.info(
+        "[TaskCompletion] hospital_id=%s session=%s outcome=%s turns=%s elapsed_seconds=%s",
+        hospital_id, session_token, outcome, turns, elapsed_seconds,
+    )
+
 _GTRANSLATE_URL = "https://translate.googleapis.com/translate_a/single"
 
 
@@ -10509,6 +10539,22 @@ def build_context(
     parts = [
         f"You are Arogya, the AI Assistant for {hospital.name}.",
         f"Current Date: {prompt_date_str}",
+        (
+            "DATE RESOLUTION RULES (follow these exactly, every time):\n"
+            f"- Treat \"{prompt_date_str}\" as ground truth for today. Ignore any other "
+            "notion of the current date or year.\n"
+            "- If the patient gives a date with NO year (e.g. \"July 10\", \"next Monday\", "
+            "\"the 15th\"), resolve it to the NEAREST occurrence of that date on or after "
+            "today's date above — this almost always means the current year, or next year "
+            "only if that month/day has already occurred this year.\n"
+            "- NEVER assume a year from your own training data (e.g. 2023, 2024, 2025) when "
+            "the patient doesn't state one. Only use a year the patient explicitly typed.\n"
+            "- Only tell a patient a date \"has already passed\" if it is chronologically "
+            "before the Current Date stated above — double check the year you inferred "
+            "before saying this.\n"
+            "- When calling book_appointment, preferred_date must be YYYY-MM-DD using the "
+            "year resolved by these rules."
+        ),
         "",
         hospital.system_prompt or "",
         "",
@@ -10929,8 +10975,11 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
         logger.info("[Translation] ml->en: %r -> %r", request.question[:60], english_question[:60])
 
     intent = await classify_user_intent(english_question, request.history or [])
-    _PATIENT_CTX_CALL = """
-    # Update patient context from this turn (deterministic, < 1 ms)
+
+    # Update patient context from this turn (deterministic, < 1 ms).
+    # NOTE: this was previously a dead string literal (_PATIENT_CTX_CALL) that
+    # was never executed, so patient context was never updated on the
+    # streaming path — only read. Fixed as part of §1.1.
     _update_patient_ctx(
         request.hospital_id,
         request.session_token,
@@ -10939,7 +10988,7 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
         history=request.history or [],
         db=db,
     )
-"""
+
     logger.info("[Intent] %s -> %s", english_question[:60], intent)
 
     async def event_generator() -> AsyncGenerator[str, None]:
@@ -11300,6 +11349,12 @@ IMPORTANT:
                 db.add(appt)
                 db.commit()
                 db.refresh(appt)
+                _log_task_completion(
+                    request.hospital_id,
+                    request.session_token,
+                    _load_patient_ctx(request.hospital_id, request.session_token),
+                    outcome="booking_success",
+                )
 
                 config = get_booking_config(hospital)
                 staff_email = config.get("notification_email", "")
