@@ -10,6 +10,8 @@ class HospitalBase(BaseModel):
     # YOU MUST ADD THESE TWO:
     system_prompt: Optional[str] = "You are Arogya, a helpful assistant."
     google_sheet_id: Optional[str] = None
+    welcome_message: Optional[str] = None
+    post_booking_disclaimer: Optional[str] = None
 
 class HospitalCreate(HospitalBase):
     pass

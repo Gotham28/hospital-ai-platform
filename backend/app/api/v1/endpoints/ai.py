@@ -125,6 +125,7 @@ def _update_patient_ctx(
     Returns the updated context dict.
     """
     ctx = _load_patient_ctx(hospital_id, session_token)
+    is_new_session = not ctx 
 
     # ── 0. Session timing / turn count (for task-completion metric) ───────
     if "session_started_at" not in ctx:
@@ -183,7 +184,7 @@ def _update_patient_ctx(
         if any(kw in question_en.lower() for kw in keywords):
             seen.add(topic)
     ctx["seen_topics"] = list(seen)
- 
+    ctx["_is_new_session"] = is_new_session
     _save_patient_ctx(hospital_id, session_token, ctx)
     return ctx
  
@@ -1018,6 +1019,11 @@ async def chat_with_arogya(request: ChatRequest, db: Session = Depends(get_db)):
     history=request.history or [],
     db=db,
 )
+    _turn_ctx = _update_patient_ctx(
+    request.hospital_id,
+    request.session_token,
+    ...
+)
     _, openai_messages, _ = build_context(request, db, force_english=False,session_token=request.session_token)
 
     # For Malayalam, prepend the English question as a hidden note for context retrieval
@@ -1040,6 +1046,10 @@ async def chat_with_arogya(request: ChatRequest, db: Session = Depends(get_db)):
         total_tokens=usage.total_tokens, estimated_cost=(usage.total_tokens / 1_000_000) * 0.15
     ))
     db.commit()
+    if _turn_ctx.get("_is_new_session"):
+        if hospital := db.query(Hospital).filter(Hospital.id == request.hospital_id).first():
+            if hospital.welcome_message:
+                answer = f"{hospital.welcome_message}\n\n{answer}"
     return {"answer": answer}
 
 
@@ -1194,12 +1204,23 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
         history=request.history or [],
         db=db,
     )
+    _turn_ctx = _update_patient_ctx(
+        request.hospital_id,
+        request.session_token,
+        language=request.language,
+        question_en=english_question,
+        history=request.history or [],
+        db=db,
+    )
 
     logger.info("[Intent] %s -> %s", english_question[:60], intent)
 
     async def event_generator() -> AsyncGenerator[str, None]:
         pt = ct = tt = 0
-
+        if _turn_ctx.get("_is_new_session"):
+            hospital_for_welcome = db.query(Hospital).filter(Hospital.id == request.hospital_id).first()
+            if hospital_for_welcome and hospital_for_welcome.welcome_message:
+                yield f"data: {json.dumps(hospital_for_welcome.welcome_message)}\n\n"
         # ── CANCEL ───────────────────────────────────────────────────────────
         if intent == "CANCEL":
             msg = (
@@ -1606,6 +1627,8 @@ IMPORTANT:
                         f"Patient: {appt.patient_name}, age {appt.patient_age}\n\n"
                         f"The hospital will call **{appt.patient_phone}** to confirm your slot."
                     )
+                if hospital.post_booking_disclaimer:
+                    success_msg += f"\n\n{hospital.post_booking_disclaimer}"
                 yield f"data: {json.dumps(success_msg)}\n\n"
                 yield "data: [DONE]\n\n"
                 return

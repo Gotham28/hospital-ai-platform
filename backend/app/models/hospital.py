@@ -15,6 +15,8 @@ class Hospital(Base):
     # Add this column to your existing Hospital class
     google_sheet_id = Column(String, nullable=True)
     booking_config = Column(Text, nullable=True)  # JSON string
+    welcome_message = Column(Text, nullable=True)
+    post_booking_disclaimer = Column(Text, nullable=True)
     # Relationship: One Hospital has many Users
     users = relationship("User", back_populates="hospital")
     # Inside your Hospital class in app/models/hospital.py
