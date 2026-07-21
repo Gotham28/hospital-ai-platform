@@ -570,6 +570,8 @@ def build_lab_tests_context(question: str, tests: list) -> str:
         lines.append(f"- {t.name} ({t.category or 'General'}): Price: ₹{t.price or 'N/A'}, Turnaround: {t.turnaround_time or 'N/A'}, Location: {loc}")
         if t.prerequisites:
             lines.append(f"  Preparation/Prerequisites: {t.prerequisites}")
+        if getattr(t, "is_outsourced", False) and getattr(t, "outsourced_note", None):
+            lines.append(f"  Note: {t.outsourced_note}")
 
     return "\n".join(lines) + "\n"
 

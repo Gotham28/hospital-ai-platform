@@ -13,5 +13,11 @@ class LabTest(Base):
     prerequisites = Column(Text, nullable=True) # e.g., "Fasting for 8 hours"
     turnaround_time = Column(String, nullable=True)
     is_inhouse = Column(Boolean, default=True)
+    # Feature 3: outsourced lab test flag (IRIS clinic, 2026-07-21)
+    # is_outsourced: admin-toggleable per test; defaults to False (no change to existing rows).
+    # outsourced_note: free-text note shown by the AI when this test is mentioned.
+    #   TODO: left empty by default — wording pending sign-off from Iris Rheumatology Clinic.
+    is_outsourced = Column(Boolean, nullable=False, default=False)
+    outsourced_note = Column(Text, nullable=True)
     
     hospital = relationship("Hospital")
