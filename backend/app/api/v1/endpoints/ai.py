@@ -1012,7 +1012,13 @@ async def upload_pdf(file: UploadFile = File(...), hospital_id: int = Form(...),
 
 @router.post("/chat")
 async def chat_with_arogya(request: ChatRequest, db: Session = Depends(get_db)):
-    # Non-streaming endpoint always responds in the requested language natively
+    # NOTE: This endpoint is NOT used by any current frontend client.
+    # All production frontend components (iris/chat-bot-ui.tsx, ChatPreview.tsx,
+    # useHospitalChat.tsx) use /chat-stream exclusively.
+    # Kept as a simple non-streaming endpoint for internal testing and scripts only.
+    # Do not add frontend-facing features here without also implementing them in
+    # /chat-stream — that is the live path for real users.
+    # Last confirmed no-frontend-caller: 2026-07-21 (grep of frontend/src confirmed zero hits).
     _turn_ctx = _update_patient_ctx(
         request.hospital_id,
         request.session_token,

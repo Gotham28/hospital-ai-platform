@@ -59,9 +59,16 @@ export default HospitalTheme;
 
 When porting code from **Bolt.new**, you must refactor the `sendMessage` function to align with the FastAPI backend.
 
-* **Request Method**: `POST /api/v1/ai/chat`.
-* **Request Body**: Must include `question` (string) and `hospital_id` (int).
-* **Response Body**: The AI's reply is found in `res.data.answer`.
+> **Correction (2026-07-21):** An earlier version of this guide documented `POST /api/v1/ai/chat`
+> as the integration path. **This is wrong — do not use it for new themes.**
+> All production frontend components use `POST /api/v1/ai/chat-stream` (Server-Sent Events).
+> `/api/v1/ai/chat` exists but is not called by any frontend; it is kept only for
+> internal testing and scripts.
+
+* **Request Method**: `POST /api/v1/ai/chat-stream` (Server-Sent Events stream).
+* **Request Body**: Must include `question` (string), `hospital_id` (int), and `session_token` (string — use a stable per-user UUID).
+* **Response Body**: Each `data:` line is a JSON-encoded token chunk; the stream ends with `data: [DONE]`.
+* **How to consume**: Use the browser's `EventSource` API or `fetch` with `ReadableStream`. See `useHospitalChat.tsx` for the canonical implementation.
 
 ### 3. Styling & Animations
 
