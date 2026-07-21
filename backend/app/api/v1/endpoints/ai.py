@@ -1011,20 +1011,15 @@ async def upload_pdf(file: UploadFile = File(...), hospital_id: int = Form(...),
 @router.post("/chat")
 async def chat_with_arogya(request: ChatRequest, db: Session = Depends(get_db)):
     # Non-streaming endpoint always responds in the requested language natively
-    _update_patient_ctx(
-    request.hospital_id,
-    request.session_token,
-    language=request.language,
-    question_en=request.question,
-    history=request.history or [],
-    db=db,
-)
     _turn_ctx = _update_patient_ctx(
-    request.hospital_id,
-    request.session_token,
-    ...
-)
-    _, openai_messages, _ = build_context(request, db, force_english=False,session_token=request.session_token)
+        request.hospital_id,
+        request.session_token,
+        language=request.language,
+        question_en=request.question,
+        history=request.history or [],
+        db=db,
+    )
+    _, openai_messages, _ = build_context(request, db, force_english=False, session_token=request.session_token)
 
     # For Malayalam, prepend the English question as a hidden note for context retrieval
     # but the system prompt already instructs the model to reply in Malayalam
