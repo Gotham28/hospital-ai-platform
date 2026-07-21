@@ -19,3 +19,7 @@ build/
 # OS
 .DS_Store
 Thumbs.db
+
+# Diff logs
+backend/ai_diff.txt
+repomix-output.xml

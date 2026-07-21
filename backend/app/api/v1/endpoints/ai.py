@@ -253,6 +253,33 @@ def _log_task_completion(hospital_id: int, session_token: str, ctx: dict, outcom
         hospital_id, session_token, outcome, turns, elapsed_seconds,
     )
 
+# =============================================================================
+# FEATURE 4 — RELEVANCE GATE HELPERS
+# =============================================================================
+
+# Stage sequencing for the multi-turn relevance Q&A
+_RELEVANCE_STAGES = ["asked_referral", "asked_prior_docs", "asked_symptom", "done"]
+
+
+def _reset_relevance_gate(ctx: dict) -> dict:
+    """Clear all relevance gate keys. Called when a new booking attempt starts."""
+    ctx.pop("relevance_stage",   None)
+    ctx.pop("relevance_answers", None)
+    ctx.pop("relevance_verdict", None)
+    return ctx
+
+
+def _is_new_booking_attempt(ctx: dict) -> bool:
+    """
+    Return True if the patient has already completed at least one booking in
+    this session AND the relevance gate still holds a cached verdict from that
+    prior booking. That combination means we must reset and re-run the gate.
+    """
+    return (
+        ctx.get("booking_completed_at") is not None
+        and ctx.get("relevance_stage") == "done"
+    )
+
 _GTRANSLATE_URL = "https://translate.googleapis.com/translate_a/single"
 
 
@@ -1307,6 +1334,121 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
         # This completely eliminates the Google Translate post-processing step
         # and the garbled/unnatural phrasing it produces.
         #
+
+        # ── FEATURE 4: RELEVANCE GATE ─────────────────────────────────────────
+        # Only active when hospital.relevance_criteria is set.
+        # Gate runs BEFORE any doctor/slot collection begins.
+        # Uses patient_ctx for state so it survives across turns without a
+        # separate Redis key.
+        if intent == "BOOKING":
+            from app.services.relevance import check_relevance, RelevanceVerdict, check_referral_intent
+
+            # Re-fetch hospital for the gate (already fetched in build_context below,
+            # but we need it here before that call).
+            _gate_hospital = db.query(Hospital).filter(
+                Hospital.id == request.hospital_id
+            ).first()
+            _criteria = (_gate_hospital.relevance_criteria or "").strip() if _gate_hospital else ""
+
+            if _criteria:
+                _rctx = _load_patient_ctx(request.hospital_id, request.session_token)
+
+                # Detect a new booking attempt (patient already completed one this session)
+                if _is_new_booking_attempt(_rctx):
+                    logger.info(
+                        "[RelevanceGate] New booking attempt detected for hospital_id=%s — resetting gate",
+                        request.hospital_id,
+                    )
+                    _rctx = _reset_relevance_gate(_rctx)
+                    _save_patient_ctx(request.hospital_id, request.session_token, _rctx)
+
+                _stage = _rctx.get("relevance_stage")
+                _answers = _rctx.get("relevance_answers", {})
+
+                if _stage is None:
+                    # ── Q1: Has a doctor referred you? ──────────────────────
+                    _rctx["relevance_stage"] = "asked_referral"
+                    _save_patient_ctx(request.hospital_id, request.session_token, _rctx)
+                    q1 = (
+                        "ഒരു ചോദ്യം: ഒരു ഡോക്ടർ നിങ്ങളെ ഞങ്ങളുടെ ക്ലിനിക്കിലേക്ക് refer ചെയ്തിട്ടുണ്ടോ?"
+                        if is_malayalam
+                        else "Before I proceed with the booking, I have a quick question: Has a doctor referred you to our clinic?"
+                    )
+                    yield f"data: {json.dumps(q1)}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+
+                elif _stage == "asked_referral":
+                    # Patient just answered Q1 — record and branch
+                    _answers["referral"] = english_question
+                    _rctx["relevance_answers"] = _answers
+
+                    referral_positive = await check_referral_intent(
+                        patient_answer=english_question,
+                        hospital_id=request.hospital_id
+                    )
+                    if referral_positive:
+                        # Referred patients are always relevant — skip remaining questions
+                        verdict_dict = {
+                            "is_relevant": True,
+                            "needs_staff_review": False,
+                            "reason": "Patient was referred by a doctor — treated as relevant.",
+                        }
+                        _rctx["relevance_stage"] = "done"
+                        _rctx["relevance_verdict"] = verdict_dict
+                        _save_patient_ctx(request.hospital_id, request.session_token, _rctx)
+                        # Fall through to normal booking below (no yield/return here)
+                    else:
+                        # Ask Q2: which specialists have they seen?
+                        _rctx["relevance_stage"] = "asked_prior_docs"
+                        _save_patient_ctx(request.hospital_id, request.session_token, _rctx)
+                        q2 = (
+                            "ഞങ്ങൾ മനസ്സിലാക്കാൻ ശ്രമിക്കുകയാണ്: ഈ ആരോഗ്യ പ്രശ്നത്തിന് ഇതിനുമുമ്പ് ഏത് ഡോക്ടർ/സ്പെഷ്യലിസ്റ്റ് ആണ് നോക്കിയിട്ടുള്ളത്?"
+                            if is_malayalam
+                            else "To help us prepare, could you briefly mention which doctors or specialists you've consulted for this condition before?"
+                        )
+                        yield f"data: {json.dumps(q2)}\n\n"
+                        yield "data: [DONE]\n\n"
+                        return
+
+                elif _stage == "asked_prior_docs":
+                    # Patient answered Q2 — record and ask Q3
+                    _answers["prior_docs"] = english_question
+                    _rctx["relevance_answers"] = _answers
+                    _rctx["relevance_stage"] = "asked_symptom"
+                    _save_patient_ctx(request.hospital_id, request.session_token, _rctx)
+                    q3 = (
+                        "നന്ദി. ഒടുവിലായി, ഇന്ന് നിങ്ങൾ ഏറ്റവും അനുഭവിക്കുന്ന പ്രധാന ലക്ഷണം ഒന്ന് ചുരുക്കി പറയാമോ?"
+                        if is_malayalam
+                        else "Thank you. Finally, could you briefly describe your main symptom or concern that brings you here today?"
+                    )
+                    yield f"data: {json.dumps(q3)}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+
+                elif _stage == "asked_symptom":
+                    # Patient answered Q3 — run the LLM relevance check
+                    _answers["symptom"] = english_question
+                    _rctx["relevance_answers"] = _answers
+
+                    verdict: RelevanceVerdict = await check_relevance(
+                        relevance_criteria=_criteria,
+                        patient_answers=_answers,
+                        hospital_id=request.hospital_id,
+                    )
+                    verdict_dict = {
+                        "is_relevant": verdict.is_relevant,
+                        "needs_staff_review": verdict.needs_staff_review,
+                        "reason": verdict.reason,
+                    }
+                    _rctx["relevance_stage"] = "done"
+                    _rctx["relevance_verdict"] = verdict_dict
+                    _save_patient_ctx(request.hospital_id, request.session_token, _rctx)
+                    # Fall through to normal booking below
+
+                # _stage == "done": gate complete, fall through to normal booking
+
+        # ── End relevance gate ────────────────────────────────────────────────
         context_question = english_question if is_malayalam else request.question
         translated_request = request.model_copy(update={
             "question": context_question,
@@ -1587,9 +1729,23 @@ IMPORTANT:
                     time_of_day=args["time_of_day"].lower(),
                     status="pending"
                 )
+
+                # Feature 4: attach relevance verdict if gate ran for this hospital
+                _final_ctx = _load_patient_ctx(request.hospital_id, request.session_token)
+                _verdict = _final_ctx.get("relevance_verdict")
+                if _verdict:
+                    appt.relevance_reason   = _verdict.get("reason")
+                    appt.needs_staff_review = bool(_verdict.get("needs_staff_review", False))
+
                 db.add(appt)
                 db.commit()
                 db.refresh(appt)
+
+                # Stamp booking_completed_at so a second booking attempt in this
+                # session resets the relevance gate (see _is_new_booking_attempt).
+                _final_ctx["booking_completed_at"] = time.time()
+                _final_ctx["booking_attempt"] = _final_ctx.get("booking_attempt", 0) + 1
+                _save_patient_ctx(request.hospital_id, request.session_token, _final_ctx)
                 _log_task_completion(
                     request.hospital_id,
                     request.session_token,

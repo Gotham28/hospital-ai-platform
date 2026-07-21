@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import api from '../api/axios';
-import { TestTube, Plus, Trash2, Loader2, Upload } from 'lucide-react';
+import { TestTube, Plus, Trash2, Loader2, Upload, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
 
 export default function LabTestsPage() {
   const { hospitalId } = useParams();
@@ -14,6 +14,8 @@ export default function LabTestsPage() {
   const [category, setCategory] = useState('');
   const [price, setPrice] = useState('');
   const [prerequisites, setPrerequisites] = useState('');
+  const [expandedRowId, setExpandedRowId] = useState<number | null>(null);
+  const [tempNote, setTempNote] = useState('');
 
   const fetchTests = async () => {
     try {
@@ -102,6 +104,45 @@ export default function LabTestsPage() {
     }
   };
 
+  const handleToggleOutsourced = async (test: any) => {
+    const isOutsourcedNow = !test.is_outsourced;
+    const payload: any = { is_outsourced: isOutsourcedNow };
+    
+    // Clear note if turned off
+    if (!isOutsourcedNow && test.outsourced_note) {
+      payload.outsourced_note = null;
+    }
+    
+    try {
+      await api.patch(`/lab-tests/${test.id}`, payload);
+      // Update local state without full reload
+      setTests(tests.map(t => t.id === test.id ? { ...t, ...payload } : t));
+    } catch (err) {
+      alert("Failed to update status");
+    }
+  };
+
+  const handleSaveNote = async (testId: number) => {
+    try {
+      // Use null instead of empty string if clearing it out
+      const noteToSave = tempNote.trim() || null;
+      await api.patch(`/lab-tests/${testId}`, { outsourced_note: noteToSave });
+      setTests(tests.map(t => t.id === testId ? { ...t, outsourced_note: noteToSave } : t));
+      setExpandedRowId(null);
+    } catch (err) {
+      alert("Failed to save note");
+    }
+  };
+
+  const handleExpand = (test: any) => {
+    if (expandedRowId === test.id) {
+      setExpandedRowId(null);
+    } else {
+      setExpandedRowId(test.id);
+      setTempNote(test.outsourced_note || '');
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-5xl">
 
@@ -162,24 +203,69 @@ export default function LabTestsPage() {
                 <th className="p-4">Category</th>
                 <th className="p-4">Price</th>
                 <th className="p-4">Prerequisites</th>
+                <th className="p-4">Outsourced</th>
                 <th className="p-4">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {tests.map(test => (
-                <tr key={test.id} className="hover:bg-gray-50">
-                  <td className="p-4 font-medium">{test.name}</td>
-                  <td className="p-4 text-gray-500">{test.category || '-'}</td>
-                  <td className="p-4">₹{test.price}</td>
-                  <td className="p-4 text-gray-600 text-xs">{test.prerequisites || 'None'}</td>
-                  <td className="p-4 flex items-center gap-3">
-                    <button onClick={() => handleEditClick(test)} className="text-purple-600 hover:text-purple-800 text-sm font-medium">Edit</button>
-                    <button onClick={() => handleDelete(test.id)} className="text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
-                  </td>
-                </tr>
+                <React.Fragment key={test.id}>
+                  <tr className={`hover:bg-gray-50 ${expandedRowId === test.id ? 'bg-gray-50' : ''}`}>
+                    <td className="p-4 font-medium">{test.name}</td>
+                    <td className="p-4 text-gray-500">{test.category || '-'}</td>
+                    <td className="p-4">₹{test.price}</td>
+                    <td className="p-4 text-gray-600 text-xs">{test.prerequisites || 'None'}</td>
+                    <td className="p-4">
+                      <div className="flex items-center gap-3">
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            className="sr-only peer" 
+                            checked={!!test.is_outsourced} 
+                            onChange={() => handleToggleOutsourced(test)} 
+                          />
+                          <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                        </label>
+                        {!!test.outsourced_note && (
+                          <MessageSquare className="w-4 h-4 text-purple-600" title="Has Note" />
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-4 flex items-center gap-3">
+                      <button onClick={() => handleEditClick(test)} className="text-purple-600 hover:text-purple-800 text-sm font-medium">Edit</button>
+                      <button onClick={() => handleDelete(test.id)} className="text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                      <button 
+                        onClick={() => handleExpand(test)} 
+                        className="text-gray-400 hover:text-gray-600 ml-2"
+                        title="Add/Edit Outsourced Note"
+                      >
+                        {expandedRowId === test.id ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                      </button>
+                    </td>
+                  </tr>
+                  {expandedRowId === test.id && (
+                    <tr className="bg-gray-50 border-b border-gray-100">
+                      <td colSpan={6} className="p-4 pl-8 pb-6">
+                        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm w-full max-w-2xl">
+                          <label className="block text-xs font-semibold text-gray-700 mb-2">Outsourced Note (Optional)</label>
+                          <textarea
+                            value={tempNote}
+                            onChange={(e) => setTempNote(e.target.value)}
+                            placeholder="e.g. This test is processed by an external lab..."
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white min-h-[80px] focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
+                          />
+                          <div className="flex gap-2 mt-3 justify-end">
+                            <button onClick={() => setExpandedRowId(null)} className="px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-md transition-colors">Cancel</button>
+                            <button onClick={() => handleSaveNote(test.id)} className="px-3 py-1.5 text-xs font-medium bg-purple-600 text-white hover:bg-purple-700 rounded-md transition-colors">Save Note</button>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               ))}
               {tests.length === 0 && (
-                <tr><td colSpan={5} className="p-8 text-center text-gray-400">No lab tests added yet.</td></tr>
+                <tr><td colSpan={6} className="p-8 text-center text-gray-400">No lab tests added yet.</td></tr>
               )}
             </tbody>
           </table>

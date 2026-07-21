@@ -16,6 +16,8 @@ interface Appointment {
   status: 'pending' | 'approved' | 'rejected';
   confirmed_time: string | null;
   rejection_reason: string | null;
+  relevance_reason: string | null;
+  needs_staff_review: boolean;
   created_at: string;
 }
 
@@ -52,6 +54,8 @@ export default function AppointmentsTab() {
   const [rejectionReason, setRejectionReason] = useState(REJECTION_REASONS[0]);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [isGateEnabled, setIsGateEnabled] = useState(false);
+  const [expandedReasonId, setExpandedReasonId] = useState<number | null>(null);
 
   const fetchAppointments = useCallback(async () => {
     if (!hospitalId) return;
@@ -73,6 +77,13 @@ export default function AppointmentsTab() {
     const interval = setInterval(fetchAppointments, 30_000);
     return () => clearInterval(interval);
   }, [fetchAppointments]);
+
+  useEffect(() => {
+    if (!hospitalId) return;
+    api.get(`/hospitals/${hospitalId}`)
+      .then(res => setIsGateEnabled(!!res.data.relevance_criteria))
+      .catch(console.error);
+  }, [hospitalId]);
 
   const handleApprove = async () => {
     if (!approveModal || !confirmedTime.trim()) return;
@@ -159,6 +170,7 @@ export default function AppointmentsTab() {
                 <th className="p-4 text-left">Patient</th>
                 <th className="p-4 text-left">Doctor</th>
                 <th className="p-4 text-left">Date & Time</th>
+                {isGateEnabled && <th className="p-4 text-left">Relevance</th>}
                 <th className="p-4 text-left">Status</th>
                 <th className="p-4 text-left">Actions</th>
               </tr>
@@ -203,6 +215,30 @@ export default function AppointmentsTab() {
                       </div>
                     </div>
                   </td>
+                  {isGateEnabled && (
+                    <td className="p-4">
+                      <div className="relative">
+                        <button
+                          onClick={() => setExpandedReasonId(expandedReasonId === appt.id ? null : appt.id)}
+                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border transition-colors ${
+                            appt.needs_staff_review
+                              ? 'bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-200'
+                              : 'bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-200'
+                          }`}
+                        >
+                          {appt.needs_staff_review ? 'Review Required' : 'OK'}
+                        </button>
+                        {expandedReasonId === appt.id && (
+                          <div className="absolute z-10 mt-2 w-64 p-3 bg-white border shadow-lg rounded-lg text-xs text-gray-700 right-0 md:left-auto">
+                            <strong className={`block mb-1 ${appt.needs_staff_review ? 'text-amber-800' : 'text-emerald-800'}`}>
+                              AI Reasoning:
+                            </strong>
+                            {appt.relevance_reason || 'No reason provided.'}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  )}
                   <td className="p-4">
                     <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border capitalize ${STATUS_STYLES[appt.status]}`}>
                       {appt.status === 'pending'  && <Clock className="w-3 h-3" />}

@@ -1,5 +1,9 @@
 @import "tailwindcss";
-html, body, #root {
+html {
+  font-size: 112.5%; /* Scales base 1rem from 16px to 18px */
+}
+
+body, #root {
   max-width: 100%;
   overflow-x: hidden;
 }

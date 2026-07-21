@@ -14,6 +14,7 @@ const Dashboard = () => {
   // NEW: state for welcome message + disclaimer — declared with the other hooks, at top level
   const [welcomeMessage, setWelcomeMessage] = useState('');
   const [postBookingDisclaimer, setPostBookingDisclaimer] = useState('');
+  const [relevanceCriteria, setRelevanceCriteria] = useState('');
   const [savingConfig, setSavingConfig] = useState(false);
 
   useEffect(() => {
@@ -29,6 +30,7 @@ const Dashboard = () => {
         // NEW: seed the textareas once the hospital data actually arrives
         setWelcomeMessage(res.data.welcome_message || '');
         setPostBookingDisclaimer(res.data.post_booking_disclaimer || '');
+        setRelevanceCriteria(res.data.relevance_criteria || '');
         setLoading(false);
       })
       .catch((err) => {
@@ -45,6 +47,7 @@ const Dashboard = () => {
       await api.patch(`/hospitals/${hospitalId}`, {
         welcome_message: welcomeMessage,
         post_booking_disclaimer: postBookingDisclaimer,
+        relevance_criteria: relevanceCriteria,
       });
     } catch (err) {
       console.error("Failed to save hospital config:", err);
@@ -127,6 +130,18 @@ const Dashboard = () => {
               placeholder="e.g. Please note: waiting times may vary."
               className="w-full border rounded p-2"
               rows={2}
+            />
+          </div>
+
+          <div className="mb-6">
+            <label className="block font-medium mb-1">Relevance Gate Criteria</label>
+            <p className="text-sm text-gray-500 mb-2">Leave blank to disable the relevance gate for this hospital. If set, AI will ask follow-up questions to check if the patient matches these rules.</p>
+            <textarea
+              value={relevanceCriteria}
+              onChange={(e) => setRelevanceCriteria(e.target.value)}
+              placeholder="e.g. Must be over 18. Must have joint pain for more than 2 weeks."
+              className="w-full border rounded p-2"
+              rows={3}
             />
           </div>
 

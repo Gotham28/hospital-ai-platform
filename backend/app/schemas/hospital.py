@@ -12,6 +12,8 @@ class HospitalBase(BaseModel):
     google_sheet_id: Optional[str] = None
     welcome_message: Optional[str] = None
     post_booking_disclaimer: Optional[str] = None
+    # Feature 4: relevance gate criteria — empty/null = gate disabled for this hospital
+    relevance_criteria: Optional[str] = None
 
 class HospitalCreate(HospitalBase):
     pass
