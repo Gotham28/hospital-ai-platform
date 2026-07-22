@@ -20,6 +20,7 @@ for full specs, `.agents/AGENTS.md` for permanent rules.
 
 **Feature 4 detail (updated 2026-07-22):** Backend implemented (services/relevance.py, ai.py) and migration applied to local DB. Frontend admin UI built (Dashboard settings, Appointments click-to-expand badges). Q1 referral detection bug fixed (now uses LLM).
 - **Update:** Conducted rigorous local end-to-end verification of the booking flow. Fixed a latent bug in `ai.py` where providing all booking details simultaneously crashed the model due to incorrect `normalised_value` typing. Verified that irrelevant ailments correctly trigger `needs_staff_review=True` in the database.
+- **Fully Verified:** Backend, frontend, AND tested end-to-end in both English (scenarios: referral fast-path, no-referral-but-relevant, no-referral-irrelevant-flagged-for-review, no-gate-hospital, second-booking-attempt-reset) and Malayalam (referral fast-path smoke test, real Appointment row confirmed).
 
 ## Catch-up: changes made during separate session
 - **Relevance Logging PII Fix:** Modified `services/relevance.py` to only log the LLM's `reason` text when `needs_staff_review` is true, preventing routine clinical details from entering standard logs.
