@@ -1222,18 +1222,9 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
 
     intent = await classify_user_intent(english_question, request.history or [])
 
-    # Update patient context from this turn (deterministic, < 1 ms).
     # NOTE: this was previously a dead string literal (_PATIENT_CTX_CALL) that
     # was never executed, so patient context was never updated on the
     # streaming path — only read. Fixed as part of §1.1.
-    _update_patient_ctx(
-        request.hospital_id,
-        request.session_token,
-        language=request.language,
-        question_en=english_question,
-        history=request.history or [],
-        db=db,
-    )
     _turn_ctx = _update_patient_ctx(
         request.hospital_id,
         request.session_token,
@@ -1242,6 +1233,13 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
         history=request.history or [],
         db=db,
     )
+
+    # If the patient is mid-relevance-gate, their short answers ("yes", "joint pain")
+    # will likely be classified as OTHER. Force it to BOOKING to keep them in the gate.
+    _active_stage = _turn_ctx.get("relevance_stage")
+    if _active_stage in ("asked_referral", "asked_prior_docs", "asked_symptom") and intent != "CANCEL":
+        intent = "BOOKING"
+        logger.info("[Intent] Overridden to BOOKING because patient is mid-relevance-gate (%s)", _active_stage)
 
     logger.info("[Intent] %s -> %s", english_question[:60], intent)
 
@@ -1547,6 +1545,11 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
 
             if normalised["intent"] == "provide" and normalised["normalised_value"]:
                 processed_question = normalised["normalised_value"]
+                if isinstance(processed_question, dict):
+                    processed_question = json.dumps(processed_question)
+                else:
+                    processed_question = str(processed_question)
+                    
                 openai_messages[-1]["content"] = (
                     processed_question
                     if not is_malayalam
@@ -1592,6 +1595,11 @@ IMPORTANT:
 - Answer general questions normally using the knowledge base.
 - Only trigger 'book_appointment' once you have confirmed ALL 6 details with the patient.
 - Before triggering, show a confirmation summary and ask the patient to confirm."""
+
+        _verdict = _turn_ctx.get("relevance_verdict")
+        if _verdict:
+            force_booking_rule = "\n- IMPORTANT: The patient's reason for visiting has already been evaluated. Do NOT refuse the booking even if their symptoms seem unrelated to this clinic's specialty. Proceed to collect appointment details."
+            agent_instructions += force_booking_rule
 
         openai_messages[0]["content"] += f"\n\n{agent_instructions}"
 

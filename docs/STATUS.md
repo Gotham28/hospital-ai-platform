@@ -15,12 +15,11 @@ for full specs, `AGENTS.md` for permanent rules.
 | 1. Welcome message | ✅ Done | ✅ Done | ✅ Yes |
 | 2. Post-booking disclaimer | ✅ Done | ✅ Done | ✅ Yes |
 | 3. Outsourced lab test flag | ✅ Done | ✅ Done | ✅ Yes — toggle/note/badge/clear verified across multiple local hospitals, isolation confirmed |
-| 4. Relevance gate before booking | ✅ Done (migration applied) | ✅ Done | ⬜ No (Testing pending) |
+| 4. Relevance gate before booking | ✅ Done (migration applied) | ✅ Done | ✅ Yes — End-to-end verified with LLM intent constraints |
 | 5. Handwritten-record context | 🚫 Deferred — do not build | 🚫 Deferred | — |
 
 **Feature 4 detail (updated 2026-07-22):** Backend implemented (services/relevance.py, ai.py) and migration applied to local DB. Frontend admin UI built (Dashboard settings, Appointments click-to-expand badges). Q1 referral detection bug fixed (now uses LLM).
-**Remaining work:** 
-- Conduct rigorous local end-to-end verification of the booking flow.
+- **Update:** Conducted rigorous local end-to-end verification of the booking flow. Fixed a latent bug in `ai.py` where providing all booking details simultaneously crashed the model due to incorrect `normalised_value` typing. Verified that irrelevant ailments correctly trigger `needs_staff_review=True` in the database.
 
 ## Catch-up: changes made during separate session
 - **Relevance Logging PII Fix:** Modified `services/relevance.py` to only log the LLM's `reason` text when `needs_staff_review` is true, preventing routine clinical details from entering standard logs.
