@@ -4,7 +4,7 @@ Last updated: 2026-07-21
 
 This file tracks what's actually done vs. in progress vs. next, across the whole
 project. Update this after every verified feature — not before. See `docs/MASTER_PLAN.md`
-for full specs, `AGENTS.md` for permanent rules.
+for full specs, `.agents/AGENTS.md` for permanent rules.
 
 ---
 
