@@ -5,6 +5,9 @@ import json # Ensure this is imported at the top
 import os        # ← ADD
 import logging   # ← ADD
 from openai import OpenAI   # ← ADD
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 from sqlalchemy import func
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File
@@ -167,6 +170,7 @@ def add_doctor(hospital_id: int, payload: dict = Body(...), db: Session = Depend
         name=payload["name"],
         doctor_id=payload["doctor_id"],
         department=payload.get("department", "General Physician"),
+        base_schedule=payload.get("base_schedule"),
         hospital_id=hospital_id
     )
     db.add(new_doc)
@@ -174,7 +178,7 @@ def add_doctor(hospital_id: int, payload: dict = Body(...), db: Session = Depend
 
     # Auto-embed so the AI can find this doctor immediately
     try:
-        oai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        oai = OpenAI(api_key=settings.OPENAI_API_KEY)
         text = f"Dr. {new_doc.name}, {new_doc.department} specialist"
         resp = oai.embeddings.create(input=[text], model="text-embedding-3-small")
         new_doc.embedding = resp.data[0].embedding
@@ -198,7 +202,7 @@ async def bulk_upload_and_sync(
 ):
     from openai import OpenAI
     import os
-    oai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    oai = OpenAI(api_key=settings.OPENAI_API_KEY)
 
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
     if not hospital:
@@ -323,7 +327,7 @@ def update_doctor(hospital_id: int, doctor_id: int, payload: dict = Body(...), d
     if needs_reembed:
         try:
             from openai import OpenAI
-            oai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            oai = OpenAI(api_key=settings.OPENAI_API_KEY)
             text = f"Dr. {doctor.name}, {doctor.department} specialist, schedule: {doctor.base_schedule or ''}"
             resp = oai.embeddings.create(input=[text], model="text-embedding-3-small")
             doctor.embedding = resp.data[0].embedding

@@ -15,7 +15,7 @@ from app.api.v1.endpoints.whatsapp import router as whatsapp_router
 import os
 
 app = FastAPI(title="Hospital AI Platform")
-Base.metadata.create_all(bind=engine)
+
 
 # Single source of truth for allowed origins
 ALLOWED_ORIGINS = [

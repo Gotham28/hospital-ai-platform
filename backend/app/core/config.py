@@ -1,7 +1,12 @@
 from typing import Optional
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pathlib import Path
+
+# Compute absolute path to backend/.env relative to this file
+_env_path = Path(__file__).resolve().parent.parent.parent / ".env"
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=str(_env_path), extra="ignore")
     # Core
     PROJECT_NAME: str = "Hospital AI Platform"
     API_V1_STR: str = "/api/v1"
