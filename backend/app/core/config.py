@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = "sk-placeholder"
     JWT_SECRET: str = "supersecret"
     SARVAM_API_KEY: str = ""
+    TWILIO_ACCOUNT_SID: str = ""
+    TWILIO_AUTH_TOKEN: str = ""
+    TWILIO_WHATSAPP_NUMBER: str = ""
 
     # Helper to build the URL dynamically
     @property

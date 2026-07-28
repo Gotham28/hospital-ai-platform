@@ -101,7 +101,6 @@ def _save_patient_ctx(hospital_id: int, session_token: str, ctx: dict) -> None:
             json.dumps(ctx),
         )
         logger.info("[PatientCtx] saved: %s", json.dumps(ctx))  # ← ADD THIS LINE
-
     except Exception as exc:
         logger.warning("[PatientCtx] save failed: %s", exc)
  

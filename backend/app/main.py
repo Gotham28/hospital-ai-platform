@@ -11,6 +11,7 @@ from app.services.reminders import start_reminder_scheduler, stop_reminder_sched
 from app.api.v1.endpoints.medicines import router as medicines_router
 from app.api.v1.endpoints.lab_tests import router as lab_tests_router
 from app.api.v1.endpoints.doctor_availability import router as availability_router
+from app.api.v1.endpoints.whatsapp import router as whatsapp_router
 import os
 
 app = FastAPI(title="Hospital AI Platform")
@@ -44,6 +45,7 @@ app.include_router(appointments_router, prefix="/api/v1/appointments", tags=["Ap
 app.include_router(medicines_router, prefix="/api/v1/medicines", tags=["Medicines"])
 app.include_router(lab_tests_router, prefix="/api/v1/lab-tests", tags=["Lab Tests"])
 app.include_router(availability_router, prefix="/api/v1/availability", tags=["Doctor Availability"])
+app.include_router(whatsapp_router, prefix="/api/v1/hospitals/{hospital_id}/whatsapp", tags=["WhatsApp"])
 
 @app.on_event("startup")
 def on_startup():

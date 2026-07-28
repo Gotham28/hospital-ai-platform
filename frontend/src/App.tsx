@@ -13,7 +13,8 @@ import { useAuth } from './context/AuthContext';
 import AppointmentsTab from './components/AppointmentsTab';
 import PharmacyPage from './pages/Pharmacy';
 import LabTestsPage from './pages/LabTests';
-import IrisPage from './pages/IrisPage'
+import IrisPage from './pages/IrisPage';
+import MessagingPage from './pages/Messaging';
 
 
 /**
@@ -282,6 +283,10 @@ export default function App() {
         <Route 
           path="/hospitals/:hospitalId/lab-tests" 
           element={<StaffGuard><LabTestsPage /></StaffGuard>} 
+        />
+        <Route 
+          path="/hospitals/:hospitalId/messaging" 
+          element={<StaffGuard><MessagingPage /></StaffGuard>} 
         />
 
         {/* Superadmin Only Routes */}
