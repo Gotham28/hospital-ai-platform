@@ -20,6 +20,7 @@ from app.core.config import settings
 from app.api.deps import get_db
 from app.models.hospital import Hospital
 from app.services.security import detect_prompt_injection
+from app.services.translation import _translate, _translate_async
 from app.models.knowledge import KnowledgeBase
 from app.models.usage import UsageLedger
 from app.models.doctor import Doctor
@@ -280,36 +281,7 @@ def _is_new_booking_attempt(ctx: dict) -> bool:
         and ctx.get("relevance_stage") == "done"
     )
 
-_GTRANSLATE_URL = "https://translate.googleapis.com/translate_a/single"
-
-
-def _translate(text: str, source: str, target: str) -> str:
-    if not text or not text.strip():
-        return text
-    try:
-        params = {"client": "gtx", "sl": source, "tl": target, "dt": "t", "q": text}
-        resp = httpx.get(_GTRANSLATE_URL, params=params, timeout=8.0)
-        resp.raise_for_status()
-        data = resp.json()
-        return "".join(part[0] for part in data[0] if part[0])
-    except Exception as e:
-        logger.warning("Translation failed (%s->%s): %s", source, target, e)
-        return text
-
-
-async def _translate_async(text: str, source: str, target: str) -> str:
-    if not text or not text.strip():
-        return text
-    try:
-        params = {"client": "gtx", "sl": source, "tl": target, "dt": "t", "q": text}
-        async with httpx.AsyncClient() as http:
-            resp = await http.get(_GTRANSLATE_URL, params=params, timeout=8.0)
-            resp.raise_for_status()
-            data = resp.json()
-            return "".join(part[0] for part in data[0] if part[0])
-    except Exception as e:
-        logger.warning("Async translation failed (%s->%s): %s", source, target, e)
-        return text
+# TRANSLATION functions moved to app.services.translation
 
 
 # =============================================================================
