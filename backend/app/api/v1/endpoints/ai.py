@@ -20,7 +20,25 @@ from app.core.config import settings
 from app.api.deps import get_db
 from app.models.hospital import Hospital
 from app.services.security import detect_prompt_injection
+# NOTE: _translate (sync) confirmed unused as of 2026-08-02 — zero call sites
+# in this file or the rest of the repo (only _translate_async is used).
+# TODO: Remove in future cleanup task alongside _session_key and resolve_doctor_id.
 from app.services.translation import _translate, _translate_async
+from app.services.vocabulary import (
+    _DEPT_SYNONYMS,
+    _expand_with_synonyms,
+    normalize_name,
+    score_doctor_relevance,
+)
+from app.services.patient_context import (
+    PATIENT_CTX_TTL,
+    _patient_ctx_key,
+    _load_patient_ctx,
+    _save_patient_ctx,
+    _update_patient_ctx,
+    _build_patient_ctx_block,
+    _log_task_completion,
+)
 from app.models.knowledge import KnowledgeBase
 from app.models.usage import UsageLedger
 from app.models.doctor import Doctor
@@ -61,198 +79,14 @@ VALID_LANGUAGES          = {"en", "ml"}
 
 
 # =============================================================================
-# GOOGLE TRANSLATE BRIDGE  (kept only for fallback / STT post-processing)
+# PATIENT CONTEXT + VOCABULARY — moved to services
 # =============================================================================
-PATIENT_CTX_TTL = 600   # matches BOOKING_SESSION_TTL; both keys expire together
- 
- 
-def _patient_ctx_key(hospital_id: int, session_token: str) -> str:
-    """Redis key for patient personalisation (separate from booking state)."""
-    return f"patient_ctx:{hospital_id}:{session_token}"
- 
- 
-def _load_patient_ctx(hospital_id: int, session_token: str) -> dict:
-    """
-    Return the current patient context dict, or {} if none exists yet.
- 
-    Schema
-    ------
-    {
-      "doctor_id":   int | None,
-      "doctor_name": str | None,
-      "department":  str | None,      # canonical department string
-      "language":    "en" | "ml",
-      "seen_topics": list[str]        # e.g. ["pharmacy", "appointment"]
-    }
-    """
-    try:
-        raw = _redis.get(_patient_ctx_key(hospital_id, session_token))
-        if raw:
-            return json.loads(raw)
-    except Exception as exc:
-        logger.warning("[PatientCtx] load failed: %s", exc)
-    return {}
- 
- 
-def _save_patient_ctx(hospital_id: int, session_token: str, ctx: dict) -> None:
-    """Write (or refresh TTL of) the patient context in Redis."""
-    try:
-        _redis.setex(
-            _patient_ctx_key(hospital_id, session_token),
-            PATIENT_CTX_TTL,
-            json.dumps(ctx),
-        )
-        logger.info("[PatientCtx] saved: %s", json.dumps(ctx))  # ← ADD THIS LINE
-    except Exception as exc:
-        logger.warning("[PatientCtx] save failed: %s", exc)
- 
- 
-def _update_patient_ctx(
-    hospital_id: int,
-    session_token: str,
-    *,
-    language: str,
-    question_en: str,
-    history: list,
-    db,
-) -> dict:
-    """
-    Deterministically update patient context from the current turn.
-    No LLM call — purely regex/keyword matching, so it adds < 1 ms.
- 
-    Call this ONCE per request, outside event_generator(), so the context
-    is already updated before streaming begins.
- 
-    Returns the updated context dict.
-    """
-    ctx = _load_patient_ctx(hospital_id, session_token)
-    is_new_session = not ctx 
-
-    # ── 0. Session timing / turn count (for task-completion metric) ───────
-    if "session_started_at" not in ctx:
-        ctx["session_started_at"] = time.time()
-    ctx["turn_count"] = ctx.get("turn_count", 0) + 1
-
-    # ── 1. Language preference ────────────────────────────────────────────
-    ctx["language"] = language   # always authoritative from the live request  # always authoritative from the live request
- 
-    # ── 2. Doctor / department from the most recent assistant turn ────────
-    # The doctor context lines we already inject look like:
-    #   "- [ID: 7] Dr. Priya (Cardiology): Available today from ..."
-    # Pick up the ID and hydrate name + department from the DB.
-    if history:
-        for msg in reversed(history):
-            if msg.role == "assistant":
-                id_match = re.search(r"\[ID:\s*(\d+)\]", msg.content)
-                if id_match:
-                    doctor_id = int(id_match.group(1))
-                    if ctx.get("doctor_id") != doctor_id:
-                        try:
-                            doc = (
-                                db.query(Doctor)
-                                .filter(
-                                    Doctor.id == doctor_id,
-                                    Doctor.hospital_id == hospital_id,  # tenant-scoped
-                                )
-                                .first()
-                            )
-                            if doc:
-                                ctx["doctor_id"]   = doc.id
-                                ctx["doctor_name"] = doc.name
-                                ctx["department"]  = doc.department
-                        except Exception as exc:
-                            logger.warning("[PatientCtx] doctor lookup failed: %s", exc)
-                break   # only look at the single most-recent assistant message
- 
-    # ── 3. Department from the user question (fallback) ───────────────────
-    # Uses the existing _DEPT_SYNONYMS dict — no extra work needed.
-    if not ctx.get("department"):
-        q_lower = question_en.lower()
-        for canonical, variants in _DEPT_SYNONYMS.items():
-            if canonical in q_lower or any(v in q_lower for v in variants):
-                ctx["department"] = canonical
-                break
- 
-    # ── 4. Seen-topics accumulation ───────────────────────────────────────
-    seen = set(ctx.get("seen_topics", []))
-    topic_keywords: dict[str, list[str]] = {
-        "pharmacy":     ["medicine", "pharmacy", "drug", "tablet", "pill"],
-        "lab_tests":    ["lab", "test", "blood", "scan", "diagnostic", "x-ray"],
-        "appointment":  ["book", "appointment", "schedule", "reserve"],
-        "availability": ["available", "availability", "timing", "when", "today"],
-    }
-    for topic, keywords in topic_keywords.items():
-        if any(kw in question_en.lower() for kw in keywords):
-            seen.add(topic)
-    ctx["seen_topics"] = list(seen)
-    ctx["_is_new_session"] = is_new_session
-    _save_patient_ctx(hospital_id, session_token, ctx)
-    return ctx
- 
- 
-def _build_patient_ctx_block(ctx: dict) -> str:
-    """
-    Render the patient context as a concise system-prompt block.
-    Returns "" when ctx is empty (clean no-op for new sessions).
-    """
-    if not ctx:
-        return ""
- 
-    lines = ["PATIENT CONTEXT THIS SESSION:"]
- 
-    if ctx.get("doctor_name"):
-        dept_str = f" ({ctx['department']})" if ctx.get("department") else ""
-        lines.append(
-            f"  • The patient has already discussed Dr. {ctx['doctor_name']}"
-            f"{dept_str} [ID: {ctx['doctor_id']}] — reference this doctor"
-            f" without re-introducing them."
-        )
-    elif ctx.get("department"):
-        lines.append(
-            f"  • The patient is interested in the {ctx['department'].title()} department."
-        )
- 
-    lang_label = {"ml": "Malayalam", "en": "English"}.get(
-        ctx.get("language", "en"), "English"
-    )
-    lines.append(f"  • Preferred language this session: {lang_label}.")
- 
-    seen = ctx.get("seen_topics", [])
-    if seen:
-        readable_map = {
-            "pharmacy":     "pharmacy / medicines",
-            "lab_tests":    "lab tests",
-            "appointment":  "appointment booking",
-            "availability": "doctor availability",
-        }
-        readable = [readable_map.get(t, t) for t in seen]
-        lines.append(
-            f"  • Topics already covered this session: {', '.join(readable)}."
-        )
-        lines.append(
-            "    Do not repeat the same basic information; instead build on it."
-        )
- 
-    lines.append("")   # trailing newline so the block is visually separated
-    return "\n".join(lines)
- 
-def _log_task_completion(hospital_id: int, session_token: str, ctx: dict, outcome: str) -> None:
-    """
-    Log the task-completion metric for this session: turns and elapsed time
-    from first message to a terminal outcome (booking success so far;
-    'abandoned' can be logged the same way later if we add session-expiry
-    hooks). One structured log line per completed session — grep on
-    "[TaskCompletion]" to pull these for analysis, or ship them to whatever
-    log aggregation you already have. Deliberately not a new DB table yet;
-    the plan only asks that this be logged, not eyeballed.
-    """
-    started_at = ctx.get("session_started_at")
-    turns = ctx.get("turn_count", 0)
-    elapsed_seconds = round(time.time() - started_at, 1) if started_at else None
-    logger.info(
-        "[TaskCompletion] hospital_id=%s session=%s outcome=%s turns=%s elapsed_seconds=%s",
-        hospital_id, session_token, outcome, turns, elapsed_seconds,
-    )
+# PATIENT_CTX_TTL, _patient_ctx_key, _load_patient_ctx, _save_patient_ctx,
+# _update_patient_ctx, _build_patient_ctx_block, _log_task_completion
+#   → app.services.patient_context
+# _DEPT_SYNONYMS, _expand_with_synonyms, normalize_name, score_doctor_relevance
+#   → app.services.vocabulary
+# All imported at the top of this file; call sites below are unchanged.
 
 # =============================================================================
 # FEATURE 4 — RELEVANCE GATE HELPERS
@@ -347,81 +181,8 @@ class IngestRequest(BaseModel):
 # =============================================================================
 # DOCTOR RELEVANCE FILTERING
 # =============================================================================
-
-_DEPT_SYNONYMS: dict[str, list[str]] = {
-    "orthopaedics":     ["orthopedics", "ortho", "orthopedic", "orthopaedic", "bone", "joint"],
-    "orthopedics":      ["orthopaedics", "ortho", "orthopedic", "orthopaedic", "bone", "joint"],
-    "cardiology":       ["cardiac", "heart", "cardio"],
-    "general medicine": ["general", "medicine", "physician", "gm"],
-    "gynaecology":      ["gynecology", "gynae", "obstetrics", "obgyn", "ob-gyn", "women"],
-    "gynecology":       ["gynaecology", "gynae", "obstetrics", "obgyn", "ob-gyn", "women"],
-    "paediatrics":      ["pediatrics", "paediatric", "pediatric", "child", "children"],
-    "pediatrics":       ["paediatrics", "paediatric", "pediatric", "child", "children"],
-    "dermatology":      ["derma", "skin"],
-    "neurology":        ["neuro", "brain", "nerve"],
-    "ophthalmology":    ["eye", "ophthal", "vision"],
-    "ent":              ["ear", "nose", "throat", "otolaryngology"],
-    "psychiatry":       ["mental health", "psychology", "psych"],
-    "oncology":         ["cancer", "tumor", "tumour"],
-    "urology":          ["urological", "kidney", "bladder"],
-    "nephrology":       ["kidney", "renal"],
-    "pulmonology":      ["lung", "chest", "respiratory", "pulmonary"],
-    "gastroenterology": ["gastro", "digestive", "stomach", "gut", "gi"],
-    "endocrinology":    ["diabetes", "thyroid", "hormones", "endocrine"],
-    "rheumatology":     ["arthritis", "rheumatic", "joints"],
-    "surgery":          ["surgical", "general surgery", "laparoscopy", "laproscopy"],
-    "dentistry":        ["dental", "teeth", "tooth"],
-    "physiotherapy":    ["physio", "rehabilitation", "rehab"],
-    "radiology":        ["xray", "x-ray", "imaging", "scan", "mri"],
-    "anesthesiology":   ["anaesthesia", "anesthesia", "anaesthesiology"],
-}
-
-def _expand_with_synonyms(tokens: set) -> set:
-    expanded = set(tokens)
-    for token in tokens:
-        for canonical, variants in _DEPT_SYNONYMS.items():
-            if token == canonical or token in variants:
-                expanded.add(canonical)
-                expanded.update(variants)
-    return expanded
-
-
-def normalize_name(text: str) -> str:
-    text = text.lower()
-    text = re.sub(r"dr\.?\s*", "", text)
-    text = re.sub(r"[^a-z\s]", "", text)
-    return re.sub(r"\s+", " ", text).strip()
-
-
-def score_doctor_relevance(question: str, doctor: Doctor) -> float:
-    q_norm = normalize_name(question)
-    q_tokens = set(q_norm.split())
-    if not q_tokens:
-        return 0.0
-
-    dept  = normalize_name(doctor.department or "")
-    name  = normalize_name(doctor.name or "")
-    sched = normalize_name(
-        getattr(doctor, "base_schedule", None)
-        or getattr(doctor, "schedule", None)
-        or ""
-    )
-
-    d_tokens = set((dept + " " + name + " " + sched).split())
-    if not d_tokens:
-        return 0.0
-
-    q_expanded = _expand_with_synonyms(q_tokens)
-    d_expanded = _expand_with_synonyms(d_tokens)
-
-    token_score = len(q_expanded & d_expanded) / len(q_expanded)
-
-    substring_score = 0.0
-    for qt in q_tokens:
-        if len(qt) >= 4 and qt in dept:
-            substring_score = max(substring_score, 0.6)
-
-    return max(token_score, substring_score)
+# _DEPT_SYNONYMS, _expand_with_synonyms, normalize_name, score_doctor_relevance
+# moved to app.services.vocabulary — imported at top of this file.
 
 
 def check_doctor_availability_db(doctor: Doctor, db: Session, target_date: datetime) -> str:
