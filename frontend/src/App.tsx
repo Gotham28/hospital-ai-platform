@@ -16,22 +16,6 @@ import LabTestsPage from './pages/LabTests';
 import IrisPage from './pages/IrisPage';
 import MessagingPage from './pages/Messaging';
 
-
-/**
- * Replace the HospitalList function in frontend/src/App.tsx with this.
- * 
- * Changes:
- *  - Adds a Delete button (trash icon) on each hospital card
- *  - Shows a confirmation dialog before deleting
- *  - Calls DELETE /hospitals/:id on confirm
- *  - Refreshes the list after deletion
- * 
- * Also add this import at the top of App.tsx:
- *   import { Plus, Trash2 } from 'lucide-react';
- */
-
-
-
 // ── Confirmation dialog ──────────────────────────────────────────
 interface DeleteDialogProps {
   hospital: { id: number; name: string } | null;
@@ -43,34 +27,37 @@ interface DeleteDialogProps {
 function DeleteConfirmDialog({ hospital, onConfirm, onCancel, isDeleting }: DeleteDialogProps) {
   if (!hospital) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full mx-4 p-6">
-        <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <Trash2 className="w-6 h-6 text-red-600" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-[2px]">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full mx-4 overflow-hidden">
+        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
+          <div className="w-10 h-10 bg-rose-50 rounded-full flex items-center justify-center mb-4">
+            <Trash2 className="w-5 h-5 text-rose-500" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-900 mb-1">Delete Hospital?</h3>
+          <p className="text-sm text-slate-500">
+            You are about to permanently delete <span className="font-semibold text-slate-900">"{hospital.name}"</span>
+          </p>
         </div>
-        <h3 className="text-lg font-bold text-gray-900 text-center mb-2">Delete Hospital?</h3>
-        <p className="text-sm text-gray-500 text-center mb-1">
-          You are about to permanently delete
-        </p>
-        <p className="text-sm font-semibold text-gray-900 text-center mb-4">
-          "{hospital.name}"
-        </p>
-        <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2 text-center mb-6">
-          ⚠️ This will also delete all doctors, appointments, knowledge base entries,
-          and staff accounts for this hospital. This cannot be undone.
-        </p>
-        <div className="flex gap-3">
+        
+        <div className="px-6 py-4">
+          <p className="text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">
+            ⚠️ This will also delete all doctors, appointments, knowledge base entries,
+            and staff accounts for this hospital. This cannot be undone.
+          </p>
+        </div>
+
+        <div className="px-6 pb-6 pt-2 flex gap-3 justify-end">
           <button
             onClick={onCancel}
             disabled={isDeleting}
-            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+            className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 hover:border-slate-300 transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
             disabled={isDeleting}
-            className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
+            className="px-4 py-2 bg-rose-500 text-white rounded-lg text-sm font-medium hover:bg-rose-600 transition-colors disabled:opacity-50 flex items-center gap-2"
           >
             {isDeleting ? (
               <>
@@ -81,9 +68,7 @@ function DeleteConfirmDialog({ hospital, onConfirm, onCancel, isDeleting }: Dele
                 Deleting…
               </>
             ) : (
-              <>
-                <Trash2 className="w-4 h-4" /> Delete Permanently
-              </>
+              'Delete Permanently'
             )}
           </button>
         </div>
@@ -91,6 +76,7 @@ function DeleteConfirmDialog({ hospital, onConfirm, onCancel, isDeleting }: Dele
     </div>
   );
 }
+
 // ── HospitalList ─────────────────────────────────────────────────
 function HospitalList() {
   const [hospitals, setHospitals] = useState<any[]>([]);
@@ -124,14 +110,25 @@ function HospitalList() {
     }
   };
 
+  // Assign distinct colors based on index to give the list variety
+  const getAvatarColors = (id: number) => {
+    const variants = [
+      'bg-indigo-50 text-indigo-600',
+      'bg-violet-50 text-violet-600',
+      'bg-cyan-50 text-cyan-600',
+      'bg-amber-50 text-amber-600'
+    ];
+    return variants[id % variants.length];
+  };
+
   return (
     <div>
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Hospital Management</h2>
+      <div className="flex justify-between items-center mb-8">
+        <h2 className="text-2xl font-bold text-slate-900">Hospital Management</h2>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500/30 transition-colors"
         >
           <Plus className="w-4 h-4" /> Add Hospital
         </button>
@@ -139,47 +136,57 @@ function HospitalList() {
 
       {/* Error banner */}
       {deleteError && (
-        <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex justify-between items-center">
+        <div className="mb-6 px-4 py-3 bg-rose-50 border border-rose-200 rounded-lg text-sm text-rose-700 flex justify-between items-center">
           {deleteError}
-          <button onClick={() => setDeleteError(null)} className="text-red-400 hover:text-red-600 ml-4 font-bold">×</button>
+          <button onClick={() => setDeleteError(null)} className="text-rose-400 hover:text-rose-600 ml-4 font-bold">×</button>
         </div>
       )}
 
       {/* Hospital cards */}
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-5 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
         {hospitals.map((h: any) => (
           <div
             key={h.id}
-            className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow relative group"
+            className="bg-white rounded-xl border border-slate-200 hover:border-slate-300 transition-all duration-150 relative group overflow-hidden"
           >
-            {/* Delete button — top-right corner, visible on hover */}
+            {/* Delete button — top-right, appears on hover */}
             <button
               onClick={() => setDeleteTarget({ id: h.id, name: h.name })}
               title="Delete hospital"
-              className="absolute top-3 right-3 p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
+              className="absolute top-3 right-3 p-1.5 rounded-md text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
             >
               <Trash2 className="w-4 h-4" />
             </button>
 
-            <h3 className="font-bold text-gray-900 text-lg pr-8">{h.name}</h3>
-            <p className="text-xs text-gray-400 mb-4">Slug: {h.slug}</p>
+            <div className="px-5 py-5">
+              <div className="flex items-start gap-3 mb-4">
+                {/* Hospital initial avatar */}
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0 ${getAvatarColors(h.id)}`}>
+                  {h.name[0]}
+                </div>
+                <div className="min-w-0 pr-6">
+                  <h3 className="font-semibold text-slate-900 text-sm truncate">{h.name}</h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5 font-mono truncate">{h.slug}</p>
+                </div>
+              </div>
+            </div>
 
-            <div className="flex gap-2 border-t pt-4">
+            <div className="px-5 pb-5 flex gap-2 border-t border-slate-100 pt-4">
               <Link
                 to={`/hospitals/${h.id}/appointments`}
-                className="flex-1 text-center text-xs bg-emerald-600 text-white py-2 rounded-md font-medium hover:bg-emerald-700"
+                className="flex-1 text-center text-[12px] font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 py-1.5 rounded-md transition-colors"
               >
                 Appointments
               </Link>
               <Link
                 to={`/hospitals/${h.id}/training`}
-                className="flex-1 text-center text-xs bg-blue-600 text-white py-2 rounded-md font-medium hover:bg-blue-700"
+                className="flex-1 text-center text-[12px] font-medium text-cyan-700 bg-cyan-50 hover:bg-cyan-100 py-1.5 rounded-md transition-colors"
               >
                 Train AI
               </Link>
               <Link
                 to={`/hospitals/${h.id}/settings`}
-                className="flex-1 text-center text-xs border border-gray-300 text-gray-600 py-2 rounded-md font-medium hover:bg-gray-50"
+                className="flex-1 text-center text-[12px] font-medium text-slate-600 hover:text-slate-700 hover:bg-slate-50 py-1.5 rounded-md transition-colors border border-slate-200"
               >
                 Settings
               </Link>

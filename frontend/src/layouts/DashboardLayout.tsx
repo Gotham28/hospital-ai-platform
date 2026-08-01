@@ -1,6 +1,7 @@
 import { Outlet, Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Users, Building2, Settings, LogOut, BrainCircuit, CalendarCheck, Pill, TestTube, MessageSquare } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+
 export default function DashboardLayout() {
   const navigate = useNavigate();
   const { hospitalId } = useParams();
@@ -13,102 +14,110 @@ export default function DashboardLayout() {
   };
 
   const isActive = (path: string) => location.pathname === path;
-  const linkBase = 'flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors';
-  const linkActive = 'bg-blue-50 text-blue-600';
-  const linkIdle = 'text-gray-700 hover:bg-blue-50';
-
+  
+  const linkBase = 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200';
+  
   return (
-    <div className="flex h-screen bg-gray-50">
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col shadow-sm">
-        <div className="p-6 border-b">
-          <h2 className="text-xl font-bold text-blue-600 flex items-center gap-2">
-            <Building2 className="w-6 h-6" /> Gothos Labs
+    <div className="flex h-screen bg-slate-50 admin-shell font-sans text-slate-900">
+      {/* Dark Sidebar with gradient */}
+      <aside 
+        className="w-[260px] flex flex-col shadow-xl z-10"
+        style={{ background: 'linear-gradient(180deg, #0f2318 0%, #081410 100%)' }}
+      >
+        <div className="p-6 border-b border-white/10 flex flex-col justify-center">
+          <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
+            AROGYA
           </h2>
+          <span className="text-xs text-brand-400 font-medium mt-1 uppercase tracking-wider">by Gothos Labs</span>
         </div>
 
-        <nav className="flex-1 p-4 space-y-2">
+        <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
           {role === 'superadmin' && (
             <Link
               to="/"
-              className={`${linkBase} ${isActive('/') ? linkActive : linkIdle}`}
+              className={`${linkBase} ${isActive('/') ? 'bg-brand-500/15 text-brand-300' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}
             >
-              <LayoutDashboard className="w-5 h-5" /> Hospitals
+              <LayoutDashboard className={`w-5 h-5 ${isActive('/') ? 'text-brand-400' : 'text-brand-500/70'}`} /> Hospitals
             </Link>
           )}
 
           {hospitalId && (
             <>
-              <div className="mt-6 mb-2 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+              <div className="mt-8 mb-4 px-3 text-[10px] font-bold text-white/40 uppercase tracking-widest">
                 Management
               </div>
 
               <Link
                 to={`/hospitals/${hospitalId}/appointments`}
-                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/appointments`) ? linkActive : linkIdle}`}
+                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/appointments`) ? 'bg-indigo-500/15 text-indigo-300' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}
               >
-                <CalendarCheck className="w-5 h-5 text-blue-500" /> Appointments
+                <CalendarCheck className={`w-5 h-5 ${isActive(`/hospitals/${hospitalId}/appointments`) ? 'text-indigo-400' : 'text-indigo-400/60'}`} /> Appointments
               </Link>
 
               <Link
                 to={`/hospitals/${hospitalId}/doctors`}
-                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/doctors`) ? linkActive : linkIdle}`}
+                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/doctors`) ? 'bg-violet-500/15 text-violet-300' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}
               >
-                <Users className="w-5 h-5 text-blue-500" /> Doctors
+                <Users className={`w-5 h-5 ${isActive(`/hospitals/${hospitalId}/doctors`) ? 'text-violet-400' : 'text-violet-400/60'}`} /> Doctors
               </Link>
 
-              {/* Settings is now visible to all roles */}
-              <Link
-                to={`/hospitals/${hospitalId}/settings`}
-                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/settings`) ? linkActive : linkIdle}`}
-              >
-                <Settings className="w-5 h-5 text-blue-500" /> Settings
-              </Link>
               <Link
                 to={`/hospitals/${hospitalId}/pharmacy`}
-                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/pharmacy`) ? linkActive : linkIdle}`}
+                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/pharmacy`) ? 'bg-brand-500/15 text-brand-300' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}
               >
-                <Pill className="w-5 h-5 text-blue-500" /> Pharmacy
+                <Pill className={`w-5 h-5 ${isActive(`/hospitals/${hospitalId}/pharmacy`) ? 'text-brand-400' : 'text-brand-400/60'}`} /> Pharmacy
               </Link>
 
               <Link
                 to={`/hospitals/${hospitalId}/lab-tests`}
-                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/lab-tests`) ? linkActive : linkIdle}`}
+                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/lab-tests`) ? 'bg-cyan-500/15 text-cyan-300' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}
               >
-                <TestTube className="w-5 h-5 text-purple-500" /> Lab Tests
+                <TestTube className={`w-5 h-5 ${isActive(`/hospitals/${hospitalId}/lab-tests`) ? 'text-cyan-400' : 'text-cyan-400/60'}`} /> Lab Tests
               </Link>
 
               <Link
                 to={`/hospitals/${hospitalId}/messaging`}
-                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/messaging`) ? linkActive : linkIdle}`}
+                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/messaging`) ? 'bg-indigo-500/15 text-indigo-300' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}
               >
-                <MessageSquare className="w-5 h-5 text-blue-500" /> Messaging
+                <MessageSquare className={`w-5 h-5 ${isActive(`/hospitals/${hospitalId}/messaging`) ? 'text-indigo-400' : 'text-indigo-400/60'}`} /> Messaging
               </Link>
 
-              {/* AI Training is Superadmin only */}
+              <Link
+                to={`/hospitals/${hospitalId}/settings`}
+                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/settings`) ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}
+              >
+                <Settings className={`w-5 h-5 ${isActive(`/hospitals/${hospitalId}/settings`) ? 'text-slate-300' : 'text-slate-400/60'}`} /> Settings
+              </Link>
+
               {role === 'superadmin' && (
-                <Link
-                  to={`/hospitals/${hospitalId}/training`}
-                  className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/training`) ? linkActive : linkIdle}`}
-                >
-                  <BrainCircuit className="w-5 h-5 text-blue-500" /> AI Training
-                </Link>
+                <>
+                  <div className="mt-8 mb-4 px-3 text-[10px] font-bold text-white/40 uppercase tracking-widest">
+                    Platform Admin
+                  </div>
+                  <Link
+                    to={`/hospitals/${hospitalId}/training`}
+                    className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/training`) ? 'bg-cyan-500/15 text-cyan-300' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}
+                  >
+                    <BrainCircuit className={`w-5 h-5 ${isActive(`/hospitals/${hospitalId}/training`) ? 'text-cyan-400' : 'text-cyan-400/60'}`} /> AI Training
+                  </Link>
+                </>
               )}
             </>
           )}
         </nav>
 
-        <div className="p-4 border-t">
+        <div className="p-4 border-t border-white/10">
           <button
             onClick={handleSignOut}
-            className="flex items-center gap-3 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium w-full transition-colors"
+            className="flex items-center gap-3 px-3 py-2 text-white/50 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg text-sm font-medium w-full transition-colors"
           >
             <LogOut className="w-5 h-5" /> Sign Out
           </button>
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto bg-gray-50">
-        <div className="p-8">
+      <main className="flex-1 overflow-auto bg-slate-50 relative">
+        <div className="max-w-7xl mx-auto px-8 py-8">
           <Outlet />
         </div>
       </main>
