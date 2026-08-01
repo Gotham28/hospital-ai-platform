@@ -19,6 +19,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from app.core.config import settings
 from app.api.deps import get_db
 from app.models.hospital import Hospital
+from app.services.security import detect_prompt_injection
 from app.models.knowledge import KnowledgeBase
 from app.models.usage import UsageLedger
 from app.models.doctor import Doctor
@@ -315,31 +316,12 @@ async def _translate_async(text: str, source: str, target: str) -> str:
 # Session helpers
 # =============================================================================
 
-def _session_key(hospital_id: str, session_token: str) -> str:
-    return f"booking:{hospital_id}:{session_token}"
+# TODO: Confirmed unused via grep on 2026-08-01. Remove in future cleanup task.
+# def _session_key(hospital_id: str, session_token: str) -> str:
+#     return f"booking:{hospital_id}:{session_token}"
 
 
-# =============================================================================
-# INJECTION DETECTION
-# =============================================================================
-
-_INJECTION_PATTERNS = [
-    re.compile(r"ignore\s+(all\s+)?(previous|prior|above|your)\s+(instructions?|prompt|rules?|guidelines?)", re.IGNORECASE),
-    re.compile(r"(disregard|forget|override|bypass|circumvent)\s+(your\s+)?(instructions?|guidelines?|rules?|prompt|training)", re.IGNORECASE),
-    re.compile(r"(your\s+new|new\s+instructions?\s+(are|is)|from\s+now\s+on\s+you)", re.IGNORECASE),
-    re.compile(r"\byou\s+are\s+now\b", re.IGNORECASE),
-    re.compile(r"\b(act|behave|pretend|roleplay|role-play|simulate)\s+(as|like)\b", re.IGNORECASE),
-    re.compile(r"\b(DAN|jailbreak|do\s+anything\s+now)\b", re.IGNORECASE),
-    re.compile(r"(^|\s)(system|assistant)\s*:", re.IGNORECASE | re.MULTILINE),
-    re.compile(r"(\[INST\]|<<SYS>>|<</SYS>>|\[/INST\])", re.IGNORECASE),
-    re.compile(r"(repeat|show|print|reveal|display|tell me|what (are|is))\s+(your\s+)?(system\s+)?(prompt|instructions?|guidelines?|rules?)", re.IGNORECASE),
-]
-
-def detect_prompt_injection(text: str) -> Optional[str]:
-    for pattern in _INJECTION_PATTERNS:
-        if pattern.search(text):
-            return "Prompt injection detected."
-    return None
+# INJECTION DETECTION moved to app.services.security
 
 
 # =============================================================================
@@ -602,20 +584,21 @@ def build_lab_tests_context(question: str, tests: list) -> str:
     return "\n".join(lines) + "\n"
 
 
-def resolve_doctor_id(user_text: str, doctor_data: dict):
-    nq = normalize_name(user_text)
-    best_match, best_score = None, 0
-    for did, d in doctor_data.items():
-        name = d.get("name", "") if isinstance(d, dict) else str(d)
-        nn = normalize_name(name)
-        qt, nt = set(nq.split()), set(nn.split())
-        if not qt or not nt:
-            continue
-        score = len(qt & nt) / len(nt)
-        if score > best_score:
-            best_score = score
-            best_match = (did, name)
-    return best_match if best_score >= 0.5 else (None, None)
+# TODO: Confirmed unused via grep on 2026-08-01. Remove in future cleanup task.
+# def resolve_doctor_id(user_text: str, doctor_data: dict):
+#     nq = normalize_name(user_text)
+#     best_match, best_score = None, 0
+#     for did, d in doctor_data.items():
+#         name = d.get("name", "") if isinstance(d, dict) else str(d)
+#         nn = normalize_name(name)
+#         qt, nt = set(nq.split()), set(nn.split())
+#         if not qt or not nt:
+#             continue
+#         score = len(qt & nt) / len(nt)
+#         if score > best_score:
+#             best_score = score
+#             best_match = (did, name)
+#     return best_match if best_score >= 0.5 else (None, None)
 
 
 # =============================================================================
