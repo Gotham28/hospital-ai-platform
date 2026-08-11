@@ -89,7 +89,7 @@ const IrisTheme: React.FC<IrisThemeProps> = ({ hospitalId, hospitalName }) => {
               </div>
 
               {/* Right — Chat widget */}
-    <div className="flex flex-col items-center lg:col-auto col-span-full">
+    <div className="flex flex-col justify-center items-center w-full px-2 lg:col-auto col-span-full">
       <Chat hospitalId={hospitalId?.toString() ?? ''} />
     </div>
             </div>

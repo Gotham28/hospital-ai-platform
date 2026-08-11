@@ -6,6 +6,8 @@ This file tracks what's actually done vs. in progress vs. next, across the whole
 project. Update this after every verified feature — not before. See `docs/MASTER_PLAN.md`
 for full specs, `.agents/AGENTS.md` for permanent rules.
 
+The "Catch-up" section is an append-only log — once an entry is added, do not edit or delete it in later sessions, even if it becomes outdated; add a new dated entry instead. This is the project's running memory of what was actually done, session to session.
+
 ---
 
 ## IRIS Rheumatology Clinic Features (MASTER_PLAN.md §1.6)
@@ -14,7 +16,7 @@ for full specs, `.agents/AGENTS.md` for permanent rules.
 |---|---|---|---|
 | 1. Welcome message | ✅ Done | ✅ Done | ✅ Yes |
 | 2. Post-booking disclaimer | ✅ Done | ✅ Done | ✅ Yes |
-| 3. Outsourced lab test flag | ✅ Done | ✅ Done | ✅ Yes — toggle/note/badge/clear verified across multiple local hospitals, isolation confirmed |
+| 3. Outsourced lab test flag | ✅ Done | ✅ Done | ⚠️ Partial — toggle/note/badge/clear verified across multiple local hospitals. "Isolation confirmed" applies to the admin toggle only; the `PATCH`/`DELETE /lab-tests/{id}` mutation endpoints were not covered and are cross-tenant open (see audit note 2026-08-08) |
 | 4. Relevance gate before booking | ✅ Done (migration applied) | ✅ Done | ✅ Yes — End-to-end verified with LLM intent constraints |
 | 5. Handwritten-record context | 🚫 Deferred — do not build | 🚫 Deferred | — |
 
@@ -59,10 +61,38 @@ migration backup retained at D:\Hospital\neon-migration-dump\arogya_staging_rend
 | Item | Status |
 |---|---|
 | 1.1 Patient Personalisation | ✅ Done (per master plan) |
-| 1.2 Extract services out of ai.py | ⬜ Not started — do after IRIS features 3 & 4 |
+| 1.2 Extract services out of ai.py | ✅ Done — all 5 stages complete (see detail below) |
 | 1.3 Sarvam translation upgrade | ⬜ Not started |
 | 1.4 Security hardening | ⬜ Not started |
 | 1.5 Multi-tenant isolation hardening | ⬜ Not started |
+
+**§1.2 Service extraction detail (completed 2026-08-07):**
+`ai.py` has been split into 5 dedicated service modules across 5 commits:
+- Stage 1 (`271745c`): `services/security.py` — `detect_prompt_injection()`, `_INJECTION_PATTERNS`
+- Stage 2 (`0301795`): `services/translation.py` — `_translate()`, `_translate_async()` (Google Translate bridge; note for Sarvam upgrade: this is the file to modify for §1.3)
+- Stage 3 (`6910e23`): `services/vocabulary.py` + `services/patient_context.py` — vocabulary helpers and Redis-backed session context
+- Stage 4 (`aa99831`): `services/rag.py` — all RAG/context-building: `build_context()`, `build_doctor_context()`, `build_kb_context()`, `build_system_prompt_*()`, `build_fallback_instruction()`, PDF/ingest helpers
+- Stage 5 (`a53a63a`): `services/booking.py` — booking state machine and session logic
+
+`ai.py` now delegates to these modules. No behavior changes, no signature changes. All `hospital_id` filters preserved in extracted code.
+
+---
+
+## WhatsApp Integration (unplanned — added 2026-08-07)(But currently not in use)
+
+A Twilio-backed WhatsApp messaging feature has been added outside the original plan:
+
+- **`services/whatsapp.py`**: `send_whatsapp_message()` — sends via Twilio, stores a masked-phone log (no raw number stored), records `status`/`twilio_sid`/`error_message`. Tenant-scoped.
+- **`models/whatsapp_log.py`**: `WhatsAppLog` table — `hospital_id`, `masked_phone`, `status`, `twilio_sid`, `created_at`.
+- **Migration `0c682ef81de1`**: `add_whatsapp_logs_table` applied to local DB.
+- **`Multi-Hospital-WhatsApp-Patient-Messaging-Platform/`** (moved out 2026-08-09): a
+  standalone Node.js/Express project (SQLite + Twilio) by a separate developer, used to
+  send bot links to patients over WhatsApp. It previously sat inside this workspace as a
+  nested git repo; it now lives outside the AROGYA repo and is maintained separately. Not
+  imported by `backend/app/`, not part of the FastAPI system, and out of scope for all
+  AROGYA tasks.
+- **Credentials required**: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_NUMBER` in config. Gracefully degrades if not set.
+- **Verified locally**: Migration applied, PII masking confirmed.
 
 ---
 
@@ -79,3 +109,44 @@ Not started. Do not begin until Phase 1 is complete and demoed end-to-end.
   configurable but intentionally left empty.
 - Feature 4 relevance criteria are partial (referral + prior-doctor checks only) —
   clinic will provide more later; this is expected, not a bug.
+- **Next up for Phase 1:** §1.3 Sarvam translation upgrade (modify `services/translation.py`), then §1.4 security hardening (Malayalam injection patterns + `SecurityLog` table), then §1.5 multi-tenant isolation hardening. See MASTER_PLAN.md §2 for specs.
+- WhatsApp integration: confirm whether end-to-end testing against Twilio sandbox has been done, and whether it needs a frontend UI surface in the admin panel.
+- **Tenant-isolation audit (2026-08-08, read-only review of repomix snapshot — no code
+  changed):** six endpoints in `backend/app/` fetch tenant-owned rows by primary key and
+  mutate them without any `hospital_id` check. Violates AGENTS.md §5.1 and §4. Not yet
+  fixed — to be scoped as its own task after the Neon migration closes, feeding into
+  §1.5 multi-tenant isolation hardening.
+
+  | Endpoint | File:line | Issue |
+  |---|---|---|
+  | `PATCH /knowledge/entry/{id}` | `ai.py:1127` | No auth dependency at all; no `hospital_id` filter |
+  | `DELETE /knowledge/entry/{id}` | `ai.py:1143` | No auth dependency at all; no `hospital_id` filter |
+  | `DELETE /lab-tests/{id}` | `lab_tests.py:42` | `_tenant` injected via `get_current_tenant` but never compared to `db_item.hospital_id` |
+  | `PATCH /lab-tests/{id}` | `lab_tests.py:142` | Same |
+  | `DELETE /medicines/{id}` | `medicines.py:42` | Same |
+  | `PATCH /medicines/{id}` | `medicines.py:148` | Same |
+
+  The two `/knowledge/entry/` routes are the most severe: their only dependency is
+  `get_db`, so they are unauthenticated write access to any tenant's `KnowledgeBase` —
+  a RAG-corpus integrity risk, not only a data-leak risk.
+
+  Correct pattern already exists in the codebase: `approve_appointment`
+  (`appointments.py:190`) fetches the row, then rejects when
+  `str(user_hospital) != str(appt.hospital_id)` unless the caller is superadmin. The fix
+  is applying that same check in the six places above.
+
+  Audit scope caveat: only `.query(<Model>)` call sites were checked. Other access paths
+  (raw SQL, CRUD helpers, bulk-upload routes) were not swept and may share the gap.
+
+- **JWT fallback secret (2026-08-08):** `deps.py:10` reads
+  `SECRET_KEY = os.getenv("JWT_SECRET", "dev-secret-key-change-in-production")`. Any
+  environment where `JWT_SECRET` is unset silently accepts tokens signed with a
+  publicly-known key. Confirm `JWT_SECRET` is set in every deployed environment —
+  worth re-checking during the Neon `DATABASE_URL` cutover, when env vars are being
+  edited.
+
+- **Repo hygiene (resolved 2026-08-09):** the stale `.agents/agents_md_review_routing.md`
+  duplicate was deleted, `.repomixignore` was added, and the
+  `Multi-Hospital-WhatsApp-Patient-Messaging-Platform/` project was moved out of the
+  AROGYA repo. The repomix snapshot no longer carries vendored pgvector source, nested
+  `.git` internals, or scratch diff files.

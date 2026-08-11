@@ -1,1 +1,0 @@
-This project's rules now live in .agents/AGENTS.md (Antigravity's auto-loaded convention). This file is kept only so human contributors know where to look.
