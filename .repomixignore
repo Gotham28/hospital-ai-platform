@@ -1,0 +1,22 @@
+# Vendored third-party source — 40% of the old snapshot, never reviewed
+backend/pgvector/**
+
+# Separate application by another author, not part of AROGYA
+Multi-Hospital-WhatsApp-Patient-Messaging-Platform/**
+
+# Nested git internals (can contain remote credentials)
+**/.git/**
+
+# Diff and scratch files
+*_diff.txt
+clean_diff.txt
+diff_output.txt
+final_diff.txt
+local run code.txt
+backend/ai_diff.txt
+
+# Build output and dependencies
+**/node_modules/**
+frontend/dist/**
+frontend/build/**
+**/__pycache__/**

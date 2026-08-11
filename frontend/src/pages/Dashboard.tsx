@@ -4,6 +4,7 @@ import api from '../api/axios';
 import KnowledgeBaseUpload from './KnowledgeBase'; 
 import ChatPreview from '../components/ChatPreview'; 
 import HospitalStats from '../components/HospitalStats'; 
+import { MessageSquare, AlertTriangle, Shield } from 'lucide-react';
 
 const Dashboard = () => {
   const { hospitalId } = useParams(); 
@@ -109,40 +110,51 @@ const Dashboard = () => {
           <KnowledgeBaseUpload hospitalId={hospitalId} />
 
           {/* NEW: Welcome message + disclaimer live inside the SAME training column */}
-          <div className="mb-6">
-            <label className="block font-medium mb-1">Welcome Message</label>
-            <p className="text-sm text-gray-500 mb-2">Shown to patients when they start a new chat session.</p>
-            <textarea
-              value={welcomeMessage}
-              onChange={(e) => setWelcomeMessage(e.target.value)}
-              placeholder="e.g. Welcome to Iris Rheumatology Clinic. Our process is..."
-              className="w-full border rounded p-2"
-              rows={3}
-            />
-          </div>
+          <div className="space-y-6">
+            <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-5 shadow-sm">
+              <div className="flex items-center gap-2 mb-2 text-indigo-700">
+                <MessageSquare className="w-5 h-5" />
+                <label className="font-semibold text-lg">Welcome Message</label>
+              </div>
+              <p className="text-sm text-indigo-600/80 mb-3">Shown to patients when they start a new chat session.</p>
+              <textarea
+                value={welcomeMessage}
+                onChange={(e) => setWelcomeMessage(e.target.value)}
+                placeholder="e.g. Welcome to Iris Rheumatology Clinic. Our process is..."
+                className="w-full border-0 bg-white ring-1 ring-indigo-200 focus:ring-2 focus:ring-indigo-400 rounded-lg p-3 text-sm text-slate-700"
+                rows={3}
+              />
+            </div>
 
-          <div className="mb-6">
-            <label className="block font-medium mb-1">Post-Booking Disclaimer</label>
-            <p className="text-sm text-gray-500 mb-2">Appended to the confirmation message after a booking is made.</p>
-            <textarea
-              value={postBookingDisclaimer}
-              onChange={(e) => setPostBookingDisclaimer(e.target.value)}
-              placeholder="e.g. Please note: waiting times may vary."
-              className="w-full border rounded p-2"
-              rows={2}
-            />
-          </div>
+            <div className="bg-amber-50 border border-amber-100 rounded-xl p-5 shadow-sm">
+              <div className="flex items-center gap-2 mb-2 text-amber-700">
+                <AlertTriangle className="w-5 h-5" />
+                <label className="font-semibold text-lg">Post-Booking Disclaimer</label>
+              </div>
+              <p className="text-sm text-amber-700/80 mb-3">Appended to the confirmation message after a booking is made.</p>
+              <textarea
+                value={postBookingDisclaimer}
+                onChange={(e) => setPostBookingDisclaimer(e.target.value)}
+                placeholder="e.g. Please note: waiting times may vary."
+                className="w-full border-0 bg-white ring-1 ring-amber-200 focus:ring-2 focus:ring-amber-400 rounded-lg p-3 text-sm text-slate-700"
+                rows={2}
+              />
+            </div>
 
-          <div className="mb-6">
-            <label className="block font-medium mb-1">Relevance Gate Criteria</label>
-            <p className="text-sm text-gray-500 mb-2">Leave blank to disable the relevance gate for this hospital. If set, AI will ask follow-up questions to check if the patient matches these rules.</p>
-            <textarea
-              value={relevanceCriteria}
-              onChange={(e) => setRelevanceCriteria(e.target.value)}
-              placeholder="e.g. Must be over 18. Must have joint pain for more than 2 weeks."
-              className="w-full border rounded p-2"
-              rows={3}
-            />
+            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-5 shadow-sm">
+              <div className="flex items-center gap-2 mb-2 text-emerald-700">
+                <Shield className="w-5 h-5" />
+                <label className="font-semibold text-lg">Relevance Gate Criteria</label>
+              </div>
+              <p className="text-sm text-emerald-700/80 mb-3">Leave blank to disable the relevance gate for this hospital. If set, AI will ask follow-up questions to check if the patient matches these rules.</p>
+              <textarea
+                value={relevanceCriteria}
+                onChange={(e) => setRelevanceCriteria(e.target.value)}
+                placeholder="e.g. Must be over 18. Must have joint pain for more than 2 weeks."
+                className="w-full border-0 bg-white ring-1 ring-emerald-200 focus:ring-2 focus:ring-emerald-400 rounded-lg p-3 text-sm text-slate-700"
+                rows={3}
+              />
+            </div>
           </div>
 
           <button

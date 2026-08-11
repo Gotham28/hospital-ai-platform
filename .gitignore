@@ -23,3 +23,12 @@ Thumbs.db
 # Diff logs
 backend/ai_diff.txt
 repomix-output.xml
+# Scratch diff files (currently tracked, ~85K tokens of snapshot noise)
+clean_diff.txt
+diff_output.txt
+final_diff.txt
+local run code.txt
+
+# Separate WhatsApp outreach app — different author, own git repo, handles patient
+# phone numbers. Not part of AROGYA and must not be modified during AROGYA tasks.
+Multi-Hospital-WhatsApp-Patient-Messaging-Platform/

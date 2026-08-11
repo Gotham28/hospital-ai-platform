@@ -220,8 +220,20 @@ async def get_welcome(hospital_id: int, db: Session = Depends(get_db)):
         en_caps.append("🏥 Answer questions about hospital **timings, services & contact**")
         ml_caps.append("🏥 ആശുപത്രി **സമയം, സേവനങ്ങൾ, ബന്ധപ്പെടൽ** സംബന്ധിച്ച ചോദ്യങ്ങൾ")
 
+    # Custom Welcome Message Logic
+    if hospital.welcome_message and hospital.welcome_message.strip():
+        base_en_greeting = hospital.welcome_message.strip()
+        try:
+            base_ml_greeting = await _translate_async(base_en_greeting, source="en", target="ml")
+        except Exception:
+            # Fallback: Just show the English text rather than awkwardly mixing two languages in one sentence
+            base_ml_greeting = f"{base_en_greeting}"
+    else:
+        base_en_greeting = f"Hello! I am **Arogya**, the AI assistant for **{hospital_name}**."
+        base_ml_greeting = f"നമസ്കാരം! ഞാൻ **ആരോഗ്യ**, **{hospital_name}**-ന്റെ AI അസിസ്റ്റന്റ്."
+
     en_msg = "\n".join([
-        f"👋 Hello! I am **Arogya**, the AI assistant for **{hospital_name}**.",
+        f"### 👋 {base_en_greeting}",
         "",
         "Here is what I can help you with:",
         *[f"- {c}" for c in en_caps],
@@ -230,7 +242,7 @@ async def get_welcome(hospital_id: int, db: Session = Depends(get_db)):
     ])
 
     ml_msg = "\n".join([
-        f"👋 നമസ്കാരം! ഞാൻ **ആരോഗ്യ**, **{hospital_name}**-ന്റെ AI അസിസ്റ്റന്റ്.",
+        f"### 👋 {base_ml_greeting}",
         "",
         "ഞാൻ ഇവ സഹായിക്കാം:",
         *[f"- {c}" for c in ml_caps],

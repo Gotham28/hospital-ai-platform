@@ -30,37 +30,46 @@ Research-only code (benchmarks, evaluation scripts) belongs in a separate, isola
 
 - **Backend**: FastAPI (Python)
 - **Frontend**: React + TypeScript
-- **Database**: PostgreSQL on Render, with the `pgvector` extension enabled
+- **Database**: PostgreSQL with the `pgvector` extension enabled. Staging is hosted on
+  Render; a migration of staging to Neon is in progress — check
+  `.agents/CURRENT_TASK.md` and `STATUS.md` before assuming which host is live.
 - **Cache/session store**: Redis
 - **LLM**: OpenAI GPT-4o-mini (current default)
 - **Embeddings**: OpenAI `text-embedding-3-small`, 1536 dimensions
-- **Translation**: currently Google Translate via `_translate_async()`; Sarvam AI upgrade
-  in progress (see `docs/MASTER_PLAN.md` §1.3)
+- **Translation**: currently Google Translate via `_translate_async()` in
+  `services/translation.py`; Sarvam AI upgrade not yet started (see
+  `docs/MASTER_PLAN.md` §1.3)
 - **Migrations**: Alembic
+- **Messaging**: Twilio WhatsApp via `services/whatsapp.py` (degrades gracefully if
+  credentials are unset)
 
 ---
 
 ## 3. Key File Locations
 
+Service extraction (§1.2) completed 2026-08-07. `ai.py` now delegates to the modules
+below rather than containing this logic itself.
+
 | Purpose | Path |
 |---|---|
-| Main AI logic (RAG, translation, booking, security, intent) | `backend/app/api/v1/endpoints/ai.py` |
-| System prompt builders | `build_system_prompt_english()`, `build_system_prompt_malayalam()`, `build_fallback_instruction()` — inside `ai.py` |
-| Context builder | `build_context(request, db)` — inside `ai.py` |
-| KB retrieval | `build_kb_context()` — inside `ai.py` |
-| Doctor retrieval | `build_doctor_context()` — inside `ai.py` |
-| Injection detection | `detect_prompt_injection(text)` using `_INJECTION_PATTERNS` — inside `ai.py` |
-| Translation bridge | `_translate_async(text, source, target)` — inside `ai.py` |
-| DB models | `backend/app/models/` — `Hospital`, `Doctor`, `KnowledgeBase`, `Appointment`, `LabTest` |
-| Config | `backend/app/core/config.py` — contains `SARVAM_API_KEY`, (soon) `GROQ_API_KEY` |
-| Existing services | `backend/app/services/` — currently `booking_rules.py`, `email.py`, `reminders.py` |
+| Chat endpoint / orchestration | `backend/app/api/v1/endpoints/ai.py` |
+| RAG + context building — `build_context()`, `build_doctor_context()`, `build_kb_context()`, `build_system_prompt_*()`, `build_fallback_instruction()` | `backend/app/services/rag.py` |
+| Injection detection — `detect_prompt_injection()`, `_INJECTION_PATTERNS` | `backend/app/services/security.py` |
+| Translation bridge — `_translate()`, `_translate_async()` | `backend/app/services/translation.py` |
+| Session context (Redis-backed) | `backend/app/services/patient_context.py` |
+| Vocabulary helpers | `backend/app/services/vocabulary.py` |
+| Booking state machine / session logic | `backend/app/services/booking.py` |
+| Relevance gate (IRIS Feature 4) | `backend/app/services/relevance.py` |
+| WhatsApp messaging | `backend/app/services/whatsapp.py` |
+| Other services | `backend/app/services/` — `booking_rules.py`, `email.py`, `reminders.py` |
+| Config | `backend/app/core/config.py` — contains `SARVAM_API_KEY`, `TWILIO_*`, (soon) `GROQ_API_KEY` |
+| DB models | `backend/app/models/` — `Hospital`, `Doctor`, `DoctorSchedule`, `DoctorLeave`, `KnowledgeBase`, `Appointment`, `LabTest`, `Medicine`, `UsageLedger`, `User`, `WhatsAppLog` |
 | Research code (isolated, do not import into production) | `backend/research/` |
+| Current task scope (ephemeral — overwritten each task, not history) | `.agents/CURRENT_TASK.md` |
 
-**Note:** `ai.py` is currently a large (~800+ line) file mixing many concerns. This is
-scheduled to be split into `services/rag.py`, `services/patient_context.py`,
-`services/translation.py`, `services/booking.py`, `services/security.py` — **do not do
-this refactor unless the current task explicitly says to.** Don't "clean up" ai.py as a
-side effect of an unrelated task.
+**Note:** the extraction above was a pure refactor — no signature changes, no behavior
+changes. Do not further restructure `ai.py` or the `services/` modules unless the current
+task explicitly says to. Don't "clean up" as a side effect of an unrelated task.
 
 ---
 
@@ -90,9 +99,9 @@ side effect of an unrelated task.
    into shared code. The mechanism should be generically reusable by any other hospital
    tenant with different needs.
 3. **Don't silently restructure.** If a task seems to require touching a much bigger
-   piece of the system than described (e.g. refactoring `ai.py`, changing an existing
-   function signature used elsewhere), stop and flag this to the developer instead of
-   just doing it.
+   piece of the system than described (e.g. restructuring `ai.py` or a `services/`
+   module, changing an existing function signature used elsewhere), stop and flag this to
+   the developer instead of just doing it.
 4. **Migrations need review.** Alembic migrations are drafted, not applied, without
    explicit developer approval — especially anything touching a real/staging database.
 5. **No fabricated content.** Do not invent placeholder legal/medical disclaimer wording
@@ -110,7 +119,17 @@ side effect of an unrelated task.
    research task done.
 8. **One feature per task/diff.** Don't bundle unrelated features into the same set of
    changes, even if both appear in the same STATUS.md entry — ask if unsure.
-9. **Server Port Management and Testing.** Before starting the backend or frontend dev server, always first check if something is already listening on that port (8000 for backend, 5173 for frontend) and kill it if so, rather than starting a second instance on top of an existing one. Confirm each server is actually responding before running any test script against it.
+9. **Server port management and testing.** Before starting the backend or frontend dev
+   server, always first check if something is already listening on that port (8000 for
+   backend, 5173 for frontend) and kill it if so, rather than starting a second instance
+   on top of an existing one. Confirm each server is actually responding before running
+   any test script against it.
+10. **No unevidenced claims.** Do not report that something works, passes, or was
+    verified without pasting the actual output that shows it. "Tested and working" with
+    no command output is not a report — it is an assertion. When a task or investigation
+    requires running commands, paste the **full, raw output of every command** before any
+    analysis or summary. Do not quote fragments selectively. Do not write "output complete"
+    and then summarise — that is the same failure. Output first, analysis after.
 
 ---
 
@@ -120,12 +139,38 @@ side effect of an unrelated task.
 2. Read the relevant section of `docs/MASTER_PLAN.md` for full spec detail.
 3. Before writing any code, state which files you plan to create/modify and why.
    Wait for developer confirmation before proceeding.
-4. Implement only the confirmed, scoped task.
-5. If schema changes are involved, generate the Alembic migration and stop — do not run
+4. Once confirmed, write `.agents/CURRENT_TASK.md` describing the confirmed scope:
+   what feature, which files, and what's explicitly out of scope. This file always
+   exists but holds only the current task — overwrite it, don't append to it. If the
+   developer supplies a `CURRENT_TASK.md` themselves, treat it as the confirmed scope:
+   read it, do not rewrite or expand it.
+5. Implement only the confirmed, scoped task.
+6. If schema changes are involved, generate the Alembic migration and stop — do not run
    it against anything but a confirmed local database.
-6. Report back exactly which files changed, for developer review before merge.
-7. Do not update `STATUS.md` yourself unless asked — the developer will confirm the
-   feature works first, then update it (or ask you to).
+7. Report back exactly which files changed, for developer review before merge. Include a
+   suggested review model line as specified in §10.
+8. At the end of every task, draft a proposed STATUS.md update as part of your final
+   report — both (a) any current-state table row that changed, and (b) a dated bullet for
+   the "Catch-up" section describing what was done, in the same style as existing
+   Catch-up entries. Do not edit STATUS.md directly. Present the draft entry to the
+   developer for review. Only write it into the actual file if the developer explicitly
+   approves it or asks you to apply it — same approval flow as Alembic migrations (§4).
+9. Once the task is reported (regardless of whether the STATUS.md draft has been
+   approved yet), regenerate the repomix snapshot by overwriting the existing output
+   file in place — do not delete it first, then run the repomix build. This keeps the
+   on-disk snapshot current; it does NOT update the developer's Claude Project, which
+   requires a manual reupload. Also reset `.agents/CURRENT_TASK.md` to an idle state
+   (e.g. "No task currently in progress.") now that the task is closed.
+10. **Always cut branches from `origin/main`, not local `main`.** Local `main` may be
+    ahead of `origin/main` by unpushed commits; cutting from it silently includes those
+    commits in the PR. Use:
+    ```
+    git fetch origin
+    git checkout -b fix/your-task-name origin/main
+    ```
+    This guarantees the branch starts from exactly what GitHub has, so the PR contains
+    only the current task's work. Never use `git checkout -b <name>` without an explicit
+    upstream ref.
 
 ---
 
@@ -158,3 +203,79 @@ Ask the developer rather than guessing, especially for:
 - Anything that would change behavior for hospitals other than the one being worked on
 - Any migration or command that would touch a non-local database
 - Disclaimer/legal wording not yet confirmed by hospital administration
+
+- **No commands against a non-local database.** Do not run any command against a
+  database that is not a confirmed local development database — this includes Alembic,
+  `psql`, `pg_dump`, `pg_restore`, `CREATE EXTENSION`, and any script or tool that opens
+  a connection. Neon, Render, and any other hosted instance are non-local. For a
+  non-local target, either the developer runs the command themselves, or the developer
+  explicitly approves it in-chat after the exact target connection string has been
+  stated and confirmed. Never infer approval from an earlier approval for a different
+  command or a different target.
+
+---
+
+## 10. Suggested Review Model
+
+At the end of every task report (§6.7), state which Claude model the developer should use
+to review the diff. Output it on its own line, in exactly this format:
+
+```
+Suggested review model: <Opus 5 | Sonnet 5 | Haiku 4.5>, <low | medium | high | xhigh> effort — <the trigger that fired>
+```
+
+**This is a mechanical classification, not a judgment call.** Decide the tier purely from
+which files and patterns the diff actually touches, using the lists below. Do not
+downgrade a tier because the change felt small, safe, or obvious to you. If a listed
+trigger fired, name that tier regardless of how confident you are in the code.
+
+### Opus 5 — name this tier if the diff does ANY of the following
+
+- Adds or modifies any query against `Doctor`, `KnowledgeBase`, `Appointment`, or
+  `LabTest`
+- Adds, removes, or edits any `hospital_id` filter, or adds any code path that returns
+  tenant-scoped data (including helpers, fallbacks, and error paths)
+- Creates or edits an Alembic migration, or runs any migration command
+- Touches logging, audit trails, or `SecurityLog`, or handles raw patient text anywhere
+- Touches `detect_prompt_injection()`, `_INJECTION_PATTERNS`, or `services/security.py`
+- Changes an existing function signature, or moves code between modules
+- Adds or edits disclaimer, legal, or medical wording fields
+- Touches anything under `backend/research/`, or any import crossing the
+  `app/` ↔ `research/` boundary
+- Touches auth, session tokens, or Redis session key patterns
+- Touches `DATABASE_URL`, connection configuration, or any non-local database
+
+### Sonnet 5 — default tier for real logic changes not listed above
+
+New service functions, booking-flow changes, frontend admin UI, new config fields,
+translation logic, ordinary bug fixes.
+
+### Haiku 4.5 — mechanical changes only
+
+Formatting, comments, README or docs text, renaming a variable within a single file,
+STATUS.md draft wording.
+
+### Effort level
+
+Pair the effort level to the tier:
+
+| Tier | Effort | Escalate to xhigh when |
+|---|---|---|
+| Opus 5 | `high` | Two or more Opus triggers fired in the same diff, **or** the diff combines a migration with tenant-scoped query changes, **or** it touches `services/security.py` / `_INJECTION_PATTERNS` |
+| Sonnet 5 | `medium` | Never — if it needs more, the tier is wrong |
+| Haiku 4.5 | `low` | Never |
+
+Do not name `max` effort. If a diff seems to warrant it, that is a signal the change is
+too large for one task and should have been split under §5.8 — say so instead.
+
+### Rules for choosing
+
+- If triggers from more than one tier fire, **name the highest tier**.
+- If you are unsure which tier applies, **name the higher one**. Never round down.
+- The developer has a limited Opus budget — do not name Opus 5 unless a trigger in the
+  Opus list actually fired. Do not name it defensively or "just in case."
+- Name exactly one tier and one trigger. If several Opus triggers fired, cite the most
+  significant one.
+- Cite the tier from the rules in this section. If `.agents/CURRENT_TASK.md` already
+  names a suggested tier and your own classification differs, say so explicitly rather
+  than silently copying the task file's tier.
