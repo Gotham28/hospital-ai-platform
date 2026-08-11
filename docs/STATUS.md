@@ -1,6 +1,6 @@
 # STATUS.md — Current Sprint Status
 
-Last updated: 2026-07-21
+Last updated: 2026-08-09
 
 This file tracks what's actually done vs. in progress vs. next, across the whole
 project. Update this after every verified feature — not before. See `docs/MASTER_PLAN.md`
@@ -29,6 +29,18 @@ for full specs, `.agents/AGENTS.md` for permanent rules.
 - **Design Decision (Click-to-Expand):** The `needs_staff_review` badge in the table uses a click-to-expand popover to reveal the AI's reasoning, rather than a hover state, ensuring staff deliberately action the review.
 - **Backend Bug Fix:** The referral keyword-matching bug in `ai.py` was replaced with a dedicated LLM check (`check_referral_intent`) to accurately parse yes/no/ambiguous answers.
 - **Time Import Confirmed:** The `time` module is correctly imported in `ai.py`.
+
+### Catch-up — 2026-08-09
+Neon migration (staging) — COMPLETE. Dump/restore executed and fully verified: row
+counts (3b), per-hospital parity (3c), cross-tenant referential integrity (3d),
+embedding dimensions (3e), and alembic head (3f) all matched between Render and Neon.
+DATABASE_URL cutover live; both read-only and write-path smoke tests passed against
+the deployed app. Render Postgres instance deleted 2026-08-09 after confirming the
+app runs correctly against Neon post-deletion. Traffic-observation gating was
+consciously skipped — the app has no real users yet pending Twilio business
+registration (separate future task); risk accepted rather than blocked on. Pre-
+migration backup retained at D:\Hospital\neon-migration-dump\arogya_staging_render.dump
+(single local copy — not yet duplicated to a second location).
 
 **Bonus (unplanned, found/fixed during Feature 3 work):**
 - Fixed pre-existing bug in `/chat` (broken since 2026-06-28, commit `da12385`) —
