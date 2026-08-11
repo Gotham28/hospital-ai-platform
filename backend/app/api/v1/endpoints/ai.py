@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from app.core.config import settings
-from app.api.deps import get_db
+from app.api.deps import get_db, get_current_tenant, get_token_payload
 from app.models.hospital import Hospital
 from app.services.security import detect_prompt_injection
 # NOTE: _translate (sync) confirmed unused as of 2026-08-02 — zero call sites
@@ -1124,10 +1124,16 @@ class UpdateKnowledgeRequest(BaseModel):
 
 
 @router.patch("/knowledge/entry/{entry_id}")
-async def update_knowledge_entry(entry_id: int, request: UpdateKnowledgeRequest, db: Session = Depends(get_db)):
+async def update_knowledge_entry(entry_id: int, request: UpdateKnowledgeRequest, db: Session = Depends(get_db), _tenant: int = Depends(get_current_tenant), token_data: dict = Depends(get_token_payload)):
     entry = db.query(KnowledgeBase).filter(KnowledgeBase.id == entry_id).first()
     if not entry:
         raise HTTPException(status_code=404, detail="Knowledge entry not found")
+
+    user_role = token_data.get("role")
+    user_hospital = token_data.get("hospital_id")
+    if user_role != "superadmin" and str(user_hospital) != str(entry.hospital_id):
+        raise HTTPException(status_code=403, detail="Not authorized to modify this resource")
+
     try:
         resp = client.embeddings.create(input=request.content, model="text-embedding-3-small")
         entry.content = request.content
@@ -1140,10 +1146,16 @@ async def update_knowledge_entry(entry_id: int, request: UpdateKnowledgeRequest,
 
 
 @router.delete("/knowledge/entry/{entry_id}")
-async def delete_knowledge_entry(entry_id: int, db: Session = Depends(get_db)):
+async def delete_knowledge_entry(entry_id: int, db: Session = Depends(get_db), _tenant: int = Depends(get_current_tenant), token_data: dict = Depends(get_token_payload)):
     entry = db.query(KnowledgeBase).filter(KnowledgeBase.id == entry_id).first()
     if not entry:
         raise HTTPException(status_code=404, detail="Knowledge entry not found")
+
+    user_role = token_data.get("role")
+    user_hospital = token_data.get("hospital_id")
+    if user_role != "superadmin" and str(user_hospital) != str(entry.hospital_id):
+        raise HTTPException(status_code=403, detail="Not authorized to modify this resource")
+
     try:
         db.delete(entry)
         db.commit()

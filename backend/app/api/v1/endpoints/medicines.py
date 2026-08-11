@@ -42,11 +42,17 @@ def list_medicines(
 def delete_medicine(
     medicine_id: int, 
     db: Session = Depends(get_db),
-    _tenant: int = Depends(get_current_tenant)
+    _tenant: int = Depends(get_current_tenant),
+    token_data: dict = Depends(get_token_payload)
 ):
     db_item = db.query(Medicine).filter(Medicine.id == medicine_id).first()
     if not db_item:
         raise HTTPException(status_code=404, detail="Medicine not found")
+
+    user_role = token_data.get("role")
+    user_hospital = token_data.get("hospital_id")
+    if user_role != "superadmin" and str(user_hospital) != str(db_item.hospital_id):
+        raise HTTPException(status_code=403, detail="Not authorized to modify this resource")
     
     db.delete(db_item)
     db.commit()
@@ -149,11 +155,17 @@ def update_medicine(
     medicine_id: int, 
     payload: MedicineUpdate,
     db: Session = Depends(get_db),
-    _tenant: int = Depends(get_current_tenant)
+    _tenant: int = Depends(get_current_tenant),
+    token_data: dict = Depends(get_token_payload)
 ):
     db_item = db.query(Medicine).filter(Medicine.id == medicine_id).first()
     if not db_item:
         raise HTTPException(status_code=404, detail="Medicine not found")
+
+    user_role = token_data.get("role")
+    user_hospital = token_data.get("hospital_id")
+    if user_role != "superadmin" and str(user_hospital) != str(db_item.hospital_id):
+        raise HTTPException(status_code=403, detail="Not authorized to modify this resource")
     
     update_data = payload.model_dump(exclude_unset=True)
     for key, value in update_data.items():

@@ -32,3 +32,4 @@ local run code.txt
 # Separate WhatsApp outreach app — different author, own git repo, handles patient
 # phone numbers. Not part of AROGYA and must not be modified during AROGYA tasks.
 Multi-Hospital-WhatsApp-Patient-Messaging-Platform/
+backend/seed_local_test_users.py
