@@ -1,0 +1,226 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# AROGYA — CodeRabbit review configuration
+# Encodes AGENTS.md §4 and §5 as REVIEWER criteria (not author instructions).
+# This file is read by both PR reviews and the CodeRabbit CLI.
+
+language: "en-US"
+early_access: false
+
+reviews:
+  profile: "assertive"
+  request_changes_workflow: true
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - "main"
+
+  tone_instructions: >-
+    This is production code for a multi-tenant medical system deployed at a real
+    hospital, and most diffs are written by an autonomous coding agent rather than
+    a human. Be direct and specific. Do not soften findings. Do not praise a change
+    to balance out a criticism. If a diff violates a stated project rule, say which
+    rule and quote the offending line. Skip pure style and formatting nits unless
+    they obscure correctness — the developer's review time is the scarce resource.
+
+  path_filters:
+    - "!repomix-output.xml"
+    - "!**/package-lock.json"
+    - "!**/yarn.lock"
+    - "!**/pnpm-lock.yaml"
+    - "!frontend/public/vad-assets/**"
+    - "!frontend/src/assets/**"
+    - "!**/*.svg"
+    - "!backend/alembic/script.py.mako"
+    - "!backend/alembic/README"
+
+  path_instructions:
+
+    # ---------- GLOBAL: applies to every reviewed file ----------
+    - path: "**/*"
+      instructions: |
+        AROGYA project-wide rules. Flag any violation explicitly and name the rule.
+
+        SCOPE (AGENTS.md §5.3, §5.8): One feature per diff. If this changeset
+        contains work that is clearly unrelated to a single coherent feature —
+        e.g. a bugfix bundled with a refactor, or a new feature plus incidental
+        "cleanup" of untouched code — flag it as a scope violation and list which
+        hunks belong to which concern. Also flag any refactor, file move, or
+        function-signature change that was not the obvious point of the change.
+        Renaming or reorganising code "while we're in here" is a violation, not
+        a courtesy.
+
+        FABRICATED CONTENT (AGENTS.md §5.5): Flag ANY hardcoded string literal
+        that reads as legal, medical, consent, or disclaimer wording — in Python,
+        TypeScript, JSON, SQL seed data, or migration files, in English or
+        Malayalam. Such wording requires hospital-administration sign-off and must
+        be an empty-defaulted, admin-configurable field with a TODO comment, never
+        baked into a code path. A plausible-sounding disclaimer is exactly the
+        failure mode to catch. When unsure whether a string is placeholder wording,
+        flag it and ask.
+
+        UNEVIDENCED CLAIMS (AGENTS.md §5.10): If the PR description or commit
+        message asserts something was tested, verified, or works, but the diff
+        contains no test, no assertion, and no pasted output supporting it, flag
+        the claim as unsubstantiated. Do not treat the author's summary as evidence.
+
+        HARDCODED TENANT BEHAVIOUR (AGENTS.md §5.2): Flag any branch keyed on a
+        specific hospital identity — `if hospital_id == <literal>`, comparisons
+        against a hospital slug or name string, or a dict/map keyed by specific
+        hospital. Per-hospital behaviour must be a configurable column or setting
+        on the Hospital model, generically reusable by any tenant.
+
+        SECRETS: Flag any API key, token, password, connection string, or JWT
+        secret appearing as a literal, including in test files, seed scripts, and
+        migrations. Flag any config default that would be a usable secret in
+        production if the env var were unset.
+
+    # ---------- TENANT ISOLATION: the highest-severity rule ----------
+    - path: "backend/app/{crud,api}/**/*.py"
+      instructions: |
+        MULTI-TENANT ISOLATION (AGENTS.md §4, §5.1) — highest severity in this
+        project. A leak across hospitals is a patient-data breach, not a bug.
+
+        Flag as a blocking issue any query, ORM call, or raw SQL against a
+        tenant-scoped model (Doctor, KnowledgeBase, Appointment, LabTest, Medicine,
+        DoctorSchedule, DoctorLeave, UsageLedger, WhatsAppLog, User) that does not
+        filter by hospital_id. This applies to helper functions, "internal-only"
+        utilities, fallback branches, exception handlers, and empty-result paths —
+        AGENTS.md explicitly calls out edge cases and error handling.
+
+        Verify the hospital_id is derived from the AUTHENTICATED principal, not
+        taken from a request path parameter, query string, or request body without
+        an authorisation check tying that hospital to the caller. An endpoint at
+        /hospitals/{hospital_id}/... that trusts the path parameter is an IDOR —
+        flag it even if it "matches the existing pattern" elsewhere in the file.
+
+        Flag any new endpoint that returns tenant-scoped data without a dependency
+        enforcing tenant scope. Flag any admin or cross-hospital aggregate endpoint
+        and require an explicit justification in the description.
+
+        Also check vector/similarity searches: a pgvector nearest-neighbour query
+        without a hospital_id predicate will retrieve another hospital's documents.
+
+    # ---------- SERVICES ----------
+    - path: "backend/app/services/**/*.py"
+      instructions: |
+        Same tenant-isolation scrutiny as crud/ and api/ — context-building
+        functions (build_context, build_doctor_context, build_kb_context) retrieve
+        tenant data and must filter by hospital_id on every path including
+        fallbacks (AGENTS.md §5.1).
+
+        LOGGING (AGENTS.md §5.6): Flag any logger call, print, exception message,
+        audit-trail write, or persisted record containing raw patient text —
+        chat messages, transcripts, WhatsApp bodies, symptom descriptions, names,
+        phone numbers. It must be hashed or masked if a record is required. Check
+        f-strings and .format() calls inside log statements specifically, and check
+        whether an exception handler logs the request payload.
+
+        STRUCTURE (AGENTS.md §3): ai.py and the services/ modules were extracted in
+        a completed pure refactor. Flag any further restructuring, signature change,
+        or code movement between these modules unless it is plainly the stated
+        point of the change.
+
+        CONCURRENCY: booking.py and booking_rules.py govern appointment slots.
+        Flag check-then-write sequences on slot availability that lack row-level
+        locking or a unique constraint — concurrent requests can double-book.
+
+        Flag any bare `except:` or `except Exception` that swallows an error and
+        returns data, since a silently-caught tenant filter failure is
+        indistinguishable from an empty result.
+
+    - path: "backend/app/services/security.py"
+      instructions: |
+        Highest scrutiny (AGENTS.md §10 Opus trigger). Any change to
+        detect_prompt_injection() or _INJECTION_PATTERNS must be assessed for
+        whether it WEAKENS detection. Flag any pattern removal, any narrowing of a
+        regex, and any new early-return that bypasses the check. Malayalam and
+        transliterated-Malayalam bypasses are in scope — a pattern set that only
+        matches English is a gap worth flagging. Never quote raw patient input in
+        a log line added here.
+
+    # ---------- MODELS ----------
+    - path: "backend/app/models/**/*.py"
+      instructions: |
+        Flag any new tenant-scoped table lacking a hospital_id foreign key, and any
+        hospital_id column lacking an index. Embedding columns must be Vector(1536)
+        to match text-embedding-3-small (AGENTS.md §4) — flag any other dimension.
+        Flag any column that would persist raw patient text without hashing/masking
+        (AGENTS.md §5.6). Flag any hardcoded default that encodes one specific
+        hospital's policy rather than a neutral default (AGENTS.md §8).
+
+    # ---------- MIGRATIONS ----------
+    - path: "backend/alembic/versions/**/*.py"
+      instructions: |
+        MIGRATIONS ARE DRAFTED, NEVER APPLIED without explicit developer approval
+        (AGENTS.md §4, §5.4). Review these, do not filter them out.
+
+        Check: a real downgrade() that actually reverses upgrade(); no NOT NULL
+        added to a populated table without a server_default or backfill; new
+        tenant-scoped tables include hospital_id with an index; no destructive
+        drop_column/drop_table without an explicit note that data loss is intended;
+        descriptive revision name; down_revision forms a single linear chain with
+        no divergent heads.
+
+        Flag if a migration file appears alongside evidence it was already executed
+        against a non-local database — for example, a committed alembic_version
+        change, a modified DATABASE_URL, or a script invoking `alembic upgrade`.
+
+        Flag any migration bundled into a diff that also contains unrelated feature
+        work: schema changes must be reviewable in isolation.
+
+    # ---------- CONFIG ----------
+    - path: "backend/app/core/config.py"
+      instructions: |
+        Flag any secret with a non-empty default (SARVAM_API_KEY, TWILIO_*,
+        GROQ_API_KEY, OPENAI_*, JWT/SECRET_KEY, DATABASE_URL). A JWT secret with a
+        guessable or published default that is live if the env var is unset is a
+        critical finding, not a nit. New admin-facing config fields must default to
+        empty string or false and never assume a value (AGENTS.md §8).
+
+    # ---------- RESEARCH ISOLATION ----------
+    - path: "backend/research/**"
+      instructions: |
+        RESEARCH ISOLATION (AGENTS.md §5.7). Flag any import of `app.` or
+        `backend.app.` from this directory. Research code must run standalone via
+        `python -m backend.research.xxx`, and deleting this directory entirely must
+        leave production fully functional. Flag anything that would break that.
+
+    - path: "backend/app/**"
+      instructions: |
+        Flag any import from `backend.research` or `research.` — production code
+        must never depend on research code (AGENTS.md §5.7).
+
+    # ---------- FRONTEND ----------
+    - path: "frontend/src/**/*.{ts,tsx}"
+      instructions: |
+        Flag any hospital-specific behaviour branching on a hospital id, slug, or
+        name outside the theme registry — per-hospital differences belong in
+        themes/registry.ts or an admin-configured field (AGENTS.md §5.2). Theme
+        directories are an approved registry-driven mechanism; new `if slug ===
+        "..."` logic in shared components is not.
+
+        Flag any component that reads hospitalId from the route and issues a
+        privileged request without the backend independently authorising it —
+        client-side scoping is not access control.
+
+        Flag any raw patient message text sent to analytics, console.log, or a
+        third-party SDK. Flag any hardcoded disclaimer, consent, or legal copy
+        (AGENTS.md §5.5), in English or Malayalam.
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "AGENTS.md"
+      - "docs/AGENTS.md"
+      - ".agents/AGENTS.md"
+      - ".agents/CURRENT_TASK.md"
