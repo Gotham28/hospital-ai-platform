@@ -37,8 +37,8 @@ Neon migration (staging) — COMPLETE. Dump/restore executed and fully verified:
 counts (3b), per-hospital parity (3c), cross-tenant referential integrity (3d),
 embedding dimensions (3e), and alembic head (3f) all matched between Render and Neon.
 DATABASE_URL cutover live; both read-only and write-path smoke tests passed against
-the deployed app. Render Postgres instance deleted 2026-08-09 after confirming the
-app runs correctly against Neon post-deletion. Traffic-observation gating was
+the deployed app. Confirmed the app runs correctly against Neon BEFORE the
+Render Postgres instance was deleted on 2026-08-09. Traffic-observation gating was
 consciously skipped — the app has no real users yet pending Twilio business
 registration (separate future task); risk accepted rather than blocked on. Pre-
 migration backup retained at D:\Hospital\neon-migration-dump\arogya_staging_render.dump
@@ -150,3 +150,7 @@ Not started. Do not begin until Phase 1 is complete and demoed end-to-end.
   `Multi-Hospital-WhatsApp-Patient-Messaging-Platform/` project was moved out of the
   AROGYA repo. The repomix snapshot no longer carries vendored pgvector source, nested
   `.git` internals, or scratch diff files.
+
+- 2026-08-11: Neon migration backup is a single local copy only, not yet duplicated.
+  Needs a second encrypted location + checksum + retention owner before the migration is
+  considered fully closed.
