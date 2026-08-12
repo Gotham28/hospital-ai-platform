@@ -16,7 +16,7 @@ The "Catch-up" section is an append-only log — once an entry is added, do not 
 |---|---|---|---|
 | 1. Welcome message | ✅ Done | ✅ Done | ✅ Yes |
 | 2. Post-booking disclaimer | ✅ Done | ✅ Done | ✅ Yes |
-| 3. Outsourced lab test flag | ✅ Done | ✅ Done | ⚠️ Partial — toggle/note/badge/clear verified across multiple local hospitals. "Isolation confirmed" applies to the admin toggle only; the `PATCH`/`DELETE /lab-tests/{id}` mutation endpoints were not covered and are cross-tenant open (see audit note 2026-08-08) |
+| 3. Outsourced lab test flag | ✅ Done | ✅ Done | ✅ Yes — toggle/note/badge/clear verified across multiple local hospitals. The `PATCH`/`DELETE /lab-tests/{id}` cross-tenant gap noted 2026-08-08 was closed 2026-08-12 (PR #3) |
 | 4. Relevance gate before booking | ✅ Done (migration applied) | ✅ Done | ✅ Yes — End-to-end verified with LLM intent constraints |
 | 5. Handwritten-record context | 🚫 Deferred — do not build | 🚫 Deferred | — |
 
@@ -53,6 +53,11 @@ migration backup retained at D:\Hospital\neon-migration-dump\arogya_staging_rend
 - Fixed whole-app "zoomed out" UI issue via `html { font-size: 112.5%; }` in `index.css`.
 - Seeded richer local fake data (multiple test hospitals, lab tests, pharmacy items)
   and a local-only superadmin account, for realistic cross-tenant testing going forward.
+
+### Catch-up — 2026-08-12
+**Tenant-ownership enforcement on six mutation endpoints — COMPLETE (PR #3, branch `fix/tenant-ownership-mutation-endpoints`, commits `dedd052`, `9915c7f`, `f7dca57`, `a5c9c23`).** Closes the 2026-08-08 audit finding. Endpoints fixed: `PATCH`/`DELETE /knowledge/entry/{id}` (previously unauthenticated entirely), `PATCH`/`DELETE /lab-tests/{id}`, `PATCH`/`DELETE /medicines/{id}`. All six now follow the `approve_appointment` pattern — fetch row, reject when the caller's hospital does not match `hospital_id`, superadmin exempt. Verified with real `/auth/login` tokens against local fixtures: 401 unauthenticated, 403 cross-tenant, 200 owner, 200 superadmin bypass, 404 preserved for missing rows, on each of the six.
+
+Known and deferred: these endpoints return 403 for a row owned by another tenant and 404 for a row that does not exist, which is an enumeration oracle. Deferred deliberately — needs a separate task normalising the response across all seven ownership-checked endpoints.
 
 ---
 
@@ -111,11 +116,11 @@ Not started. Do not begin until Phase 1 is complete and demoed end-to-end.
   clinic will provide more later; this is expected, not a bug.
 - **Next up for Phase 1:** §1.3 Sarvam translation upgrade (modify `services/translation.py`), then §1.4 security hardening (Malayalam injection patterns + `SecurityLog` table), then §1.5 multi-tenant isolation hardening. See MASTER_PLAN.md §2 for specs.
 - WhatsApp integration: confirm whether end-to-end testing against Twilio sandbox has been done, and whether it needs a frontend UI surface in the admin panel.
-- **Tenant-isolation audit (2026-08-08, read-only review of repomix snapshot — no code
-  changed):** six endpoints in `backend/app/` fetch tenant-owned rows by primary key and
-  mutate them without any `hospital_id` check. Violates AGENTS.md §5.1 and §4. Not yet
-  fixed — to be scoped as its own task after the Neon migration closes, feeding into
-  §1.5 multi-tenant isolation hardening.
+- **Tenant-isolation audit (2026-08-08) — RESOLVED 2026-08-12 via PR #3.** Six endpoints in
+  `backend/app/` fetched tenant-owned rows by primary key and mutated them without any
+  `hospital_id` check, violating AGENTS.md §5.1 and §4. All six now enforce ownership as of
+  PR #3; the endpoint table below is retained for history. Fed into §1.5 multi-tenant
+  isolation hardening.
 
   | Endpoint | File:line | Issue |
   |---|---|---|
@@ -132,8 +137,7 @@ Not started. Do not begin until Phase 1 is complete and demoed end-to-end.
 
   Correct pattern already exists in the codebase: `approve_appointment`
   (`appointments.py:190`) fetches the row, then rejects when
-  `str(user_hospital) != str(appt.hospital_id)` unless the caller is superadmin. The fix
-  is applying that same check in the six places above.
+  `str(user_hospital) != str(appt.hospital_id)` unless the caller is superadmin. That same check was applied to all six endpoints in PR #3.
 
   Audit scope caveat: only `.query(<Model>)` call sites were checked. Other access paths
   (raw SQL, CRUD helpers, bulk-upload routes) were not swept and may share the gap.
@@ -154,3 +158,5 @@ Not started. Do not begin until Phase 1 is complete and demoed end-to-end.
 - 2026-08-11: Neon migration backup is a single local copy only, not yet duplicated.
   Needs a second encrypted location + checksum + retention owner before the migration is
   considered fully closed.
+
+- **Bulk-upload endpoint unauthenticated (found 2026-08-12, not fixed):** `POST /hospitals/{hospital_id}/doctors/bulk-upload` (`hospitals.py` ~line 197) has no auth dependency at all and creates `Doctor` rows for whatever `hospital_id` is in the path. Same defect class as the `/knowledge/entry/` routes closed in PR #3, but not covered by the 2026-08-08 audit because that sweep only checked `.query(<Model>)` call sites. Scoped, not started.
