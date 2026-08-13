@@ -59,6 +59,23 @@ migration backup retained at D:\Hospital\neon-migration-dump\arogya_staging_rend
 
 Known and deferred: these endpoints return 403 for a row owned by another tenant and 404 for a row that does not exist, which is an enumeration oracle. Deferred deliberately — needs a separate task normalising the response across all seven ownership-checked endpoints.
 
+### Catch-up — 2026-08-13
+**Bulk-upload endpoint tenant-ownership enforcement — VERIFIED (branch `fix/bulk-upload-tenant-auth`,
+code change uncommitted, awaiting PR).** `POST /hospitals/{hospital_id}/doctors/bulk-upload`
+(`hospitals.py` ~line 197) now requires authentication and enforces hospital-ownership, following
+the `approve_appointment` pattern. Auth dependency: `get_current_tenant` + `get_token_payload` added
+to the route. Ownership check placed after the 404 hospital-existence guard and before `file.read()`.
+
+All five verification cases evidenced against local fixtures:
+- (a) No Authorization header, hospital_id=1 → **401**, 0 rows created
+- (b) admin1@local.test (hospital 1) posting to hospital 2 → **403**, 0 rows created
+- (c) admin1@local.test posting to own hospital 1 → **200**, 3 rows created under hospital 1, no other hospital changed
+- (d) superadmin posting to hospital 2 → **200** (auth gate passed correctly); write itself returned 0 rows due to a pre-existing, non-deterministic LLM header-mapping issue unrelated to auth — see Open Questions
+- (e) admin token, nonexistent hospital 99999 → **404**, not 403 — confirms existence check still fires before the ownership check
+
+Baseline doctor counts before this session's tests: hospital 1=25, hospital 2=6, hospital 15=2.
+After: hospital 1=28 (+3 from case c), hospital 2=6 (unchanged), hospital 15=2 (unchanged).
+
 ---
 
 ## Phase 1 — Product Improvements (MASTER_PLAN.md §2)
@@ -159,4 +176,30 @@ Not started. Do not begin until Phase 1 is complete and demoed end-to-end.
   Needs a second encrypted location + checksum + retention owner before the migration is
   considered fully closed.
 
-- **Bulk-upload endpoint unauthenticated (found 2026-08-12, not fixed):** `POST /hospitals/{hospital_id}/doctors/bulk-upload` (`hospitals.py` ~line 197) has no auth dependency at all and creates `Doctor` rows for whatever `hospital_id` is in the path. Same defect class as the `/knowledge/entry/` routes closed in PR #3, but not covered by the 2026-08-08 audit because that sweep only checked `.query(<Model>)` call sites. Scoped, not started.
+- **Bulk-upload endpoint unauthenticated (found 2026-08-12, not fixed) — RESOLVED 2026-08-13, see
+  Catch-up entry above. Fix on branch fix/bulk-upload-tenant-auth, verified, pending PR/merge.** `POST /hospitals/{hospital_id}/doctors/bulk-upload` (`hospitals.py` ~line 197) has no auth dependency at all and creates `Doctor` rows for whatever `hospital_id` is in the path. Same defect class as the `/knowledge/entry/` routes closed in PR #3, but not covered by the 2026-08-08 audit because that sweep only checked `.query(<Model>)` call sites. Fix implemented and verified locally; PR pending.
+
+- **Bulk-upload endpoint 403/404 behaviour (2026-08-13):** `POST /hospitals/{hospital_id}/doctors/bulk-upload`
+  returns 404 for a nonexistent hospital_id and 403 for a valid hospital owned by another tenant —
+  joins the existing deferred enumeration-oracle set from PR #3. Needs a separate normalisation
+  task across all ownership-checked endpoints.
+
+- **Unaudited bulk-upload siblings (found 2026-08-13):** `POST /lab-tests/hospital/{hospital_id}/bulk-upload`
+  (`lab_tests.py:60`) and `POST /medicines/hospital/{hospital_id}/bulk-upload` (`medicines.py:60`)
+  have not been checked for auth or tenant ownership — same defect class as this endpoint before
+  the fix; PR #3 covered only PATCH/DELETE in those files. Separate task per §5.8.
+
+- **Superadmin bulk-upload "0 doctors" anomaly (2026-08-13):** the LLM header-mapping call
+  (GPT-4o-mini, non-deterministic) can return a null column mapping and silently skip every row.
+  Confirmed unrelated to auth — the 200 status confirms the ownership gate passed correctly in
+  both an occurrence and a non-occurrence of this bug across separate test runs. Pre-existing
+  fragility in `bulk_upload_and_sync`'s LLM-based CSV mapping step, not introduced by this fix,
+  out of scope here.
+
+- **15 test-artifact Doctor rows identified and removed (2026-08-13):** ids 24–38 in the local
+  `doctors` table (`Test8171A/B/C`, `Test8876A/B/C`, `Zeta/Ypsilon/Xi` ×2, `Delta/Echo/Foxtrot`)
+  were confirmed via the `H{hospital_id}-D-{hex}` `doctor_id` pattern to be artifacts of prior
+  unlogged test sessions verifying this same endpoint — three independent successful writes, each
+  correctly scoped to its target hospital_id with no cross-tenant bleed. Deleted by the developer
+  to restore a clean fixture baseline ahead of Phase 2 (`tenant_isolation_test.py`, retrieval/LLM
+  benchmarks).
