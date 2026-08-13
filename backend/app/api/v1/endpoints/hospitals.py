@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File
 from sqlalchemy.orm import Session
 from datetime import datetime
 from app import crud, schemas
-from app.api.deps import get_db, get_current_tenant, require_superadmin
+from app.api.deps import get_db, get_current_tenant, get_token_payload, require_superadmin
 from app.models.hospital import Hospital
 from app.models.doctor import Doctor
 from app.models.usage import UsageLedger
@@ -198,7 +198,9 @@ def add_doctor(hospital_id: int, payload: dict = Body(...), db: Session = Depend
 async def bulk_upload_and_sync(
     hospital_id: int,
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _tenant: int = Depends(get_current_tenant),
+    token_data: dict = Depends(get_token_payload)
 ):
     from openai import OpenAI
     import os
@@ -207,6 +209,11 @@ async def bulk_upload_and_sync(
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
     if not hospital:
         raise HTTPException(status_code=404, detail="Hospital not found")
+
+    user_role = token_data.get("role")
+    user_hospital = token_data.get("hospital_id")
+    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied. You can only bulk upload doctors for your assigned hospital.")
 
     content = await file.read()
     text_content = content.decode("utf-8")
