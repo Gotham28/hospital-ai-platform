@@ -82,6 +82,7 @@ After: hospital 1=28 (+3 from case c), hospital 2=6 (unchanged), hospital 15=2 (
   confirm-before-code, migration draft-only, and no autonomous merge/PR.
 
 ### Catch-up — 2026-08-16
+
 **Bulk-upload sibling endpoints audit and existence guard.** `POST /lab-tests/hospital/{hospital_id}/bulk-upload` and `POST /medicines/hospital/{hospital_id}/bulk-upload` were audited for tenant-ownership enforcement. Added a `404 Not Found` existence guard for non-existent hospitals prior to the ownership check to match the doctors endpoint. 
 
 *Correction:* The 2026-08-13 note about "unaudited bulk-upload siblings" described endpoints that were unverified, not unprotected. The auth and ownership checks were already functionally intact.

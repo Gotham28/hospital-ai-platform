@@ -404,5 +404,6 @@ unaffected throughout.
 ## 9. Unplanned / Ad-hoc Work
 
 ### 2026-08-16 — Bulk-upload sibling endpoints audit + hospital-existence guard
+
 Not in the original plan. Verified tenant-ownership enforcement on the lab-tests and medicines bulk-upload endpoints and added the missing hospital-existence guard to match the doctors endpoint.
 Scope: `backend/app/api/v1/endpoints/lab_tests.py`, `backend/app/api/v1/endpoints/medicines.py`. Related: CURRENT_TASK.md dated 2026-08-16.
