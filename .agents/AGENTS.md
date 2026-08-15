@@ -147,8 +147,8 @@ task explicitly says to. Don't "clean up" as a side effect of an unrelated task.
 5. Implement only the confirmed, scoped task.
 6. If schema changes are involved, generate the Alembic migration and stop — do not run
    it against anything but a confirmed local database.
-7. Report back exactly which files changed, for developer review before merge. Include a
-   suggested review model line as specified in §10.
+7. Report back exactly which files changed, for developer review. Once accepted,
+   close out per §6.11. Include a suggested review model line as specified in §10.
 8. At the end of every task, draft a proposed STATUS.md update as part of your final
    report — both (a) any current-state table row that changed, and (b) a dated bullet for
    the "Catch-up" section describing what was done, in the same style as existing
@@ -159,8 +159,10 @@ task explicitly says to. Don't "clean up" as a side effect of an unrelated task.
    approved yet), regenerate the repomix snapshot by overwriting the existing output
    file in place — do not delete it first, then run the repomix build. This keeps the
    on-disk snapshot current; it does NOT update the developer's Claude Project, which
-   requires a manual reupload. Also reset `.agents/CURRENT_TASK.md` to an idle state
-   (e.g. "No task currently in progress.") now that the task is closed.
+   requires a manual reupload. Do NOT reset `.agents/CURRENT_TASK.md` at this point — §6.11 reads its
+   `## Files/areas in scope` list when staging. Reset it to an idle state (e.g. "No
+   task currently in progress.") only after the close-out commit and push in §6.11
+   are complete.
 10. **Always cut branches from `origin/main`, not local `main`.** Local `main` may be
     ahead of `origin/main` by unpushed commits; cutting from it silently includes those
     commits in the PR. Use:
@@ -168,9 +170,46 @@ task explicitly says to. Don't "clean up" as a side effect of an unrelated task.
     git fetch origin
     git checkout -b fix/your-task-name origin/main
     ```
+    Because this sets `origin/main` as the branch's upstream, run
+    `git branch --unset-upstream` before the first push, then push with an explicit
+    target: `git push -u origin HEAD:refs/heads/<branch-name>`.
+
     This guarantees the branch starts from exactly what GitHub has, so the PR contains
     only the current task's work. Never use `git checkout -b <name>` without an explicit
     upstream ref.
+
+11. **Task close-out.** Once a task is reviewed and accepted, and the developer has
+    approved the STATUS.md entry, you may: write that approved entry, stage the
+    task's files by explicit path, commit, push to the feature branch, and open a PR
+    against `main`. Then fetch CodeRabbit's review and report it in full without
+    fixing anything.
+
+    Never `git add -A`, `git add .`, or `git add -u` — stage only files named in
+    `.agents/CURRENT_TASK.md` under `## Files/areas in scope`, plus `docs/STATUS.md`,
+    which is a standing exception because every task writes it and it is therefore
+    never listed as task scope. Nothing else may be staged. If any other file is
+    modified, leave it untouched and commit around it. Paste `git show --name-only
+    HEAD` after committing.
+
+    Note that `git add docs/STATUS.md` stages the whole file. Before staging it, run
+    `git diff docs/STATUS.md` and check whether it contains changes beyond the
+    approved entry. If it does, STOP: report exactly what the unrelated changes are
+    and ask the developer whether to include them, commit separately, or set them
+    aside. Do not stage unrelated changes on your own judgement, and do not stash,
+    revert or discard them either.
+
+    Run `git branch --unset-upstream` before pushing if the branch was created with
+    `git checkout -b <name> origin/main`, which sets `origin/main` as upstream and
+    would make a bare `git push` target `main`. Then push with an explicit target:
+
+    ```
+    git push -u origin HEAD:refs/heads/<feature-branch>
+    ```
+
+    Never use a bare `git push` in close-out.
+
+    **You may never merge a pull request.** That is the developer's action, always,
+    including when CodeRabbit reports no issues.
 
 ---
 
@@ -279,3 +318,33 @@ too large for one task and should have been split under §5.8 — say so instead
 - Cite the tier from the rules in this section. If `.agents/CURRENT_TASK.md` already
   names a suggested tier and your own classification differs, say so explicitly rather
   than silently copying the task file's tier.
+
+---
+
+## 11. Superpowers Plugin Precedence
+
+1. AGENTS.md §5 and §6 take precedence over any Superpowers skill instruction.
+   Where a Superpowers skill says an action is mandatory and AGENTS.md forbids or
+   gates it, AGENTS.md wins. Flag the conflict to the developer rather than
+   resolving it silently.
+2. subagent-driven-development and executing-plans must not run autonomously
+   across more than one feature. AGENTS.md §5 rule 8 (one feature per task/diff)
+   is not suspended by an approved Superpowers plan. Stop at the end of each
+   feature and report.
+3. The §6 step-3 gate stands: state which files you plan to create or modify and
+   wait for developer confirmation, even when a Superpowers plan already exists.
+   An approved plan is not approval to begin writing code.
+4. finishing-a-development-branch may push to a feature branch and open a pull
+   request without a further approval step, since both are reversible and neither
+   changes `main`. It must NOT merge, force-push, delete a branch or worktree, push
+   to `main`, or alter branch protection — those are developer-only actions. See
+   §6.11 for the full close-out sequence.
+5. Alembic migrations remain draft-only per §5 rule 4. No Superpowers workflow,
+   including a clean-test-baseline check, authorises applying a migration.
+6. Superpowers must not be used on IRIS clinic-facing features whose wording is
+   still pending clinic sign-off. §5 rule 5 (no fabricated placeholder
+   legal/medical text) applies with full force to any text a Superpowers skill
+   proposes.
+7. test-driven-development is adopted for new work under §1.4 and §1.5 and for
+   backend/research/. It is not retroactively applied to existing code, and it
+   does not authorise deleting existing code that lacks tests.
