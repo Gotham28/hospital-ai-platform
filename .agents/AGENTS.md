@@ -159,8 +159,10 @@ task explicitly says to. Don't "clean up" as a side effect of an unrelated task.
    approved yet), regenerate the repomix snapshot by overwriting the existing output
    file in place — do not delete it first, then run the repomix build. This keeps the
    on-disk snapshot current; it does NOT update the developer's Claude Project, which
-   requires a manual reupload. Also reset `.agents/CURRENT_TASK.md` to an idle state
-   (e.g. "No task currently in progress.") now that the task is closed.
+   requires a manual reupload. Do NOT reset `.agents/CURRENT_TASK.md` at this point — §6.11 reads its
+   `## Files/areas in scope` list when staging. Reset it to an idle state (e.g. "No
+   task currently in progress.") only after the close-out commit and push in §6.11
+   are complete.
 10. **Always cut branches from `origin/main`, not local `main`.** Local `main` may be
     ahead of `origin/main` by unpushed commits; cutting from it silently includes those
     commits in the PR. Use:
@@ -189,15 +191,20 @@ task explicitly says to. Don't "clean up" as a side effect of an unrelated task.
     modified, leave it untouched and commit around it. Paste `git show --name-only
     HEAD` after committing.
 
-    Note that `git add docs/STATUS.md` stages the whole file. If it already carries
-    unrelated uncommitted changes, they will be included — say so in the task report
-    rather than attempting to separate them.
+    Note that `git add docs/STATUS.md` stages the whole file. Before staging it, run
+    `git diff docs/STATUS.md` and check whether it contains changes beyond the
+    approved entry. If it does, STOP: report exactly what the unrelated changes are
+    and ask the developer whether to include them, commit separately, or set them
+    aside. Do not stage unrelated changes on your own judgement, and do not stash,
+    revert or discard them either.
 
     Run `git branch --unset-upstream` before pushing if the branch was created with
     `git checkout -b <name> origin/main`, which sets `origin/main` as upstream and
     would make a bare `git push` target `main`. Then push with an explicit target:
 
-        git push -u origin HEAD:refs/heads/<feature-branch>
+    ```
+    git push -u origin HEAD:refs/heads/<feature-branch>
+    ```
 
     Never use a bare `git push` in close-out.
 
