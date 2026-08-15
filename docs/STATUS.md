@@ -76,6 +76,34 @@ All five verification cases evidenced against local fixtures:
 Baseline doctor counts before this session's tests: hospital 1=25, hospital 2=6, hospital 15=2.
 After: hospital 1=28 (+3 from case c), hospital 2=6 (unchanged), hospital 15=2 (unchanged).
 
+* 2026-08-13: Installed the Superpowers plugin (obra/superpowers) in Antigravity and added
+  AGENTS.md §11 ("Superpowers Plugin Precedence") to make AGENTS.md §5/§6 override the
+  plugin's default mandatory-workflow behavior — specifically one-feature-per-diff,
+  confirm-before-code, migration draft-only, and no autonomous merge/PR.
+
+### Catch-up — 2026-08-16
+
+**Bulk-upload sibling endpoints audit and existence guard.** `POST /lab-tests/hospital/{hospital_id}/bulk-upload` and `POST /medicines/hospital/{hospital_id}/bulk-upload` were audited for tenant-ownership enforcement. Added a `404 Not Found` existence guard for non-existent hospitals prior to the ownership check to match the doctors endpoint. 
+
+*Correction:* The 2026-08-13 note about "unaudited bulk-upload siblings" described endpoints that were unverified, not unprotected. The auth and ownership checks were already functionally intact.
+
+Verification tests used `TestClient` against the in-process ASGI app (not a live uvicorn server). Unlike earlier runs which used programmatically minted tokens, these final runs successfully utilized tokens retrieved via the real `POST /api/v1/auth/login` endpoint.
+
+Outcomes demonstrated per endpoint and per case:
+**Lab-tests:**
+- (a) Unauthenticated → **401 Unauthorized**. Shows auth enforcement.
+- (b) Cross-tenant admin → **403 Forbidden**. Shows tenant boundary enforcement.
+- (c) Own-hospital admin → **200 OK**, with 3 rows created. Shows that a valid admin can write to their own hospital's data. (Note: This resulted in 0 rows imported across 10 consecutive attempts in the earlier minted-token run, then a 3-row import on the first attempt in the login-token run).
+- (d) Superadmin cross-tenant → **200 OK**, with 3 rows created. Shows that a superadmin can write to another tenant's data. (Note: A previous run yielded a 200 with 0 rows imported, which confirmed auth bypassing but failed the write due to LLM variance. The re-run succeeded in proving the write. The mapping is non-deterministic and can return a null mapping, silently importing 0 rows while returning 200; the write succeeds whenever the mapping succeeds.)
+- (e) Nonexistent hospital 99999 → **404 Not Found**. Shows existence check enforcement.
+
+**Medicines:**
+- (a) Unauthenticated → **401 Unauthorized**. Shows auth enforcement.
+- (b) Cross-tenant admin → **403 Forbidden**. Shows tenant boundary enforcement.
+- (c) Own-hospital admin → **200 OK**, with 3 rows created. Shows that a valid admin can write to their own hospital's data.
+- (d) Superadmin cross-tenant → **200 OK**, with 3 rows created. Shows that a superadmin can write to another tenant's data.
+- (e) Nonexistent hospital 99999 → **404 Not Found**. Shows existence check enforcement.
+
 ---
 
 ## Phase 1 — Product Improvements (MASTER_PLAN.md §2)
@@ -203,3 +231,5 @@ Not started. Do not begin until Phase 1 is complete and demoed end-to-end.
   correctly scoped to its target hospital_id with no cross-tenant bleed. Deleted by the developer
   to restore a clean fixture baseline ahead of Phase 2 (`tenant_isolation_test.py`, retrieval/LLM
   benchmarks).
+- **Repo Hygiene Issue (2026-08-16):** The `backend/pgvector/` directory is appearing as an untracked file in `git status`. It is currently covered by neither `.gitignore` nor `.repomixignore`, which reopens the 2026-08-09 hygiene note that was previously recorded as resolved.
+- **Redundant Branch (2026-08-16):** Branch `fix/bulk-upload-tenant-auth` is redundant (its content is already present in `origin/main` via PR merge `d9e6a78`) and can be safely deleted locally and on the remote.
