@@ -168,6 +168,10 @@ task explicitly says to. Don't "clean up" as a side effect of an unrelated task.
     git fetch origin
     git checkout -b fix/your-task-name origin/main
     ```
+    Because this sets `origin/main` as the branch's upstream, run
+    `git branch --unset-upstream` before the first push, then push with an explicit
+    target: `git push -u origin HEAD:refs/heads/<branch-name>`.
+
     This guarantees the branch starts from exactly what GitHub has, so the PR contains
     only the current task's work. Never use `git checkout -b <name>` without an explicit
     upstream ref.
@@ -179,12 +183,23 @@ task explicitly says to. Don't "clean up" as a side effect of an unrelated task.
     fixing anything.
 
     Never `git add -A`, `git add .`, or `git add -u` — stage only files named in
-    `.agents/CURRENT_TASK.md` under `## Files/areas in scope`. If any other file is
+    `.agents/CURRENT_TASK.md` under `## Files/areas in scope`, plus `docs/STATUS.md`,
+    which is a standing exception because every task writes it and it is therefore
+    never listed as task scope. Nothing else may be staged. If any other file is
     modified, leave it untouched and commit around it. Paste `git show --name-only
     HEAD` after committing.
 
+    Note that `git add docs/STATUS.md` stages the whole file. If it already carries
+    unrelated uncommitted changes, they will be included — say so in the task report
+    rather than attempting to separate them.
+
     Run `git branch --unset-upstream` before pushing if the branch was created with
-    `git checkout -b <name> origin/main`, which sets `origin/main` as upstream.
+    `git checkout -b <name> origin/main`, which sets `origin/main` as upstream and
+    would make a bare `git push` target `main`. Then push with an explicit target:
+
+        git push -u origin HEAD:refs/heads/<feature-branch>
+
+    Never use a bare `git push` in close-out.
 
     **You may never merge a pull request.** That is the developer's action, always,
     including when CodeRabbit reports no issues.
