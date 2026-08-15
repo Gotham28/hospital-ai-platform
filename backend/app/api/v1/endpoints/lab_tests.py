@@ -65,6 +65,10 @@ async def bulk_upload_lab_tests(
     _tenant: int = Depends(get_current_tenant),
     token_data: dict = Depends(get_token_payload)
 ):
+    hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+
     if token_data.get("role") != "superadmin" and str(token_data.get("hospital_id")) != str(hospital_id):
         raise HTTPException(status_code=403, detail="Access denied")
 
