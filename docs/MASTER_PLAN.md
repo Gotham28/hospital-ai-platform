@@ -33,7 +33,7 @@ the earlier "research prompt." Corrections locked in after review:
 
 | Topic | Earlier prompt said | Paper actually requires | Decision |
 |---|---|---|---|
-| Translation baseline | Sarvam vs Google | mBERT / XLM-R vs professional reference (BLEU/chrF) | **Both**: product uses Sarvam (with Google fallback); paper *also* benchmarks mBERT/XLM-R as academic baselines in `backend/research/translation_eval.py` |
+| Translation baseline | Sarvam vs Google | IndicTrans2 / NLLB-200 / mBART-50 vs professional reference (BLEU/chrF) | **Both**: product uses Sarvam (with Google fallback); paper *also* benchmarks IndicTrans2, NLLB-200, and mBART-50 as academic baselines in `backend/research/translation_eval.py`. (Corrected 2026-08-19 from mBERT/XLM-R — those are encoder-only models, not translation models, and can't produce output scorable with BLEU/chrF.) |
 | Retrieval comparison | E5 vs sentence-transformers vs OpenAI | Not explicitly required by paper, but strengthens the RAG section | **Keep** — still valuable supporting evidence, done in Phase 2 |
 | LLM comparison | GPT-4o-mini vs Llama 3 vs Mistral (via Groq) | Not explicitly required, but strengthens results | **Keep**, gated on you obtaining a Groq key (see §5) |
 | Dialogue dataset | Not mentioned | Paper requires a **synthetic Malayalam scheduling dialogue dataset**, publicly released | **Upgraded to real data** — see §6, this is now a consent-gated real-query pipeline, not synthetic |
@@ -165,11 +165,19 @@ backend/research/
 ├── translation_eval.py
 ├── bias_analysis.py
 ├── security_eval.py
+├── relevance_gate_eval.py      # NEW — see §3.9
 ├── tenant_isolation_test.py
 ├── load_test.py
 ├── real_query_pipeline/        # consent + PII scrubbing (see §6)
 └── results/                    # gitignored
 ```
+
+**Headline metric convention:** every script above that scores English and Malayalam
+separately also reports Δ = score_EN − score_ML for each metric, same tenant, same
+policy, same query set (Mid Review slide 18). This is the paper's single headline
+result — the English–Malayalam safety/quality parity gap — so it needs to come out of
+each script as a named number, not just be inferable from two side-by-side rows in a
+CSV.
 
 ### 3.1 `test_queries.py` — foundation, build first
 - 50 query dicts: `id`, `query_en`, `query_ml`, `reference_answer`, `category`,
@@ -177,6 +185,9 @@ backend/research/
 - **You write reference answers for queries 1–15** as the style/tone guide (medically
   accurate, matches how AROGYA should actually respond). **I generate 16–50** matching that
   style, you review before we lock the file.
+- Companion dataset for `relevance_gate_eval.py` (§3.9): labelled EN–ML relevance-gate
+  cases across referral / prior-doctor / ambiguous branches — built and reviewed the same
+  way as the 50-query set above.
 
 ### 3.2 `retrieval_benchmark.py`
 - Compare `text-embedding-3-small` (current) vs `intfloat/multilingual-e5-base` vs
@@ -197,8 +208,9 @@ backend/research/
   reference pairs:
   - **Production track**: Sarvam (primary) vs Google (fallback) — proves the product
     upgrade actually improved translation quality.
-  - **Academic baseline track**: mBERT vs XLM-R — matches the paper's stated objective 1
-    exactly, needed regardless of what the product uses internally.
+  - **Academic baseline track**: IndicTrans2 vs NLLB-200 vs mBART-50 — matches the
+    paper's stated objective 1 exactly, needed regardless of what the product uses
+    internally. (Corrected from mBERT/XLM-R — see §1 note.)
 - Score both tracks with `sacrebleu` (BLEU, chrF).
 
 ### 3.5 `bias_analysis.py`
@@ -207,12 +219,24 @@ backend/research/
 - RAGAs scores per category + `scipy` significance testing.
 
 ### 3.6 `tenant_isolation_test.py` *(new)*
-- Seed ≥2 test hospital_ids with deliberately overlapping data (e.g. both have a doctor
-  named "Dr. Priya" in different departments).
-- Fire identical queries at each tenant; assert retrieved chunks and final answers for
-  Tenant A never contain Tenant B's content, and vice versa.
-- Output: pass/fail isolation report — this is the paper's "≥2 concurrent tenants, zero
-  cross-tenant leakage" evidence.
+- Three specific leak paths, each its own test case (Mid Review slide 10):
+  1. **Name collision in generation** — seed ≥2 test hospital_ids with deliberately
+     overlapping data (e.g. both have a doctor named "Dr. Priya" in different
+     departments). Fire identical queries at each tenant; assert retrieved chunks and
+     final answers for Tenant A never contain Tenant B's content, and vice versa.
+  2. **Shared translation cache** — check whether the Redis translation cache (§1.3) is
+     keyed in a way that could return one tenant's cached translation to a different
+     tenant. Test case only for now — not a confirmed production bug. If this test finds
+     a real leak, stop and flag it to the developer before continuing; do not attempt a
+     production fix as part of this research task.
+  3. **Interpreted tenant policy** — a hospital's free-text admin fields
+     (`hospital.system_prompt`, `hospital.relevance_criteria`, etc.) are read by the LLM
+     fresh on every request, not enforced as a fixed rule. Test whether one tenant's
+     policy text can be made to affect another tenant's response, including via
+     injection-style prompting.
+- Output: pass/fail isolation report per leak path — this is the paper's "≥2 concurrent
+  tenants, zero cross-tenant leakage" evidence, and the taxonomy of LLM-layer leak paths
+  (Mid Review slide 21, contribution C2).
 
 ### 3.7 `load_test.py` *(new)*
 - Async load generator (e.g. `asyncio` + `httpx`, or `locust`) hitting the chat endpoint
@@ -227,6 +251,24 @@ backend/research/
   Malayalam variants, drawing on OWASP LLM Top 10 patterns.
 - Run through `detect_prompt_injection()`. Output: confusion matrix, precision/recall/F1.
 
+### 3.9 `relevance_gate_eval.py` *(new — added 2026-08-19, closes G3/O7)*
+
+- Tests `services/relevance.py` (the IRIS Feature 4 relevance gate) for two things:
+  - **Branch accuracy**: given a labelled input, does the gate pick the correct
+    branch — referral fast-path, prior-doctor match, or ambiguous/staff-review?
+  - **Consistency under paraphrase**: does the same underlying case, worded
+    differently (including English vs Malayalam), get the same verdict?
+- New dataset needed: a labelled relevance-gate evaluation set — parallel
+  English–Malayalam cases across the three branches (referral / prior-doctor /
+  ambiguous), each with an expected verdict. Build this alongside `test_queries.py`
+  in the same review process (developer writes a style-guide subset, Claude generates
+  the rest, developer reviews before it's locked) — see §3.1.
+- Output: accuracy per branch, per language, and a paraphrase-stability score
+  (same case reworded N ways, % of verdicts that agree).
+- This is the paper's "policy-gate accuracy and consistency" metric (Mid Review
+  slide 18) and closes Objective O7 / Gap G3 — natural-language tenant policy has
+  had no evaluation framework until this script.
+
 ### Dependencies to add to `requirements.txt`
 ```
 ragas
@@ -235,7 +277,7 @@ groq
 scipy
 sentence-transformers
 datasets
-transformers   # for mBERT / XLM-R baseline
+transformers   # for IndicTrans2 / NLLB-200 / mBART-50 baselines
 httpx          # or locust, for load_test.py
 ```
 
@@ -326,7 +368,7 @@ milestone) are backed by real numbers, not just descriptions.
 | **—** | **12–21 Aug** | **Mid Review (25 marks)** | Methodology, Project Progress (Phase 1 complete + research scaffold), time plan for Phase 2, viva | Direct deliverable — biggest checkpoint so far |
 | 6 | 22–29 Aug | Run `retrieval_benchmark.py` | CSV comparing 3 embedding models, English vs Malayalam | Project diary entry |
 | 7 | 30 Aug–5 Sep | Groq key (§5) + `llm_benchmark.py` | GPT-4o-mini vs Llama 3 vs Mistral comparison table | Project diary entry |
-| 8 | 6–12 Sep | `translation_eval.py` — both tracks | Sarvam-vs-Google AND mBERT-vs-XLM-R, BLEU/chrF tables | Project diary entry |
+| 8 | 6–12 Sep | `translation_eval.py` — both tracks | Sarvam-vs-Google AND IndicTrans2/NLLB-200/mBART-50, BLEU/chrF tables | Project diary entry |
 | 9 | 13–19 Sep | `bias_analysis.py`; start real-query consent-flow draft | Bias report with significance tests; consent UI draft for hospital review | Project diary entry |
 | 10 | 20–27 Sep | `tenant_isolation_test.py` + `load_test.py`; compile diary | Isolation pass/fail report; latency-vs-concurrency chart (staging only) | Feeds into 28 Sep |
 | **—** | **28 Sep** | **Code/Progress Review (15 marks, guide-assessed)** | Weekly project diary submitted, working demo covering Phase 1 + research through Week 10 | Direct deliverable |
