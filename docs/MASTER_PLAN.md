@@ -252,6 +252,7 @@ CSV.
 - Run through `detect_prompt_injection()`. Output: confusion matrix, precision/recall/F1.
 
 ### 3.9 `relevance_gate_eval.py` *(new — added 2026-08-19, closes G3/O7)*
+
 - Tests `services/relevance.py` (the IRIS Feature 4 relevance gate) for two things:
   - **Branch accuracy**: given a labelled input, does the gate pick the correct
     branch — referral fast-path, prior-doctor match, or ambiguous/staff-review?
