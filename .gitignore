@@ -33,3 +33,6 @@ local run code.txt
 # phone numbers. Not part of AROGYA and must not be modified during AROGYA tasks.
 Multi-Hospital-WhatsApp-Patient-Messaging-Platform/
 backend/seed_local_test_users.py
+
+.agents/runs/
+backend/pgvector/
