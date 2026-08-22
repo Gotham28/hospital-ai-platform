@@ -69,6 +69,40 @@ each step below unlocks a cleaner version of the next.
 - Fallback to Google Translate with a circuit breaker if Sarvam fails.
 - Cache common translations in Redis.
 
+### 1.3a Sarvam upgrade — execution sequence (agreed 2026-08-22)
+
+§1.3 above is four separate pieces of work. Under AGENTS.md §5.8 (one feature per
+task/diff) it is split into three tasks, each its own CURRENT_TASK.md, diff, review and
+PR. Post-processing runs first because it is the only one verifiable without an API key.
+
+| Task | What | Route | Expected review tier |
+|---|---|---|---|
+| B | Malayalam post-processing — provider-agnostic normaliser (doctor-name prefix, formal pronouns), applied to translated output | C — automated loop | Sonnet 5, medium |
+| A | Sarvam client (primary) + Google fallback with in-process circuit breaker, in `services/translation.py` | B — agent + manual review | Sonnet 5, medium |
+| C | Redis translation cache | B — agent + manual review | Opus 5, high |
+
+Design decisions locked at split time:
+- Task A stays inside `services/translation.py`. A new module would move code between
+  modules and trigger an Opus review under §10 for no benefit.
+- Task A's circuit-breaker state is in-process, not Redis. Redis state would trigger the
+  §10 "Redis session key patterns" rule.
+- Task A degrades gracefully when `SARVAM_API_KEY` is unset, same pattern as
+  `services/whatsapp.py`, so it can land before the key arrives — but it is not signed
+  off until a real ml↔en call has been evidenced.
+- Task C is the only Opus-tier task, and is the leak path already named in §3.6 case 2.
+  Its cache key design is a developer decision, not an agent decision.
+
+Order of work, as of 2026-08-22:
+1. Obtain the Sarvam API key (developer, not started — blocks task A only)
+2. Docs reconciliation — STATUS.md brought level with origin/main (this task)
+3. Task B — Malayalam post-processing
+4. Task A — Sarvam client + Google fallback
+5. Task C — Redis translation cache
+6. Re-plan §7: Phase 1 is roughly 3 weeks behind the weekly table as of 2026-08-22
+
+Close-out for every task above is manual (`close-task`). No loop runner commits, pushes,
+opens or merges a PR.
+
 ### 1.4 Security hardening
 - Extend `_INJECTION_PATTERNS` with Malayalam equivalents, informed by OWASP LLM Top 10
   (this doubles as the seed set for the paper's adversarial test suite in Phase 2).

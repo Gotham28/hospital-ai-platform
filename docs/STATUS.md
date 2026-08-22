@@ -1,6 +1,6 @@
 # STATUS.md — Current Sprint Status
 
-Last updated: 2026-08-09
+Last updated: 2026-08-22
 
 This file tracks what's actually done vs. in progress vs. next, across the whole
 project. Update this after every verified feature — not before. See `docs/MASTER_PLAN.md`
@@ -104,6 +104,41 @@ Outcomes demonstrated per endpoint and per case:
 - (d) Superadmin cross-tenant → **200 OK**, with 3 rows created. Shows that a superadmin can write to another tenant's data.
 - (e) Nonexistent hospital 99999 → **404 Not Found**. Shows existence check enforcement.
 
+### Catch-up — 2026-08-22
+
+**Five merged PRs recorded in one entry.** STATUS.md had not been updated since
+2026-08-09 and the Catch-up log had no entry for any of the following.
+
+- **PR #5** — `fix/bulk-upload-tenant-auth`, commit `c4c4096`, merged `d9e6a78` on
+  2026-08-13. Tenant-ownership enforcement on
+  `POST /hospitals/{hospital_id}/doctors/bulk-upload`. Verification evidence is in the
+  2026-08-13 Catch-up entry above; this entry records only that it merged.
+- **PR #6** — `fix/bulk-upload-sibling-guards`, commits `91cb3f7`, `d42dfa8`, merged
+  `452ddc3` on 2026-08-15. Hospital-existence guard added to the lab-tests and medicines
+  bulk-upload endpoints. Verification evidence is in the 2026-08-16 Catch-up entry above.
+- **PR #7** — `docs/agents-close-out-workflow`, commits `28b1a6a`, `7742a29`, `2ba7f59`,
+  merged `52cfa4b` on 2026-08-15. Added AGENTS.md §11 (Superpowers Plugin Precedence) and
+  §6.11 (task close-out). Two further commits on that branch, `9193ddb` and `1fca2c8`,
+  were never pushed and so did not survive the squash merge — recovered by PR #9 below.
+- **PR #8** — `docs/research-plan-corrections-2026-08-19`, commits `c291445`, `3604ed8`,
+  merged `79cb7b9` on 2026-08-22. Completed the 2026-08-19 translation-baseline
+  correction (mBERT/XLM-R replaced by IndicTrans2 / NLLB-200 / mBART-50 at all four
+  occurrences), added the Δ = score_EN − score_ML headline metric convention, expanded
+  §3.6 into three named leak paths, and added §3.9 `relevance_gate_eval.py`.
+  CodeRabbit raised three findings: MD022 was fixed; the §5.8 scope flag was overridden
+  knowingly and answered in the PR thread; the metric-notation finding was declined —
+  `.coderabbit.yaml` contains no such path instruction and CodeRabbit was quoting the
+  PR description back at itself.
+- **PR #9** — `chore/gitignore-runs-and-pgvector`, commit `20c7d44`, merged `4e483da` on
+  2026-08-22. Added `.agents/runs/` and `backend/pgvector/` to `.gitignore`. These two
+  lines were committed locally on the PR #7 branch but never pushed. Without them
+  `loop.py` hard-halts at its gitignore check, and its `capture_diff()` runs
+  `git add -A -N`, which would sweep run transcripts and vendored pgvector source into
+  the review diff.
+
+Documentation only. No code, schema, or migration touched by this entry's work beyond
+what the linked PRs already record.
+
 ---
 
 ## Phase 1 — Product Improvements (MASTER_PLAN.md §2)
@@ -205,7 +240,7 @@ Not started. Do not begin until Phase 1 is complete and demoed end-to-end.
   considered fully closed.
 
 - **Bulk-upload endpoint unauthenticated (found 2026-08-12, not fixed) — RESOLVED 2026-08-13, see
-  Catch-up entry above. Fix on branch fix/bulk-upload-tenant-auth, verified, pending PR/merge.** `POST /hospitals/{hospital_id}/doctors/bulk-upload` (`hospitals.py` ~line 197) has no auth dependency at all and creates `Doctor` rows for whatever `hospital_id` is in the path. Same defect class as the `/knowledge/entry/` routes closed in PR #3, but not covered by the 2026-08-08 audit because that sweep only checked `.query(<Model>)` call sites. Fix implemented and verified locally; PR pending.
+  Catch-up entry above. Fix on branch fix/bulk-upload-tenant-auth, merged 2026-08-13 as PR #5.** `POST /hospitals/{hospital_id}/doctors/bulk-upload` (`hospitals.py` ~line 197) has no auth dependency at all and creates `Doctor` rows for whatever `hospital_id` is in the path. Same defect class as the `/knowledge/entry/` routes closed in PR #3, but not covered by the 2026-08-08 audit because that sweep only checked `.query(<Model>)` call sites. Fix implemented, verified locally, and merged as PR #5.
 
 - **Bulk-upload endpoint 403/404 behaviour (2026-08-13):** `POST /hospitals/{hospital_id}/doctors/bulk-upload`
   returns 404 for a nonexistent hospital_id and 403 for a valid hospital owned by another tenant —
