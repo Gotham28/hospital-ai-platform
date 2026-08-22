@@ -212,10 +212,11 @@ Not started. Do not begin until Phase 1 is complete and demoed end-to-end.
   joins the existing deferred enumeration-oracle set from PR #3. Needs a separate normalisation
   task across all ownership-checked endpoints.
 
-- **Unaudited bulk-upload siblings (found 2026-08-13):** `POST /lab-tests/hospital/{hospital_id}/bulk-upload`
+- **Unaudited bulk-upload siblings (found 2026-08-13) — RESOLVED 2026-08-16 via PR #6.** `POST /lab-tests/hospital/{hospital_id}/bulk-upload`
   (`lab_tests.py:60`) and `POST /medicines/hospital/{hospital_id}/bulk-upload` (`medicines.py:60`)
-  have not been checked for auth or tenant ownership — same defect class as this endpoint before
-  the fix; PR #3 covered only PATCH/DELETE in those files. Separate task per §5.8.
+  were flagged as unchecked for auth or tenant ownership; PR #3 had covered only PATCH/DELETE in
+  those files. Audited 2026-08-16: both already enforced auth and ownership, and a 404
+  hospital-existence guard was added to match the doctors endpoint. See the 2026-08-16 Catch-up entry.
 
 - **Superadmin bulk-upload "0 doctors" anomaly (2026-08-13):** the LLM header-mapping call
   (GPT-4o-mini, non-deterministic) can return a null column mapping and silently skip every row.
@@ -231,5 +232,5 @@ Not started. Do not begin until Phase 1 is complete and demoed end-to-end.
   correctly scoped to its target hospital_id with no cross-tenant bleed. Deleted by the developer
   to restore a clean fixture baseline ahead of Phase 2 (`tenant_isolation_test.py`, retrieval/LLM
   benchmarks).
-- **Repo Hygiene Issue (2026-08-16):** The `backend/pgvector/` directory is appearing as an untracked file in `git status`. It is currently covered by neither `.gitignore` nor `.repomixignore`, which reopens the 2026-08-09 hygiene note that was previously recorded as resolved.
-- **Redundant Branch (2026-08-16):** Branch `fix/bulk-upload-tenant-auth` is redundant (its content is already present in `origin/main` via PR merge `d9e6a78`) and can be safely deleted locally and on the remote.
+- **Repo Hygiene Issue (2026-08-16) — RESOLVED 2026-08-22 via PR #9.** The `backend/pgvector/` directory was appearing as untracked in `git status`, covered by neither `.gitignore` nor `.repomixignore`, reopening the 2026-08-09 hygiene note. `.gitignore` now covers both `backend/pgvector/` and `.agents/runs/` as of PR #9. `.repomixignore` was not changed — confirm separately that the repomix snapshot still excludes vendored pgvector source.
+- **Redundant Branch (2026-08-16) — RESOLVED 2026-08-22.** Branch `fix/bulk-upload-tenant-auth` was redundant — its content is already on `origin/main` via PR merge `d9e6a78`. Deleted locally and on the remote on 2026-08-22.
