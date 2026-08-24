@@ -138,10 +138,11 @@ Outcomes demonstrated per endpoint and per case:
 
 Documentation only. No code, schema, or migration touched by this entry's work beyond
 what the linked PRs already record.
+
 ### Catch-up — 2026-08-23
 
 **Task B1 — Malayalam output normaliser module + test script — COMPLETE
-(branch `feat/ml-postprocess-normaliser`, PR: pending, Commits: pending).**
+(branch `feat/ml-postprocess-normaliser`, PR #11, commit `837001b`).**
 
 Two new files, neither wired into any call path:
 
@@ -236,6 +237,7 @@ Google's free endpoint returned HTTP 429 and the function returned the untransla
 English instead of raising. A Malayalam-speaking patient receives an English reply and no
 error is recorded anywhere. Not fixed here — out of scope for B1 per §5.8. Feeds the
 §1.3a Task A circuit breaker.
+
 ---
 
 ## Phase 1 — Product Improvements (MASTER_PLAN.md §2)
