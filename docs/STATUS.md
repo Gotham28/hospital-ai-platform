@@ -160,7 +160,7 @@ Two new files, neither wired into any call path:
 
 Verification:
 
-```
+```text
 $ python backend/run_ml_postprocess_test.py
 PASS rule_1_chillu_normalisation
 PASS rule_2_abbreviated_title
@@ -232,11 +232,32 @@ model, sarvam-translate the formal one. Register differs too — "Please" came b
   provider-agnostic defence for the untested Google fallback and for patient-typed input,
   but it has no demonstrated Sarvam trigger. Revisit before wiring.
 
-**`_translate_async()` swallows upstream failures (found 2026-08-22, NOT fixed).**
-Google's free endpoint returned HTTP 429 and the function returned the untranslated
-English instead of raising. A Malayalam-speaking patient receives an English reply and no
-error is recorded anywhere. Not fixed here — out of scope for B1 per §5.8. Feeds the
-§1.3a Task A circuit breaker.
+**`_translate_async()` returns untranslated English on upstream failure (found
+2026-08-22, NOT fixed).** Google's free endpoint returned HTTP 429. `translation.py`
+lines 41-43 catch the exception, call
+`logger.warning("Async translation failed (%s->%s): %s", ...)`, and return the input text
+unchanged. The failure IS logged — but no exception is raised and the return value is an
+ordinary string, so the caller in `ai.py` cannot tell an untranslated reply from a
+translated one, and a Malayalam-speaking patient receives English. `_translate()` lines
+26-28 behave identically. Corrected 2026-08-23: this bullet originally claimed no error
+was recorded anywhere, which CodeRabbit correctly flagged on PR #11 — the failure is
+logged, it is simply invisible to the caller. Not fixed here — out of scope for B1 per
+§5.8. Feeds the §1.3a Task A circuit breaker.
+
+**Patient text can reach the application log on translation failure (found 2026-08-23,
+NOT fixed).** Following that exception into the log line: `resp.raise_for_status()` raises
+`httpx.HTTPStatusError`, whose message is built from the template
+`"{error_type} '{0.status_code} {0.reason_phrase}' for url '{0.url}'"` — verified against
+`httpx.Response.raise_for_status` source on 2026-08-24. `{0.url}` is the full request URL,
+and `translation.py` lines 21 and 35 place the text being translated into that URL as the
+`q=` parameter. Passing the exception object into `logger.warning` therefore writes that
+text into the log. For an English→Malayalam call it is AROGYA's own outgoing reply; for
+the Malayalam→English calls at `ai.py` lines 369 and 413 it is the patient's own typed
+message. This contradicts AGENTS.md §5.6. Pre-existing — introduced with `translation.py`
+at §1.2 Stage 2 (commit `0301795`), not by Task B1 — and deliberately not fixed here per
+§5.8 and the `CURRENT_TASK.md` "Do NOT touch" list. No real patient traffic yet (Twilio
+business registration outstanding, see Catch-up 2026-08-09), so nothing is known to have
+leaked.
 
 ---
 
@@ -300,9 +321,19 @@ Not started. Do not begin until Phase 1 is complete and demoed end-to-end.
 - **`mayura:v1` is unusable for AROGYA (2026-08-23):** it inverts availability wording
   and renders positive and negative identically. Task A must use `sarvam-translate:v1`,
   cap 2000 chars. Full detail in Catch-up 2026-08-23.
-- **`_translate_async()` silently returns untranslated English on upstream failure
-  (2026-08-22, not fixed):** confirmed against a Google HTTP 429. No exception raised, no
-  log written. To be fixed by the Task A circuit breaker. Detail in Catch-up 2026-08-23.
+- **`_translate_async()` returns untranslated English on upstream failure (2026-08-22,
+  not fixed):** confirmed against a Google HTTP 429. The failure IS logged via
+  `logger.warning` (`translation.py` lines 41-43), but no exception is raised, so the
+  caller cannot distinguish failure from success. Same in `_translate()` lines 26-28.
+  To be fixed by the Task A circuit breaker. Detail in Catch-up 2026-08-23.
+- **Patient text can reach the application log on translation failure (found 2026-08-23,
+  not fixed):** `translation.py` passes the raw exception into `logger.warning`; an
+  `httpx.HTTPStatusError` message embeds the full request URL, which carries the text
+  being translated in its `q=` parameter. Contradicts AGENTS.md §5.6. Pre-existing
+  (commit `0301795`), not introduced by Task B1. The fix is small — log the status code
+  and exception type rather than the exception object, inside the two existing `except`
+  blocks — but it touches logging and raw patient text, so AGENTS.md §10 puts it at
+  Opus 5, high effort. Detail in Catch-up 2026-08-23.
 - **Docs-hygiene follow-up task queued (2026-08-23), deliberately NOT bundled into Task
   B1 per §5.8:** (i) AGENTS.md §2 still says the Sarvam upgrade is "not yet started";
   (ii) AGENTS.md §3 file table does not list `backend/app/services/ml_postprocess.py`;
