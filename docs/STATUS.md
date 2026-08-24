@@ -144,7 +144,7 @@ what the linked PRs already record.
 **Task B1 — Malayalam output normaliser module + test script — COMPLETE
 (branch `feat/ml-postprocess-normaliser`, PR #11, commit `837001b`).**
 
-Two new files, neither wired into any call path:
+Two new files, neither wired into any production call path:
 
 - `backend/app/services/ml_postprocess.py` — pure text-in/text-out
   `normalise_malayalam(text: str) -> str`. Standard library only. No logging of any kind
