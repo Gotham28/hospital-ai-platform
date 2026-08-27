@@ -36,3 +36,4 @@ backend/seed_local_test_users.py
 
 .agents/runs/
 backend/pgvector/
+.claude/settings.local.json
