@@ -259,6 +259,58 @@ at §1.2 Stage 2 (commit `0301795`), not by Task B1 — and deliberately not fix
 business registration outstanding, see Catch-up 2026-08-09), so nothing is known to have
 leaked.
 
+### Catch-up — 2026-08-27
+
+**Raw patient text removed from application logging — COMPLETE
+(branch `fix/remove-patient-text-from-logs`, PR #TBD).**
+
+Six log sites across four files. Closes the two §5.6 findings recorded in
+Catch-up 2026-08-23.
+
+- `backend/app/main.py` — `logging.getLogger("httpx").setLevel(logging.WARNING)`
+  added after `logging.basicConfig`. httpx logged every request at INFO with the
+  full URL, and `translation.py` places the text being translated in that URL as
+  the `q=` parameter, so this fired on every successful translate call, not only
+  on failure.
+- `backend/app/services/translation.py` — both `except` blocks now log
+  `type(e).__name__`, plus `e.response.status_code` when the exception is an
+  `httpx.HTTPStatusError`. The exception object itself is never passed to the
+  logger. `source` and `target` retained.
+- `backend/app/api/v1/endpoints/ai.py` lines 414 and 437 — patient text replaced
+  with `len()`. `intent` retained as a classification label.
+- `backend/app/services/relevance.py` line 223 — `patient_answer[:100]` replaced
+  with `len(patient_answer)`. `hospital_id` and `parsed_as` retained.
+
+Verified live against the local `hospital_ai` database, port 8000 confirmed free
+before starting. One `/chat-stream` request with `language="ml"` and synthetic
+Malayalam, sent identically before and after.
+
+BEFORE (13:42) — four leak sites in one request:
+- `httpx: HTTP Request: GET ...&q=<text>`
+- `Async translation failed (ml->en): ... for url '...q=<text>'`
+- `[Translation] ml->en: '<text>' -> '<text>'`
+- `[Intent] <text> -> OTHER`
+
+AFTER (13:45) — same request:
+- httpx GET line absent
+- `Async translation failed (ml->en): HTTPStatusError (status=429)`
+- `[Translation] ml->en: len=33 -> len=33`
+- `[Intent] len=33 -> OTHER`
+
+Forced failure, `_translate("APPOINTMENT TEST TEXT", "en", "zz-not-a-language")`:
+- before: `Client error '429 Too Many Requests' for url '...q=APPOINTMENT+TEST+TEXT'`
+- after: `HTTPStatusError (status=429)`
+
+Referral path: `[Relevance] hospital_id=1 referral check answer_len=54
+parsed_as=True`.
+
+No Alembic command run, no migration file created. All test text synthetic.
+
+Out of scope and untouched: the `_translate_async()` "returns untranslated English
+on upstream failure" bug in the same `except` blocks (Task A's circuit breaker,
+§5.8); `whatsapp.py` line 65; `ai.py` line 1079; any hashing of logged text
+(MASTER_PLAN.md §1.4 owns that). `MASTER_PLAN.md` §9 appended.
+
 ---
 
 ## Phase 1 — Product Improvements (MASTER_PLAN.md §2)
@@ -326,14 +378,6 @@ Not started. Do not begin until Phase 1 is complete and demoed end-to-end.
   `logger.warning` (`translation.py` lines 41-43), but no exception is raised, so the
   caller cannot distinguish failure from success. Same in `_translate()` lines 26-28.
   To be fixed by the Task A circuit breaker. Detail in Catch-up 2026-08-23.
-- **Patient text can reach the application log on translation failure (found 2026-08-23,
-  not fixed):** `translation.py` passes the raw exception into `logger.warning`; an
-  `httpx.HTTPStatusError` message embeds the full request URL, which carries the text
-  being translated in its `q=` parameter. Contradicts AGENTS.md §5.6. Pre-existing
-  (commit `0301795`), not introduced by Task B1. The fix is small — log the status code
-  and exception type rather than the exception object, inside the two existing `except`
-  blocks — but it touches logging and raw patient text, so AGENTS.md §10 puts it at
-  Opus 5, high effort. Detail in Catch-up 2026-08-23.
 - **Docs-hygiene follow-up task queued (2026-08-23), deliberately NOT bundled into Task
   B1 per §5.8:** (i) AGENTS.md §2 still says the Sarvam upgrade is "not yet started";
   (ii) AGENTS.md §3 file table does not list `backend/app/services/ml_postprocess.py`;
@@ -416,3 +460,8 @@ Not started. Do not begin until Phase 1 is complete and demoed end-to-end.
   benchmarks).
 - **Repo Hygiene Issue (2026-08-16) — RESOLVED 2026-08-22 via PR #9.** The `backend/pgvector/` directory was appearing as untracked in `git status`, covered by neither `.gitignore` nor `.repomixignore`, reopening the 2026-08-09 hygiene note. `.gitignore` now covers both `backend/pgvector/` and `.agents/runs/` as of PR #9. `.repomixignore` was not changed — confirm separately that the repomix snapshot still excludes vendored pgvector source.
 - **Redundant Branch (2026-08-16) — RESOLVED 2026-08-22.** Branch `fix/bulk-upload-tenant-auth` was redundant — its content is already on `origin/main` via PR merge `d9e6a78`. Deleted locally and on the remote on 2026-08-22.
+
+- **Patient text in application logs — RESOLVED 2026-08-27.** Both findings from
+  Catch-up 2026-08-23 (the `translation.py` exception-object leak, and the httpx
+  INFO-level URL logging) are closed. See Catch-up 2026-08-27.
+

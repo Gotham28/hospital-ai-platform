@@ -411,7 +411,7 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
     english_question = request.question
     if is_malayalam:
         english_question = await _translate_async(request.question, "ml", "en")
-        logger.info("[Translation] ml->en: %r -> %r", request.question[:60], english_question[:60])
+        logger.info("[Translation] ml->en: len=%d -> len=%d", len(request.question), len(english_question))
 
     intent = await classify_user_intent(english_question, request.history or [])
 
@@ -434,7 +434,7 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
         intent = "BOOKING"
         logger.info("[Intent] Overridden to BOOKING because patient is mid-relevance-gate (%s)", _active_stage)
 
-    logger.info("[Intent] %s -> %s", english_question[:60], intent)
+    logger.info("[Intent] len=%d -> %s", len(english_question), intent)
 
     async def event_generator() -> AsyncGenerator[str, None]:
         pt = ct = tt = 0
