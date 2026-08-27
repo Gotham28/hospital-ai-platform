@@ -220,8 +220,8 @@ async def check_referral_intent(patient_answer: str, hospital_id: int) -> bool:
         )
         raw = json.loads(resp.choices[0].message.content)
         is_referred = bool(raw.get("referred", False))
-        logger.info("[Relevance] hospital_id=%s referral check answer=%r parsed_as=%s", 
-                    hospital_id, patient_answer[:100], is_referred)
+        logger.info("[Relevance] hospital_id=%s referral check answer_len=%d parsed_as=%s",
+                    hospital_id, len(patient_answer), is_referred)
         return is_referred
     except Exception as exc:
         logger.warning("[Relevance] Referral LLM check failed for hospital_id=%s: %s", hospital_id, exc)

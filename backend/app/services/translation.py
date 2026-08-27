@@ -24,7 +24,16 @@ def _translate(text: str, source: str, target: str) -> str:
         data = resp.json()
         return "".join(part[0] for part in data[0] if part[0])
     except Exception as e:
-        logger.warning("Translation failed (%s->%s): %s", source, target, e)
+        if isinstance(e, httpx.HTTPStatusError):
+            logger.warning(
+                "Translation failed (%s->%s): %s (status=%s)",
+                source, target, type(e).__name__, e.response.status_code
+            )
+        else:
+            logger.warning(
+                "Translation failed (%s->%s): %s",
+                source, target, type(e).__name__
+            )
         return text
 
 
@@ -39,5 +48,14 @@ async def _translate_async(text: str, source: str, target: str) -> str:
             data = resp.json()
             return "".join(part[0] for part in data[0] if part[0])
     except Exception as e:
-        logger.warning("Async translation failed (%s->%s): %s", source, target, e)
+        if isinstance(e, httpx.HTTPStatusError):
+            logger.warning(
+                "Async translation failed (%s->%s): %s (status=%s)",
+                source, target, type(e).__name__, e.response.status_code
+            )
+        else:
+            logger.warning(
+                "Async translation failed (%s->%s): %s",
+                source, target, type(e).__name__
+            )
         return text

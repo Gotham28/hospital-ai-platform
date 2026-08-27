@@ -483,3 +483,7 @@ unaffected throughout.
 
 Not in the original plan. Verified tenant-ownership enforcement on the lab-tests and medicines bulk-upload endpoints and added the missing hospital-existence guard to match the doctors endpoint.
 Scope: `backend/app/api/v1/endpoints/lab_tests.py`, `backend/app/api/v1/endpoints/medicines.py`. Related: CURRENT_TASK.md dated 2026-08-16.
+
+### 2026-08-24 — Remove raw patient text from application logs
+Not in the original plan. Replaced patient-text arguments with character counts across three files (`translation.py`, `ai.py`, `relevance.py`) to prevent raw patient text from reaching the application log. Also raised the `httpx` logger level to WARNING in `main.py` as a defensive measure.
+Scope: `backend/app/main.py`, `backend/app/services/translation.py`, `backend/app/api/v1/endpoints/ai.py`, `backend/app/services/relevance.py`. Related: CURRENT_TASK.md dated 2026-08-24.
