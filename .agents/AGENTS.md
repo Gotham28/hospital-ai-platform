@@ -211,6 +211,12 @@ task explicitly says to. Don't "clean up" as a side effect of an unrelated task.
     **You may never merge a pull request.** That is the developer's action, always,
     including when CodeRabbit reports no issues.
 
+    
+    Once the developer approves the drafted entry, the agent writes it into
+    STATUS.md verbatim as approved, then pastes `git diff docs/STATUS.md` to prove
+    that only the approved text landed. The agent may not reword, condense, expand
+    or reorder an approved entry while writing it.
+
 ---
 
 ## 7. Broader Roadmap (for context — see docs/MASTER_PLAN.md for detail)
