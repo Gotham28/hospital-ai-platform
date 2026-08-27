@@ -139,6 +139,126 @@ Outcomes demonstrated per endpoint and per case:
 Documentation only. No code, schema, or migration touched by this entry's work beyond
 what the linked PRs already record.
 
+### Catch-up — 2026-08-23
+
+**Task B1 — Malayalam output normaliser module + test script — COMPLETE
+(branch `feat/ml-postprocess-normaliser`, PR #11, commit `837001b`).**
+
+Two new files, neither wired into any production call path:
+
+- `backend/app/services/ml_postprocess.py` — pure text-in/text-out
+  `normalise_malayalam(text: str) -> str`. Standard library only. No logging of any kind
+  (AGENTS.md §5.6 — this handles patient-facing text). No network, DB, Redis or config
+  read. Early return leaves text containing no Malayalam codepoint byte-identical.
+  `_RULES` holds exactly the three Tier 1 rules from `.agents/CURRENT_TASK.md`:
+  (1) chillu normalisation — five consonant+virama+ZWJ sequences mapped to their atomic
+  chillu codepoints, runs first; (2) "ഡോ." + whitespace to "ഡോക്ടർ"; (3) word-boundary
+  "Dr"/"Dr." to "ഡോക്ടർ". Idempotent. Latin-script doctor NAMES are deliberately not
+  transliterated — "Dr. Priya" becomes "ഡോക്ടർ Priya", not "ഡോക്ടർ പ്രിയ".
+- `backend/run_ml_postprocess_test.py` — standalone runnable script, no pytest, matching
+  the existing `run_e2e_test.py` / `run_malayalam_test.py` convention (AGENTS.md §8).
+
+Verification:
+
+```text
+$ python backend/run_ml_postprocess_test.py
+PASS rule_1_chillu_normalisation
+PASS rule_2_abbreviated_title
+PASS rule_3_untranslated_latin_title
+PASS rule_3_no_match_inside_word
+PASS empty_and_whitespace
+PASS empty_string
+PASS english_passthrough
+PASS no_rules_match
+PASS rule_1_chillu_ra
+PASS rule_1_chillu_na
+PASS rule_1_chillu_la
+PASS rule_1_chillu_lla
+PASS rule_1_chillu_nna
+PASS idempotent_rule_1_chillu_normalisation
+PASS idempotent_rule_2_abbreviated_title
+PASS idempotent_rule_3_untranslated_latin_title
+PASS idempotent_rule_3_no_match_inside_word
+PASS idempotent_empty_and_whitespace
+PASS idempotent_empty_string
+PASS idempotent_english_passthrough
+PASS idempotent_no_rules_match
+PASS idempotent_rule_1_chillu_ra
+PASS idempotent_rule_1_chillu_na
+PASS idempotent_rule_1_chillu_la
+PASS idempotent_rule_1_chillu_lla
+PASS idempotent_rule_1_chillu_nna
+
+26 passed, 0 failed
+EXIT CODE: 0
+```
+
+Codepoint audit (developer): every ഡോക്ടർ in both files ends U+0D7C (atomic chillu). The
+only U+200D in either file is inside Rule 1's test INPUT string, where it belongs. Every
+Malayalam string in the test script was read and confirmed by the developer — a test the
+agent wrote to match code the agent wrote proves nothing on its own.
+
+Review: via `loop.py`, Sonnet/high, verdict "accept as-is". Two Minor findings, both
+resolved before close-out (name placeholder filled; manual steps completed).
+
+Deliberately deferred:
+
+- Wiring is Task B1b, a separate diff per §5.8. Scope already mapped: `_translate_async`
+  is called at five points, all in `backend/app/api/v1/endpoints/ai.py`; only three are
+  English to Malayalam — lines 227 (greeting), 516 (reply), 918 (error message). Lines
+  369 and 413 are Malayalam to English and need no post-processing.
+- Formal-pronoun rewriting (§1.3) split out entirely. A blind അവൻ to അദ്ദേഹം swap would
+  address a patient's son in the register reserved for a senior physician. It needs a
+  context-conditional rule, which does not fit the flat (pattern, replacement) shape.
+- Per-hospital configurability dropped 2026-08-22: it would need a Hospital column and an
+  Alembic migration, triggering AGENTS.md §10 Opus and ruling out route C.
+
+**Sarvam model finding (2026-08-23) — use `sarvam-translate:v1`, NOT `mayura:v1`.**
+
+`mayura:v1` inverts availability wording in short sentences. "Dr. Priya is available
+today" came back as ഡോ. പ്രിയയ്ക്ക് ഇന്ന് സമയം ലഭിക്കുന്നില്ല — "has no time available". The same
+inversion occurred with "Doctor" spelled out and with "Dr. Smith". Setting `mode: "formal"`
+did not fix it. Worse: positive and negative inputs both render ലഭ്യമല്ല, so the two are
+indistinguishable in the output. `sarvam-translate:v1` handled every one of the same
+inputs correctly and kept ലഭ്യമാണ് and ലഭ്യമല്ല distinct. Cause: mayura is the colloquial
+model, sarvam-translate the formal one. Register differs too — "Please" came back as
+ഒന്ന് (casual) from mayura, versus ദയവായി.
+
+- Consequence for §1.3a Task A: use `sarvam-translate:v1`. Its input cap is 2000
+  characters, not 1000, which changes Task A's chunking. It is formal-mode-only and may
+  reject `mode` / `output_script` — untested.
+- Consequence for Task B1b: `sarvam-translate:v1` emits ഡോക്ടർ with U+0D7C directly and
+  triggered none of the three rules across 11 probes. The normaliser still stands as
+  provider-agnostic defence for the untested Google fallback and for patient-typed input,
+  but it has no demonstrated Sarvam trigger. Revisit before wiring.
+
+**`_translate_async()` returns untranslated English on upstream failure (found
+2026-08-22, NOT fixed).** Google's free endpoint returned HTTP 429. `translation.py`
+lines 41-43 catch the exception, call
+`logger.warning("Async translation failed (%s->%s): %s", ...)`, and return the input text
+unchanged. The failure IS logged — but no exception is raised and the return value is an
+ordinary string, so the caller in `ai.py` cannot tell an untranslated reply from a
+translated one, and a Malayalam-speaking patient receives English. `_translate()` lines
+26-28 behave identically. Corrected 2026-08-23: this bullet originally claimed no error
+was recorded anywhere, which CodeRabbit correctly flagged on PR #11 — the failure is
+logged, it is simply invisible to the caller. Not fixed here — out of scope for B1 per
+§5.8. Feeds the §1.3a Task A circuit breaker.
+
+**Patient text can reach the application log on translation failure (found 2026-08-23,
+NOT fixed).** Following that exception into the log line: `resp.raise_for_status()` raises
+`httpx.HTTPStatusError`, whose message is built from the template
+`"{error_type} '{0.status_code} {0.reason_phrase}' for url '{0.url}'"` — verified against
+`httpx.Response.raise_for_status` source on 2026-08-24. `{0.url}` is the full request URL,
+and `translation.py` lines 21 and 35 place the text being translated into that URL as the
+`q=` parameter. Passing the exception object into `logger.warning` therefore writes that
+text into the log. For an English→Malayalam call it is AROGYA's own outgoing reply; for
+the Malayalam→English calls at `ai.py` lines 369 and 413 it is the patient's own typed
+message. This contradicts AGENTS.md §5.6. Pre-existing — introduced with `translation.py`
+at §1.2 Stage 2 (commit `0301795`), not by Task B1 — and deliberately not fixed here per
+§5.8 and the `CURRENT_TASK.md` "Do NOT touch" list. No real patient traffic yet (Twilio
+business registration outstanding, see Catch-up 2026-08-09), so nothing is known to have
+leaked.
+
 ---
 
 ## Phase 1 — Product Improvements (MASTER_PLAN.md §2)
@@ -147,7 +267,7 @@ what the linked PRs already record.
 |---|---|
 | 1.1 Patient Personalisation | ✅ Done (per master plan) |
 | 1.2 Extract services out of ai.py | ✅ Done — all 5 stages complete (see detail below) |
-| 1.3 Sarvam translation upgrade | ⬜ Not started |
+| 1.3 Sarvam translation upgrade | 🟡 In progress — normaliser module built (Task B1, not wired); Task A blocked on Sarvam API key |
 | 1.4 Security hardening | ⬜ Not started |
 | 1.5 Multi-tenant isolation hardening | ⬜ Not started |
 
@@ -194,7 +314,34 @@ Not started. Do not begin until Phase 1 is complete and demoed end-to-end.
   configurable but intentionally left empty.
 - Feature 4 relevance criteria are partial (referral + prior-doctor checks only) —
   clinic will provide more later; this is expected, not a bug.
-- **Next up for Phase 1:** §1.3 Sarvam translation upgrade (modify `services/translation.py`), then §1.4 security hardening (Malayalam injection patterns + `SecurityLog` table), then §1.5 multi-tenant isolation hardening. See MASTER_PLAN.md §2 for specs.
+- **Next up for Phase 1:** §1.3a Task B1b — wire `normalise_malayalam()` into
+  `ai.py` lines 227, 516, 918. Route B, because it changes live Malayalam output for
+  every tenant. Then Task A (Sarvam client, blocked on the API key), then Task C (Redis
+  translation cache). Read Catch-up 2026-08-23 before starting B1b.
+- **`mayura:v1` is unusable for AROGYA (2026-08-23):** it inverts availability wording
+  and renders positive and negative identically. Task A must use `sarvam-translate:v1`,
+  cap 2000 chars. Full detail in Catch-up 2026-08-23.
+- **`_translate_async()` returns untranslated English on upstream failure (2026-08-22,
+  not fixed):** confirmed against a Google HTTP 429. The failure IS logged via
+  `logger.warning` (`translation.py` lines 41-43), but no exception is raised, so the
+  caller cannot distinguish failure from success. Same in `_translate()` lines 26-28.
+  To be fixed by the Task A circuit breaker. Detail in Catch-up 2026-08-23.
+- **Patient text can reach the application log on translation failure (found 2026-08-23,
+  not fixed):** `translation.py` passes the raw exception into `logger.warning`; an
+  `httpx.HTTPStatusError` message embeds the full request URL, which carries the text
+  being translated in its `q=` parameter. Contradicts AGENTS.md §5.6. Pre-existing
+  (commit `0301795`), not introduced by Task B1. The fix is small — log the status code
+  and exception type rather than the exception object, inside the two existing `except`
+  blocks — but it touches logging and raw patient text, so AGENTS.md §10 puts it at
+  Opus 5, high effort. Detail in Catch-up 2026-08-23.
+- **Docs-hygiene follow-up task queued (2026-08-23), deliberately NOT bundled into Task
+  B1 per §5.8:** (i) AGENTS.md §2 still says the Sarvam upgrade is "not yet started";
+  (ii) AGENTS.md §3 file table does not list `backend/app/services/ml_postprocess.py`;
+  (iii) the Repo Hygiene bullet is marked RESOLVED while still saying `.repomixignore`
+  needs confirming (CodeRabbit finding merged over); (iv) six RESOLVED bullets in this
+  section should collapse to one-liners pointing at their Catch-up entries.
+  Swept and confirmed NOT stale on 2026-08-23: MASTER_PLAN.md §1.3a names neither
+  `mayura:v1` nor a 1000-character input cap.
 - WhatsApp integration: confirm whether end-to-end testing against Twilio sandbox has been done, and whether it needs a frontend UI surface in the admin panel.
 - **Tenant-isolation audit (2026-08-08) — RESOLVED 2026-08-12 via PR #3.** Six endpoints in
   `backend/app/` fetched tenant-owned rows by primary key and mutated them without any
