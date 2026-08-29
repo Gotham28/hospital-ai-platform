@@ -647,8 +647,8 @@ written per the append-only rule; this entry is the correction.
 **AGENTS.md §12 internal contradictions resolved; close-task skill rewritten.**
 
 Branch: `docs/governing-docs-staleness-2026-08-29`.
-PR: pending
-Commits: pending
+PR: #18
+Commits: `1aa3d73`, `496cb89`
 
 §12 landed on 2026-08-28 already inconsistent with itself. Four fixes:
 
