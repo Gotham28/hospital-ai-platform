@@ -546,8 +546,8 @@ Not started. Do not begin until Phase 1 is complete and demoed end-to-end.
 proof not observed.**
 
 Branch: `feat/ml-postprocess-wiring`, cut from `origin/main`.
-PR: pending
-Commits: pending
+PR: #17
+Commits: f15d435
 
 Wired the existing Malayalam output normaliser (`ml_postprocess.py`, Task B1, PR #11)
 into the three English-to-Malayalam `_translate_async()` call sites in
@@ -603,4 +603,4 @@ unescalated.
 work modified (`.agents/CURRENT_TASK.md` also shows modified on this branch, which is
 Claude Chat's own governance-file activity per §12.1, not caused by this task's code
 work).
-
+
