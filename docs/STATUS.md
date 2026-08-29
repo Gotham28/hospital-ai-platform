@@ -356,7 +356,7 @@ Scope: `.agents/AGENTS.md`, `docs/MASTER_PLAN.md`, `.claude/skills/drive/` (dele
 |---|---|
 | 1.1 Patient Personalisation | ✅ Done (per master plan) |
 | 1.2 Extract services out of ai.py | ✅ Done — all 5 stages complete (see detail below) |
-| 1.3 Sarvam translation upgrade | 🟡 In progress — normaliser module built (Task B1, not wired); Task A blocked on Sarvam API key |
+| 1.3 Sarvam translation upgrade | 🟡 In progress — normaliser wired into ai.py (Task B1b); Task A next, Sarvam API key received 2026-08-29 |
 | 1.4 Security hardening | ⬜ Not started |
 | 1.5 Multi-tenant isolation hardening | ⬜ Not started |
 
@@ -403,10 +403,48 @@ Not started. Do not begin until Phase 1 is complete and demoed end-to-end.
   configurable but intentionally left empty.
 - Feature 4 relevance criteria are partial (referral + prior-doctor checks only) —
   clinic will provide more later; this is expected, not a bug.
-- **Next up for Phase 1:** §1.3a Task B1b — wire `normalise_malayalam()` into
-  `ai.py` lines 227, 516, 918. Route B, because it changes live Malayalam output for
-  every tenant. Then Task A (Sarvam client, blocked on the API key), then Task C (Redis
-  translation cache). Read Catch-up 2026-08-23 before starting B1b.
+- **Next up for Phase 1:** §1.3a Task A — Sarvam client + Google fallback with an
+  in-process circuit breaker, in `services/translation.py`. **Unblocked: the Sarvam API
+  key arrived 2026-08-29.** Then Task C (Redis translation cache, Opus tier). Read
+  Catch-up 2026-08-23 before starting Task A: it must use `sarvam-translate:v1`, not
+  `mayura:v1`; input cap 2000 characters, not 1000; it is formal-mode-only and may
+  reject `mode` / `output_script` — untested.
+- **Live rule-firing of `normalise_malayalam()` on a successfully translated Malayalam
+  string has never been observed** (Google 429 on all three Task B1b attempts,
+  2026-08-29). Deliberately not chased further — folded into §1.3a Task A, which is now
+  unblocked. When `sarvam-translate:v1` becomes primary, real translated Malayalam
+  passes through `ai.py` lines 228, 517 and 919, and the output should be read then.
+  Note the finding already recorded in Catch-up 2026-08-23: `sarvam-translate:v1` emits
+  ഡോക്ടർ with U+0D7C directly and triggered none of the three rules across 11 probes, so
+  Task A may confirm the wiring without any rule firing either. If so, the Google
+  fallback path remains the only place these rules are expected to fire.
+- **Stale governing docs after Task B1b and the Sarvam key (2026-08-29, NOT fixed).**
+  Three lines are now wrong and none may be edited by the agent layer: AGENTS.md §2's
+  Translation bullet says the Malayalam normaliser "has landed but is not yet wired into
+  any call path"; AGENTS.md §3's file-table row for
+  `backend/app/services/ml_postprocess.py` says "not currently wired into any production
+  call path"; and MASTER_PLAN.md §1.3a order item 1 says "Obtain the Sarvam API key
+  (developer, not started)". AGENTS.md is read at the start of every session, so a stale
+  line there actively misleads future work — the same failure mode corrected on
+  2026-08-28. Needs its own small docs task.
+- **Suspected pre-existing bug (found 2026-08-29, unconfirmed, NOT fixed) —
+  chat-stream's own new-session greeting bypasses translation entirely.**
+  `ai.py:442-445`:
+```python
+          if _turn_ctx.get("_is_new_session"):
+              hospital_for_welcome = db.query(Hospital).filter(Hospital.id == request.hospital_id).first()
+              if hospital_for_welcome and hospital_for_welcome.welcome_message:
+                  yield f"data: {json.dumps(hospital_for_welcome.welcome_message)}\n\n"
+```
+  This yields `hospital.welcome_message` raw, with no `_translate_async()` or
+  `normalise_malayalam()` call at all — unlike `get_welcome()`'s handling of the same
+  field (line 228, which Task B1b wired). A patient starting a new session with
+  `language="ml"` at a hospital with a custom `welcome_message` set may receive that
+  greeting in plain English via `/chat-stream`, even though the same greeting is
+  correctly translated when served via `GET /welcome/{hospital_id}`. Pre-existing (not
+  introduced by Task B1b), unconfirmed (no hospital in the local DB has a
+  `welcome_message` set, so this has not been observed live), and deliberately not fixed
+  here — out of scope under §5.8.
 - **`mayura:v1` is unusable for AROGYA (2026-08-23):** it inverts availability wording
   and renders positive and negative identically. Task A must use `sarvam-translate:v1`,
   cap 2000 chars. Full detail in Catch-up 2026-08-23.
@@ -501,4 +539,68 @@ Not started. Do not begin until Phase 1 is complete and demoed end-to-end.
 - **Patient text in application logs — RESOLVED 2026-08-27.** Both findings from
   Catch-up 2026-08-23 (the `translation.py` exception-object leak, and the httpx
   INFO-level URL logging) are closed. See Catch-up 2026-08-27.
+
+### Catch-up — 2026-08-29
+
+**Task B1b — normalise_malayalam() wired into ai.py — CODE COMPLETE, live rule-firing
+proof not observed.**
+
+Branch: `feat/ml-postprocess-wiring`, cut from `origin/main`.
+PR: pending
+Commits: pending
+
+Wired the existing Malayalam output normaliser (`ml_postprocess.py`, Task B1, PR #11)
+into the three English-to-Malayalam `_translate_async()` call sites in
+`backend/app/api/v1/endpoints/ai.py`: the custom hospital welcome-message greeting
+(line 228, served by `GET /welcome/{hospital_id}`), the appointment-status reply
+(line 517), and the booking-validation error message (line 919). The two
+Malayalam-to-English call sites (lines 370, 414) and `ml_postprocess.py` /
+`translation.py` themselves were left untouched, per scope. One new import added; no
+function signature changed.
+
+Verification: `grep -n "_translate_async("` confirmed 5 call sites (3 en→ml, 2 ml→en)
+before any edit. `python backend/run_ml_postprocess_test.py` still 26 passed, 0 failed
+after the edit (re-confirmed across three verification rounds). Live `/chat-stream`
+smoke tests (hospital_id=1, synthetic questions) confirmed correct, unaffected
+Malayalam and English replies on the general-chat path.
+
+**Live test at `ai.py:228`.** With developer-supplied local admin credentials,
+temporarily set hospital 1's `welcome_message` (originally `null`) to the synthetic
+English string `"Welcome to our clinic. Dr. Priya will see you shortly."` via
+`PATCH /hospitals/1`, called the real `GET /welcome/1` endpoint live, and restored the
+original `null` value afterward (confirmed by re-read).
+
+The wiring itself rests on inspection of a four-line diff with no conditional branches,
+plus the 26 passing unit tests on `normalise_malayalam()` in isolation. The failure
+path is verified live: Google Translate returned HTTP 429, the English input came back
+unchanged, with no mangling of the "Dr." in the source text. Live rule-firing on a
+*successful* English-to-Malayalam translation has never been observed, across three
+review rounds and three separate attempts, because Google 429'd on every one. This
+round's live result is evidence for the failure path only — it cannot show whether
+`normalise_malayalam()` actually ran on that request, because the bytes returned are
+identical whether the wrapper executed and no-opped, or was never called at all.
+
+Deliberately deferred, unchanged by this task:
+- Formal-pronoun rewriting, per-hospital normalisation config, the `_translate_async()`
+  untranslated-on-failure bug, and the Sarvam client itself — all §1.3a Task A, split
+  out under §5.8 (one feature per diff). The Sarvam API key arrived 2026-08-29, so
+  Task A is no longer blocked.
+- **Mixed-script residual case (known, narrow, not fixed):** `ml_postprocess.py:24-25`'s
+  guard only early-returns when a string contains *zero* Malayalam codepoints. A
+  failure-path string containing at least one Malayalam character (e.g. a
+  partially-successful translation) would pass the guard, and Rule 3 could then rewrite
+  a literal "Dr." inside the still-English remainder. Not observed live in any of the
+  three verification rounds (every 429 this task hit returned a purely English,
+  zero-Malayalam-codepoint string), but not structurally impossible. No code change
+  made — `ml_postprocess.py` is on the Do NOT touch list for this task.
+
+No Antigravity dispatch ran for this task in any round — all code and verification work
+was performed directly by Claude Code — so the §12.9 tier-ratchet had no independent
+floor to check against; the classification (Sonnet 5, medium, no Opus trigger) stands
+unescalated.
+
+`git status --short` confirms `ai.py` as the only tracked file this task's Agent-layer
+work modified (`.agents/CURRENT_TASK.md` also shows modified on this branch, which is
+Claude Chat's own governance-file activity per §12.1, not caused by this task's code
+work).
 

@@ -22,6 +22,7 @@ from app.services.security import detect_prompt_injection
 # in this file or the rest of the repo (only _translate_async is used).
 # TODO: Remove in future cleanup task alongside _session_key and resolve_doctor_id.
 from app.services.translation import _translate, _translate_async
+from app.services.ml_postprocess import normalise_malayalam
 from app.services.vocabulary import (
     _DEPT_SYNONYMS,
     _expand_with_synonyms,
@@ -224,7 +225,7 @@ async def get_welcome(hospital_id: int, db: Session = Depends(get_db)):
     if hospital.welcome_message and hospital.welcome_message.strip():
         base_en_greeting = hospital.welcome_message.strip()
         try:
-            base_ml_greeting = await _translate_async(base_en_greeting, source="en", target="ml")
+            base_ml_greeting = normalise_malayalam(await _translate_async(base_en_greeting, source="en", target="ml"))
         except Exception:
             # Fallback: Just show the English text rather than awkwardly mixing two languages in one sentence
             base_ml_greeting = f"{base_en_greeting}"
@@ -513,7 +514,7 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
 
             reply = "\n".join(reply_lines)
             if is_malayalam:
-                reply = await _translate_async(reply, "en", "ml")
+                reply = normalise_malayalam(await _translate_async(reply, "en", "ml"))
             yield f"data: {json.dumps(reply)}\n\n"
             yield "data: [DONE]\n\n"
             return
@@ -915,7 +916,7 @@ IMPORTANT:
                 ok, error_msg = validate_booking(hospital, doctor, args["preferred_date"], db)
                 if not ok:
                     if is_malayalam:
-                        error_msg = await _translate_async(error_msg, "en", "ml")
+                        error_msg = normalise_malayalam(await _translate_async(error_msg, "en", "ml"))
                     yield f"data: {json.dumps(error_msg)}\n\n"
                     yield "data: [DONE]\n\n"
                     return
