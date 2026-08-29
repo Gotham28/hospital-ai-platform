@@ -37,10 +37,13 @@ Research-only code (benchmarks, evaluation scripts) belongs in a separate, isola
 - **LLM**: OpenAI GPT-4o-mini (current default)
 - **Embeddings**: OpenAI `text-embedding-3-small`, 1536 dimensions
 - **Translation**: currently Google Translate via `_translate_async()` in
-  `services/translation.py`; the Malayalam output normaliser
-  (`ml_postprocess.py`) has landed but is not yet wired into any call path, and
-  the Sarvam client itself (§1.3a Task A) remains blocked on the API key (see
-  `docs/MASTER_PLAN.md` §1.3)
+  `services/translation.py`. The Malayalam output normaliser
+  (`services/ml_postprocess.py`) is wired into the three English-to-Malayalam call
+  sites in `api/v1/endpoints/ai.py` as of PR #17, merged 2026-08-29 — run
+  `grep -n "_translate_async(" backend/app/api/v1/endpoints/ai.py` for their current
+  locations. The Sarvam client itself (MASTER_PLAN.md §1.3a Task A) is not yet built;
+  the API key arrived 2026-08-29, so it is no longer blocked. Task A must use
+  `sarvam-translate:v1`, not `mayura:v1` — see `docs/STATUS.md` Catch-up 2026-08-23.
 - **Migrations**: Alembic
 - **Messaging**: Twilio WhatsApp via `services/whatsapp.py` (degrades gracefully if
   credentials are unset)
@@ -60,7 +63,7 @@ below rather than containing this logic itself.
 | Translation bridge — `_translate()`, `_translate_async()` | `backend/app/services/translation.py` |
 | Session context (Redis-backed) | `backend/app/services/patient_context.py` |
 | Vocabulary helpers | `backend/app/services/vocabulary.py` |
-| Malayalam output normaliser — `normalise_malayalam()`, provider-agnostic, not currently wired into any production call path | `backend/app/services/ml_postprocess.py` |
+| Malayalam output normaliser — `normalise_malayalam()`, provider-agnostic, wired into the three English-to-Malayalam translate call sites in `ai.py` (PR #17, 2026-08-29)
 | Booking state machine / session logic | `backend/app/services/booking.py` |
 | Relevance gate (IRIS Feature 4) | `backend/app/services/relevance.py` |
 | WhatsApp messaging | `backend/app/services/whatsapp.py` |
@@ -584,8 +587,15 @@ That is the exact failure §10 exists to prevent.
 Shell access grants none of the following. These are absolute, and §12.4 never
 authorises any of them:
 
-- **No git write commands.** No `add`, `commit`, `push`, `branch`, `merge`, no PR
-  opened, no PR merged. §6.11 close-out is the developer's action, always.
+- **Git writes are limited to a feature branch.** Claude Code MAY run `add` (named
+  paths only, never `-A`, `.`, `-u` or a glob), `commit`, `push` to a feature branch,
+  `fetch`, `rebase origin/main`, and `gh pr create`. It MAY NOT `merge`, push to
+  `main`, force-push except `--force-with-lease` on its own unmerged feature branch,
+  `reset --hard`, `checkout` a different branch, `worktree add`, delete any branch, or
+  alter branch protection. **Merging a PR is the developer's action, always, without
+  exception** — §6.11. A reviewer that needs a different revision uses `git show`,
+  `git diff` and `git log`, and reports that it cannot see something rather than moving
+  HEAD to reach it.
 - **No migration command** — not `alembic upgrade`, `downgrade`, or
   `revision --autogenerate`, against anything. §5.4.
 - **No command against a non-local database.** §9 applies in full. Neon, Render and

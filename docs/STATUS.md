@@ -418,15 +418,13 @@ Not started. Do not begin until Phase 1 is complete and demoed end-to-end.
   ഡോക്ടർ with U+0D7C directly and triggered none of the three rules across 11 probes, so
   Task A may confirm the wiring without any rule firing either. If so, the Google
   fallback path remains the only place these rules are expected to fire.
-- **Stale governing docs after Task B1b and the Sarvam key (2026-08-29, NOT fixed).**
-  Three lines are now wrong and none may be edited by the agent layer: AGENTS.md §2's
-  Translation bullet says the Malayalam normaliser "has landed but is not yet wired into
-  any call path"; AGENTS.md §3's file-table row for
-  `backend/app/services/ml_postprocess.py` says "not currently wired into any production
-  call path"; and MASTER_PLAN.md §1.3a order item 1 says "Obtain the Sarvam API key
-  (developer, not started)". AGENTS.md is read at the start of every session, so a stale
-  line there actively misleads future work — the same failure mode corrected on
-  2026-08-28. Needs its own small docs task.
+- **Stale governing docs after Task B1b and the Sarvam key (2026-08-29) — RESOLVED
+  2026-08-29 by hand.** All three lines corrected directly by the developer, not through
+  the agent layer: AGENTS.md §2's Translation bullet and §3's file-table row for
+  `backend/app/services/ml_postprocess.py` now record the normaliser as wired (PR #17),
+  and MASTER_PLAN.md §1.3a order item 1 now records the Sarvam key as received. §1.3a's
+  "close-out for every task above is manual" paragraph was deliberately left unchanged —
+  see Catch-up 2026-08-29 (second entry) for why.
 - **Suspected pre-existing bug (found 2026-08-29, unconfirmed, NOT fixed) —
   chat-stream's own new-session greeting bypasses translation entirely.**
   `ai.py:442-445`:
@@ -454,11 +452,12 @@ Not started. Do not begin until Phase 1 is complete and demoed end-to-end.
   caller cannot distinguish failure from success. Same in `_translate()` lines 26-28.
   To be fixed by the Task A circuit breaker. Detail in Catch-up 2026-08-23.
 - **Docs-hygiene follow-up task queued (2026-08-23), deliberately NOT bundled into Task
-  B1 per §5.8:** (i) AGENTS.md §2 still says the Sarvam upgrade is "not yet started";
-  (ii) AGENTS.md §3 file table does not list `backend/app/services/ml_postprocess.py`;
-  (iii) the Repo Hygiene bullet is marked RESOLVED while still saying `.repomixignore`
-  needs confirming (CodeRabbit finding merged over); (iv) six RESOLVED bullets in this
-  section should collapse to one-liners pointing at their Catch-up entries.
+  B1 per §5.8:** (i) AGENTS.md §2 still says the Sarvam upgrade is "not yet started" —
+  RESOLVED 2026-08-29; (ii) AGENTS.md §3 file table does not list
+  `backend/app/services/ml_postprocess.py` — RESOLVED 2026-08-28; (iii) the Repo Hygiene
+  bullet is marked RESOLVED while still saying `.repomixignore` needs confirming
+  (CodeRabbit finding merged over) — STILL OPEN; (iv) six RESOLVED bullets in this
+  section should collapse to one-liners pointing at their Catch-up entries — STILL OPEN.
   Swept and confirmed NOT stale on 2026-08-23: MASTER_PLAN.md §1.3a names neither
   `mayura:v1` nor a 1000-character input cap.
 - WhatsApp integration: confirm whether end-to-end testing against Twilio sandbox has been done, and whether it needs a frontend UI surface in the admin panel.
@@ -547,7 +546,7 @@ proof not observed.**
 
 Branch: `feat/ml-postprocess-wiring`, cut from `origin/main`.
 PR: #17
-Commits: f15d435
+Commits: 625cf91 (feature); docs commits recording the PR number follow on the same branch
 
 Wired the existing Malayalam output normaliser (`ml_postprocess.py`, Task B1, PR #11)
 into the three English-to-Malayalam `_translate_async()` call sites in
@@ -604,3 +603,41 @@ work modified (`.agents/CURRENT_TASK.md` also shows modified on this branch, whi
 Claude Chat's own governance-file activity per §12.1, not caused by this task's code
 work).
 
+### Catch-up — 2026-08-29 (second entry)
+
+**Governing-doc staleness corrected by hand — COMPLETE. No agent layer involved.**
+
+Three lines fixed directly by the developer in `.agents/AGENTS.md` and
+`docs/MASTER_PLAN.md`:
+
+- AGENTS.md §2 Translation bullet — now records `ml_postprocess.py` as wired into the
+  three English-to-Malayalam call sites in `ai.py` (PR #17, merged 2026-08-29), and the
+  Sarvam key as received. Deliberately does not name line numbers: the 2026-08-23 numbers
+  went stale after the 2026-08-27 log-hygiene edit, which is why Task B1b chose route B
+  over route C. A `grep -n "_translate_async("` pointer replaces them.
+- AGENTS.md §3 file-table row for `backend/app/services/ml_postprocess.py` — same
+  correction.
+- MASTER_PLAN.md §1.3a order item 1 — Sarvam key recorded as received 2026-08-29,
+  Task A unblocked.
+
+Done by hand rather than through the agent layer for two reasons. First, §12.15's
+append-only rule lets the agent layer append to MASTER_PLAN.md §9 and nothing else, so
+§1.3a was never the agent's to edit. Second, three line edits do not justify a task file,
+branch, review cycle and PR.
+
+**A fourth edit was scoped and then dropped.** The original plan also rewrote §1.3a's
+"Close-out for every task above is manual (`close-task`). No loop runner commits, pushes,
+opens or merges a PR." paragraph, on the grounds that AGENTS.md §12.10 had superseded it.
+That reasoning was wrong on the dates: §6.11 already permitted agent commit/push/PR from
+2026-08-15 (PR #7, merge `52cfa4b`), and §1.3a's manual-close-out sentence was written a
+week later on 2026-08-22. It was never stale text — it is a deliberate narrowing of a
+permission that already existed. Task C (Redis translation cache) is the Opus-tier task
+named in MASTER_PLAN.md §3.6 case 2 as a cross-tenant leak path, and its close-out stays
+manual. The paragraph is unchanged.
+
+**PR #17 commit-hash discrepancy (recorded, not resolved).** Catch-up 2026-08-29 above
+records `Commits: f15d435` for PR #17. A later check of `origin/main` reported the PR as
+squash commit `0336e6b`, squashing `625cf91` and `8b7ce52` — `f15d435` appears in neither.
+Most likely `f15d435` was the round-one commit and two further verification rounds rewrote
+the branch before merge. Not confirmed against `git log`. The earlier entry is left as
+written per the append-only rule; this entry is the correction.
