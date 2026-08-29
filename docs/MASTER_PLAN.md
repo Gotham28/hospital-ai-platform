@@ -487,3 +487,8 @@ Scope: `backend/app/api/v1/endpoints/lab_tests.py`, `backend/app/api/v1/endpoint
 ### 2026-08-24 — Remove raw patient text from application logs
 Not in the original plan. Replaced patient-text arguments with character counts across three files (`translation.py`, `ai.py`, `relevance.py`) to prevent raw patient text from reaching the application log. Also raised the `httpx` logger level to WARNING in `main.py` as a defensive measure.
 Scope: `backend/app/main.py`, `backend/app/services/translation.py`, `backend/app/api/v1/endpoints/ai.py`, `backend/app/services/relevance.py`. Related: CURRENT_TASK.md dated 2026-08-24.
+
+### 2026-08-28 — AGENTS.md §12 orchestration rules; drive skill removed
+
+Not in the original plan. Added AGENTS.md §12, defining the Claude Code / Antigravity closed-loop orchestration process, and removed the drive skill and its unattended runner, which conflicted with §12 in several ways (autonomous git writes, a colliding halt-file name, no resume path). Also corrected two stale AGENTS.md entries describing the Sarvam/Malayalam-normaliser status.
+Scope: `.agents/AGENTS.md`, `.claude/skills/drive/` (deleted), `.agents/run-unattended.ps1` (deleted), `docs/MASTER_PLAN.md`. Related: CURRENT_TASK.md dated 2026-08-28.

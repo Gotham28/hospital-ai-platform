@@ -37,7 +37,9 @@ Research-only code (benchmarks, evaluation scripts) belongs in a separate, isola
 - **LLM**: OpenAI GPT-4o-mini (current default)
 - **Embeddings**: OpenAI `text-embedding-3-small`, 1536 dimensions
 - **Translation**: currently Google Translate via `_translate_async()` in
-  `services/translation.py`; Sarvam AI upgrade not yet started (see
+  `services/translation.py`; the Malayalam output normaliser
+  (`ml_postprocess.py`) has landed but is not yet wired into any call path, and
+  the Sarvam client itself (§1.3a Task A) remains blocked on the API key (see
   `docs/MASTER_PLAN.md` §1.3)
 - **Migrations**: Alembic
 - **Messaging**: Twilio WhatsApp via `services/whatsapp.py` (degrades gracefully if
@@ -58,6 +60,7 @@ below rather than containing this logic itself.
 | Translation bridge — `_translate()`, `_translate_async()` | `backend/app/services/translation.py` |
 | Session context (Redis-backed) | `backend/app/services/patient_context.py` |
 | Vocabulary helpers | `backend/app/services/vocabulary.py` |
+| Malayalam output normaliser — `normalise_malayalam()`, provider-agnostic, not currently wired into any production call path | `backend/app/services/ml_postprocess.py` |
 | Booking state machine / session logic | `backend/app/services/booking.py` |
 | Relevance gate (IRIS Feature 4) | `backend/app/services/relevance.py` |
 | WhatsApp messaging | `backend/app/services/whatsapp.py` |
@@ -354,3 +357,363 @@ too large for one task and should have been split under §5.8 — say so instead
 7. test-driven-development is adopted for new work under §1.4 and §1.5 and for
    backend/research/. It is not retroactively applied to existing code, and it
    does not authorise deleting existing code that lacks tests.
+
+---
+
+## 12. Claude Code Orchestration — The Closed Loop
+
+Work is scoped in Claude Chat, executed by Claude Code and Antigravity without
+supervision, and returns to Claude Chat only when a decision is genuinely the
+developer's to make.
+
+The developer talks only to Claude Chat. Nothing below Claude Chat asks the developer
+a question directly.
+
+### 12.1 The layers
+
+| Layer | Is | Does | Never does |
+|---|---|---|---|
+| **Developer** | The decision-maker | Approves scope, makes every escalated decision, performs all git close-out (§6.11), merges | — |
+| **Claude Chat** | Planning and decision layer | Scopes the task, writes `.agents/CURRENT_TASK.md`, answers halts, writes `.agents/DECISION.md` | Write code. Run commands. Touch the repo |
+| **Claude Code** | Execution driver | Plans the mechanics, dispatches Antigravity, reads its raw output, re-dispatches on error, resolves minor decisions per §12.4, reviews at the end, writes the handoff on a halt | Any git write. Any migration. Any non-local DB command. Any edit to `docs/STATUS.md`. Resolve anything §12.5 names |
+| **Antigravity** | Mechanical executor | Writes the code named in the plan | Decide anything. Deviate from `CURRENT_TASK.md` |
+
+Claude Code has shell access so it can run Antigravity and read its output. That
+access exists to remove the developer from the middle of the error loop — not to
+widen what Claude Code may change. See §12.10.
+
+### 12.2 The loop
+
+1. **Scope.** The task is scoped in Claude Chat. `.agents/CURRENT_TASK.md` is written
+   there, per §6.4. Nothing below this point starts until the developer confirms it.
+2. **Run.** Claude Code dispatches Antigravity, reads its raw output, re-dispatches on
+   error, and resolves minor decisions itself per §12.4. This continues without
+   developer involvement for as long as no §12.5 halt condition is reached.
+3. **Halt.** On a §12.5 condition, Claude Code stops, writes `.agents/LOOP_HANDOFF.md`
+   (§12.6), and does nothing further.
+4. **Decide.** The developer brings `LOOP_HANDOFF.md` into Claude Chat. The decision is
+   made there. Claude Chat writes `.agents/DECISION.md` (§12.7).
+5. **Resume.** Claude Code reads `DECISION.md`, appends it to the dispatch log, and
+   continues from where it halted. Steps 2–5 repeat as needed.
+6. **Review and report.** At the end of the task, Claude Code reviews its execution
+   against the plan, and reports — including every minor decision it took under
+   §12.4, batched into one list. The developer reads them once, at the end, not six
+   times mid-run.
+7. **Close out.** Developer only, per §6.11. Never automated.
+
+### 12.3 Which work goes where
+
+- **Fully mechanical work** — every file and line already named, formatting,
+  `STATUS.md` wording, repomix regeneration, a rename inside one file — runs in
+  Antigravity alone, with no Claude Code reasoning involved. This is most of the
+  token volume and none of the risk.
+- **Work containing a decision** is reasoned by Claude Code first, written into the
+  plan, then executed mechanically by Antigravity.
+
+The split is by whether the task needs judgement, not by which area of the codebase
+it touches.
+
+Reviews read only the changed files plus their direct callers. Never the repomix
+snapshot — it goes stale, and re-reading it is the largest avoidable cost in the
+review path. Review runs once, at the end, not mid-task.
+
+### 12.4 Decisions Claude Code takes on its own
+
+**Default: decide it, log it, keep going.** Do not halt for a small decision. An
+interruption costs the developer more than a reversible wrong choice caught at
+review.
+
+A decision is Claude Code's to take if it is on the whitelist below, **or** it passes
+the reversibility test — and it is not named in §12.5. §12.5 always wins.
+
+**Whitelist — take these without asking:**
+
+- Wording of a log message, comment, docstring or error string that is not
+  patient-facing, legal, or medical.
+- Local variable and helper names inside a file already in scope.
+- The order in which the scoped edits are applied.
+- Test fixture values, as long as they are obviously synthetic (§5.10).
+- Which throwaway/scratch script to write for evidence capture, and how.
+- Formatting and import ordering consistent with the existing file (§8).
+- Retry strategy for a transient failure — network, port in use, flaky start.
+- Which of two equivalent phrasings satisfies an instruction already given in
+  `CURRENT_TASK.md`.
+
+**Reversibility test — for anything not on the whitelist, all four must be true:**
+
+1. It is undone by editing one file, with no migration and no data change.
+2. It changes nothing a patient sees, and nothing another tenant sees.
+3. It touches no §10 Opus trigger.
+4. It stays inside the `## Files/areas in scope` list in `CURRENT_TASK.md`.
+
+If any of the four is false, it is a §12.5 halt.
+
+**Logging them.** Every decision taken under this section is appended to
+`.agents/DECISIONS_TAKEN.md` as it happens — one line each: what was decided, which
+whitelist item or test justified it, and the file it affected. The developer is never
+required to read this mid-run; it exists so a task that goes sideways can be
+reconstructed. The same list is repeated in the end-of-task report (§12.2 step 6).
+
+`DECISIONS_TAKEN.md` is reset at the start of each task, not appended across tasks.
+
+### 12.5 Decision points — what forces a halt
+
+Claude Code halts and writes a handoff on any of:
+
+1. **Any Alembic migration**, drafted or applied. §5.4 is unchanged by this section.
+2. **Any §10 Opus trigger** — tenant-scoped queries, `hospital_id` filters, logging
+   or raw patient text, `services/security.py`, function signature changes,
+   disclaimer or legal wording, `backend/research/` boundary crossings, auth or Redis
+   session keys, `DATABASE_URL`.
+3. **Any scope change** beyond the `## Files/areas in scope` list in
+   `CURRENT_TASK.md`. §5.3 and §5.8 apply in full.
+4. **The same error hit three times.** Stop, hand off the three attempts with their
+   raw output, and do not attempt a fourth. Repeated failure means the plan is wrong,
+   not that the retry needs rewording.
+5. **Anything in §9** ("When In Doubt") — real patient data, cross-tenant behaviour
+   change, a non-local database, unconfirmed disclaimer wording.
+6. **Anything that fails the §12.4 reversibility test** and is not on the §12.4
+   whitelist.
+
+A halt is a full stop. Claude Code does **not** continue with other in-scope work
+while waiting. Partial work built on an unresolved assumption is worse than an idle
+loop — it produces a diff where some of it presumes a decision that was never made.
+
+When in doubt between §12.4 and §12.5, halt. The §12.4 default is for decisions that
+are clearly small, not for close calls.
+
+### 12.6 `.agents/LOOP_HANDOFF.md` — the halt file
+
+Written by Claude Code. Overwritten each halt, not appended to. Must be
+**self-contained**: Claude Chat must be able to answer it without opening the repo.
+
+Required sections, in this order:
+
+```
+# Handoff — <UTC timestamp>
+
+## Task
+<the CURRENT_TASK.md feature line, verbatim>
+
+## Halt trigger
+<which §12.5 condition fired, by number, and the one-line reason>
+
+## Where execution stopped
+<the last completed step from CURRENT_TASK.md ## Order, and what was next>
+
+## The decision needed
+<one sentence, phrased as a question>
+
+## Options seen
+<each option, what it costs, what it risks. No invented third options>
+
+## Recommendation
+<Claude Code's own pick and why — a recommendation, not an action>
+
+## Evidence
+<the raw command output, diff hunk, or error trace that triggered the halt.
+ Full and unedited. No selective quoting — §5.10>
+
+## Rules implicated
+<the §5, §9 or §10 rule numbers this touches>
+
+## Files touched so far this task
+<explicit paths, and whether each is complete or mid-edit>
+
+## Minor decisions taken since the last handoff
+<the §12.4 lines, so the developer sees them in context>
+```
+
+No raw patient text in a handoff file, ever — §5.6. If the evidence would contain it,
+the handoff says so and reports character counts instead.
+
+### 12.7 `.agents/DECISION.md` — the resume file
+
+Written by Claude Chat once the developer has decided. Overwritten each time.
+
+```
+# Decision — <UTC timestamp>
+
+## Answers
+<the halt question, and the decision, unambiguous>
+
+## Scope effect
+<either "no change to CURRENT_TASK.md" or the exact lines that change>
+
+## Resume from
+<the step in CURRENT_TASK.md ## Order to continue from>
+```
+
+Claude Code resumes only on a `DECISION.md` newer than the current `LOOP_HANDOFF.md`. If
+`DECISION.md` does not answer the question asked, Claude Code halts again rather than
+interpreting it.
+
+If a decision changes scope, `CURRENT_TASK.md` is edited by Claude Chat, not by Claude
+Code, and the change is stated in `## Scope effect` so it is auditable.
+
+### 12.8 Dispatch log
+
+Every instruction Claude Code sends to Antigravity, and every raw output it reads
+back, is appended to a timestamped file under `.agents/runs/`.
+
+- Append-only. Entries are never edited or deleted.
+- Each entry records: timestamp, instruction sent, raw output received, and whether a
+  halt fired.
+- Every `LOOP_HANDOFF.md` and `DECISION.md` is copied into the log at the moment it is read
+  or written, so the decision history survives the next overwrite.
+- `.agents/runs/` is already gitignored (PR #9, merged 2026-08-22), so none of this
+  reaches a diff.
+
+The purpose is reconstruction — the developer must be able to see exactly what
+happened without having watched it live.
+
+### 12.9 Review tier — ratchet only
+
+- Antigravity emits the §10 suggested-review-model line mechanically at the end of its
+  work, exactly as §10 already requires.
+- Claude Code **may escalate** that tier, naming the §10 trigger that justifies it.
+- Claude Code **may never lower** it. If its own §10 classification comes out lower
+  than Antigravity's, Antigravity's tier stands and the disagreement is reported as a
+  finding.
+
+A reviewer allowed to lower its own tier will round down when a change feels small.
+That is the exact failure §10 exists to prevent.
+
+### 12.10 Hard limits on Claude Code
+
+Shell access grants none of the following. These are absolute, and §12.4 never
+authorises any of them:
+
+- **No git write commands.** No `add`, `commit`, `push`, `branch`, `merge`, no PR
+  opened, no PR merged. §6.11 close-out is the developer's action, always.
+- **No migration command** — not `alembic upgrade`, `downgrade`, or
+  `revision --autogenerate`, against anything. §5.4.
+- **No command against a non-local database.** §9 applies in full. Neon, Render and
+  any other hosted instance are non-local.
+- **No documentation write before approval.** `docs/STATUS.md` and
+  `docs/MASTER_PLAN.md` are drafted, presented, and written into only after the
+  developer has explicitly approved the text — see §12.15. Writing an unapproved draft
+  into either file is a §12.5 halt condition in retrospect, not a minor decision.
+- **No edit to `.agents/CURRENT_TASK.md` or `.agents/DECISION.md`.** Both are written by
+  Claude Chat and read by Claude Code. §6.4 forbids rewriting a developer-supplied scope
+  file; §12.7 makes the resume file Claude Chat's. See §12.15 for why these two sit on
+  the other side of the line from STATUS.md.
+
+### 12.11 Precedence
+
+§5 and §6 outrank everything in §12. Where continuing the loop would require breaking
+a rule in §5 or §6, the loop halts instead — always, without exception.
+
+§11 (Superpowers Plugin Precedence) is unchanged and still governs Antigravity's
+plugin behaviour. Where §11 and §12 both apply, the stricter reading wins.
+
+### 12.12 Model policy
+
+Claude Code does not choose its own model. This is fixed:
+
+| Job | Model | Why |
+|---|---|---|
+| Loop driver — dispatching Antigravity, reading raw output, re-dispatching, taking §12.4 decisions | **Sonnet** | High volume, low judgement. Most of the token spend and least of the risk |
+| First-pass review at end of task (§12.13) | **Sonnet** | A mechanical checklist — did execution match the plan |
+| Second review — adversarial, in Claude Chat | **Per §10**, reaching Opus only when a §10 Opus trigger actually fired | This is where judgement is genuinely needed |
+
+**Opus is never run inside Claude Code.**
+
+**Budget cap.** On the Claude Pro plan, Claude Code and Claude Chat draw from the same
+usage pool — every token the loop spends is a token unavailable for the §10 review. The
+loop is therefore capped: if a single task reaches **three halt cycles**, Claude Code
+stops and reports rather than continuing. Three halts means the scope was wrong, and
+grinding on risks exhausting the budget before the diff has been reviewed at all.
+
+### 12.13 First-pass review report — fixed format
+
+Claude Code's end-of-task review (§12.2 step 6) outputs exactly these seven sections, in
+this order, matching the `review-skill` format so the second review always has the same
+shape to check:
+
+1. **Findings**
+2. **Verdict**
+3. **Tier check**
+4. **STATUS.md check**
+5. **Follow-up prompt**
+6. **Follow-up model**
+7. **Plain-English explainer**
+
+Rules for the report:
+
+- Every finding cites file and line. A finding with no location is not a finding.
+- Verdict is one of: `accept as-is`, `accept with fixes`, `reject`. There is no hedged
+  fourth option.
+- Tier check states Antigravity's §10 line verbatim, and whether Claude Code escalated
+  it and why, per §12.9. It may never lower it.
+- STATUS.md check confirms the §6.8 draft entry exists and has **not** been written into
+  the file.
+- Follow-up prompt is complete and copy-pasteable, or the section reads "none needed".
+  Not a sketch the developer has to rewrite.
+- No claim of passing, working or verified without the raw output pasted — §5.10.
+- The §12.4 minor-decision list is appended under **Findings**, not buried elsewhere.
+
+This report is the *input* to the second review. It is not a substitute for it.
+
+### 12.14 What this does and does not save
+
+This removes the developer from the middle of the error loop, stops stale or partial
+pastes reaching a reviewer, and keeps small decisions from becoming interruptions.
+That is the win.
+
+It does **not** reduce Claude token use per diff — a reviewer reading files directly
+generally uses more than a pasted diff, not less. The saving comes from §12.3: fully
+mechanical work runs in Antigravity with no Claude involvement at all.
+
+### 12.15 Documentation the driver may write
+
+Claude Code writes documentation. The developer approves it first. The dividing line is
+not how risky a file looks — it is whether the file **describes** the work or
+**governs** it.
+
+**Descriptive — Claude Code writes, after approval:**
+
+- `docs/STATUS.md`
+- `docs/MASTER_PLAN.md`
+- any other documentation file named in `.agents/CURRENT_TASK.md` under
+  `## Files/areas in scope`
+
+**Governing — Claude Code never writes, approved or not:**
+
+- `.agents/CURRENT_TASK.md`
+- `.agents/DECISION.md`
+
+The reason for the split is not caution, it is measurability. Every scope check in the
+review layer — files touched outside scope, anything from `## Do NOT touch`, work
+pulled from the `## Manual` bucket — compares the diff against `CURRENT_TASK.md`. If
+the thing being scoped can edit its own scope, that comparison proves nothing: a diff
+and a task file can always be made to agree by moving the task file. The same logic
+applies to `DECISION.md`, which is the record of what the developer actually decided. A
+descriptive file has no such role — a wrong line in `STATUS.md` is a wrong line, not a
+broken check.
+
+**The approval gate, in order:**
+
+1. Draft the entry per §6.8 and present it. Do not write it.
+2. Wait for the developer to approve it explicitly. Silence is not approval. "Looks
+   fine", "ok", or moving on to the next topic is not approval. If it is ambiguous
+   whether approval was given, it was not.
+3. Write the approved text **verbatim**. No rewording, condensing, expanding or
+   reordering while writing it (§6.11).
+4. Paste `git diff` for that file, proving only the approved text landed.
+5. If that diff shows anything beyond the approved text, halt under §12.5 and report
+   exactly what the extra changes are. Do not stage, revert, stash or discard them.
+
+**Append-only rules survive this section unchanged.** `STATUS.md`'s Catch-up log is
+append-only: add a new dated entry, never edit or delete an existing one, even when it
+has become wrong. `MASTER_PLAN.md`'s `## 9. Unplanned / Ad-hoc Work` is append-only and
+no other section of that document may be edited or renumbered.
+
+**The §9 append is already approved at scoping time.** `CURRENT_TASK.md`'s
+`## MASTER_PLAN.md update` section states the append, and the developer approves that
+file before any work starts. That is the approval — no second gate is needed mid-run.
+This is the one documentation write that does not pause for a fresh yes, and it is not
+an exception to the gate above: the approval simply happened earlier.
+
+**Regenerating the repomix snapshot (§6.9) is not a documentation write** and needs no
+approval. It overwrites a generated artifact, not a document anyone reads directly.

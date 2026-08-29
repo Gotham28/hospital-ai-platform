@@ -311,6 +311,43 @@ on upstream failure" bug in the same `except` blocks (Task A's circuit breaker,
 §5.8); `whatsapp.py` line 65; `ai.py` line 1079; any hashing of logged text
 (MASTER_PLAN.md §1.4 owns that). `MASTER_PLAN.md` §9 appended.
 
+### Catch-up — 2026-08-28
+**AGENTS.md §12 orchestration rules added; drive skill removed — COMPLETE
+(branch `chore/agents-md-s12-orchestration`).**
+
+Added AGENTS.md §12, the Claude Code / Antigravity closed-loop orchestration process
+(§12.1–§12.15), and removed the `drive` skill and its unattended runner
+(`.claude/skills/drive/`, `.agents/run-unattended.ps1`), which conflicted with §12 in
+several ways: it committed and pushed autonomously, it wrote `.agents/handoff.md` in an
+incompatible format that collides with §12's own halt file on a case-insensitive
+filesystem, its OPUS branch had no resume path, and it emitted its own tier line where
+§12.9 reserves escalation-only rights for Claude Code. Also corrected two stale AGENTS.md
+entries: the §2 Translation bullet (Task B1's Malayalam normaliser had landed as PR #11
+but the file still said "not yet started"), and added a §3 table row for
+`backend/app/services/ml_postprocess.py`, which had no entry.
+
+Environment work needed to make this task runnable, done by the developer:
+- Granted write permission on the repo tree for a non-elevated shell
+  (`icacls ... /grant "$env:USERNAME:(OI)(CI)F" /T`, 61,609 files, 0 failures).
+- Discovered and worked around a Windows filename collision: `.agents/HANDOFF.md` and
+  `.agents/handoff.md` are the same file, so a halt firing before the task's own
+  deletion step overwrote leftover output from PR #15's `drive` run. §12's halt file is
+  renamed to `.agents/LOOP_HANDOFF.md` as part of this change specifically to remove the
+  collision going forward.
+- Fixed `~/.gemini/antigravity-cli/settings.json`, which held two separate top-level
+  JSON objects so its permissions block never parsed; added `read_file`/`write_file`
+  grants scoped to this repo. No `command(...)` grant was added, deliberately — that
+  remains withheld.
+- The three scoped deletions (the drive skill directory and its runner, plus the stale
+  `.agents/handoff.md`) had to be performed manually by the developer rather than
+  through the Antigravity dispatch (`agy`) this task otherwise used for them: `agy` has
+  no dedicated delete-file tool, shells out to `rm`/`del` to delete, and that requires
+  the `command(...)` permission this task deliberately withholds. This is a known limit
+  of the current route D setup, not fixed by this task.
+
+Scope: `.agents/AGENTS.md`, `docs/MASTER_PLAN.md`, `.claude/skills/drive/` (deleted),
+`.agents/run-unattended.ps1` (deleted). Related: CURRENT_TASK.md dated 2026-08-28.
+
 ---
 
 ## Phase 1 — Product Improvements (MASTER_PLAN.md §2)
