@@ -93,7 +93,7 @@ Design decisions locked at split time:
   Its cache key design is a developer decision, not an agent decision.
 
 Order of work, as of 2026-08-22:
-1. Obtain the Sarvam API key (developer, not started — blocks task A only)
+1. Obtain the Sarvam API key (developer, received 2026-08-29 — Task A unblocked)
 2. Docs reconciliation — STATUS.md brought level with origin/main (this task)
 3. Task B — Malayalam post-processing
 4. Task A — Sarvam client + Google fallback
@@ -492,3 +492,15 @@ Scope: `backend/app/main.py`, `backend/app/services/translation.py`, `backend/ap
 
 Not in the original plan. Added AGENTS.md §12, defining the Claude Code / Antigravity closed-loop orchestration process, and removed the drive skill and its unattended runner, which conflicted with §12 in several ways (autonomous git writes, a colliding halt-file name, no resume path). Also corrected two stale AGENTS.md entries describing the Sarvam/Malayalam-normaliser status.
 Scope: `.agents/AGENTS.md`, `.claude/skills/drive/` (deleted), `.agents/run-unattended.ps1` (deleted), `docs/MASTER_PLAN.md`. Related: CURRENT_TASK.md dated 2026-08-28.
+
+### 2026-08-29 — AGENTS.md §12 contradictions resolved; close-task skill rewritten
+
+Not in the original plan. AGENTS.md §12 was internally inconsistent from the day it
+landed: §12.1's "Never does" column contradicted §12.10 and §12.15 on git writes and
+STATUS.md, contradicted §12.7 and §12.15 on who writes CURRENT_TASK.md, and §12.2
+step 7 forbade automated close-out that §12.10 and §6.11 both permit. All four
+resolved, plus the §12.9 tier-floor gap when no Antigravity dispatch runs. The
+`close-task` skill was rewritten to match; it is a Claude Project skill, not a repo
+file, so no part of it appears in this diff. Also carries the §1.3a order item 1
+staleness fix.
+Scope: `.agents/AGENTS.md`, `docs/MASTER_PLAN.md`, `docs/STATUS.md`. Related: no CURRENT_TASK.md — scope was carried in the close-out prompt.

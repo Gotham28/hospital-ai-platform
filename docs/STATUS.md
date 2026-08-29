@@ -641,3 +641,70 @@ squash commit `0336e6b`, squashing `625cf91` and `8b7ce52` — `f15d435` appears
 Most likely `f15d435` was the round-one commit and two further verification rounds rewrote
 the branch before merge. Not confirmed against `git log`. The earlier entry is left as
 written per the append-only rule; this entry is the correction.
+
+### Catch-up — 2026-08-29 (third entry)
+
+**AGENTS.md §12 internal contradictions resolved; close-task skill rewritten.**
+
+Branch: `docs/governing-docs-staleness-2026-08-29`.
+PR: pending
+Commits: pending
+
+§12 landed on 2026-08-28 already inconsistent with itself. Four fixes:
+
+- §12.1, Claude Code row — "Never does: Any git write" and "Any edit to
+  `docs/STATUS.md`" both removed. §12.10 permits feature-branch git writes and §12.15
+  permits writing STATUS.md after approval, so the summary row contradicted two later
+  subsections. "Merge a PR, ever" and the `CURRENT_TASK.md` / `DECISION.md` ban were
+  pulled up into the cell so it still reads as a real summary.
+- §12.1, Claude Chat row — "Touch the repo" now excepts `.agents/CURRENT_TASK.md` and
+  `.agents/DECISION.md`, which §12.7 and §12.15 make Claude Chat's files to write.
+- §12.2 step 7 — relaxed from "Developer only, per §6.11. Never automated." to Claude
+  Code driving close-out on a feature branch, stopping short of merge. §6.11 has
+  permitted this since 2026-08-15 (PR #7, `52cfa4b`) and §12.10 since 2026-08-28, so
+  the old step 7 contradicted both. Step 7 is now explicitly a floor, not a ceiling: a
+  task file or plan section may still narrow close-out to manual, and MASTER_PLAN.md
+  §1.3a continues to do exactly that for the three Sarvam tasks.
+- §12.9 — new bullet covering the case where no Antigravity dispatch runs. There is
+  then no independent tier line to ratchet from, and Claude Code must say so rather
+  than presenting its own §10 classification as a second opinion.
+
+**`close-task` skill rewritten. No diff — it is a Claude Project skill, not a repo
+file, so nothing about it appears in this commit or any `git log`.** Its §2 had
+asserted "Claude Code cannot run git writes, AGENTS.md §12.10 forbids it", true of an
+older AGENTS.md and false since 2026-08-28. It therefore routed every git step through
+an Antigravity dispatch that cannot run them — `agy` has no `command(...)` grant,
+deliberately withheld (see Catch-up 2026-08-28) — so the prompt it produced could not
+have executed. Changes: §2 rewritten with §12.10 quoted rather than paraphrased and
+Antigravity removed from close-out entirely; new §2c narrowing check; new §5a for
+deliverables that produce no diff; §2b sweep extended to cover skills that quote a
+rule; §3 gained branch-cutting and explicit-target push; §5 split into an unfiltered
+fetch and a verification pass where Claude Code reads each CodeRabbit claim back off
+disk and pastes evidence without deciding whether to fix; §6 now triages from that
+evidence rather than from a repomix snapshot; new §7 on the §12.9 tier floor.
+Description trimmed to 1022 characters to meet the 1024 limit, dropping the trigger
+phrases 'wrap this up' and 'raise the PR'.
+
+**Two silent no-ops, caught by the close-out gate.** The §1.3a order item 1 edit was
+believed made by hand on 2026-08-29 and was not. `git add` on an unmodified file
+succeeds silently, so the first commit on this branch went through describing an edit
+it did not contain, and a later `git commit --amend --no-edit` appeared to work while
+changing nothing — the amend rewrote `69ca77d` to `1aa3d73` with the same three files.
+Both were found by reading the claimed diff back off disk before writing anything,
+rather than by trusting a commit message. The edit landed on the third attempt and is
+carried by the second commit on this branch. Commit `1aa3d73`'s message still claims a
+MASTER_PLAN.md edit it does not contain; left uncorrected rather than amended again.
+
+Verification: no commands run beyond git and one character count. Docs-only change,
+plus one file outside the repo. Nothing here was executed or tested, and nothing in it
+could be.
+
+Deliberately deferred:
+- MASTER_PLAN.md §1.3a's "Close-out for every task above is manual" paragraph stays
+  unchanged. See Catch-up 2026-08-29 (second entry) for the dating argument.
+- Docs-hygiene items (iii) and (iv) from Catch-up 2026-08-23 are still open.
+- No sweep of §11 or §§1–10 for contradictions of the same class. Only §12 was swept.
+- Ten untracked files left in place: `.agents/DECISION.md`,
+  `.agents/DECISIONS_TAKEN.md`, `.agents/LOOP_HANDOFF.md` from earlier resolved tasks,
+  and seven scratch/test scripts. Untracked, so they cannot reach a commit. Cleanup is
+  its own task.

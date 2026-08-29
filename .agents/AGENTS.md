@@ -377,8 +377,8 @@ a question directly.
 | Layer | Is | Does | Never does |
 |---|---|---|---|
 | **Developer** | The decision-maker | Approves scope, makes every escalated decision, performs all git close-out (§6.11), merges | — |
-| **Claude Chat** | Planning and decision layer | Scopes the task, writes `.agents/CURRENT_TASK.md`, answers halts, writes `.agents/DECISION.md` | Write code. Run commands. Touch the repo |
-| **Claude Code** | Execution driver | Plans the mechanics, dispatches Antigravity, reads its raw output, re-dispatches on error, resolves minor decisions per §12.4, reviews at the end, writes the handoff on a halt | Any git write. Any migration. Any non-local DB command. Any edit to `docs/STATUS.md`. Resolve anything §12.5 names |
+| **Claude Chat** | Planning and decision layer | Scopes the task, writes `.agents/CURRENT_TASK.md`, answers halts, writes `.agents/DECISION.md` | Write code. Run commands. Touch the repo, except `.agents/CURRENT_TASK.md` and `.agents/DECISION.md`, which §12.7 and §12.15 make its files to write |
+| **Claude Code** | Execution driver | Plans the mechanics, dispatches Antigravity, reads its raw output, re-dispatches on error, resolves minor decisions per §12.4, reviews at the end, writes the handoff on a halt, drives close-out on a feature branch per §6.11 and §12.10 | Any git write beyond §12.10's feature-branch list. Merge a PR, ever. Any migration. Any non-local DB command. Any documentation write before the developer has approved the text (§12.15). Any edit to `.agents/CURRENT_TASK.md` or `.agents/DECISION.md`. Resolve anything §12.5 names |
 | **Antigravity** | Mechanical executor | Writes the code named in the plan | Decide anything. Deviate from `CURRENT_TASK.md` |
 
 Claude Code has shell access so it can run Antigravity and read its output. That
@@ -402,7 +402,17 @@ widen what Claude Code may change. See §12.10.
    against the plan, and reports — including every minor decision it took under
    §12.4, batched into one list. The developer reads them once, at the end, not six
    times mid-run.
-7. **Close out.** Developer only, per §6.11. Never automated.
+7. **Close out.** Claude Code drives it on the feature branch, per §6.11 and §12.10:
+   run the documentation sweep, write the approved STATUS.md entry, append
+   `MASTER_PLAN.md` §9 if the task file scoped one, stage by explicit path, commit,
+   push, open the PR, backfill the real PR number and commit hashes, then fetch
+   CodeRabbit's review and report it in full. It fixes nothing it finds. It never
+   merges. Merging the PR, deleting the branch, and re-uploading any changed
+   governing document to the Claude Project are the developer's, always.
+
+   A task file may narrow this. `MASTER_PLAN.md` §1.3a keeps close-out manual for the
+   three Sarvam tasks, deliberately. A narrowing in a task file or plan section wins
+   over this step — it is a floor, not a ceiling.
 
 ### 12.3 Which work goes where
 
@@ -578,6 +588,11 @@ happened without having watched it live.
 - Claude Code **may never lower** it. If its own §10 classification comes out lower
   than Antigravity's, Antigravity's tier stands and the disagreement is reported as a
   finding.
+- When **no Antigravity dispatch runs** and Claude Code did the work itself, there is
+  no independent tier line to ratchet from. Claude Code still emits its own §10 line,
+  and must say plainly in the report that no floor existed and the classification is
+  unratcheted. It may not present its own line as if it were a second opinion. One
+  classification stated once is not two that agreed.
 
 A reviewer allowed to lower its own tier will round down when a change feels small.
 That is the exact failure §10 exists to prevent.
