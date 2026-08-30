@@ -21,7 +21,7 @@ from app.services.security import detect_prompt_injection
 # NOTE: _translate (sync) confirmed unused as of 2026-08-02 — zero call sites
 # in this file or the rest of the repo (only _translate_async is used).
 # TODO: Remove in future cleanup task alongside _session_key and resolve_doctor_id.
-from app.services.translation import _translate, _translate_async
+from app.services.translation import _translate, _translate_async, TranslationUnavailableError
 from app.services.ml_postprocess import normalise_malayalam
 from app.services.vocabulary import (
     _DEPT_SYNONYMS,
@@ -226,8 +226,12 @@ async def get_welcome(hospital_id: int, db: Session = Depends(get_db)):
         base_en_greeting = hospital.welcome_message.strip()
         try:
             base_ml_greeting = normalise_malayalam(await _translate_async(base_en_greeting, source="en", target="ml"))
-        except Exception:
+        except TranslationUnavailableError as e:
+            logger.warning("[Translation] en->ml failed at welcome greeting: %s", type(e).__name__)
             # Fallback: Just show the English text rather than awkwardly mixing two languages in one sentence
+            base_ml_greeting = f"{base_en_greeting}"
+        except Exception as e:
+            logger.warning("[Translation] en->ml unexpected failure at welcome greeting: %s", type(e).__name__)
             base_ml_greeting = f"{base_en_greeting}"
     else:
         base_en_greeting = f"Hello! I am **Arogya**, the AI assistant for **{hospital_name}**."
@@ -367,7 +371,11 @@ async def chat_with_arogya(request: ChatRequest, db: Session = Depends(get_db)):
     # For Malayalam, prepend the English question as a hidden note for context retrieval
     # but the system prompt already instructs the model to reply in Malayalam
     if request.language == "ml":
-        english_question = await _translate_async(request.question, "ml", "en")
+        try:
+            english_question = await _translate_async(request.question, "ml", "en")
+        except TranslationUnavailableError as e:
+            logger.warning("[Translation] ml->en failed: %s", type(e).__name__)
+            english_question = request.question
         openai_messages[-1]["content"] = (
             f"[User asked in Malayalam: {request.question}]\n"
             f"[English translation for your reference: {english_question}]\n"
@@ -411,8 +419,11 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
     # retrieval, but then generate the Malayalam response natively (no post-translate).
     english_question = request.question
     if is_malayalam:
-        english_question = await _translate_async(request.question, "ml", "en")
-        logger.info("[Translation] ml->en: len=%d -> len=%d", len(request.question), len(english_question))
+        try:
+            english_question = await _translate_async(request.question, "ml", "en")
+            logger.info("[Translation] ml->en: len=%d -> len=%d", len(request.question), len(english_question))
+        except TranslationUnavailableError as e:
+            logger.warning("[Translation] ml->en failed: %s", type(e).__name__)
 
     intent = await classify_user_intent(english_question, request.history or [])
 
@@ -514,7 +525,12 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
 
             reply = "\n".join(reply_lines)
             if is_malayalam:
-                reply = normalise_malayalam(await _translate_async(reply, "en", "ml"))
+                try:
+                    reply = normalise_malayalam(await _translate_async(reply, "en", "ml"))
+                except TranslationUnavailableError as e:
+                    logger.warning("[Translation] en->ml failed at STATUS reply: %s", type(e).__name__)
+                except Exception as e:
+                    logger.warning("[Translation] en->ml unexpected failure at STATUS reply: %s", type(e).__name__)
             yield f"data: {json.dumps(reply)}\n\n"
             yield "data: [DONE]\n\n"
             return
@@ -916,7 +932,12 @@ IMPORTANT:
                 ok, error_msg = validate_booking(hospital, doctor, args["preferred_date"], db)
                 if not ok:
                     if is_malayalam:
-                        error_msg = normalise_malayalam(await _translate_async(error_msg, "en", "ml"))
+                        try:
+                            error_msg = normalise_malayalam(await _translate_async(error_msg, "en", "ml"))
+                        except TranslationUnavailableError as e:
+                            logger.warning("[Translation] en->ml failed at booking-validation error: %s", type(e).__name__)
+                        except Exception as e:
+                            logger.warning("[Translation] en->ml unexpected failure at booking-validation error: %s", type(e).__name__)
                     yield f"data: {json.dumps(error_msg)}\n\n"
                     yield "data: [DONE]\n\n"
                     return

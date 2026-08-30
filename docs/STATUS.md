@@ -604,3 +604,79 @@ work modified (`.agents/CURRENT_TASK.md` also shows modified on this branch, whi
 Claude Chat's own governance-file activity per §12.1, not caused by this task's code
 work).
 
+### Catch-up — 2026-08-30
+
+**Task A — Sarvam translation client + Google fallback + circuit breaker —
+CODE COMPLETE (branch `feat/sarvam-translation-client`).**
+
+Closes MASTER_PLAN.md §1.3a Task A. Three bundled changes, chosen knowingly at
+scoping despite §5.8: provider swap, failure-contract change, and chunking.
+
+- `backend/app/services/translation.py` — Sarvam (`sarvam-translate:v1`) is now
+  primary, Google's gtx endpoint the fallback. New `TranslationUnavailableError`;
+  `_translate()` and `_translate_async()` now raise it when both providers fail
+  instead of returning the untranslated input. This closes the bug recorded in
+  Catch-up 2026-08-23. Per-provider in-process `_CircuitBreaker` — 3 consecutive
+  failures, 60s open, no half-open probe, reset on close. Redis was ruled out at
+  scoping because it fires the §10 session-key trigger. Sarvam-only chunking at
+  2000 characters on sentence boundaries; 2000 exactly does not chunk. Trailing
+  whitespace is stripped before each provider call and re-attached to the
+  translated chunk, so seam spacing survives the rejoin. Any chunk failing aborts
+  the whole Sarvam attempt and falls to Google with the full original text — no
+  partial translation can reach a patient. Google is never chunked.
+
+- `backend/app/api/v1/endpoints/ai.py` — all five `_translate_async()` call sites
+  now handle the raise. The three en→ml sites (welcome greeting line 229, STATUS
+  reply line 527, booking-validation error line 932) each have a
+  `TranslationUnavailableError` branch followed by a broader `except Exception`
+  branch, so an unexpected failure from `normalise_malayalam()` cannot kill the
+  /chat-stream SSE generator mid-response. The two ml→en sites (lines 373, 422)
+  fall back to the untranslated patient question. Every branch logs
+  `type(e).__name__` only. No `from e` anywhere — deliberate: `httpx.HTTPStatusError`
+  carries the request URL, and `translation.py` puts the text being translated into
+  that URL as the `q=` parameter, so chaining would reopen the §5.6 leak closed on
+  2026-08-27. Patient sees English on total failure; no new Malayalam string was
+  authored, since nobody in the loop can verify Malayalam they wrote themselves.
+
+- `backend/run_translation_test.py` — new standalone script, matching the
+  `run_ml_postprocess_test.py` convention. 34 tests: chunk boundaries at
+  1999/2000/2001, hard-split termination, seam spacing, breaker open/skip/cooldown,
+  provider independence, total-failure raise (sync and async), and key-unset
+  skip-to-Google.
+
+- `backend/app/core/config.py` — not touched. `SARVAM_API_KEY` already existed;
+  the URL and model live as private constants beside `_GTRANSLATE_URL`.
+
+Live evidence (developer, PowerShell, outside the agent environment — both
+`api.sarvam.ai` and `api.openai.com` are unreachable from the agent sandbox, so no
+/chat-stream evidence exists for this task):
+
+```text
+--- en-IN -> ml-IN --- STATUS: 200
+{"translated_text":"ഡോക്ടർ പ്രിയ ഇന്ന് ലഭ്യമാണ്. പതിനഞ്ച് മിനിറ്റ് നേരത്തെ എത്തുക.", ...}
+--- ml-IN -> en-IN --- STATUS: 200
+{"translated_text":"I need an appointment.", ...}
+```
+
+This confirms the two API details the code had guessed: the response field is
+`translated_text`, and the language codes are `en-IN` / `ml-IN`. It also confirms
+from the opposite direction the Catch-up 2026-08-23 finding — `sarvam-translate:v1`
+renders "is available" as ലഭ്യമാണ്, where `mayura:v1` inverted it.
+
+Test evidence: `run_translation_test.py` 34 passed, 0 failed;
+`run_ml_postprocess_test.py` 26 passed, 0 failed (unchanged, no regression).
+
+Known and NOT fixed here:
+- An all-whitespace chunk would send empty input to Sarvam. Reachable only via a
+  >2000-character admin field made mostly of blank lines. Degrades safely — Sarvam
+  rejects it, the whole call falls to Google.
+- Sarvam transliterates doctor names (`Priya` → `പ്രിയ`) where `normalise_malayalam()`
+  deliberately does not. The two providers therefore render names differently. Needs
+  its own task.
+- `sarvam-translate:v1` emits ഡോക്ടർ with U+0D7C directly, so none of the three
+  normaliser rules fire on Sarvam output. The Google fallback remains the only path
+  where they are expected to fire — as predicted in Catch-up 2026-08-23.
+- `mode` / `output_script` were deliberately omitted from the Sarvam payload; their
+  acceptance is untested.
+- Branch history note: this work was written on `docs/governing-docs-staleness-2026-08-29`
+  and moved to a clean branch cut from `origin/main` before commit, per §6.10.
