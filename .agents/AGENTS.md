@@ -37,10 +37,13 @@ Research-only code (benchmarks, evaluation scripts) belongs in a separate, isola
 - **LLM**: OpenAI GPT-4o-mini (current default)
 - **Embeddings**: OpenAI `text-embedding-3-small`, 1536 dimensions
 - **Translation**: currently Google Translate via `_translate_async()` in
-  `services/translation.py`; the Malayalam output normaliser
-  (`ml_postprocess.py`) has landed but is not yet wired into any call path, and
-  the Sarvam client itself (§1.3a Task A) remains blocked on the API key (see
-  `docs/MASTER_PLAN.md` §1.3)
+  `services/translation.py`. The Malayalam output normaliser
+  (`services/ml_postprocess.py`) is wired into the three English-to-Malayalam call
+  sites in `api/v1/endpoints/ai.py` as of PR #17, merged 2026-08-29 — run
+  `grep -n "_translate_async(" backend/app/api/v1/endpoints/ai.py` for their current
+  locations. The Sarvam client itself (MASTER_PLAN.md §1.3a Task A) is not yet built;
+  the API key arrived 2026-08-29, so it is no longer blocked. Task A must use
+  `sarvam-translate:v1`, not `mayura:v1` — see `docs/STATUS.md` Catch-up 2026-08-23.
 - **Migrations**: Alembic
 - **Messaging**: Twilio WhatsApp via `services/whatsapp.py` (degrades gracefully if
   credentials are unset)
@@ -60,7 +63,7 @@ below rather than containing this logic itself.
 | Translation bridge — `_translate()`, `_translate_async()` | `backend/app/services/translation.py` |
 | Session context (Redis-backed) | `backend/app/services/patient_context.py` |
 | Vocabulary helpers | `backend/app/services/vocabulary.py` |
-| Malayalam output normaliser — `normalise_malayalam()`, provider-agnostic, not currently wired into any production call path | `backend/app/services/ml_postprocess.py` |
+| Malayalam output normaliser — `normalise_malayalam()`, provider-agnostic, wired into the three English-to-Malayalam translate call sites in `ai.py` (PR #17, 2026-08-29)
 | Booking state machine / session logic | `backend/app/services/booking.py` |
 | Relevance gate (IRIS Feature 4) | `backend/app/services/relevance.py` |
 | WhatsApp messaging | `backend/app/services/whatsapp.py` |
@@ -374,8 +377,8 @@ a question directly.
 | Layer | Is | Does | Never does |
 |---|---|---|---|
 | **Developer** | The decision-maker | Approves scope, makes every escalated decision, performs all git close-out (§6.11), merges | — |
-| **Claude Chat** | Planning and decision layer | Scopes the task, writes `.agents/CURRENT_TASK.md`, answers halts, writes `.agents/DECISION.md` | Write code. Run commands. Touch the repo |
-| **Claude Code** | Execution driver | Plans the mechanics, dispatches Antigravity, reads its raw output, re-dispatches on error, resolves minor decisions per §12.4, reviews at the end, writes the handoff on a halt | Any git write. Any migration. Any non-local DB command. Any edit to `docs/STATUS.md`. Resolve anything §12.5 names |
+| **Claude Chat** | Planning and decision layer | Scopes the task, writes `.agents/CURRENT_TASK.md`, answers halts, writes `.agents/DECISION.md` | Write code. Run commands. Touch the repo, except `.agents/CURRENT_TASK.md` and `.agents/DECISION.md`, which §12.7 and §12.15 make its files to write |
+| **Claude Code** | Execution driver | Plans the mechanics, dispatches Antigravity, reads its raw output, re-dispatches on error, resolves minor decisions per §12.4, reviews at the end, writes the handoff on a halt, drives close-out on a feature branch per §6.11 and §12.10 | Any git write beyond §12.10's feature-branch list. Merge a PR, ever. Any migration. Any non-local DB command. Any documentation write before the developer has approved the text (§12.15). Any edit to `.agents/CURRENT_TASK.md` or `.agents/DECISION.md`. Resolve anything §12.5 names |
 | **Antigravity** | Mechanical executor | Writes the code named in the plan | Decide anything. Deviate from `CURRENT_TASK.md` |
 
 Claude Code has shell access so it can run Antigravity and read its output. That
@@ -399,7 +402,17 @@ widen what Claude Code may change. See §12.10.
    against the plan, and reports — including every minor decision it took under
    §12.4, batched into one list. The developer reads them once, at the end, not six
    times mid-run.
-7. **Close out.** Developer only, per §6.11. Never automated.
+7. **Close out.** Claude Code drives it on the feature branch, per §6.11 and §12.10:
+   run the documentation sweep, write the approved STATUS.md entry, append
+   `MASTER_PLAN.md` §9 if the task file scoped one, stage by explicit path, commit,
+   push, open the PR, backfill the real PR number and commit hashes, then fetch
+   CodeRabbit's review and report it in full. It fixes nothing it finds. It never
+   merges. Merging the PR, deleting the branch, and re-uploading any changed
+   governing document to the Claude Project are the developer's, always.
+
+   A task file may narrow this. `MASTER_PLAN.md` §1.3a keeps close-out manual for the
+   three Sarvam tasks, deliberately. A narrowing in a task file or plan section wins
+   over this step — it is a floor, not a ceiling.
 
 ### 12.3 Which work goes where
 
@@ -575,6 +588,11 @@ happened without having watched it live.
 - Claude Code **may never lower** it. If its own §10 classification comes out lower
   than Antigravity's, Antigravity's tier stands and the disagreement is reported as a
   finding.
+- When **no Antigravity dispatch runs** and Claude Code did the work itself, there is
+  no independent tier line to ratchet from. Claude Code still emits its own §10 line,
+  and must say plainly in the report that no floor existed and the classification is
+  unratcheted. It may not present its own line as if it were a second opinion. One
+  classification stated once is not two that agreed.
 
 A reviewer allowed to lower its own tier will round down when a change feels small.
 That is the exact failure §10 exists to prevent.
@@ -584,8 +602,15 @@ That is the exact failure §10 exists to prevent.
 Shell access grants none of the following. These are absolute, and §12.4 never
 authorises any of them:
 
-- **No git write commands.** No `add`, `commit`, `push`, `branch`, `merge`, no PR
-  opened, no PR merged. §6.11 close-out is the developer's action, always.
+- **Git writes are limited to a feature branch.** Claude Code MAY run `add` (named
+  paths only, never `-A`, `.`, `-u` or a glob), `commit`, `push` to a feature branch,
+  `fetch`, `rebase origin/main`, and `gh pr create`. It MAY NOT `merge`, push to
+  `main`, force-push except `--force-with-lease` on its own unmerged feature branch,
+  `reset --hard`, `checkout` a different branch, `worktree add`, delete any branch, or
+  alter branch protection. **Merging a PR is the developer's action, always, without
+  exception** — §6.11. A reviewer that needs a different revision uses `git show`,
+  `git diff` and `git log`, and reports that it cannot see something rather than moving
+  HEAD to reach it.
 - **No migration command** — not `alembic upgrade`, `downgrade`, or
   `revision --autogenerate`, against anything. §5.4.
 - **No command against a non-local database.** §9 applies in full. Neon, Render and
