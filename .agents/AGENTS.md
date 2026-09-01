@@ -31,19 +31,22 @@ Research-only code (benchmarks, evaluation scripts) belongs in a separate, isola
 - **Backend**: FastAPI (Python)
 - **Frontend**: React + TypeScript
 - **Database**: PostgreSQL with the `pgvector` extension enabled. Staging is hosted on
-  Render; a migration of staging to Neon is in progress — check
-  `.agents/CURRENT_TASK.md` and `STATUS.md` before assuming which host is live.
+  Neon. The migration from Render completed 2026-08-09 and the Render Postgres
+  instance was deleted the same day — see `docs/STATUS.md` Catch-up 2026-08-09. Neon
+  is non-local: §9's no-commands-against-a-non-local-database rule applies to it in
+  full.
 - **Cache/session store**: Redis
 - **LLM**: OpenAI GPT-4o-mini (current default)
 - **Embeddings**: OpenAI `text-embedding-3-small`, 1536 dimensions
-- **Translation**: currently Google Translate via `_translate_async()` in
-  `services/translation.py`. The Malayalam output normaliser
-  (`services/ml_postprocess.py`) is wired into the three English-to-Malayalam call
-  sites in `api/v1/endpoints/ai.py` as of PR #17, merged 2026-08-29 — run
-  `grep -n "_translate_async(" backend/app/api/v1/endpoints/ai.py` for their current
-  locations. The Sarvam client itself (MASTER_PLAN.md §1.3a Task A) is not yet built;
-  the API key arrived 2026-08-29, so it is no longer blocked. Task A must use
-  `sarvam-translate:v1`, not `mayura:v1` — see `docs/STATUS.md` Catch-up 2026-08-23.
+- **Translation**: Sarvam AI (`sarvam-translate:v1`) is primary, Google Translate is
+  fallback, per-provider in-process circuit breaker — `services/translation.py`,
+  MASTER_PLAN.md §1.3a Task A, merged as PR #19 (2026-09-01). Both providers raise
+  `TranslationUnavailableError` on total failure rather than silently returning
+  untranslated text. The Malayalam output normaliser (`services/ml_postprocess.py`)
+  is wired into the three English-to-Malayalam call sites in `api/v1/endpoints/ai.py`
+  as of PR #17 — run `grep -n "_translate_async(" backend/app/api/v1/endpoints/ai.py`
+  for their current locations. Task C (Redis translation cache, Opus tier) is the
+  remaining §1.3a item, not yet built.
 - **Migrations**: Alembic
 - **Messaging**: Twilio WhatsApp via `services/whatsapp.py` (degrades gracefully if
   credentials are unset)
@@ -63,7 +66,7 @@ below rather than containing this logic itself.
 | Translation bridge — `_translate()`, `_translate_async()` | `backend/app/services/translation.py` |
 | Session context (Redis-backed) | `backend/app/services/patient_context.py` |
 | Vocabulary helpers | `backend/app/services/vocabulary.py` |
-| Malayalam output normaliser — `normalise_malayalam()`, provider-agnostic, wired into the three English-to-Malayalam translate call sites in `ai.py` (PR #17, 2026-08-29)
+| Malayalam output normaliser — `normalise_malayalam()`, provider-agnostic, wired into the three English-to-Malayalam translate call sites in `ai.py` (PR #17, 2026-08-29) | `backend/app/services/ml_postprocess.py` |
 | Booking state machine / session logic | `backend/app/services/booking.py` |
 | Relevance gate (IRIS Feature 4) | `backend/app/services/relevance.py` |
 | WhatsApp messaging | `backend/app/services/whatsapp.py` |
@@ -738,6 +741,22 @@ Claude Code does not choose its own model. This is fixed:
 
 **Opus is never run inside Claude Code.**
 
+**Haiku is not a substitute for Sonnet as the loop driver.** The table above is the
+whole policy: Sonnet drives, Sonnet reviews. On 2026-09-01 a Haiku-driven loop
+passed the §6.10 branch-verification gate by asserting two commit hashes without
+pasting the `git log` output that produced them. Both hashes were correct. The
+failure was §5.10 — a gate marked passed on an assertion — and it cost two full
+review round trips to settle, because nothing in the report could be checked without
+re-running the commands. Applying specified text is mechanical. Reporting evidence
+for a gate is not.
+
+**§10's tier line is not this table.** §10 names the model the *developer* uses to
+review a finished diff. This table names the model *Claude Code itself runs on*.
+A task file may correctly say "Suggested review tier: Haiku 4.5, low effort" and
+still require a Sonnet-driven loop — the two lines answer different questions, and
+neither constrains the other. A task file's `## Suggested review tier` section must
+never be read as a model setting for Claude Code.
+
 **Budget cap.** On the Claude Pro plan, Claude Code and Claude Chat draw from the same
 usage pool — every token the loop spends is a token unavailable for the §10 review. The
 loop is therefore capped: if a single task reaches **three halt cycles**, Claude Code
@@ -801,6 +820,10 @@ not how risky a file looks — it is whether the file **describes** the work or
 
 - `.agents/CURRENT_TASK.md`
 - `.agents/DECISION.md`
+
+`AGENTS.md` sits on the governing side for the same reason: it defines every check
+the review layer runs. A driver that can edit the rules it is measured against can
+always make a diff compliant by editing the rule.
 
 The reason for the split is not caution, it is measurability. Every scope check in the
 review layer — files touched outside scope, anything from `## Do NOT touch`, work

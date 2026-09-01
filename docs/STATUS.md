@@ -1,6 +1,6 @@
 # STATUS.md — Current Sprint Status
 
-Last updated: 2026-08-22
+Last updated: 2026-09-01
 
 This file tracks what's actually done vs. in progress vs. next, across the whole
 project. Update this after every verified feature — not before. See `docs/MASTER_PLAN.md`
@@ -356,7 +356,7 @@ Scope: `.agents/AGENTS.md`, `docs/MASTER_PLAN.md`, `.claude/skills/drive/` (dele
 |---|---|
 | 1.1 Patient Personalisation | ✅ Done (per master plan) |
 | 1.2 Extract services out of ai.py | ✅ Done — all 5 stages complete (see detail below) |
-| 1.3 Sarvam translation upgrade | 🟡 In progress — normaliser wired into ai.py (Task B1b); Task A next, Sarvam API key received 2026-08-29 |
+| 1.3 Sarvam translation upgrade | 🟡 In progress — Task B (normaliser, PR #17) and Task A (Sarvam client + Google fallback + circuit breaker, PR #19) both done; Task C (Redis translation cache, Opus tier) remaining |
 | 1.4 Security hardening | ⬜ Not started |
 | 1.5 Multi-tenant isolation hardening | ⬜ Not started |
 
@@ -390,7 +390,7 @@ A Twilio-backed WhatsApp messaging feature has been added outside the original p
 
 ---
 
-## Phase 2 — Research (MASTER_PLAN.md §4, later)
+## Phase 2 — Research (MASTER_PLAN.md §3, later)
 
 Not started. Do not begin until Phase 1 is complete and demoed end-to-end.
 
@@ -403,12 +403,10 @@ Not started. Do not begin until Phase 1 is complete and demoed end-to-end.
   configurable but intentionally left empty.
 - Feature 4 relevance criteria are partial (referral + prior-doctor checks only) —
   clinic will provide more later; this is expected, not a bug.
-- **Next up for Phase 1:** §1.3a Task A — Sarvam client + Google fallback with an
-  in-process circuit breaker, in `services/translation.py`. **Unblocked: the Sarvam API
-  key arrived 2026-08-29.** Then Task C (Redis translation cache, Opus tier). Read
-  Catch-up 2026-08-23 before starting Task A: it must use `sarvam-translate:v1`, not
-  `mayura:v1`; input cap 2000 characters, not 1000; it is formal-mode-only and may
-  reject `mode` / `output_script` — untested.
+- **Next up for Phase 1:** §1.3a Task A is done (PR #19, 2026-09-01) — Sarvam client
+  is primary, Google fallback, per-provider circuit breaker, in
+  `services/translation.py`. **Remaining: Task C (Redis translation cache, Opus
+  tier)** — not yet scoped.
 - **Live rule-firing of `normalise_malayalam()` on a successfully translated Malayalam
   string has never been observed** (Google 429 on all three Task B1b attempts,
   2026-08-29). Deliberately not chased further — folded into §1.3a Task A, which is now
@@ -953,3 +951,46 @@ changed, nothing else.
 
 Scope: `.agents/AGENTS.md`, `docs/MASTER_PLAN.md`. Related: `.agents/CURRENT_TASK.md`
 dated 2026-09-01 (amended 2026-09-02, `§12.10a content` section only).
+
+### Catch-up — 2026-09-01 (second entry)
+
+**Governing-doc corrections — nine lines, docs only.**
+
+A full cross-read of `AGENTS.md`, `docs/STATUS.md` and `docs/MASTER_PLAN.md` found
+seven lines that were factually wrong or structurally broken. Two further edits were
+added during execution after the failures below. No code, schema, migration or
+process change.
+
+`docs/STATUS.md` (four): the Phase 1 `1.3 Sarvam translation upgrade` row and the
+Notes "Next up for Phase 1" bullet both still pointed at Task A as upcoming after
+PR #19 merged — the same failure pattern PR #18 fixed once before. The header read
+"Last updated: 2026-08-22" with eight later entries below it. The Phase 2 heading
+cross-referenced MASTER_PLAN.md §4; research is §3.
+
+`.agents/AGENTS.md` (five): §2's Translation bullet still described the Sarvam client
+as "not yet built". §2's Database bullet still described the Neon migration as in
+progress, though it completed 2026-08-09 and the Render instance was deleted the same
+day. §3's `ml_postprocess.py` table row had no path column and no closing pipe.
+§12.12 gained a paragraph separating the loop-driver model from §10's review tier.
+§12.15 gained `AGENTS.md` on the governing side, closing a gap that let the driver
+rewrite the document governing it.
+
+**Two process failures during this task, both recorded because both were expensive.**
+
+First, the loop ran on Haiku, which §12.12 does not permit. It passed the §6.10
+branch gate by asserting two commit hashes without pasting the `git log` output
+behind them. Both hashes were correct; the evidence was absent, which is a §5.10
+breach. Edit 8 exists because of this.
+
+Second, Claude Chat then wrongly accused the agent layer of fabricating one of those
+hashes. It tested `git branch --contains <branch-commit>` against `origin/main`,
+which can never return `main` under squash merge, and read the empty result as
+"unmerged". `docs/STATUS.md` Catch-up 2026-08-29 (second entry) already records this
+exact trap for PR #17. The accusation was written into `.agents/DECISION.md` and into
+a draft of AGENTS.md §12.12 before being caught and retracted; the §12.12 text as
+merged states only what is true.
+
+Known and NOT fixed here: the STATUS.md archive split; the out-of-order Catch-up
+entries after the Notes section; the `PR #TBD` in Catch-up 2026-08-27;
+MASTER_PLAN.md's overlapping §7/§7a/§7b schedules; and §10's Sonnet list naming
+"frontend admin UI", which does not cover patient-facing frontend.
