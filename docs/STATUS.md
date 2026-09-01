@@ -843,3 +843,113 @@ Known and NOT fixed here:
   and still hard-codes "Not fix anything... reporting only" — now superseded by
   the §6.11/§12.2-step-7 text this commit lands. Outside this task's scope. Needs
   its own task.
+
+### Catch-up — 2026-09-02
+
+**Antigravity scoped `command(...)` grant + AGENTS.md §12.10a — DESIGNED AND
+EMPIRICALLY VALIDATED, NOT YET INSTALLED (branch `chore/antigravity-command-grant`,
+cut from `origin/main` at `3d2d0cf`).**
+
+Reverses the deliberate withholding recorded in Catch-up 2026-08-28. Added AGENTS.md
+§12.10a (immediately after §12.10), enumerating exactly what a new `command(...)` grant
+in `~/.gemini/antigravity-cli/settings.json` allows, denies, and withholds:
+
+- **Allow (enumerated, no wildcards):** the four `run_*.py` standalone test scripts by
+  exact literal relative path; `grep`/`rg`/`ls`/`dir`/`cat`/`type`/`findstr`;
+  `git status`/`diff`/`log`/`show`; `npx repomix`.
+- **Deny (unconditional):** all deletion (`rm`, `del`, `rmdir`, `Remove-Item`, `ri`,
+  `erase`, `rd`); `alembic`; `psql`/`pg_dump`/`pg_restore`; all network tools (`curl`,
+  `curl .*`, `curl.exe`, `wget`, `Invoke-WebRequest`, `iwr`); all git-write subcommands
+  including `stash`; `sudo`.
+- **Not granted:** dev servers (port-kill needs a runtime PID a static permission
+  pattern can't scope) and `python -m backend.research.*` (Phase 2 hasn't started).
+
+Design questions resolved empirically, against Antigravity's own documentation and live
+dispatches, not assumed:
+
+- **Deny beats allow**, confirmed verbatim from `antigravity.google/docs/permissions`:
+  "Conflicting rules are strictly evaluated in priority order: Deny > Ask > Allow."
+- **An unmatched command is auto-denied in headless dispatch**, confirmed live:
+  dispatching `agy --print "Run the shell command: whoami"` against the real,
+  unmodified `settings.json` (zero `command(...)` entries) in the isolated
+  `D:\scratch-loop-test` sandbox returned `jetski: no output produced — a tool required
+  the "command" permission that headless mode cannot prompt for, so it was
+  auto-denied.` Confirms, not merely corroborates, the 2026-08-28 observation that
+  Antigravity was blocked, not permitted, on ungranted commands — specific to headless
+  dispatch; interactive-mode behavior was not tested.
+- **`curl`/`wget` denied outright, not scoped to localhost.** Permission patterns match
+  per whitespace-separated token, anchored, as a token-count prefix —
+  `command(curl http://localhost.*)` fails to match `curl -s http://localhost:8000`
+  because the second token is `-s`, not the URL. Enforcing "localhost only" would mean
+  enumerating every flag ordering the model might generate.
+- **Deletion denied entirely, not scoped to non-recursive.** On this machine's shell
+  (PowerShell), `rm`/`del` are aliases for `Remove-Item`, which takes
+  `-Recurse`/`-Force` — flag names no POSIX deny token (`-r`, `-rf`, `-R`) matches.
+  There is no pattern that permits a single-file delete without also permitting a
+  recursive one.
+- **`command(*)` on the ask list is not the answer.** Deny > Ask > Allow means an `Ask`
+  entry on `*` would outrank every `Allow` entry, prompting before every enumerated
+  script and defeating unattended running entirely.
+
+**A second empirical round (2026-09-02, same day) found and resolved a further gap
+before any install.** The developer ran `agy --print "Run: python
+backend/run_ml_postprocess_test.py"` from the repo root against the real settings.json
+(still just the original two directory-scoped `read_file`/`write_file` entries) and got
+`required the "read_file" permission ... auto-denied` — despite
+`read_file(D:\Hospital\hospital-ai-platform)` already covering that directory.
+Investigated live, with the developer's explicit, narrow, revoked-on-completion
+permission to modify the real settings.json for this purpose only (backup at
+`settings.json.bak`, restored and verified byte-identical via `cmp` afterward):
+
+- A file read via **absolute path** (either slash direction) succeeded immediately
+  against the unmodified directory grant — the pattern and the documented "recursive
+  read access to all contained files/folders" claim are both correct.
+- The same file via **relative path** failed, and adding a bare relative-form grant
+  (`read_file(backend)`) did not fix it.
+- Passing **`--add-dir "D:\Hospital\hospital-ai-platform"`** to the `agy` invocation
+  fixed it immediately, with zero settings.json changes beyond the original two
+  entries. The missing piece was dispatch-time workspace-root registration, not
+  settings.json content.
+- With `--add-dir` set, the exact, already-drafted `command(python
+  backend/run_ml_postprocess_test.py)` string was added and the real script executed
+  for real: 26 passed, 0 failed, live output pasted in this task's chat transcript.
+  No pattern in the drafted allow/deny lists needed to change.
+
+**Conclusion: every already-drafted `read_file`/`write_file`/`command(...)` pattern is
+correct as written. Claude Code's own dispatch of Antigravity must pass `--add-dir
+<repo-root>` (or equivalent workspace-root registration) for any of them to resolve a
+relative path at all** — recorded in AGENTS.md §12.10a's prose. Without it, every
+relative-path grant fails exactly as observed, regardless of how carefully the
+permission strings are written.
+
+**Process incident during the investigation, recorded in full per §5.10.** A Bash
+heredoc used to write a test settings.json collapsed `\\` to `\` in transit, producing
+invalid JSON — caught immediately by the same `python -c "import json..."` validation
+habit used throughout this task, before any dispatch was attempted against the
+corrupted file. Restored from `settings.json.bak` via `cp` and verified byte-identical
+with `cmp` (exit 0) before continuing. All subsequent test files were written with the
+Write tool and installed via `cp`, which preserved escaping correctly.
+
+**Found, NOT fixed here: `--dangerously-skip-permissions`.** Antigravity's own CLI
+offers this flag, which auto-approves every tool call and bypasses the entire
+allow/deny engine designed in §12.10a — discovered incidentally, surfaced in the CLI's
+own denial messages during this task's testing (e.g. "Alternatively, re-run with
+--dangerously-skip-permissions to auto-approve all tools"). Nothing in `settings.json`
+or in §12.10a prevents a future dispatch — a careless invocation, a misconfigured
+script, or a compromised session — from passing this flag and voiding every deny rule
+at once. Out of scope here: this task concerns `settings.json` content, not how `agy`
+is invoked or what wraps it. Needs its own task if a durable defense is wanted (e.g. a
+dispatch wrapper that refuses to pass the flag through).
+
+**`~/.gemini/antigravity-cli/settings.json` is NOT currently live with this grant.**
+The file on disk remains the original two-entry version (`read_file`/`write_file` on
+the repo directory only, zero `command(...)` entries) throughout this task. The design
+is proven to work — not installed. Pasting the printed JSON block by hand, validating
+it parses as one object, and confirming one real dispatch runs a granted command all
+remain the developer's next steps, same approval gate as always (§12.15).
+
+`git diff .agents/AGENTS.md docs/MASTER_PLAN.md` confirmed exactly these two files
+changed, nothing else.
+
+Scope: `.agents/AGENTS.md`, `docs/MASTER_PLAN.md`. Related: `.agents/CURRENT_TASK.md`
+dated 2026-09-01 (amended 2026-09-02, `§12.10a content` section only).
