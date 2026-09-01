@@ -504,3 +504,13 @@ resolved, plus the §12.9 tier-floor gap when no Antigravity dispatch runs. The
 file, so no part of it appears in this diff. Also carries the §1.3a order item 1
 staleness fix.
 Scope: `.agents/AGENTS.md`, `docs/MASTER_PLAN.md`, `docs/STATUS.md`. Related: no CURRENT_TASK.md — scope was carried in the close-out prompt.
+
+### 2026-09-01 — AGENTS.md governance corrections
+
+AGENTS.md governance corrections. Resolved three contradictions introduced when the
+close-out rules were relaxed: §6.11 and §12.2 step 7 disagreed on whether CodeRabbit
+findings may be fixed, and §12.10 carried a duplicate git-writes bullet with a run-on
+paste error. Wrote §12.16 (Claude Chat filesystem access), which two other sections
+already referenced but which did not exist. Rewrote §12.17, which claimed git write
+tools were disabled when they were not. No code, schema or migration touched.
+Scope: `.agents/AGENTS.md`.
