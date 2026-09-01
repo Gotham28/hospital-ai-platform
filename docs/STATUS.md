@@ -784,3 +784,62 @@ Deliberately deferred:
   `.agents/DECISIONS_TAKEN.md`, `.agents/LOOP_HANDOFF.md` from earlier resolved tasks,
   and seven scratch/test scripts. Untracked, so they cannot reach a commit. Cleanup is
   its own task.
+
+### Catch-up — 2026-09-01
+
+**AGENTS.md governance corrections — CODE COMPLETE, pending commit (branch
+`docs/agents-md-corrections`, cut from `origin/main`).**
+
+Six substantive changes to `.agents/AGENTS.md`, made in Claude Chat on 2026-09-01,
+resolving three internal contradictions and writing one section that was already
+referenced but never existed:
+
+- §6.11 — the CodeRabbit-review paragraph rewritten. Close-out may now fix a
+  finding when the fix stays inside the task's `## Files/areas in scope` and fires
+  no §10 Opus trigger; every other finding is reported, not actioned. Previously
+  read "report it in full without fixing anything," contradicting §12.2 step 7's
+  already-permissive text.
+- §12.1 — all three summary-table rows rewritten to match what §12.10, §12.15,
+  §12.16 and §12.17 actually permit. Two verification rounds caught real
+  regressions in this rewrite before commit: the first restored two protections
+  dropped from the Claude Code row ("no documentation write before approval," "no
+  edit to CURRENT_TASK.md/DECISION.md"); the second fixed a self-contradiction
+  where the same row banned force-push outright while §12.10 (untouched) permits
+  `--force-with-lease` on Claude Code's own unmerged branch.
+- §12.2 step 7 — "It fixes nothing it finds" replaced with the same scoped-fix
+  language as §6.11.
+- §12.10 — a duplicate, never-committed working-tree bullet (with a
+  `protection.Then` paste error) removed. `git log -p` across the file's full
+  history confirms the surviving bullet was written once, cleanly, in PR #16 —
+  nothing was ever duplicated in any commit.
+- §12.16 — new section, written this session. Describes Claude Chat's filesystem
+  MCP access (`.agents/` and `docs/` only), including the `D:\npx.cmd` PATH issue
+  that caused a same-day outage. Was referenced by §12.17 and §12.18 before it
+  existed.
+- §12.17 — rewritten. Previously claimed Claude Chat's git write tools were
+  disabled in Desktop settings; they were not, confirmed live in this session. Now
+  describes the local-only, no-push, no-PR scope of `mcp-server-git`, and which
+  tools Claude Chat may use during close-out versus never.
+- §12.18 ("One Claude Chat session at a time") — pre-existing, uncommitted content
+  from an earlier, separate session. Confirmed via this file's edit history to
+  predate any change made here. Left unchanged; included in this commit only
+  because it shared the same uncommitted file.
+
+Framing note: §12.16/§12.17 are net-new grants of Claude Chat git/filesystem
+capability, not corrections of pre-existing text. Bundled into this commit
+alongside genuine contradiction fixes as one file, one topic — matching this
+project's established convention for governance-doc commits (Catch-up 2026-08-29).
+
+Process note: this task's own `.agents/CURRENT_TASK.md` change-list was wrong
+twice, and both times Order step 2's scope-verification check caught it before
+anything was committed — once for a fix that had never actually been missing, once
+for the undisclosed §12.18 section. Full detail in this task's `.agents/REPORT.md`
+and its two `.agents/DECISION.md` rounds. The check working as designed, not a sign
+of trouble.
+
+Known and NOT fixed here:
+- `.claude/skills/close-task/SKILL.md` is a tracked repo file (not an external
+  Claude Project skill, as this document's Repo Hygiene note previously claimed)
+  and still hard-codes "Not fix anything... reporting only" — now superseded by
+  the §6.11/§12.2-step-7 text this commit lands. Outside this task's scope. Needs
+  its own task.

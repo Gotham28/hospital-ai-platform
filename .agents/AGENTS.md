@@ -187,8 +187,15 @@ task explicitly says to. Don't "clean up" as a side effect of an unrelated task.
 11. **Task close-out.** Once a task is reviewed and accepted, and the developer has
     approved the STATUS.md entry, you may: write that approved entry, stage the
     task's files by explicit path, commit, push to the feature branch, and open a PR
-    against `main`. Then fetch CodeRabbit's review and report it in full without
-    fixing anything.
+    against `main`. Then fetch CodeRabbit's review and report it in full. A finding
+    may be fixed only when the fix stays inside the `## Files/areas in scope` list in
+    `.agents/CURRENT_TASK.md` and fires no §10 Opus trigger. Every other finding is
+    reported, not actioned — including any that needs a file outside scope, that
+    disagrees with a decision taken deliberately at scoping, or that is simply wrong.
+    CodeRabbit is not an authority: on PR #8 one finding was declined and one
+    overridden knowingly, both correctly. Push any fixes to the same branch, then
+    report three lists — fixed, declined with the reason, and deferred — and ask the
+    developer to merge.
 
     Never `git add -A`, `git add .`, or `git add -u` — stage only files named in
     `.agents/CURRENT_TASK.md` under `## Files/areas in scope`, plus `docs/STATUS.md`,
@@ -376,9 +383,9 @@ a question directly.
 
 | Layer | Is | Does | Never does |
 |---|---|---|---|
-| **Developer** | The decision-maker | Approves scope, makes every escalated decision, performs all git close-out (§6.11), merges | — |
-| **Claude Chat** | Planning and decision layer | Scopes the task, writes `.agents/CURRENT_TASK.md`, answers halts, writes `.agents/DECISION.md` | Write code. Run commands. Touch the repo, except `.agents/CURRENT_TASK.md` and `.agents/DECISION.md`, which §12.7 and §12.15 make its files to write |
-| **Claude Code** | Execution driver | Plans the mechanics, dispatches Antigravity, reads its raw output, re-dispatches on error, resolves minor decisions per §12.4, reviews at the end, writes the handoff on a halt, drives close-out on a feature branch per §6.11 and §12.10 | Any git write beyond §12.10's feature-branch list. Merge a PR, ever. Any migration. Any non-local DB command. Any documentation write before the developer has approved the text (§12.15). Any edit to `.agents/CURRENT_TASK.md` or `.agents/DECISION.md`. Resolve anything §12.5 names |
+| **Developer** | The decision-maker | Approves scope, approves the STATUS.md entry, makes every escalated decision, merges | — |
+| **Claude Chat** | Planning and decision layer | Scopes the task, writes `.agents/CURRENT_TASK.md` and `.agents/DECISION.md`, answers halts, reads git state and files under `.agents/` and `docs/` (§12.16, §12.17), and may stage and commit during §6.11 close-out | Write code. Write any file under `backend/` or `frontend/`. Push, open a PR, or merge. Move HEAD or change branches |
+| **Claude Code** | Execution driver | Plans the mechanics, dispatches Antigravity, reads its raw output, re-dispatches on error, resolves minor decisions per §12.4, reviews at the end, writes the handoff on a halt, and runs close-out per §6.11 — approved STATUS.md entry, staging, commit, push, PR, CodeRabbit triage | Merge a PR. Force-push, except `--force-with-lease` on its own unmerged feature branch (§12.10). Push to `main`. Delete a branch. `git add -A`. Any migration. Any non-local DB command. Any documentation write before the developer has approved the text (§12.15). Any edit to `.agents/CURRENT_TASK.md` or `.agents/DECISION.md`. Resolve anything §12.5 names |
 | **Antigravity** | Mechanical executor | Writes the code named in the plan | Decide anything. Deviate from `CURRENT_TASK.md` |
 
 Claude Code has shell access so it can run Antigravity and read its output. That
@@ -406,7 +413,9 @@ widen what Claude Code may change. See §12.10.
    run the documentation sweep, write the approved STATUS.md entry, append
    `MASTER_PLAN.md` §9 if the task file scoped one, stage by explicit path, commit,
    push, open the PR, backfill the real PR number and commit hashes, then fetch
-   CodeRabbit's review and report it in full. It fixes nothing it finds. It never
+   CodeRabbit's review and report it in full. It may fix a finding only when the fix
+   stays inside the task's `## Files/areas in scope` and fires no §10 Opus trigger;
+   everything else is reported, not actioned (§6.11). It never
    merges. Merging the PR, deleting the branch, and re-uploading any changed
    governing document to the Claude Project are the developer's, always.
 
@@ -742,3 +751,82 @@ an exception to the gate above: the approval simply happened earlier.
 
 **Regenerating the repomix snapshot (§6.9) is not a documentation write** and needs no
 approval. It overwrites a generated artifact, not a document anyone reads directly.
+
+### 12.16 Claude Chat's filesystem access
+
+Claude Chat reaches the repository through a local MCP server
+(`@modelcontextprotocol/server-filesystem`), scoped to exactly two directories:
+`.agents/` and `docs/`. Added 2026-08-30, repaired 2026-09-01.
+
+**Scope is enforced by the server, not by instruction.** Paths outside those two
+directories are refused by the server itself. `backend/app/` and `frontend/src/` are
+therefore unreachable to Claude Chat, by construction — it reads source only as a
+diff, through §12.17's git server.
+
+**The server has write tools and they are deliberately enabled.** This is how Claude
+Chat writes `.agents/CURRENT_TASK.md` and `.agents/DECISION.md`, the two files
+§12.15 assigns to it. It is also how it reads `LOOP_HANDOFF.md`, `STATUS.md` and
+`MASTER_PLAN.md` off disk rather than from a stale Project upload.
+
+**Launch note.** The server must be launched by absolute path to `npx`. On this
+machine `npx` lives at `D:\npx.cmd`, which is not on the PATH that Claude Desktop's
+child processes inherit; a bare `npx` in `claude_desktop_config.json` fails silently
+at launch, leaving valid JSON and no tools. That was the 2026-08-31 to 2026-09-01
+outage.
+
+**Writing `docs/STATUS.md` from Claude Chat remains gated by §12.15's approval
+sequence.** Reach is not authority: the server allows the write, the approval gate
+decides whether it happens.
+
+### 12.17 Claude Chat's git access
+
+Claude Chat reaches git through a second local MCP server (`mcp-server-git`,
+official, from `modelcontextprotocol/servers`), scoped to this repository. Added
+2026-08-31.
+
+**This server is local git only.** It has no network reach: no `push`, no remote, no
+GitHub API. Opening a pull request and reading a CodeRabbit review are therefore
+impossible from Claude Chat, and remain Claude Code's under §6.11 or the
+developer's. A third server would be required to change that.
+
+**Tools Claude Chat may use freely, at any time:** `git_status`, `git_log`,
+`git_diff`, `git_diff_staged`, `git_diff_unstaged`, `git_show`, `git_branch`.
+
+**Tools Claude Chat may use only during §6.11 close-out, and only after the
+developer has approved the STATUS.md entry:** `git_add` (named paths only, never
+`-A`, `.`, `-u` or a glob), `git_commit`.
+
+**Tools Claude Chat may never use:** `git_reset`, `git_checkout`,
+`git_create_branch`, `git_init`, and any future tool that rewrites history, moves
+HEAD, or changes which branch is checked out. A reviewer that needs a different
+revision uses `git_show` and `git_diff`, and reports that it cannot see something
+rather than moving HEAD to reach it.
+
+**Merging is never Claude Chat's.** Same as §6.11 and §12.10 — the developer merges,
+always, without exception, including when CodeRabbit reports no issues.
+
+**Why read access is granted at all.** On 2026-08-31, Claude Chat produced a branch-
+move sequence that aborted, because it did not know `origin/main` had advanced to
+`12b7c66` (PR #18) and had assumed uncommitted docs files would survive a checkout.
+The failure was a gap in visibility, not in authority.
+
+### 12.18 One Claude Chat session at a time
+
+`.agents/CURRENT_TASK.md` and `.agents/DECISION.md` are written by Claude Chat
+(§12.15, §12.16). Neither has any locking, versioning or conflict detection: a write
+is a full overwrite.
+
+Two concurrent Claude Chat sessions therefore overwrite each other silently. On
+2026-08-31 this happened — a second session wrote a repo-hygiene scope into
+`CURRENT_TASK.md` while a first session was mid-task on the IRIS design tokens.
+Claude Code, reading the file cold, correctly refused to append a paused-state
+section for a task the file no longer described.
+
+**Rule:** only one Claude Chat session may hold a task at a time. Before writing
+`CURRENT_TASK.md`, Claude Chat reads it first and reports what it is about to
+replace. If the existing content describes a different task, that is a stop-and-ask,
+not an overwrite.
+
+Claude Code is not required to reconcile a task file that does not match the work in
+front of it. Refusing and reporting is the correct behaviour, and is what §12.15's
+scope check depends on.
