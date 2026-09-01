@@ -514,3 +514,10 @@ paste error. Wrote §12.16 (Claude Chat filesystem access), which two other sect
 already referenced but which did not exist. Rewrote §12.17, which claimed git write
 tools were disabled when they were not. No code, schema or migration touched.
 Scope: `.agents/AGENTS.md`.
+
+### 2026-09-01 — Antigravity scoped command grant; AGENTS.md §12.10a
+Not in the original plan. Granted Antigravity a scoped `command(...)`
+permission in `~/.gemini/antigravity-cli/settings.json` (outside the repo,
+no diff) so mechanical work can actually run there per §12.3, and added
+AGENTS.md §12.10a listing the hard limits the grant excludes.
+Scope: `.agents/AGENTS.md`. Related: CURRENT_TASK.md dated 2026-09-01.

@@ -633,6 +633,91 @@ authorises any of them:
   file; §12.7 makes the resume file Claude Chat's. See §12.15 for why these two sit on
   the other side of the line from STATUS.md.
 
+### 12.10a Antigravity's scoped `command(...)` grant
+
+Reverses the deliberate withholding recorded in Catch-up 2026-08-28, so mechanical work
+can actually run in Antigravity per §12.3 instead of falling to Claude Code by default.
+Lives in `~/.gemini/antigravity-cli/settings.json`, outside the repo — developer-edited
+only, per §12.15's reasoning applied to permission files: an agent that can widen its own
+grant has no grant.
+
+**ALLOW, enumerated exactly. A wildcard is a door in the wall:**
+- `command(python backend/run_ml_postprocess_test.py)`
+- `command(python backend/run_translation_test.py)`
+- `command(python backend/run_e2e_test.py)`
+- `command(python backend/run_malayalam_test.py)`
+- `command(grep)`, `command(rg)`, `command(ls)`, `command(dir)`, `command(cat)`,
+  `command(type)`, `command(findstr)`
+- `command(git status)`, `command(git diff)`, `command(git log)`, `command(git show)`
+- `command(npx repomix)`
+
+Never bare `command(python)` — a one-token prefix matches every possible Python
+invocation, and `python -c` is an unrestricted shell. Never bare `command(git)` — same
+reasoning; only the four read-only subcommands above are granted.
+
+**DENY, unconditionally, regardless of any instruction Antigravity is given:**
+- All deletion: `rm`, `del`, `rmdir`, `Remove-Item`, `ri`, `erase`, `rd`
+- `command(alembic)` — §5.4. Drafted, never applied, and never by Antigravity.
+- `command(psql)`, `command(pg_dump)`, `command(pg_restore)` — §9. Neon and Render are
+  non-local.
+- All network: `curl`, `curl .*`, `curl.exe`, `wget`, `Invoke-WebRequest`, `iwr`
+- All git writes: `add`, `commit`, `push`, `merge`, `checkout`, `reset`, `branch`,
+  `worktree`, `rebase`, `stash`
+- `command(sudo)`
+
+**NOT GRANTED:**
+- Dev servers (`uvicorn` on port 8000, `vite`/`npm run dev` on port 5173). §5.9 requires
+  killing an existing port listener before starting one, and that kill command's argument
+  is a process ID discovered only at runtime — a permission pattern can either hardcode
+  one specific PID (useless next time) or wildcard the PID, which grants unrestricted
+  kill-any-process rather than anything scoped to a port. Port-clearing stays a manual,
+  developer-performed step.
+- `python -m backend.research.*` — Phase 2 has not started (STATUS.md Phase 2 section).
+
+**Why deletion is denied outright, not scoped to non-recursive.** Permission patterns
+match by whitespace-separated token, each anchored as `^(?:pattern)$`, evaluated as a
+token-count prefix — so any `command(rm)` or `command(del)` allow permits arbitrary
+trailing flags, since only the tokens explicitly named in the pattern are constrained.
+On this machine's shell (PowerShell), `rm` and `del` are built-in aliases for
+`Remove-Item`, which takes `-Recurse`/`-Force` — parameter names that match no POSIX
+deny token (`-r`, `-rf`, `-R`). There is no pattern that permits a single-file delete
+without also permitting a recursive one. The 2026-08-28 gap (three scoped deletions
+requiring the developer's hand) therefore stays manual, rather than trading it for
+recursive-delete capability on the repo tree.
+
+**Why the localhost network allowance was withdrawn.** A pattern like
+`command(curl http://localhost.*)` fails to match `curl -s http://localhost:8000`,
+because the second whitespace-separated token is `-s`, not the URL — enforcing
+"localhost only" would mean enumerating every flag ordering the model might generate,
+which breaks by accident, not only adversarially. All direct network tools are denied
+outright instead.
+
+**Why `command(*)` on the ask list is not the answer.** Antigravity's own documentation
+states permission conflicts resolve as "Deny > Ask > Allow" — an `Ask` entry on `*` would
+outrank every `Allow` entry above, prompting before every one of the enumerated scripts
+and tools and defeating unattended running entirely.
+
+**Step 3b result (2026-09-02), established empirically, not assumed.** With the real
+`~/.gemini/antigravity-cli/settings.json` unmodified (zero `command(...)` entries at the
+time), Antigravity was dispatched headlessly (`agy --print`) in the isolated
+`D:\scratch-loop-test` sandbox to run `whoami` — a command matching neither an allow nor
+a deny entry. Result: `jetski: no output produced — a tool required the "command"
+permission that headless mode cannot prompt for, so it was auto-denied.` An unmatched
+command is refused outright in headless dispatch, not left pending and not executed.
+This confirms, rather than merely corroborates, the 2026-08-28 observation that
+Antigravity was blocked, not permitted, on ungranted commands. This result is specific to
+headless (`--print`) dispatch, which is how Claude Code invokes Antigravity under this
+section; interactive-mode behavior for an unmatched command was not tested.
+
+**Residual risks, accepted knowingly:**
+- Antigravity may still reach `api.openai.com` and `api.sarvam.ai` indirectly if a dev
+  server it starts is running, spending real credits under the developer's keys — direct
+  network tools are denied, but traffic through the running application itself is not
+  prevented.
+- These limits are enforced by the permission file, not by Antigravity's cooperation.
+  §12.1 gives Antigravity no decision authority; a rule it must choose to follow is not a
+  limit.
+
 ### 12.11 Precedence
 
 §5 and §6 outrank everything in §12. Where continuing the loop would require breaking
