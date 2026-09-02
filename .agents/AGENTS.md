@@ -233,6 +233,48 @@ task explicitly says to. Don't "clean up" as a side effect of an unrelated task.
     that only the approved text landed. The agent may not reword, condense, expand
     or reorder an approved entry while writing it.
 
+### 6.12 Verifying whether work is merged — check content, never the commit graph
+
+This repository squash-merges. A squash creates a brand-new commit with new
+contents on `main` and discards the original commit's identity, so the original
+commit is never an ancestor of `main` after merging — no matter how cleanly it
+merged.
+
+Both of these are therefore invalid as evidence of merge status, and both return a
+confident, wrong "not merged" after a clean squash merge:
+
+```
+git branch --contains <sha>
+git merge-base --is-ancestor <sha> origin/main
+```
+
+Use a content check instead. Pick a string the work introduced and read the file at
+the target revision:
+
+```
+git show origin/main:<path> | grep "<string the change introduced>"
+```
+
+This reads file contents at a revision rather than commit ancestry, so a squash
+cannot fool it. If the string is there, the work is on `main`, whatever the commit
+graph says. Cite the path and the search string used, not just the verdict.
+
+Neither tool is banned for other purposes — `--contains` remains fine for "which
+local branches hold this exact commit." The rule is narrow: neither may be cited as
+evidence that something is or is not merged.
+
+**Recorded incidents.** `docs/STATUS.md` Catch-up 2026-09-01 (second entry)
+documents this trap causing a false accusation that the agent layer had fabricated
+a commit hash for PR #17 — written into `.agents/DECISION.md` and a draft of
+§12.12 before being caught and retracted — and states that Catch-up 2026-08-29
+(second entry) already recorded the same trap for that same PR. On 2026-09-02,
+Claude Code correctly halted a task on this exact question but supported the
+(correct) conclusion with two invalid checks of this kind alongside the one valid
+one.
+
+A check that cannot distinguish "merged" from "not merged" is not a weak check. It
+is not a check.
+
 ---
 
 ## 7. Broader Roadmap (for context — see docs/MASTER_PLAN.md for detail)

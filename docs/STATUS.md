@@ -1065,3 +1065,29 @@ end-of-task write — with the explicit caveat that this targets relay friction,
 review depth). Docs only, no code touched. `git diff .agents/AGENTS.md` confirmed
 only these two subsections were added, nothing else changed. MASTER_PLAN.md §9
 appended.
+
+### Catch-up — 2026-09-03
+
+**AGENTS.md §6.12 — squash-merge verification rule added — COMPLETE (branch
+`docs/squash-merge-verification-rule`, cut from `origin/main`).**
+
+PR: pending
+Commits: pending
+
+Added AGENTS.md §6.12, a new subsection immediately after §6.11: verifying whether
+work is merged into `main` must check file content at a revision
+(`git show origin/main:<path> | grep "<string>"`), never the commit graph
+(`git branch --contains`, `git merge-base --is-ancestor`) — this repo squash-merges,
+so a squash-merged commit is never an ancestor of `main` even after a clean merge,
+and both graph-based checks return a confident, wrong "not merged" as a result.
+This trap has now caused three separate incidents: two already recorded in this
+file (Catch-up 2026-08-29 second entry; Catch-up 2026-09-01 second entry, the false
+fabrication accusation on PR #17), and a third on 2026-09-02 where Claude Code
+reached the correct halt decision on a merge-status question but supported it with
+two invalid checks of this kind alongside the one valid one.
+
+Docs-only change. No commands were run beyond git, since there is no code to test.
+`git diff .agents/AGENTS.md` confirmed only the one new subsection was added and
+nothing else changed.
+
+Deferred: none — a single, self-contained rule addition.
