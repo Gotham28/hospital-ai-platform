@@ -530,3 +530,10 @@ only), 4 and 6. Conditions 1, 2 and 5 always halt for the developer. Three AGENT
 edits: §12.10 bans bypass flags, §12.10a requires `--add-dir`, §12.15 narrows the
 DECISION.md write exception. Scope: `.agents/hooks/`, `.claude/settings.json`,
 `.agents/AGENTS.md`.
+
+### 2026-09-02 — Interactive-mode and review-shape governance docs
+Interactive-mode and review-shape governance docs. Added AGENTS.md §12.19
+(interactive vs headless is a binary per-task choice; the halt-answerer is now a
+fallback, not the default; Edit not Write for permission path-scoping) and §12.20
+(the two-prompt review shape, and the rule that it targets relay friction, not
+review depth). Docs only. Scope: `.agents/AGENTS.md`.

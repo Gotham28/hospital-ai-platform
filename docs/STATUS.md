@@ -1050,3 +1050,18 @@ Windows): it did not reproduce here, on Claude Code `2.1.250`, with this exact f
 set. `halt_answerer.py`'s docstring now carries this result instead of a pending-test
 note. `.claude/settings.json` registration remains the developer's own action
 regardless — nothing here authorizes registering the hook automatically.
+
+### Catch-up — 2026-09-02 (second entry)
+
+**Interactive-mode and review-shape governance docs — COMPLETE.**
+
+Added AGENTS.md §12.19 (interactive vs headless Claude Code is a binary per-task
+choice, not a spectrum — interactive is now the default and the halt-answerer from
+PR #23 is a fallback for genuinely unattended runs; plus the related finding that
+Claude Code only enforces path-scoped permissions via `Edit(<path>)`, never
+`Write(<path>)`) and §12.20 (the two-prompt review shape — one paste to start a task,
+one for a consolidated fix round, `.agents/REPORT.md` as the new standing
+end-of-task write — with the explicit caveat that this targets relay friction, not
+review depth). Docs only, no code touched. `git diff .agents/AGENTS.md` confirmed
+only these two subsections were added, nothing else changed. MASTER_PLAN.md §9
+appended.

@@ -975,3 +975,72 @@ not an overwrite.
 Claude Code is not required to reconcile a task file that does not match the work in
 front of it. Refusing and reporting is the correct behaviour, and is what §12.15's
 scope check depends on.
+
+### 12.19 Interactive vs headless Claude Code — pick one, not both
+
+`AskUserQuestion`, and any tool marked `requiresUserInteraction`, is denied in
+headless (`-p`) dispatch even when an allow rule matches it — confirmed against
+Anthropic's own headless-mode documentation, 2026-09-02. Headless mode's only
+channel back to a human is a file it writes for someone to read later; it cannot
+interactively clarify, under any permission configuration.
+
+**Consequence: "runs unattended" and "asks real-time questions" are mutually
+exclusive per task, not a spectrum to tune.** Pick one.
+
+**Decision (developer, 2026-09-02): interactive Claude Code is the default going
+forward.** When Claude Code hits a genuine §12.5-type decision while running
+interactively, it asks the developer directly via `AskUserQuestion` — no Claude
+Chat relay for that decision, and no file-based handoff needed for it either.
+
+**Consequence for the halt-answerer** (`.agents/hooks/halt_answerer.py`, §12.15,
+merged PR #23): it is not removed and remains correct for genuinely unattended or
+overnight headless runs, where no human is present to ask. Under an interactive
+default it is a fallback, not the primary path — a present developer answers a real
+decision faster than a Sonnet process reading a handoff file. The three AGENTS.md
+edits PR #23 also landed (§12.10's bypass-flag ban, §12.10a's `--add-dir`
+requirement, §12.15's DECISION.md exception) are independent findings and remain
+fully valid regardless of which mode a given task uses.
+
+**Related permission-mechanics finding, same night, same task:** Claude Code
+enforces path-scoped permission rules for `Edit`/`Read` only. A `Write(<path>)` rule
+is accepted but silently never consulted — one line in Claude Code's own
+permissions documentation, plus a startup warning. Confirmed live, not only from
+docs: an adversarial `claude -p` dispatch on Claude Code `2.1.250` had `Edit` denied
+against a decoy file while succeeding against the allowed path, in the same run.
+**Rule for any future permission list, `.claude/settings.json`, or `--allowedTools`
+flag: scope file writes with `Edit(<path>)`, never `Write(<path>)`.**
+
+### 12.20 The two-prompt review shape
+
+Target shape for interactive-mode tasks, agreed with the developer 2026-09-02: one
+manual paste to start a task, one manual paste for a consolidated fix round if
+needed. Nothing else should require the developer to relay text between Claude Chat
+and Claude Code.
+
+**How:** Claude Chat writes `CURRENT_TASK.md` and a start message (unchanged).
+Claude Code runs interactively, dispatching Antigravity for mechanical work per
+§12.3, and asks the developer directly for any genuine §12.5-type decision — no
+Claude Chat relay for that step. On completion, Claude Code writes its full
+end-of-task report to `.agents/REPORT.md`, not only to console output — a standing
+instruction for every task's `## Order` section from here on. Claude Chat reads
+`.agents/REPORT.md` and the relevant diffs directly, through its own filesystem and
+git access (§12.16, §12.17) — no paste needed for that step either. If Claude Chat
+finds real problems, it writes one full, thorough fix prompt.
+
+**The caveat, stated as a rule of interpretation, not a target to hit by trimming
+findings:** this shape eliminates needless manual relay. It does not cap how many
+real problems get reported, or how many rounds a genuine investigation takes. If
+fixing one finding surfaces a second, genuinely new finding, that finding is
+reported on its own honest terms — never folded, softened, or withheld to preserve
+a count.
+
+Evidence this matters, from the same task that prompted this section: the fix for
+"the write-restriction mechanism does not restrict anything" (switching
+`Write(<path>)` to `Edit(<path>)`) is what surfaced the deeper question of whether
+Windows headless mode honors path-scoping at all — reachable only by investigating
+the first fix, not knowable in advance. A hard cap at one fix round would have
+shipped that unverified.
+
+**Unaffected by any of this:** §12.5 conditions 1, 2 and 5 always halt for the
+developer regardless of interactive or headless mode. Opus never runs inside Claude
+Code (§12.12). Neither is a matter of relay convenience.
