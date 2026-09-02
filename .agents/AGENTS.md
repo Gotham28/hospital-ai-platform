@@ -677,6 +677,11 @@ authorises any of them:
   Claude Chat and read by Claude Code. §6.4 forbids rewriting a developer-supplied scope
   file; §12.7 makes the resume file Claude Chat's. See §12.15 for why these two sit on
   the other side of the line from STATUS.md.
+  **Narrow exception:** at the end of a task's own close-out (§6.9), Claude Code may
+  overwrite `.agents/CURRENT_TASK.md` with the fixed idle placeholder —
+  `# Current Task\n\nNo task currently in progress.` — and nothing else: no other
+  content, no partial edit, no edit at any other point in a task. `.agents/DECISION.md`
+  remains fully off-limits, no exception.
 - **No `--dangerously-skip-permissions` or any equivalent auto-approve flag, on any
   dispatch — an Antigravity dispatch under §12.3, or the halt-answerer's `claude -p`
   invocation.** It voids every tool restriction in one argument: §12.10a's allow/deny
@@ -875,7 +880,9 @@ not how risky a file looks — it is whether the file **describes** the work or
 
 **Governing — Claude Code never writes, approved or not:**
 
-- `.agents/CURRENT_TASK.md`
+- `.agents/CURRENT_TASK.md` — except the fixed idle-reset at close-out, per §12.10's
+  narrow exception. The file's actual task-scope content remains Claude Chat's alone
+  to write.
 - `.agents/DECISION.md`
 
 **Narrow exception — the halt loop.** For §12.5 conditions 3 and 4, the `Stop` hook
