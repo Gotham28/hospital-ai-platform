@@ -1152,8 +1152,8 @@ Deferred: none — a single, self-contained rule addition.
 **Task 2 — chat-stream [TRANSLATION_UNAVAILABLE] sentinel — CODE COMPLETE
 (branch `feat/chat-stream-translation-sentinel`, cut from `origin/main`).**
 
-PR: pending
-Commits: pending
+PR: #27
+Commits: 27ee8cd
 
 Emits a bare, non-JSON SSE sentinel frame, `data: [TRANSLATION_UNAVAILABLE]\n\n`,
 from the two English-to-Malayalam `TranslationUnavailableError` branches that
