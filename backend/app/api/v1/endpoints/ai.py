@@ -529,6 +529,7 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
                     reply = normalise_malayalam(await _translate_async(reply, "en", "ml"))
                 except TranslationUnavailableError as e:
                     logger.warning("[Translation] en->ml failed at STATUS reply: %s", type(e).__name__)
+                    yield "data: [TRANSLATION_UNAVAILABLE]\n\n"
                 except Exception as e:
                     logger.warning("[Translation] en->ml unexpected failure at STATUS reply: %s", type(e).__name__)
             yield f"data: {json.dumps(reply)}\n\n"
@@ -936,6 +937,7 @@ IMPORTANT:
                             error_msg = normalise_malayalam(await _translate_async(error_msg, "en", "ml"))
                         except TranslationUnavailableError as e:
                             logger.warning("[Translation] en->ml failed at booking-validation error: %s", type(e).__name__)
+                            yield "data: [TRANSLATION_UNAVAILABLE]\n\n"
                         except Exception as e:
                             logger.warning("[Translation] en->ml unexpected failure at booking-validation error: %s", type(e).__name__)
                     yield f"data: {json.dumps(error_msg)}\n\n"
