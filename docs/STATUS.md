@@ -783,6 +783,61 @@ Deliberately deferred:
   and seven scratch/test scripts. Untracked, so they cannot reach a commit. Cleanup is
   its own task.
 
+### Catch-up — 2026-08-31
+
+**Task 1 of 3 — IRIS design tokens (foundation) — CODE COMPLETE, NOT COMMITTED
+(branch `feat/iris-design-tokens`, cut from `origin/main` at `12b7c66`, PR #18).**
+
+Foundation for the IRIS theme rebuild. Two files. No component consumes any new
+token yet.
+
+- `frontend/src/index.css` — added the `iris-*` colour and type tokens to the
+  `@theme` block. This project is on Tailwind v4: `tailwind.config.js` is not read
+  and there is no `@config` directive, so `@theme` in `index.css` is the only place
+  a token can be declared. 22 new custom properties: 9 `--color-iris-*`
+  (primary #2A69B5, primary-hover #1E4E8C, surface #F7F9FC, surface-raised #FFFFFF,
+  border #D5DEE8, text-primary #1C2430, text-muted #5C6875, accent #0E7C86,
+  danger #B04A2F), 10 `--text-iris-*` (label/ui/body/body-ml/title, each with a
+  `--line-height` companion), `--radius-iris: 16px`, `--shadow-iris: 0 2px 8px
+  rgba(28,36,48,0.10)`, and `--font-malayalam` — the one token not
+  `iris`-namespaced, carried over verbatim from the developer-approved starting
+  block despite the stated namespace rule.
+- `frontend/index.html` — added Noto Sans Malayalam to the font link; `<title>`
+  changed to "Arogya".
+
+**Verification — DEVELOPER-ATTESTED, NOT EVIDENCED (§5.10 exception, accepted by
+the developer 2026-09-01).** The checks below were run during the authoring session
+and their raw output was not preserved to any file. They were not re-run for this
+entry. Recorded as an attestation, not as evidence: `npm run build` exit 0 with no
+Tailwind warnings; a scratch element using `bg-iris-primary`, `text-iris-body`,
+`text-iris-text-muted`, `rounded-iris`, `shadow-iris` and `font-malayalam` produced
+computed styles matching spec (background rgb(42,105,181), 17px/27.2px line-height,
+colour rgb(92,104,117), 16px radius, matching shadow, "Noto Sans Malayalam" family),
+then removed; `document.fonts.check('16px "Noto Sans Malayalam"')` returned true
+with `Chat.tsx`'s own `@import` disabled; `/p/arogya-specialty` and the admin
+dashboard unchanged by screenshot. A future session must re-derive any of this
+rather than rely on it.
+
+Review: the §12.13 report first returned verdict `accept as-is`. Corrected to
+`accept with fixes` — 2 of 4 regression screenshots were not captured, and a clean
+verdict may not rest on a partial evidence set (§5.10).
+
+Regression check WAIVED by the developer, 2026-08-31 — recorded as a waiver, not a
+pass. `/p/iris-hospitals` and `/p/bkm-hospital-payannur` were not screenshotted. No
+hospital row in the local database carries either slug, and no component consumes
+any `iris-*` token yet, so there is nothing a screenshot could show. Recorded
+explicitly so a later task does not assume these routes were checked.
+
+Known and NOT fixed here:
+- `text-iris-body-ml` was never exercised. Expected 17px with 32.3px line-height,
+  unconfirmed — nothing consumes it yet. First real test is Task 2.
+- Trailing whitespace fixed before commit at `frontend/src/index.css:5` — that line
+  predates the token diff (it is the blank line after `--font-sans`) and was not
+  introduced by this task.
+- The Task 1 work lived only in `stash@{0}` from 2026-08-31 17:00:21 +0530 until
+  2026-09-01, never committed. Restored with
+  `git restore --source='stash@{0}'`; the stash was left intact.
+
 ### Catch-up — 2026-09-01
 
 **AGENTS.md governance corrections — CODE COMPLETE, pending commit (branch
