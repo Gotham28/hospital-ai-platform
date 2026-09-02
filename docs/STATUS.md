@@ -1071,8 +1071,8 @@ appended.
 **AGENTS.md §6.12 — squash-merge verification rule added — COMPLETE (branch
 `docs/squash-merge-verification-rule`, cut from `origin/main`).**
 
-PR: pending
-Commits: pending
+PR: #26
+Commits: 5aafc14
 
 Added AGENTS.md §6.12, a new subsection immediately after §6.11: verifying whether
 work is merged into `main` must check file content at a revision
