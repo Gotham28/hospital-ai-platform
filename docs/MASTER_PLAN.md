@@ -537,3 +537,12 @@ Interactive-mode and review-shape governance docs. Added AGENTS.md §12.19
 fallback, not the default; Edit not Write for permission path-scoping) and §12.20
 (the two-prompt review shape, and the rule that it targets relay friction, not
 review depth). Docs only. Scope: `.agents/AGENTS.md`.
+
+### 2026-09-03 — AGENTS.md §6.12 squash-merge verification rule
+
+Not in the original plan. Added AGENTS.md §6.12: verifying whether work is merged
+into `main` must check file content at a revision, never the commit graph, because
+this repo squash-merges and both `git branch --contains` and
+`git merge-base --is-ancestor` return a false "not merged" after a clean squash.
+This trap has caused three separate incidents. Docs only.
+Scope: `.agents/AGENTS.md`. Related: CURRENT_TASK.md dated 2026-09-03.
