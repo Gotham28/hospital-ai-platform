@@ -504,3 +504,45 @@ resolved, plus the §12.9 tier-floor gap when no Antigravity dispatch runs. The
 file, so no part of it appears in this diff. Also carries the §1.3a order item 1
 staleness fix.
 Scope: `.agents/AGENTS.md`, `docs/MASTER_PLAN.md`, `docs/STATUS.md`. Related: no CURRENT_TASK.md — scope was carried in the close-out prompt.
+
+### 2026-09-01 — AGENTS.md governance corrections
+
+AGENTS.md governance corrections. Resolved three contradictions introduced when the
+close-out rules were relaxed: §6.11 and §12.2 step 7 disagreed on whether CodeRabbit
+findings may be fixed, and §12.10 carried a duplicate git-writes bullet with a run-on
+paste error. Wrote §12.16 (Claude Chat filesystem access), which two other sections
+already referenced but which did not exist. Rewrote §12.17, which claimed git write
+tools were disabled when they were not. No code, schema or migration touched.
+Scope: `.agents/AGENTS.md`.
+
+### 2026-09-01 — Antigravity scoped command grant; AGENTS.md §12.10a
+Not in the original plan. Granted Antigravity a scoped `command(...)`
+permission in `~/.gemini/antigravity-cli/settings.json` (outside the repo,
+no diff) so mechanical work can actually run there per §12.3, and added
+AGENTS.md §12.10a listing the hard limits the grant excludes.
+Scope: `.agents/AGENTS.md`. Related: CURRENT_TASK.md dated 2026-09-01.
+
+### 2026-09-02 — Unattended halt loop
+Unattended halt loop. Added a Claude Code `Stop` hook
+(`.agents/hooks/halt_answerer.py`) that dispatches a tool-restricted Sonnet answerer
+to auto-write `.agents/DECISION.md` for AGENTS.md §12.5 conditions 3 (stay-in-scope
+only), 4 and 6. Conditions 1, 2 and 5 always halt for the developer. Three AGENTS.md
+edits: §12.10 bans bypass flags, §12.10a requires `--add-dir`, §12.15 narrows the
+DECISION.md write exception. Scope: `.agents/hooks/`, `.claude/settings.json`,
+`.agents/AGENTS.md`.
+
+### 2026-09-02 — Interactive-mode and review-shape governance docs
+Interactive-mode and review-shape governance docs. Added AGENTS.md §12.19
+(interactive vs headless is a binary per-task choice; the halt-answerer is now a
+fallback, not the default; Edit not Write for permission path-scoping) and §12.20
+(the two-prompt review shape, and the rule that it targets relay friction, not
+review depth). Docs only. Scope: `.agents/AGENTS.md`.
+
+### 2026-09-03 — AGENTS.md §6.12 squash-merge verification rule
+
+Not in the original plan. Added AGENTS.md §6.12: verifying whether work is merged
+into `main` must check file content at a revision, never the commit graph, because
+this repo squash-merges and both `git branch --contains` and
+`git merge-base --is-ancestor` return a false "not merged" after a clean squash.
+This trap has caused three separate incidents. Docs only.
+Scope: `.agents/AGENTS.md`. Related: CURRENT_TASK.md dated 2026-09-03.

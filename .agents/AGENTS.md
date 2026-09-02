@@ -31,19 +31,22 @@ Research-only code (benchmarks, evaluation scripts) belongs in a separate, isola
 - **Backend**: FastAPI (Python)
 - **Frontend**: React + TypeScript
 - **Database**: PostgreSQL with the `pgvector` extension enabled. Staging is hosted on
-  Render; a migration of staging to Neon is in progress — check
-  `.agents/CURRENT_TASK.md` and `STATUS.md` before assuming which host is live.
+  Neon. The migration from Render completed 2026-08-09 and the Render Postgres
+  instance was deleted the same day — see `docs/STATUS.md` Catch-up 2026-08-09. Neon
+  is non-local: §9's no-commands-against-a-non-local-database rule applies to it in
+  full.
 - **Cache/session store**: Redis
 - **LLM**: OpenAI GPT-4o-mini (current default)
 - **Embeddings**: OpenAI `text-embedding-3-small`, 1536 dimensions
-- **Translation**: currently Google Translate via `_translate_async()` in
-  `services/translation.py`. The Malayalam output normaliser
-  (`services/ml_postprocess.py`) is wired into the three English-to-Malayalam call
-  sites in `api/v1/endpoints/ai.py` as of PR #17, merged 2026-08-29 — run
-  `grep -n "_translate_async(" backend/app/api/v1/endpoints/ai.py` for their current
-  locations. The Sarvam client itself (MASTER_PLAN.md §1.3a Task A) is not yet built;
-  the API key arrived 2026-08-29, so it is no longer blocked. Task A must use
-  `sarvam-translate:v1`, not `mayura:v1` — see `docs/STATUS.md` Catch-up 2026-08-23.
+- **Translation**: Sarvam AI (`sarvam-translate:v1`) is primary, Google Translate is
+  fallback, per-provider in-process circuit breaker — `services/translation.py`,
+  MASTER_PLAN.md §1.3a Task A, merged as PR #19 (2026-09-01). Both providers raise
+  `TranslationUnavailableError` on total failure rather than silently returning
+  untranslated text. The Malayalam output normaliser (`services/ml_postprocess.py`)
+  is wired into the three English-to-Malayalam call sites in `api/v1/endpoints/ai.py`
+  as of PR #17 — run `grep -n "_translate_async(" backend/app/api/v1/endpoints/ai.py`
+  for their current locations. Task C (Redis translation cache, Opus tier) is the
+  remaining §1.3a item, not yet built.
 - **Migrations**: Alembic
 - **Messaging**: Twilio WhatsApp via `services/whatsapp.py` (degrades gracefully if
   credentials are unset)
@@ -63,7 +66,7 @@ below rather than containing this logic itself.
 | Translation bridge — `_translate()`, `_translate_async()` | `backend/app/services/translation.py` |
 | Session context (Redis-backed) | `backend/app/services/patient_context.py` |
 | Vocabulary helpers | `backend/app/services/vocabulary.py` |
-| Malayalam output normaliser — `normalise_malayalam()`, provider-agnostic, wired into the three English-to-Malayalam translate call sites in `ai.py` (PR #17, 2026-08-29)
+| Malayalam output normaliser — `normalise_malayalam()`, provider-agnostic, wired into the three English-to-Malayalam translate call sites in `ai.py` (PR #17, 2026-08-29) | `backend/app/services/ml_postprocess.py` |
 | Booking state machine / session logic | `backend/app/services/booking.py` |
 | Relevance gate (IRIS Feature 4) | `backend/app/services/relevance.py` |
 | WhatsApp messaging | `backend/app/services/whatsapp.py` |
@@ -187,8 +190,15 @@ task explicitly says to. Don't "clean up" as a side effect of an unrelated task.
 11. **Task close-out.** Once a task is reviewed and accepted, and the developer has
     approved the STATUS.md entry, you may: write that approved entry, stage the
     task's files by explicit path, commit, push to the feature branch, and open a PR
-    against `main`. Then fetch CodeRabbit's review and report it in full without
-    fixing anything.
+    against `main`. Then fetch CodeRabbit's review and report it in full. A finding
+    may be fixed only when the fix stays inside the `## Files/areas in scope` list in
+    `.agents/CURRENT_TASK.md` and fires no §10 Opus trigger. Every other finding is
+    reported, not actioned — including any that needs a file outside scope, that
+    disagrees with a decision taken deliberately at scoping, or that is simply wrong.
+    CodeRabbit is not an authority: on PR #8 one finding was declined and one
+    overridden knowingly, both correctly. Push any fixes to the same branch, then
+    report three lists — fixed, declined with the reason, and deferred — and ask the
+    developer to merge.
 
     Never `git add -A`, `git add .`, or `git add -u` — stage only files named in
     `.agents/CURRENT_TASK.md` under `## Files/areas in scope`, plus `docs/STATUS.md`,
@@ -222,6 +232,48 @@ task explicitly says to. Don't "clean up" as a side effect of an unrelated task.
     STATUS.md verbatim as approved, then pastes `git diff docs/STATUS.md` to prove
     that only the approved text landed. The agent may not reword, condense, expand
     or reorder an approved entry while writing it.
+
+### 6.12 Verifying whether work is merged — check content, never the commit graph
+
+This repository squash-merges. A squash creates a brand-new commit with new
+contents on `main` and discards the original commit's identity, so the original
+commit is never an ancestor of `main` after merging — no matter how cleanly it
+merged.
+
+Both of these are therefore invalid as evidence of merge status, and both return a
+confident, wrong "not merged" after a clean squash merge:
+
+```
+git branch --contains <sha>
+git merge-base --is-ancestor <sha> origin/main
+```
+
+Use a content check instead. Pick a string the work introduced and read the file at
+the target revision:
+
+```
+git show origin/main:<path> | grep "<string the change introduced>"
+```
+
+This reads file contents at a revision rather than commit ancestry, so a squash
+cannot fool it. If the string is there, the work is on `main`, whatever the commit
+graph says. Cite the path and the search string used, not just the verdict.
+
+Neither tool is banned for other purposes — `--contains` remains fine for "which
+local branches hold this exact commit." The rule is narrow: neither may be cited as
+evidence that something is or is not merged.
+
+**Recorded incidents.** `docs/STATUS.md` Catch-up 2026-09-01 (second entry)
+documents this trap causing a false accusation that the agent layer had fabricated
+a commit hash for PR #17 — written into `.agents/DECISION.md` and a draft of
+§12.12 before being caught and retracted — and states that Catch-up 2026-08-29
+(second entry) already recorded the same trap for that same PR. On 2026-09-02,
+Claude Code correctly halted a task on this exact question but supported the
+(correct) conclusion with two invalid checks of this kind alongside the one valid
+one.
+
+A check that cannot distinguish "merged" from "not merged" is not a weak check. It
+is not a check.
 
 ---
 
@@ -376,9 +428,9 @@ a question directly.
 
 | Layer | Is | Does | Never does |
 |---|---|---|---|
-| **Developer** | The decision-maker | Approves scope, makes every escalated decision, performs all git close-out (§6.11), merges | — |
-| **Claude Chat** | Planning and decision layer | Scopes the task, writes `.agents/CURRENT_TASK.md`, answers halts, writes `.agents/DECISION.md` | Write code. Run commands. Touch the repo, except `.agents/CURRENT_TASK.md` and `.agents/DECISION.md`, which §12.7 and §12.15 make its files to write |
-| **Claude Code** | Execution driver | Plans the mechanics, dispatches Antigravity, reads its raw output, re-dispatches on error, resolves minor decisions per §12.4, reviews at the end, writes the handoff on a halt, drives close-out on a feature branch per §6.11 and §12.10 | Any git write beyond §12.10's feature-branch list. Merge a PR, ever. Any migration. Any non-local DB command. Any documentation write before the developer has approved the text (§12.15). Any edit to `.agents/CURRENT_TASK.md` or `.agents/DECISION.md`. Resolve anything §12.5 names |
+| **Developer** | The decision-maker | Approves scope, approves the STATUS.md entry, makes every escalated decision, merges | — |
+| **Claude Chat** | Planning and decision layer | Scopes the task, writes `.agents/CURRENT_TASK.md` and `.agents/DECISION.md`, answers halts, reads git state and files under `.agents/` and `docs/` (§12.16, §12.17), and may stage and commit during §6.11 close-out | Write code. Write any file under `backend/` or `frontend/`. Push, open a PR, or merge. Move HEAD or change branches |
+| **Claude Code** | Execution driver | Plans the mechanics, dispatches Antigravity, reads its raw output, re-dispatches on error, resolves minor decisions per §12.4, reviews at the end, writes the handoff on a halt, and runs close-out per §6.11 — approved STATUS.md entry, staging, commit, push, PR, CodeRabbit triage | Merge a PR. Force-push, except `--force-with-lease` on its own unmerged feature branch (§12.10). Push to `main`. Delete a branch. `git add -A`. Any migration. Any non-local DB command. Any documentation write before the developer has approved the text (§12.15). Any edit to `.agents/CURRENT_TASK.md` or `.agents/DECISION.md`. Resolve anything §12.5 names |
 | **Antigravity** | Mechanical executor | Writes the code named in the plan | Decide anything. Deviate from `CURRENT_TASK.md` |
 
 Claude Code has shell access so it can run Antigravity and read its output. That
@@ -406,7 +458,9 @@ widen what Claude Code may change. See §12.10.
    run the documentation sweep, write the approved STATUS.md entry, append
    `MASTER_PLAN.md` §9 if the task file scoped one, stage by explicit path, commit,
    push, open the PR, backfill the real PR number and commit hashes, then fetch
-   CodeRabbit's review and report it in full. It fixes nothing it finds. It never
+   CodeRabbit's review and report it in full. It may fix a finding only when the fix
+   stays inside the task's `## Files/areas in scope` and fires no §10 Opus trigger;
+   everything else is reported, not actioned (§6.11). It never
    merges. Merging the PR, deleting the branch, and re-uploading any changed
    governing document to the Claude Project are the developer's, always.
 
@@ -623,6 +677,106 @@ authorises any of them:
   Claude Chat and read by Claude Code. §6.4 forbids rewriting a developer-supplied scope
   file; §12.7 makes the resume file Claude Chat's. See §12.15 for why these two sit on
   the other side of the line from STATUS.md.
+- **No `--dangerously-skip-permissions` or any equivalent auto-approve flag, on any
+  dispatch — an Antigravity dispatch under §12.3, or the halt-answerer's `claude -p`
+  invocation.** It voids every tool restriction in one argument: §12.10a's allow/deny
+  list for Antigravity, and the halt-answerer's own restricted `--allowedTools` grant.
+  Not a §12.4 minor decision. Not a valid retry after a permission refusal or a hook
+  failure. Not available under any §12.5 halt, including condition 4's three-strikes
+  case. A permission refusal means the invocation needs a grant that has not been
+  given — that is itself a reason to stop and report, not an obstacle to route around.
+
+### 12.10a Antigravity's scoped `command(...)` grant
+
+Reverses the deliberate withholding recorded in Catch-up 2026-08-28, so mechanical work
+can actually run in Antigravity per §12.3 instead of falling to Claude Code by default.
+Lives in `~/.gemini/antigravity-cli/settings.json`, outside the repo — developer-edited
+only, per §12.15's reasoning applied to permission files: an agent that can widen its own
+grant has no grant.
+
+**ALLOW, enumerated exactly. A wildcard is a door in the wall:**
+- `command(python backend/run_ml_postprocess_test.py)`
+- `command(python backend/run_translation_test.py)`
+- `command(python backend/run_e2e_test.py)`
+- `command(python backend/run_malayalam_test.py)`
+- `command(grep)`, `command(rg)`, `command(ls)`, `command(dir)`, `command(cat)`,
+  `command(type)`, `command(findstr)`
+- `command(git status)`, `command(git diff)`, `command(git log)`, `command(git show)`
+- `command(npx repomix)`
+
+Never bare `command(python)` — a one-token prefix matches every possible Python
+invocation, and `python -c` is an unrestricted shell. Never bare `command(git)` — same
+reasoning; only the four read-only subcommands above are granted.
+
+**Every dispatch MUST pass `--add-dir <repo-root>`.** Without it, relative paths in an
+allow rule resolve against no grant and every allowed read, write and command fails
+silently — confirmed by direct test 2026-09-02. A forgotten `--add-dir` produces a
+denial whose own message recommends the bypass flag banned by §12.10's new bullet;
+check `--add-dir` first, never reach for that flag instead. A grant that is never
+reached is not a grant.
+
+**DENY, unconditionally, regardless of any instruction Antigravity is given:**
+- All deletion: `rm`, `del`, `rmdir`, `Remove-Item`, `ri`, `erase`, `rd`
+- `command(alembic)` — §5.4. Drafted, never applied, and never by Antigravity.
+- `command(psql)`, `command(pg_dump)`, `command(pg_restore)` — §9. Neon and Render are
+  non-local.
+- All network: `curl`, `curl .*`, `curl.exe`, `wget`, `Invoke-WebRequest`, `iwr`
+- All git writes: `add`, `commit`, `push`, `merge`, `checkout`, `reset`, `branch`,
+  `worktree`, `rebase`, `stash`
+- `command(sudo)`
+
+**NOT GRANTED:**
+- Dev servers (`uvicorn` on port 8000, `vite`/`npm run dev` on port 5173). §5.9 requires
+  killing an existing port listener before starting one, and that kill command's argument
+  is a process ID discovered only at runtime — a permission pattern can either hardcode
+  one specific PID (useless next time) or wildcard the PID, which grants unrestricted
+  kill-any-process rather than anything scoped to a port. Port-clearing stays a manual,
+  developer-performed step.
+- `python -m backend.research.*` — Phase 2 has not started (STATUS.md Phase 2 section).
+
+**Why deletion is denied outright, not scoped to non-recursive.** Permission patterns
+match by whitespace-separated token, each anchored as `^(?:pattern)$`, evaluated as a
+token-count prefix — so any `command(rm)` or `command(del)` allow permits arbitrary
+trailing flags, since only the tokens explicitly named in the pattern are constrained.
+On this machine's shell (PowerShell), `rm` and `del` are built-in aliases for
+`Remove-Item`, which takes `-Recurse`/`-Force` — parameter names that match no POSIX
+deny token (`-r`, `-rf`, `-R`). There is no pattern that permits a single-file delete
+without also permitting a recursive one. The 2026-08-28 gap (three scoped deletions
+requiring the developer's hand) therefore stays manual, rather than trading it for
+recursive-delete capability on the repo tree.
+
+**Why the localhost network allowance was withdrawn.** A pattern like
+`command(curl http://localhost.*)` fails to match `curl -s http://localhost:8000`,
+because the second whitespace-separated token is `-s`, not the URL — enforcing
+"localhost only" would mean enumerating every flag ordering the model might generate,
+which breaks by accident, not only adversarially. All direct network tools are denied
+outright instead.
+
+**Why `command(*)` on the ask list is not the answer.** Antigravity's own documentation
+states permission conflicts resolve as "Deny > Ask > Allow" — an `Ask` entry on `*` would
+outrank every `Allow` entry above, prompting before every one of the enumerated scripts
+and tools and defeating unattended running entirely.
+
+**Step 3b result (2026-09-02), established empirically, not assumed.** With the real
+`~/.gemini/antigravity-cli/settings.json` unmodified (zero `command(...)` entries at the
+time), Antigravity was dispatched headlessly (`agy --print`) in the isolated
+`D:\scratch-loop-test` sandbox to run `whoami` — a command matching neither an allow nor
+a deny entry. Result: `jetski: no output produced — a tool required the "command"
+permission that headless mode cannot prompt for, so it was auto-denied.` An unmatched
+command is refused outright in headless dispatch, not left pending and not executed.
+This confirms, rather than merely corroborates, the 2026-08-28 observation that
+Antigravity was blocked, not permitted, on ungranted commands. This result is specific to
+headless (`--print`) dispatch, which is how Claude Code invokes Antigravity under this
+section; interactive-mode behavior for an unmatched command was not tested.
+
+**Residual risks, accepted knowingly:**
+- Antigravity may still reach `api.openai.com` and `api.sarvam.ai` indirectly if a dev
+  server it starts is running, spending real credits under the developer's keys — direct
+  network tools are denied, but traffic through the running application itself is not
+  prevented.
+- These limits are enforced by the permission file, not by Antigravity's cooperation.
+  §12.1 gives Antigravity no decision authority; a rule it must choose to follow is not a
+  limit.
 
 ### 12.11 Precedence
 
@@ -643,6 +797,22 @@ Claude Code does not choose its own model. This is fixed:
 | Second review — adversarial, in Claude Chat | **Per §10**, reaching Opus only when a §10 Opus trigger actually fired | This is where judgement is genuinely needed |
 
 **Opus is never run inside Claude Code.**
+
+**Haiku is not a substitute for Sonnet as the loop driver.** The table above is the
+whole policy: Sonnet drives, Sonnet reviews. On 2026-09-01 a Haiku-driven loop
+passed the §6.10 branch-verification gate by asserting two commit hashes without
+pasting the `git log` output that produced them. Both hashes were correct. The
+failure was §5.10 — a gate marked passed on an assertion — and it cost two full
+review round trips to settle, because nothing in the report could be checked without
+re-running the commands. Applying specified text is mechanical. Reporting evidence
+for a gate is not.
+
+**§10's tier line is not this table.** §10 names the model the *developer* uses to
+review a finished diff. This table names the model *Claude Code itself runs on*.
+A task file may correctly say "Suggested review tier: Haiku 4.5, low effort" and
+still require a Sonnet-driven loop — the two lines answer different questions, and
+neither constrains the other. A task file's `## Suggested review tier` section must
+never be read as a model setting for Claude Code.
 
 **Budget cap.** On the Claude Pro plan, Claude Code and Claude Chat draw from the same
 usage pool — every token the loop spends is a token unavailable for the §10 review. The
@@ -708,6 +878,32 @@ not how risky a file looks — it is whether the file **describes** the work or
 - `.agents/CURRENT_TASK.md`
 - `.agents/DECISION.md`
 
+**Narrow exception — the halt loop.** For §12.5 conditions 3 and 4, the `Stop` hook
+(`.agents/hooks/halt_answerer.py`) writes a fixed, hard-coded answer into
+`.agents/DECISION.md` itself, in Python, without invoking any model — both have
+exactly one correct answer with no task-specific reasoning left to do (condition 4's
+"which step to resume from" defers to whoever resumes, reading `## Order` at that
+time, rather than needing to be pre-computed), so there is no reasoning step in which
+a scope change could be introduced. For condition 6 only, the hook instead dispatches
+a tool-restricted `claude -p` halt-answerer, which may write `.agents/DECISION.md`,
+and nothing else, if and only if its own re-run of §12.4's four-part reversibility
+test against the handoff comes out clean on all four parts. This does not widen what
+Claude Code or Claude Chat may do: Claude Code's own ban on writing
+`.agents/DECISION.md`, above, is unchanged, and Claude Chat remains §12.7's only
+source of a scope-changing decision. The exception holds because what this section
+protects is that the process being scope-checked cannot move its own goalposts —
+neither the hook nor the halt-answerer can edit `.agents/CURRENT_TASK.md`, write
+code, or commit, and the condition-3/4 paths have no scope-changing capability by
+construction: no model is called, so there is nothing to author a scope change. An
+auto-answered halt, on any of the three conditions, counts toward §12.12's
+three-halt cap exactly like a developer-answered one — auto-answers spend tokens
+too. §12.12 itself needs no edit: the answerer runs Sonnet, the same tier
+§12.12 permits for loop-driver work.
+
+`AGENTS.md` sits on the governing side for the same reason: it defines every check
+the review layer runs. A driver that can edit the rules it is measured against can
+always make a diff compliant by editing the rule.
+
 The reason for the split is not caution, it is measurability. Every scope check in the
 review layer — files touched outside scope, anything from `## Do NOT touch`, work
 pulled from the `## Manual` bucket — compares the diff against `CURRENT_TASK.md`. If
@@ -742,3 +938,151 @@ an exception to the gate above: the approval simply happened earlier.
 
 **Regenerating the repomix snapshot (§6.9) is not a documentation write** and needs no
 approval. It overwrites a generated artifact, not a document anyone reads directly.
+
+### 12.16 Claude Chat's filesystem access
+
+Claude Chat reaches the repository through a local MCP server
+(`@modelcontextprotocol/server-filesystem`), scoped to exactly two directories:
+`.agents/` and `docs/`. Added 2026-08-30, repaired 2026-09-01.
+
+**Scope is enforced by the server, not by instruction.** Paths outside those two
+directories are refused by the server itself. `backend/app/` and `frontend/src/` are
+therefore unreachable to Claude Chat, by construction — it reads source only as a
+diff, through §12.17's git server.
+
+**The server has write tools and they are deliberately enabled.** This is how Claude
+Chat writes `.agents/CURRENT_TASK.md` and `.agents/DECISION.md`, the two files
+§12.15 assigns to it. It is also how it reads `LOOP_HANDOFF.md`, `STATUS.md` and
+`MASTER_PLAN.md` off disk rather than from a stale Project upload.
+
+**Launch note.** The server must be launched by absolute path to `npx`. On this
+machine `npx` lives at `D:\npx.cmd`, which is not on the PATH that Claude Desktop's
+child processes inherit; a bare `npx` in `claude_desktop_config.json` fails silently
+at launch, leaving valid JSON and no tools. That was the 2026-08-31 to 2026-09-01
+outage.
+
+**Writing `docs/STATUS.md` from Claude Chat remains gated by §12.15's approval
+sequence.** Reach is not authority: the server allows the write, the approval gate
+decides whether it happens.
+
+### 12.17 Claude Chat's git access
+
+Claude Chat reaches git through a second local MCP server (`mcp-server-git`,
+official, from `modelcontextprotocol/servers`), scoped to this repository. Added
+2026-08-31.
+
+**This server is local git only.** It has no network reach: no `push`, no remote, no
+GitHub API. Opening a pull request and reading a CodeRabbit review are therefore
+impossible from Claude Chat, and remain Claude Code's under §6.11 or the
+developer's. A third server would be required to change that.
+
+**Tools Claude Chat may use freely, at any time:** `git_status`, `git_log`,
+`git_diff`, `git_diff_staged`, `git_diff_unstaged`, `git_show`, `git_branch`.
+
+**Tools Claude Chat may use only during §6.11 close-out, and only after the
+developer has approved the STATUS.md entry:** `git_add` (named paths only, never
+`-A`, `.`, `-u` or a glob), `git_commit`.
+
+**Tools Claude Chat may never use:** `git_reset`, `git_checkout`,
+`git_create_branch`, `git_init`, and any future tool that rewrites history, moves
+HEAD, or changes which branch is checked out. A reviewer that needs a different
+revision uses `git_show` and `git_diff`, and reports that it cannot see something
+rather than moving HEAD to reach it.
+
+**Merging is never Claude Chat's.** Same as §6.11 and §12.10 — the developer merges,
+always, without exception, including when CodeRabbit reports no issues.
+
+**Why read access is granted at all.** On 2026-08-31, Claude Chat produced a branch-
+move sequence that aborted, because it did not know `origin/main` had advanced to
+`12b7c66` (PR #18) and had assumed uncommitted docs files would survive a checkout.
+The failure was a gap in visibility, not in authority.
+
+### 12.18 One Claude Chat session at a time
+
+`.agents/CURRENT_TASK.md` and `.agents/DECISION.md` are written by Claude Chat
+(§12.15, §12.16). Neither has any locking, versioning or conflict detection: a write
+is a full overwrite.
+
+Two concurrent Claude Chat sessions therefore overwrite each other silently. On
+2026-08-31 this happened — a second session wrote a repo-hygiene scope into
+`CURRENT_TASK.md` while a first session was mid-task on the IRIS design tokens.
+Claude Code, reading the file cold, correctly refused to append a paused-state
+section for a task the file no longer described.
+
+**Rule:** only one Claude Chat session may hold a task at a time. Before writing
+`CURRENT_TASK.md`, Claude Chat reads it first and reports what it is about to
+replace. If the existing content describes a different task, that is a stop-and-ask,
+not an overwrite.
+
+Claude Code is not required to reconcile a task file that does not match the work in
+front of it. Refusing and reporting is the correct behaviour, and is what §12.15's
+scope check depends on.
+
+### 12.19 Interactive vs headless Claude Code — pick one, not both
+
+`AskUserQuestion`, and any tool marked `requiresUserInteraction`, is denied in
+headless (`-p`) dispatch even when an allow rule matches it — confirmed against
+Anthropic's own headless-mode documentation, 2026-09-02. Headless mode's only
+channel back to a human is a file it writes for someone to read later; it cannot
+interactively clarify, under any permission configuration.
+
+**Consequence: "runs unattended" and "asks real-time questions" are mutually
+exclusive per task, not a spectrum to tune.** Pick one.
+
+**Decision (developer, 2026-09-02): interactive Claude Code is the default going
+forward.** When Claude Code hits a genuine §12.5-type decision while running
+interactively, it asks the developer directly via `AskUserQuestion` — no Claude
+Chat relay for that decision, and no file-based handoff needed for it either.
+
+**Consequence for the halt-answerer** (`.agents/hooks/halt_answerer.py`, §12.15,
+merged PR #23): it is not removed and remains correct for genuinely unattended or
+overnight headless runs, where no human is present to ask. Under an interactive
+default it is a fallback, not the primary path — a present developer answers a real
+decision faster than a Sonnet process reading a handoff file. The three AGENTS.md
+edits PR #23 also landed (§12.10's bypass-flag ban, §12.10a's `--add-dir`
+requirement, §12.15's DECISION.md exception) are independent findings and remain
+fully valid regardless of which mode a given task uses.
+
+**Related permission-mechanics finding, same night, same task:** Claude Code
+enforces path-scoped permission rules for `Edit`/`Read` only. A `Write(<path>)` rule
+is accepted but silently never consulted — one line in Claude Code's own
+permissions documentation, plus a startup warning. Confirmed live, not only from
+docs: an adversarial `claude -p` dispatch on Claude Code `2.1.250` had `Edit` denied
+against a decoy file while succeeding against the allowed path, in the same run.
+**Rule for any future permission list, `.claude/settings.json`, or `--allowedTools`
+flag: scope file writes with `Edit(<path>)`, never `Write(<path>)`.**
+
+### 12.20 The two-prompt review shape
+
+Target shape for interactive-mode tasks, agreed with the developer 2026-09-02: one
+manual paste to start a task, one manual paste for a consolidated fix round if
+needed. Nothing else should require the developer to relay text between Claude Chat
+and Claude Code.
+
+**How:** Claude Chat writes `CURRENT_TASK.md` and a start message (unchanged).
+Claude Code runs interactively, dispatching Antigravity for mechanical work per
+§12.3, and asks the developer directly for any genuine §12.5-type decision — no
+Claude Chat relay for that step. On completion, Claude Code writes its full
+end-of-task report to `.agents/REPORT.md`, not only to console output — a standing
+instruction for every task's `## Order` section from here on. Claude Chat reads
+`.agents/REPORT.md` and the relevant diffs directly, through its own filesystem and
+git access (§12.16, §12.17) — no paste needed for that step either. If Claude Chat
+finds real problems, it writes one full, thorough fix prompt.
+
+**The caveat, stated as a rule of interpretation, not a target to hit by trimming
+findings:** this shape eliminates needless manual relay. It does not cap how many
+real problems get reported, or how many rounds a genuine investigation takes. If
+fixing one finding surfaces a second, genuinely new finding, that finding is
+reported on its own honest terms — never folded, softened, or withheld to preserve
+a count.
+
+Evidence this matters, from the same task that prompted this section: the fix for
+"the write-restriction mechanism does not restrict anything" (switching
+`Write(<path>)` to `Edit(<path>)`) is what surfaced the deeper question of whether
+Windows headless mode honors path-scoping at all — reachable only by investigating
+the first fix, not knowable in advance. A hard cap at one fix round would have
+shipped that unverified.
+
+**Unaffected by any of this:** §12.5 conditions 1, 2 and 5 always halt for the
+developer regardless of interactive or headless mode. Opus never runs inside Claude
+Code (§12.12). Neither is a matter of relay convenience.

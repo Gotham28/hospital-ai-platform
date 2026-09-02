@@ -1,6 +1,6 @@
 # STATUS.md — Current Sprint Status
 
-Last updated: 2026-08-22
+Last updated: 2026-09-01
 
 This file tracks what's actually done vs. in progress vs. next, across the whole
 project. Update this after every verified feature — not before. See `docs/MASTER_PLAN.md`
@@ -356,7 +356,7 @@ Scope: `.agents/AGENTS.md`, `docs/MASTER_PLAN.md`, `.claude/skills/drive/` (dele
 |---|---|
 | 1.1 Patient Personalisation | ✅ Done (per master plan) |
 | 1.2 Extract services out of ai.py | ✅ Done — all 5 stages complete (see detail below) |
-| 1.3 Sarvam translation upgrade | 🟡 In progress — normaliser wired into ai.py (Task B1b); Task A next, Sarvam API key received 2026-08-29 |
+| 1.3 Sarvam translation upgrade | 🟡 In progress — Task B (normaliser, PR #17) and Task A (Sarvam client + Google fallback + circuit breaker, PR #19) both done; Task C (Redis translation cache, Opus tier) remaining |
 | 1.4 Security hardening | ⬜ Not started |
 | 1.5 Multi-tenant isolation hardening | ⬜ Not started |
 
@@ -390,7 +390,7 @@ A Twilio-backed WhatsApp messaging feature has been added outside the original p
 
 ---
 
-## Phase 2 — Research (MASTER_PLAN.md §4, later)
+## Phase 2 — Research (MASTER_PLAN.md §3, later)
 
 Not started. Do not begin until Phase 1 is complete and demoed end-to-end.
 
@@ -403,12 +403,10 @@ Not started. Do not begin until Phase 1 is complete and demoed end-to-end.
   configurable but intentionally left empty.
 - Feature 4 relevance criteria are partial (referral + prior-doctor checks only) —
   clinic will provide more later; this is expected, not a bug.
-- **Next up for Phase 1:** §1.3a Task A — Sarvam client + Google fallback with an
-  in-process circuit breaker, in `services/translation.py`. **Unblocked: the Sarvam API
-  key arrived 2026-08-29.** Then Task C (Redis translation cache, Opus tier). Read
-  Catch-up 2026-08-23 before starting Task A: it must use `sarvam-translate:v1`, not
-  `mayura:v1`; input cap 2000 characters, not 1000; it is formal-mode-only and may
-  reject `mode` / `output_script` — untested.
+- **Next up for Phase 1:** §1.3a Task A is done (PR #19, 2026-09-01) — Sarvam client
+  is primary, Google fallback, per-provider circuit breaker, in
+  `services/translation.py`. **Remaining: Task C (Redis translation cache, Opus
+  tier)** — not yet scoped.
 - **Live rule-firing of `normalise_malayalam()` on a successfully translated Malayalam
   string has never been observed** (Google 429 on all three Task B1b attempts,
   2026-08-29). Deliberately not chased further — folded into §1.3a Task A, which is now
@@ -603,6 +601,82 @@ work modified (`.agents/CURRENT_TASK.md` also shows modified on this branch, whi
 Claude Chat's own governance-file activity per §12.1, not caused by this task's code
 work).
 
+### Catch-up — 2026-08-30
+
+**Task A — Sarvam translation client + Google fallback + circuit breaker —
+CODE COMPLETE (branch `feat/sarvam-translation-client`).**
+
+Closes MASTER_PLAN.md §1.3a Task A. Three bundled changes, chosen knowingly at
+scoping despite §5.8: provider swap, failure-contract change, and chunking.
+
+- `backend/app/services/translation.py` — Sarvam (`sarvam-translate:v1`) is now
+  primary, Google's gtx endpoint the fallback. New `TranslationUnavailableError`;
+  `_translate()` and `_translate_async()` now raise it when both providers fail
+  instead of returning the untranslated input. This closes the bug recorded in
+  Catch-up 2026-08-23. Per-provider in-process `_CircuitBreaker` — 3 consecutive
+  failures, 60s open, no half-open probe, reset on close. Redis was ruled out at
+  scoping because it fires the §10 session-key trigger. Sarvam-only chunking at
+  2000 characters on sentence boundaries; 2000 exactly does not chunk. Trailing
+  whitespace is stripped before each provider call and re-attached to the
+  translated chunk, so seam spacing survives the rejoin. Any chunk failing aborts
+  the whole Sarvam attempt and falls to Google with the full original text — no
+  partial translation can reach a patient. Google is never chunked.
+
+- `backend/app/api/v1/endpoints/ai.py` — all five `_translate_async()` call sites
+  now handle the raise. The three en→ml sites (welcome greeting line 229, STATUS
+  reply line 527, booking-validation error line 932) each have a
+  `TranslationUnavailableError` branch followed by a broader `except Exception`
+  branch, so an unexpected failure from `normalise_malayalam()` cannot kill the
+  /chat-stream SSE generator mid-response. The two ml→en sites (lines 373, 422)
+  fall back to the untranslated patient question. Every branch logs
+  `type(e).__name__` only. No `from e` anywhere — deliberate: `httpx.HTTPStatusError`
+  carries the request URL, and `translation.py` puts the text being translated into
+  that URL as the `q=` parameter, so chaining would reopen the §5.6 leak closed on
+  2026-08-27. Patient sees English on total failure; no new Malayalam string was
+  authored, since nobody in the loop can verify Malayalam they wrote themselves.
+
+- `backend/run_translation_test.py` — new standalone script, matching the
+  `run_ml_postprocess_test.py` convention. 34 tests: chunk boundaries at
+  1999/2000/2001, hard-split termination, seam spacing, breaker open/skip/cooldown,
+  provider independence, total-failure raise (sync and async), and key-unset
+  skip-to-Google.
+
+- `backend/app/core/config.py` — not touched. `SARVAM_API_KEY` already existed;
+  the URL and model live as private constants beside `_GTRANSLATE_URL`.
+
+Live evidence (developer, PowerShell, outside the agent environment — both
+`api.sarvam.ai` and `api.openai.com` are unreachable from the agent sandbox, so no
+/chat-stream evidence exists for this task):
+
+```text
+--- en-IN -> ml-IN --- STATUS: 200
+{"translated_text":"ഡോക്ടർ പ്രിയ ഇന്ന് ലഭ്യമാണ്. പതിനഞ്ച് മിനിറ്റ് നേരത്തെ എത്തുക.", ...}
+--- ml-IN -> en-IN --- STATUS: 200
+{"translated_text":"I need an appointment.", ...}
+```
+
+This confirms the two API details the code had guessed: the response field is
+`translated_text`, and the language codes are `en-IN` / `ml-IN`. It also confirms
+from the opposite direction the Catch-up 2026-08-23 finding — `sarvam-translate:v1`
+renders "is available" as ലഭ്യമാണ്, where `mayura:v1` inverted it.
+
+Test evidence: `run_translation_test.py` 34 passed, 0 failed;
+`run_ml_postprocess_test.py` 26 passed, 0 failed (unchanged, no regression).
+
+Known and NOT fixed here:
+- An all-whitespace chunk would send empty input to Sarvam. Reachable only via a
+  >2000-character admin field made mostly of blank lines. Degrades safely — Sarvam
+  rejects it, the whole call falls to Google.
+- Sarvam transliterates doctor names (`Priya` → `പ്രിയ`) where `normalise_malayalam()`
+  deliberately does not. The two providers therefore render names differently. Needs
+  its own task.
+- `sarvam-translate:v1` emits ഡോക്ടർ with U+0D7C directly, so none of the three
+  normaliser rules fire on Sarvam output. The Google fallback remains the only path
+  where they are expected to fire — as predicted in Catch-up 2026-08-23.
+- `mode` / `output_script` were deliberately omitted from the Sarvam payload; their
+  acceptance is untested.
+- Branch history note: this work was written on `docs/governing-docs-staleness-2026-08-29`
+  and moved to a clean branch cut from `origin/main` before commit, per §6.10.
 ### Catch-up — 2026-08-29 (second entry)
 
 **Governing-doc staleness corrected by hand — COMPLETE. No agent layer involved.**
@@ -763,3 +837,312 @@ Known and NOT fixed here:
 - The Task 1 work lived only in `stash@{0}` from 2026-08-31 17:00:21 +0530 until
   2026-09-01, never committed. Restored with
   `git restore --source='stash@{0}'`; the stash was left intact.
+
+### Catch-up — 2026-09-01
+
+**AGENTS.md governance corrections — CODE COMPLETE, pending commit (branch
+`docs/agents-md-corrections`, cut from `origin/main`).**
+
+Six substantive changes to `.agents/AGENTS.md`, made in Claude Chat on 2026-09-01,
+resolving three internal contradictions and writing one section that was already
+referenced but never existed:
+
+- §6.11 — the CodeRabbit-review paragraph rewritten. Close-out may now fix a
+  finding when the fix stays inside the task's `## Files/areas in scope` and fires
+  no §10 Opus trigger; every other finding is reported, not actioned. Previously
+  read "report it in full without fixing anything," contradicting §12.2 step 7's
+  already-permissive text.
+- §12.1 — all three summary-table rows rewritten to match what §12.10, §12.15,
+  §12.16 and §12.17 actually permit. Two verification rounds caught real
+  regressions in this rewrite before commit: the first restored two protections
+  dropped from the Claude Code row ("no documentation write before approval," "no
+  edit to CURRENT_TASK.md/DECISION.md"); the second fixed a self-contradiction
+  where the same row banned force-push outright while §12.10 (untouched) permits
+  `--force-with-lease` on Claude Code's own unmerged branch.
+- §12.2 step 7 — "It fixes nothing it finds" replaced with the same scoped-fix
+  language as §6.11.
+- §12.10 — a duplicate, never-committed working-tree bullet (with a
+  `protection.Then` paste error) removed. `git log -p` across the file's full
+  history confirms the surviving bullet was written once, cleanly, in PR #16 —
+  nothing was ever duplicated in any commit.
+- §12.16 — new section, written this session. Describes Claude Chat's filesystem
+  MCP access (`.agents/` and `docs/` only), including the `D:\npx.cmd` PATH issue
+  that caused a same-day outage. Was referenced by §12.17 and §12.18 before it
+  existed.
+- §12.17 — rewritten. Previously claimed Claude Chat's git write tools were
+  disabled in Desktop settings; they were not, confirmed live in this session. Now
+  describes the local-only, no-push, no-PR scope of `mcp-server-git`, and which
+  tools Claude Chat may use during close-out versus never.
+- §12.18 ("One Claude Chat session at a time") — pre-existing, uncommitted content
+  from an earlier, separate session. Confirmed via this file's edit history to
+  predate any change made here. Left unchanged; included in this commit only
+  because it shared the same uncommitted file.
+
+Framing note: §12.16/§12.17 are net-new grants of Claude Chat git/filesystem
+capability, not corrections of pre-existing text. Bundled into this commit
+alongside genuine contradiction fixes as one file, one topic — matching this
+project's established convention for governance-doc commits (Catch-up 2026-08-29).
+
+Process note: this task's own `.agents/CURRENT_TASK.md` change-list was wrong
+twice, and both times Order step 2's scope-verification check caught it before
+anything was committed — once for a fix that had never actually been missing, once
+for the undisclosed §12.18 section. Full detail in this task's `.agents/REPORT.md`
+and its two `.agents/DECISION.md` rounds. The check working as designed, not a sign
+of trouble.
+
+Known and NOT fixed here:
+- `.claude/skills/close-task/SKILL.md` is a tracked repo file (not an external
+  Claude Project skill, as this document's Repo Hygiene note previously claimed)
+  and still hard-codes "Not fix anything... reporting only" — now superseded by
+  the §6.11/§12.2-step-7 text this commit lands. Outside this task's scope. Needs
+  its own task.
+
+### Catch-up — 2026-09-02
+
+**Antigravity scoped `command(...)` grant + AGENTS.md §12.10a — DESIGNED AND
+EMPIRICALLY VALIDATED, NOT YET INSTALLED (branch `chore/antigravity-command-grant`,
+cut from `origin/main` at `3d2d0cf`).**
+
+Reverses the deliberate withholding recorded in Catch-up 2026-08-28. Added AGENTS.md
+§12.10a (immediately after §12.10), enumerating exactly what a new `command(...)` grant
+in `~/.gemini/antigravity-cli/settings.json` allows, denies, and withholds:
+
+- **Allow (enumerated, no wildcards):** the four `run_*.py` standalone test scripts by
+  exact literal relative path; `grep`/`rg`/`ls`/`dir`/`cat`/`type`/`findstr`;
+  `git status`/`diff`/`log`/`show`; `npx repomix`.
+- **Deny (unconditional):** all deletion (`rm`, `del`, `rmdir`, `Remove-Item`, `ri`,
+  `erase`, `rd`); `alembic`; `psql`/`pg_dump`/`pg_restore`; all network tools (`curl`,
+  `curl .*`, `curl.exe`, `wget`, `Invoke-WebRequest`, `iwr`); all git-write subcommands
+  including `stash`; `sudo`.
+- **Not granted:** dev servers (port-kill needs a runtime PID a static permission
+  pattern can't scope) and `python -m backend.research.*` (Phase 2 hasn't started).
+
+Design questions resolved empirically, against Antigravity's own documentation and live
+dispatches, not assumed:
+
+- **Deny beats allow**, confirmed verbatim from `antigravity.google/docs/permissions`:
+  "Conflicting rules are strictly evaluated in priority order: Deny > Ask > Allow."
+- **An unmatched command is auto-denied in headless dispatch**, confirmed live:
+  dispatching `agy --print "Run the shell command: whoami"` against the real,
+  unmodified `settings.json` (zero `command(...)` entries) in the isolated
+  `D:\scratch-loop-test` sandbox returned `jetski: no output produced — a tool required
+  the "command" permission that headless mode cannot prompt for, so it was
+  auto-denied.` Confirms, not merely corroborates, the 2026-08-28 observation that
+  Antigravity was blocked, not permitted, on ungranted commands — specific to headless
+  dispatch; interactive-mode behavior was not tested.
+- **`curl`/`wget` denied outright, not scoped to localhost.** Permission patterns match
+  per whitespace-separated token, anchored, as a token-count prefix —
+  `command(curl http://localhost.*)` fails to match `curl -s http://localhost:8000`
+  because the second token is `-s`, not the URL. Enforcing "localhost only" would mean
+  enumerating every flag ordering the model might generate.
+- **Deletion denied entirely, not scoped to non-recursive.** On this machine's shell
+  (PowerShell), `rm`/`del` are aliases for `Remove-Item`, which takes
+  `-Recurse`/`-Force` — flag names no POSIX deny token (`-r`, `-rf`, `-R`) matches.
+  There is no pattern that permits a single-file delete without also permitting a
+  recursive one.
+- **`command(*)` on the ask list is not the answer.** Deny > Ask > Allow means an `Ask`
+  entry on `*` would outrank every `Allow` entry, prompting before every enumerated
+  script and defeating unattended running entirely.
+
+**A second empirical round (2026-09-02, same day) found and resolved a further gap
+before any install.** The developer ran `agy --print "Run: python
+backend/run_ml_postprocess_test.py"` from the repo root against the real settings.json
+(still just the original two directory-scoped `read_file`/`write_file` entries) and got
+`required the "read_file" permission ... auto-denied` — despite
+`read_file(D:\Hospital\hospital-ai-platform)` already covering that directory.
+Investigated live, with the developer's explicit, narrow, revoked-on-completion
+permission to modify the real settings.json for this purpose only (backup at
+`settings.json.bak`, restored and verified byte-identical via `cmp` afterward):
+
+- A file read via **absolute path** (either slash direction) succeeded immediately
+  against the unmodified directory grant — the pattern and the documented "recursive
+  read access to all contained files/folders" claim are both correct.
+- The same file via **relative path** failed, and adding a bare relative-form grant
+  (`read_file(backend)`) did not fix it.
+- Passing **`--add-dir "D:\Hospital\hospital-ai-platform"`** to the `agy` invocation
+  fixed it immediately, with zero settings.json changes beyond the original two
+  entries. The missing piece was dispatch-time workspace-root registration, not
+  settings.json content.
+- With `--add-dir` set, the exact, already-drafted `command(python
+  backend/run_ml_postprocess_test.py)` string was added and the real script executed
+  for real: 26 passed, 0 failed, live output pasted in this task's chat transcript.
+  No pattern in the drafted allow/deny lists needed to change.
+
+**Conclusion: every already-drafted `read_file`/`write_file`/`command(...)` pattern is
+correct as written. Claude Code's own dispatch of Antigravity must pass `--add-dir
+<repo-root>` (or equivalent workspace-root registration) for any of them to resolve a
+relative path at all** — recorded in AGENTS.md §12.10a's prose. Without it, every
+relative-path grant fails exactly as observed, regardless of how carefully the
+permission strings are written.
+
+**Process incident during the investigation, recorded in full per §5.10.** A Bash
+heredoc used to write a test settings.json collapsed `\\` to `\` in transit, producing
+invalid JSON — caught immediately by the same `python -c "import json..."` validation
+habit used throughout this task, before any dispatch was attempted against the
+corrupted file. Restored from `settings.json.bak` via `cp` and verified byte-identical
+with `cmp` (exit 0) before continuing. All subsequent test files were written with the
+Write tool and installed via `cp`, which preserved escaping correctly.
+
+**Found, NOT fixed here: `--dangerously-skip-permissions`.** Antigravity's own CLI
+offers this flag, which auto-approves every tool call and bypasses the entire
+allow/deny engine designed in §12.10a — discovered incidentally, surfaced in the CLI's
+own denial messages during this task's testing (e.g. "Alternatively, re-run with
+--dangerously-skip-permissions to auto-approve all tools"). Nothing in `settings.json`
+or in §12.10a prevents a future dispatch — a careless invocation, a misconfigured
+script, or a compromised session — from passing this flag and voiding every deny rule
+at once. Out of scope here: this task concerns `settings.json` content, not how `agy`
+is invoked or what wraps it. Needs its own task if a durable defense is wanted (e.g. a
+dispatch wrapper that refuses to pass the flag through).
+
+**`~/.gemini/antigravity-cli/settings.json` is NOT currently live with this grant.**
+The file on disk remains the original two-entry version (`read_file`/`write_file` on
+the repo directory only, zero `command(...)` entries) throughout this task. The design
+is proven to work — not installed. Pasting the printed JSON block by hand, validating
+it parses as one object, and confirming one real dispatch runs a granted command all
+remain the developer's next steps, same approval gate as always (§12.15).
+
+`git diff .agents/AGENTS.md docs/MASTER_PLAN.md` confirmed exactly these two files
+changed, nothing else.
+
+Scope: `.agents/AGENTS.md`, `docs/MASTER_PLAN.md`. Related: `.agents/CURRENT_TASK.md`
+dated 2026-09-01 (amended 2026-09-02, `§12.10a content` section only).
+
+### Catch-up — 2026-09-01 (second entry)
+
+**Governing-doc corrections — nine lines, docs only.**
+
+A full cross-read of `AGENTS.md`, `docs/STATUS.md` and `docs/MASTER_PLAN.md` found
+seven lines that were factually wrong or structurally broken. Two further edits were
+added during execution after the failures below. No code, schema, migration or
+process change.
+
+`docs/STATUS.md` (four): the Phase 1 `1.3 Sarvam translation upgrade` row and the
+Notes "Next up for Phase 1" bullet both still pointed at Task A as upcoming after
+PR #19 merged — the same failure pattern PR #18 fixed once before. The header read
+"Last updated: 2026-08-22" with eight later entries below it. The Phase 2 heading
+cross-referenced MASTER_PLAN.md §4; research is §3.
+
+`.agents/AGENTS.md` (five): §2's Translation bullet still described the Sarvam client
+as "not yet built". §2's Database bullet still described the Neon migration as in
+progress, though it completed 2026-08-09 and the Render instance was deleted the same
+day. §3's `ml_postprocess.py` table row had no path column and no closing pipe.
+§12.12 gained a paragraph separating the loop-driver model from §10's review tier.
+§12.15 gained `AGENTS.md` on the governing side, closing a gap that let the driver
+rewrite the document governing it.
+
+**Two process failures during this task, both recorded because both were expensive.**
+
+First, the loop ran on Haiku, which §12.12 does not permit. It passed the §6.10
+branch gate by asserting two commit hashes without pasting the `git log` output
+behind them. Both hashes were correct; the evidence was absent, which is a §5.10
+breach. Edit 8 exists because of this.
+
+Second, Claude Chat then wrongly accused the agent layer of fabricating one of those
+hashes. It tested `git branch --contains <branch-commit>` against `origin/main`,
+which can never return `main` under squash merge, and read the empty result as
+"unmerged". `docs/STATUS.md` Catch-up 2026-08-29 (second entry) already records this
+exact trap for PR #17. The accusation was written into `.agents/DECISION.md` and into
+a draft of AGENTS.md §12.12 before being caught and retracted; the §12.12 text as
+merged states only what is true.
+
+Known and NOT fixed here: the STATUS.md archive split; the out-of-order Catch-up
+entries after the Notes section; the `PR #TBD` in Catch-up 2026-08-27;
+MASTER_PLAN.md's overlapping §7/§7a/§7b schedules; and §10's Sonnet list naming
+"frontend admin UI", which does not cover patient-facing frontend.
+
+### Catch-up — 2026-09-02 (second entry)
+
+**Unattended halt loop — code complete, tested, registered, and live-verified.**
+
+Added `.agents/hooks/halt_answerer.py`, a Claude Code `Stop` hook that auto-answers
+AGENTS.md §12.5 halt conditions 3 and 4 (both fully deterministic, fixed answers
+written directly in Python — no model is ever invoked for either, so "no scope
+change possible" is true by construction) and condition 6 (a tool-restricted
+`claude -p --model sonnet --restricted` dispatch that independently re-runs §12.4's
+four-part reversibility test and writes nothing if any part fails). Conditions 1, 2
+and 5 always halt for the developer, no exceptions. Never passes
+`--dangerously-skip-permissions`; every dispatch passes `--add-dir <repo-root>`;
+`ANTHROPIC_API_KEY` presence (never its value) gates every path before any dispatch.
+A three-halt cap persists to `.agents/runs/` and resets on a new task; a stale
+handoff left over from an already-closed task is now detected and skipped rather
+than silently reprocessed. `.agents/hooks/run_halt_answerer_test.py` covers all of
+this in 22 synthetic-fixture cases with zero real `claude` calls.
+
+Three AGENTS.md edits, as approved (revised once mid-task at the developer's
+correction — condition 4 was originally designed to dispatch a model for no real
+reason and was converted to pure Python to match condition 3): §12.10 bans the
+bypass flag on any dispatch; §12.10a requires `--add-dir` on every Antigravity
+dispatch; §12.15 adds the narrow DECISION.md write exception, now correctly scoped
+to conditions 3/4 (deterministic) and 6 (dispatched) after the mid-task correction.
+
+**A four-lens code review caught two Critical bugs before this report, both fixed
+and re-tested:** an uncaught crash on non-UTF-8 handoff content, and a stale
+leftover handoff from a closed task being silently reprocessable on a fresh task's
+first Stop event.
+
+**A separate, more serious design gap was caught by the developer, not the
+automated review: the write-restriction mechanism (`--allowedTools
+"Write(.agents/DECISION.md)"`) does not actually restrict anything.** Claude Code
+only enforces path-scoped permission rules for `Edit`/`Read`, never `Write` — a
+`Write(<path>)` rule is silently unconsulted. Two open GitHub issues
+(anthropics/claude-code #1188, #67849) describe exactly this failure mode in
+headless `-p` mode on Windows. Redesigned to use `Edit(.agents/DECISION.md)`
+instead (the hook now pre-creates the file with a placeholder for the answerer to
+Edit, since Edit needs existing content), plus `--disallowedTools "Bash PowerShell
+WebFetch Write"` as defense in depth.
+
+**Finding 6 is resolved.** Two real adversarial `claude -p` dispatches (isolated temp
+directories, the exact shipping command) confirmed the write restriction live, in
+both directions: round 1 showed the bare `Write` tool fully blocked; round 2 targeted
+`Edit`'s own path-scoping specifically — the model was explicitly instructed to use
+Edit against a pre-existing decoy file and was denied, while in the SAME run Edit
+succeeded against `.agents/DECISION.md`. Because the same tool both failed against
+one path and succeeded against the other in one session, the denial can only be
+explained by path-scoping, not a blanket Edit-tool block. This directly answers the
+failure mode described in two open GitHub issues (anthropics/claude-code #1188,
+#67849 — path-specific `allowedTools` rules silently ignored in headless `-p` mode on
+Windows): it did not reproduce here, on Claude Code `2.1.250`, with this exact flag
+set. `halt_answerer.py`'s docstring now carries this result instead of a pending-test
+note. `.claude/settings.json` registration remains the developer's own action
+regardless — nothing here authorizes registering the hook automatically.
+
+### Catch-up — 2026-09-02 (second entry)
+
+**Interactive-mode and review-shape governance docs — COMPLETE.**
+
+Added AGENTS.md §12.19 (interactive vs headless Claude Code is a binary per-task
+choice, not a spectrum — interactive is now the default and the halt-answerer from
+PR #23 is a fallback for genuinely unattended runs; plus the related finding that
+Claude Code only enforces path-scoped permissions via `Edit(<path>)`, never
+`Write(<path>)`) and §12.20 (the two-prompt review shape — one paste to start a task,
+one for a consolidated fix round, `.agents/REPORT.md` as the new standing
+end-of-task write — with the explicit caveat that this targets relay friction, not
+review depth). Docs only, no code touched. `git diff .agents/AGENTS.md` confirmed
+only these two subsections were added, nothing else changed. MASTER_PLAN.md §9
+appended.
+
+### Catch-up — 2026-09-03
+
+**AGENTS.md §6.12 — squash-merge verification rule added — COMPLETE (branch
+`docs/squash-merge-verification-rule`, cut from `origin/main`).**
+
+PR: #26
+Commits: 5aafc14
+
+Added AGENTS.md §6.12, a new subsection immediately after §6.11: verifying whether
+work is merged into `main` must check file content at a revision
+(`git show origin/main:<path> | grep "<string>"`), never the commit graph
+(`git branch --contains`, `git merge-base --is-ancestor`) — this repo squash-merges,
+so a squash-merged commit is never an ancestor of `main` even after a clean merge,
+and both graph-based checks return a confident, wrong "not merged" as a result.
+This trap has now caused three separate incidents: two already recorded in this
+file (Catch-up 2026-08-29 second entry; Catch-up 2026-09-01 second entry, the false
+fabrication accusation on PR #17), and a third on 2026-09-02 where Claude Code
+reached the correct halt decision on a merge-status question but supported it with
+two invalid checks of this kind alongside the one valid one.
+
+Docs-only change. No commands were run beyond git, since there is no code to test.
+`git diff .agents/AGENTS.md` confirmed only the one new subsection was added and
+nothing else changed.
+
+Deferred: none — a single, self-contained rule addition.

@@ -1,161 +1,196 @@
 # Current Task
 
 ## Feature
-Wire the existing `normalise_malayalam()` normaliser into the three English-to-Malayalam
-`_translate_async()` call sites in `ai.py`, so translated Malayalam output is normalised
-before it reaches a patient.
+A Claude Code `Stop` hook (`.agents/hooks/halt_answerer.py`) that fires when Claude
+Code halts under AGENTS.md §12.5, reads `.agents/LOOP_HANDOFF.md`, and dispatches a
+tool-restricted, headless `claude -p` answerer that may write `.agents/DECISION.md`
+automatically for a narrow set of halt conditions — removing the developer from the
+middle of cheap, mechanical halts without giving away any real decision.
 
 ## Plan reference
-MASTER_PLAN.md §1.3a — Sarvam upgrade execution sequence, Task B (Malayalam
-post-processing, "applied to translated output"). This is the second half of Task B;
-the module itself landed as Task B1 (PR #11, commit `837001b`).
-STATUS.md state at time of scoping: §1.3 marked 🟡 In progress — normaliser module built
-but not wired; Task A blocked on the Sarvam API key. B1b is named as next up.
+Not in MASTER_PLAN.md. Unplanned agent-tooling work. Follows the Antigravity scoped
+command grant (PR #22, merged `8080da0`) and the governing-doc corrections (PR #21,
+merged `1357752`). Both confirmed on `origin/main` 2026-09-02 via `git log`.
 
-## MASTER_PLAN.md update
-- [ ] None — task matches §1.3a Task B above. No §9 append.
+Branch: `feat/unattended-halt-loop`, cut from `origin/main` by the developer.
+
+## How the answerer must behave
+
+**Model and billing.** The answerer runs Sonnet on the developer's Claude Pro
+subscription via `claude -p`. AGENTS.md §12.12 needs NO edit — Sonnet is already the
+permitted tier for loop-driver-level work. `ANTHROPIC_API_KEY` must be unset; if set,
+`claude -p` bills API credits instead of the subscription.
+
+**Hard cost guard (added at scoping).** Before dispatching anything, the hook checks
+`os.environ` for `ANTHROPIC_API_KEY`. If it is set, the hook writes nothing, dispatches
+nothing, and exits — leaving the halt exactly as it would be with no hook installed.
+This needs its own test case.
+
+**Tool restriction.** The answerer may use only read-type tools needed to inspect
+`.agents/LOOP_HANDOFF.md` and files it references, and may write exactly one file:
+`.agents/DECISION.md`. No Bash. No git. No other write path.
+
+**Per-condition behaviour — this is the safety-critical core:**
+
+- **§12.5 conditions 1, 2, 5** (any Alembic migration; any §10 Opus trigger; anything
+  under AGENTS.md §9 "When In Doubt") — the hook must never dispatch the answerer.
+  It exits, leaving `LOOP_HANDOFF.md` for the developer. No exceptions, no flags.
+
+- **§12.5 condition 3 (scope change)** — one-way door. The answerer may only ever
+  answer "stay in scope: do not touch anything outside the `## Files/areas in scope`
+  list; report the needed change instead." It may NEVER authorise a scope change.
+  A scope widening is always the developer's.
+
+- **§12.5 condition 4 (same error hit three times)** — one fixed answer, no reasoning
+  about the error itself:
+  > "Do not attempt a fourth time. Skip this step, record it as blocked in the
+  > end-of-task report, and continue from the next step in `## Order` that does not
+  > depend on it. If every remaining step depends on it, stop and report."
+
+- **§12.5 condition 6 (fails the §12.4 reversibility test)** — the answerer is a
+  false-positive filter, NOT an approver. It independently re-runs §12.4's four-part
+  reversibility test against the handoff. It may write `DECISION.md` only if all four
+  come out true, i.e. the original halt was a false alarm. If any one is false, it
+  writes nothing and the halt stands for the developer.
+
+**Halt-cycle budget.** An auto-answered halt counts toward AGENTS.md §12.12's
+three-halt cap exactly like a developer-answered one. Auto-answers spend tokens too.
+
+**Exit code.** The hook exits 0 in every path. On a `Stop` hook, exit code 2 means
+"do not stop, keep going", which is not the signal wanted here — resumption is driven
+by `DECISION.md` being newer than `LOOP_HANDOFF.md` (§12.7), not by the hook's exit
+code. Verified against Claude Code hooks reference, 2026-09-02.
 
 ## Files/areas in scope
-- `backend/app/api/v1/endpoints/ai.py` — add an import of `normalise_malayalam` from
-  `app.services.ml_postprocess`, and apply it to the returned string at the three
-  English-to-Malayalam `_translate_async()` call sites only.
+- `.agents/hooks/halt_answerer.py` — new.
+- `.agents/hooks/run_halt_answerer_test.py` — new. Standalone runnable script, no
+  pytest, matching the `backend/run_*_test.py` convention in spirit. Deliberately
+  placed beside the hook rather than under `backend/`: this is agent tooling, not
+  production backend code.
+- `.claude/settings.json` — new or edited. Registers the `Stop` hook. Committed
+  deliberately (not `settings.local.json`), matching how `.claude/skills/` is already
+  tracked.
+- `.agents/AGENTS.md` — exactly three edits, no others:
+  - **§12.10** — add a bullet banning any dispatch from passing
+    `--dangerously-skip-permissions` or any equivalent bypass flag. Recorded as
+    found-NOT-fixed in `docs/STATUS.md` Catch-up 2026-09-01; this closes it.
+  - **§12.10a** — add the `--add-dir <repo-root>` requirement. Without it, relative
+    paths resolve against no grant and every allow rule silently fails. Proved
+    empirically 2026-09-02, already recorded in STATUS.md prose.
+  - **§12.15** — add a narrow exception permitting the halt-answerer (not Claude
+    Code, not Claude Chat) to write `.agents/DECISION.md` automatically, for
+    conditions 3 (stay-in-scope only), 4 and 6 only.
+- `docs/MASTER_PLAN.md` — one append to §9 (Unplanned / Ad-hoc Work).
 
-## Explicitly out of scope
-- Formal-pronoun rewriting (അവൻ → അദ്ദേഹം) — split out at B1 scoping time; needs a
-  context-conditional rule, not a flat (pattern, replacement) rule.
-- Any new or changed rule inside `ml_postprocess.py` — the module is final for this task.
-- Per-hospital configurability of normalisation — dropped 2026-08-22; would need a
-  Hospital column and an Alembic migration.
-- The `_translate_async()` "returns untranslated English on upstream failure" bug —
-  MASTER_PLAN.md §1.3a Task A owns it, via the circuit breaker.
-- Any Sarvam client work — Task A, blocked on the API key.
-- Writing into `docs/STATUS.md` — draft the entry per §6.8, do not write it.
+## MASTER_PLAN.md update
+- [ ] Append to §9, dated 2026-09-02: "Unattended halt loop. Added a Claude Code
+      `Stop` hook (`.agents/hooks/halt_answerer.py`) that dispatches a tool-restricted
+      Sonnet answerer to auto-write `.agents/DECISION.md` for AGENTS.md §12.5
+      conditions 3 (stay-in-scope only), 4 and 6. Conditions 1, 2 and 5 always halt for
+      the developer. Three AGENTS.md edits: §12.10 bans bypass flags, §12.10a requires
+      `--add-dir`, §12.15 narrows the DECISION.md write exception. Scope:
+      `.agents/hooks/`, `.claude/settings.json`, `.agents/AGENTS.md`."
+
+Pre-approved at scoping per §12.15 — no second gate when this step is reached.
 
 ## Do NOT touch
-- `backend/app/services/ml_postprocess.py` — no edits of any kind.
-- `backend/app/services/translation.py` — Task A's file. Do not move the normaliser call
-  inside `_translate()` or `_translate_async()`. Wrapping happens at the call sites in
-  `ai.py` only, so the function signatures stay unchanged (AGENTS.md §5.3, §10).
-- The two Malayalam-to-English `_translate_async()` call sites — their output is English;
-  normalising it is pointless and would be a behaviour change nobody asked for.
-- The six log sites fixed on 2026-08-27 (`main.py`, `translation.py`,
-  `ai.py`, `relevance.py`). Do not re-introduce any patient text into a log line, and do
-  not add a new log line that prints translated text (AGENTS.md §5.6).
-- `backend/run_ml_postprocess_test.py` — run it, do not edit it.
-- `docs/STATUS.md`, `docs/MASTER_PLAN.md`, `.agents/CURRENT_TASK.md`, `.agents/DECISION.md`.
-- Any other file in the repo. If a fix seems needed elsewhere, halt and report it.
+- Any file under `backend/` or `frontend/`. This task contains no product code.
+- `backend/google_credentials.json` — separate, unresolved security item (tracked in
+  git since `d2b2828`, key revocation outstanding). Not this task.
+- Any AGENTS.md section other than the three named above.
+- `MASTER_PLAN.md` §1.3a's "Close-out for every task above is manual" paragraph.
+- `~/.gemini/antigravity-cli/settings.json` — developer-edited only, per §12.10a.
+- The untracked files currently in `git status` and unrelated to this task:
+  `.claude/launch.json`, `backend/mock_test.py`, `backend/test_welcome.py`,
+  `cleanup.md`, `scratch_token_volume.py`, `test_httpx_leak.py`,
+  `test_relevance.py`, `test_req.py`. Leave every one untouched.
+- `.agents/DECISION.md`, `.agents/DECISIONS_TAKEN.md`, `.agents/LOOP_HANDOFF.md`,
+  `.agents/REPORT.md`, `.agents/RUN_REPORT.md` — leftovers from the closed-out PR #21
+  task. The developer deletes these by hand; the agent layer must not.
+- `.agents/CURRENT_TASK.md` and `.agents/DECISION.md` as governing files (§12.15).
 
 ## Execution route
-- B — Claude Code loop
-- Why: route C test point 1 fails — the three call sites are NOT already named by a
-  reliable line number (the 2026-08-23 numbers are stale after the 2026-08-27 edit), so
-  locating them is a judgement step. Point 6 also fails: verifying Malayalam output is
-  correct is not something a diff and an exit code can settle.
-- Close-out: route B — never automated. Committing, pushing and opening the PR is
-  `close-task`, developer-driven, per AGENTS.md §6.11.
+- B — Claude Code writes, developer reviews.
+- Close-out: manual. Commit, push and PR are `close-task`, developer-driven, per
+  AGENTS.md §6.11. No loop runner opens or merges a PR for this task.
 
 ## Manual (developer does)
-- [ ] Approve this task file before any code is written (AGENTS.md §6.3).
-- [ ] Read the live Malayalam output in the verification evidence and confirm it is
-      correct Malayalam — an agent checking its own Malayalam proves nothing, same
-      reasoning as the Task B1 codepoint audit.
+- [ ] Delete the five leftover `.agents/` files listed above, then confirm.
+- [ ] Confirm `ANTHROPIC_API_KEY` is unset in the environment that actually runs the
+      hook — this is the condition the entire cost design rests on.
+- [ ] Approve this task file (AGENTS.md §6.3).
 - [ ] Approve the STATUS.md draft entry.
 - [ ] All of close-out: commit, push, PR, merge.
 
 ## Agent (does on its own, once scope is confirmed)
-- [ ] Locate every `_translate_async(` call site in `backend/app/api/v1/endpoints/ai.py`
-      and report each one with its current line number, its source language and its
-      target language. Expected: five sites total, three English-to-Malayalam, two
-      Malayalam-to-English.
-- [ ] Add the import of `normalise_malayalam` to `ai.py`, matching the existing import
-      style in that file (AGENTS.md §8).
-- [ ] Apply `normalise_malayalam()` to the returned string at the three
-      English-to-Malayalam sites only.
-- [ ] Run `python backend/run_ml_postprocess_test.py` and paste the full raw output.
-- [ ] Run the live smoke test in `## Verification required` and paste the full raw output.
-- [ ] Draft the STATUS.md entry per §6.8. Do not write it into the file.
-- [ ] Run `code-review` at the end and produce the §12.13 seven-section report.
-
-## Blocked on developer input
-- [ ] None at run time. The one open question — whether to wire now given that
-      `sarvam-translate:v1` triggers none of the three rules — is answered in this file:
-      wire now, because Google Translate is the live provider and is the untested
-      fallback path the normaliser was written to defend.
+- [ ] Read `AGENTS.md`, `docs/STATUS.md` and this file fresh from disk.
+- [ ] Read the CURRENT text of §12.10, §12.10a and §12.15 off disk before editing.
+      Do not rely on any copy pasted into a chat transcript.
+- [ ] Write the hook and the test script.
+- [ ] Register the hook. Make the three AGENTS.md edits. Append MASTER_PLAN §9.
+- [ ] Draft the STATUS.md entry per §6.8. Do not write it.
+- [ ] Regenerate the repomix snapshot in place (AGENTS.md §6.9).
 
 ## Order
-### Steps inside this task
 1. Read `AGENTS.md`, `docs/STATUS.md` and this file fresh.
-2. Locate and report all five `_translate_async(` call sites with current line numbers
-   and language directions. If the count is not five, or the English-to-Malayalam split
-   is not three, HALT under §12.5 condition 3 — do not guess which sites to wire.
-3. Add the import.
-4. Wrap the three English-to-Malayalam results.
-5. Run `python backend/run_ml_postprocess_test.py` — must still be 26 passed, 0 failed.
-6. Check nothing is listening on port 8000, kill it if so, start the backend, confirm it
-   responds (AGENTS.md §5.9).
-7. Run the live smoke test. Paste raw output.
-8. Run `code-review`. Produce the §12.13 report.
-9. Draft the STATUS.md entry. Do not write it.
-10. Regenerate the repomix snapshot by overwriting the existing output file in place
-    (AGENTS.md §6.9).
-
-### Where this task sits
-- Before this: nothing. Task B1 landed as PR #11.
-- After this: §1.3a Task A (Sarvam client + Google fallback + circuit breaker), still
-  blocked on the Sarvam API key. Then Task C (Redis translation cache, Opus tier).
+2. Read §12.10, §12.10a and §12.15 off disk. Present the exact proposed replacement
+   wording for all three. STOP and wait for developer confirmation before any code.
+3. Write `.agents/hooks/halt_answerer.py`.
+4. Write `.agents/hooks/run_halt_answerer_test.py`. Must include, at minimum: a case
+   per §12.5 condition 1–6; the `ANTHROPIC_API_KEY`-set refusal; the condition 3
+   one-way door (assert it can never emit a scope widening); the condition 6 filter
+   rejecting a case where one of the four reversibility parts is false.
+5. Run the test script. Paste full raw output and exit code.
+6. Register the `Stop` hook in `.claude/settings.json`.
+7. Make the three AGENTS.md edits.
+8. Append the MASTER_PLAN.md §9 entry.
+9. Capture every item under `## Verification required`.
+10. Run `code-review`. Produce the §12.13 seven-section report.
+11. Draft the STATUS.md entry. Do not write it.
+12. Regenerate the repomix snapshot in place.
 
 ## Verification required before this is considered done
-- [ ] `grep -n "_translate_async(" backend/app/api/v1/endpoints/ai.py` — full raw output,
-      pasted before any edit, showing every call site and its current line number.
-- [ ] `python backend/run_ml_postprocess_test.py` — full raw output, `26 passed, 0 failed`,
-      `EXIT CODE: 0`. Proves the module still behaves as it did at PR #11.
-- [ ] Port 8000 confirmed free before starting the backend, and the backend confirmed
-      responding, with the command output for both pasted.
-- [ ] One live `/chat-stream` request with `language="ml"` against the local `hospital_ai`
-      database, using synthetic patient text only. Paste the raw request and the raw
-      response. The Malayalam reply must render correctly and must contain no ഡോ.
-      abbreviation and no untranslated "Dr"/"Dr.".
-- [ ] Evidence that the wrapper actually runs, not just that the app still works. If no
-      rule fires on live Google output, say so explicitly and additionally prove the wiring
-      by a throwaway scratch script that feeds a known rule-triggering string through the
-      exact wired code path. A scratch script is fine (§12.4 whitelist); it is not
-      committed.
-- [ ] One live `/chat-stream` request with `language="en"` — the English reply must be
-      unchanged, proving the English path is untouched.
-- [ ] `git status --short` — full raw output, showing only `ai.py` modified and no other
-      tracked file changed.
-- [ ] No claim of "works" or "verified" anywhere in the report without the raw output
-      pasted directly above it (AGENTS.md §5.10).
+- [ ] `git status --short` — full raw output. Paste it, do not summarise (§5.10).
+- [ ] `git diff --stat` showing exactly the in-scope files and nothing else. If any
+      `backend/` or `frontend/` file appears, HALT under §12.5 condition 3.
+- [ ] `run_halt_answerer_test.py` full raw output and exit code.
+- [ ] Evidence that the hook is actually registered and fires: the `/hooks` menu
+      listing it, or a live `Stop` event showing it ran.
+- [ ] A live end-to-end run: a real halt written to `LOOP_HANDOFF.md` under a
+      condition 4 scenario, showing `DECISION.md` written with the fixed answer.
+      Paste the resulting `DECISION.md` in full.
+- [ ] A live negative run: a halt under condition 2 (any §10 Opus trigger), showing
+      NO `DECISION.md` was written and the halt was left for the developer.
+- [ ] Evidence the `ANTHROPIC_API_KEY` guard fires: set it, trigger a halt, show
+      nothing was dispatched and nothing written.
+- [ ] `git diff .agents/AGENTS.md` — full raw output, showing only the three intended
+      edits and no other section changed.
+- [ ] No claim of "works", "passes" or "verified" anywhere without the raw output
+      pasted directly above it (§5.10). A description of what output said is not
+      the output.
 
 ## Flags (AGENTS.md rule triggers)
-- §5.3 — real risk of restructuring. Putting the call inside `translation.py` would be
-  cleaner-looking and is forbidden here: it would change behaviour for the two
-  Malayalam-to-English sites too, and it collides with Task A's file. Call sites only.
-- §5.6 — this code path carries patient-facing text. No new log line may print translated
-  or patient text. All verification text must be synthetic.
-- §5.8 — three neighbouring pieces of work are deliberately excluded: formal pronouns,
-  per-hospital config, and the untranslated-English-on-failure bug.
-- §5.9 — needs the backend dev server on port 8000. Check and kill before starting.
+- §5.1 / §5.2 — no query, no `hospital_id`, no tenant-specific behaviour. None apply.
+- §5.3 — real restructuring risk in the AGENTS.md edits. Three sections, named
+  explicitly. Any fourth section touched is a §12.5 condition 3 halt.
+- §5.5 — no legal, medical or disclaimer wording is authored anywhere in this task.
+- §5.6 — `LOOP_HANDOFF.md` may reference evidence files. The answerer must never
+  copy raw patient text into `DECISION.md`. §12.6 already bars it from handoffs.
+- §5.8 — one feature. The bypass-flag ban and the `--add-dir` rule are included
+  because both are prerequisites for the loop being safe to run unattended at all,
+  not as bundled extras.
 - §5.10 — every claim needs pasted raw output.
-- §12.5 condition 3 — halt if the `_translate_async` call-site count or language split
-  differs from five total / three English-to-Malayalam.
-- §12.5 condition 2 — halt if the work turns out to need a signature change in
-  `translation.py`.
-- Not a §5.1 concern: this is a pure text-in/text-out transform with no query, no
-  `hospital_id` filter and no tenant-scoped data. It does change output for every tenant
-  equally, which is why the route is B and not C.
-- Not a §5.2 concern: the behaviour is uniform across all tenants, not clinic-specific.
-- Not a §5.5 concern: no new legal or medical wording. The normaliser rewrites a title
-  form, it does not author text.
+- §12.5 condition 3 — halt if any file outside `## Files/areas in scope` needs
+  touching, including a fourth AGENTS.md section.
 
 ## Suggested review tier (set at scoping time)
-- Sonnet 5, medium effort — AGENTS.md §10 names "translation logic" in the Sonnet 5 list.
-  No Opus trigger is expected: no query, no `hospital_id` filter, no migration, no
-  logging change, no `services/security.py`, no signature change, no disclaimer wording,
-  no `backend/research/` boundary, no auth or Redis keys, no `DATABASE_URL`.
-  If the agent layer comes back naming Opus, that is a signal something in the diff went
-  beyond this scope — do not accept a quiet upgrade without asking what triggered it.
-
-## Suggested Antigravity model
-- The default agentic coding model — ordinary feature work, no Opus trigger expected.
-  Keep Antigravity on its included model; the Claude review layer is the safety net.
+- Sonnet 5, medium effort. Mechanically, no §10 Opus trigger fires: no query, no
+  `hospital_id` filter, no migration, no logging of patient text, no
+  `services/security.py`, no function signature change, no disclaimer wording, no
+  `backend/research/` boundary, no auth or Redis session keys, no `DATABASE_URL`.
+- Noted separately, NOT a tier upgrade: this task widens what an automated process
+  may do without the developer, and edits the document that governs the review
+  layer. §10 does not list that as a trigger, so the tier stays Sonnet 5 per the
+  mechanical rule. The developer may choose to review it harder anyway.
+- If the agent layer comes back naming Opus, ask what triggered it rather than
+  accepting a quiet upgrade.
