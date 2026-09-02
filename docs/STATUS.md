@@ -1146,3 +1146,74 @@ Docs-only change. No commands were run beyond git, since there is no code to tes
 nothing else changed.
 
 Deferred: none — a single, self-contained rule addition.
+
+### Catch-up — 2026-09-03 (second entry)
+
+**Task 2 — chat-stream [TRANSLATION_UNAVAILABLE] sentinel — CODE COMPLETE
+(branch `feat/chat-stream-translation-sentinel`, cut from `origin/main`).**
+
+PR: pending
+Commits: pending
+
+Emits a bare, non-JSON SSE sentinel frame, `data: [TRANSLATION_UNAVAILABLE]\n\n`,
+from the two English-to-Malayalam `TranslationUnavailableError` branches that
+live lexically inside the `/chat-stream` endpoint's `event_generator` in
+`backend/app/api/v1/endpoints/ai.py`: the STATUS-reply site (line 532) and the
+booking-validation-error site (line 940). Deliberately a raw literal string,
+not `json.dumps(...)` like every other frame in this file — `json.dumps(...)`
+would wrap it in quotes and make it valid JSON, defeating the point, since
+`useHospitalChat.tsx` silently skips any frame that fails `JSON.parse()`.
+
+Order step 2's own gate caught a real discrepancy before any edit: the raw
+`grep -n "TranslationUnavailableError"` count inside `chat_stream` is 3, not
+the 2 the task file expected — a third match at line 425 is the
+Malayalam-to-English site (translating the patient's incoming question),
+already named out of scope elsewhere in the same task file. Confirmed with
+the developer via `AskUserQuestion` before proceeding on the two
+English-to-Malayalam sites only (STATUS reply, booking-validation error).
+
+Out of scope, explicitly: the welcome-greeting `TranslationUnavailableError`
+branch (served by `GET /welcome/{hospital_id}`, a different endpoint with no
+SSE stream), and both Malayalam-to-English call sites in `/chat-stream`
+(including line 425's ml→en site found during the step-2 check).
+
+`backend/run_chat_stream_sentinel_test.py` — new, standalone, no pytest.
+Drives the real `chat_stream()` function end-to-end for both sites (not an
+isolated snippet test), with `_translate_async`, `classify_user_intent`,
+`_update_patient_ctx`, `build_context`, the OpenAI streaming client, and
+`validate_booking` all monkeypatched — no real network, no real DB, no real
+LLM call. Asserts: the exact frame `data: [TRANSLATION_UNAVAILABLE]\n\n`
+appears in the yielded output at each site; `json.loads()` on its payload
+raises `json.JSONDecodeError`, proving it is genuinely invalid JSON and not
+just visually different; an ordinary `json.dumps(...)`-wrapped frame later in
+the same run still parses as valid JSON, unaffected.
+
+```text
+[Translation] en->ml failed at STATUS reply: TranslationUnavailableError
+[Translation] en->ml failed at booking-validation error: TranslationUnavailableError
+PASS status_site_sentinel_frame_present
+PASS status_site_has_a_normal_frame_too
+PASS status_site_normal_frame_is_valid_json
+PASS status_site_sentinel_payload_is_invalid_json
+PASS booking_site_sentinel_frame_present
+PASS booking_site_has_a_normal_frame_too
+PASS booking_site_normal_frame_is_valid_json
+PASS booking_site_sentinel_payload_is_invalid_json
+
+8 passed, 0 failed
+EXIT CODE: 0
+```
+
+`app/api/v1/endpoints/__init__.py` does `from .ai import router as ai`, which
+overwrites the package's own `ai` attribute with the router object — a plain
+`import app.api.v1.endpoints.ai as ai` resolves via attribute access and
+would silently bind the router, not the module. The test script imports via
+`importlib.import_module("app.api.v1.endpoints.ai")` instead, which reads
+`sys.modules` directly and is unaffected by the shadowing.
+
+`git diff backend/app/api/v1/endpoints/ai.py` confirmed exactly two lines
+added, nothing else touched. No Alembic command run, no migration file
+created. No frontend file touched — this task has no consumer for the
+sentinel; that is design frame 07, deferred until a frontend task picks it up.
+
+Deferred: none — a single, self-contained backend signal addition.

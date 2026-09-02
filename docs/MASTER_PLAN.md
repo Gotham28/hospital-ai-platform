@@ -546,3 +546,14 @@ this repo squash-merges and both `git branch --contains` and
 `git merge-base --is-ancestor` return a false "not merged" after a clean squash.
 This trap has caused three separate incidents. Docs only.
 Scope: `.agents/AGENTS.md`. Related: CURRENT_TASK.md dated 2026-09-03.
+
+### 2026-09-03 — chat-stream [TRANSLATION_UNAVAILABLE] sentinel
+
+Not in the original plan. Emits a bare, non-JSON `data: [TRANSLATION_UNAVAILABLE]`
+SSE frame from the two English-to-Malayalam `TranslationUnavailableError`
+branches inside `/chat-stream`'s event generator (STATUS reply, booking-validation
+error), so a frontend can eventually detect and react to a translation failure the
+patient currently sees only as silent English. Backend only — consuming the
+signal is design frame 07, deferred until a frontend task lands.
+Scope: `backend/app/api/v1/endpoints/ai.py`, `backend/run_chat_stream_sentinel_test.py`.
+Related: CURRENT_TASK.md dated 2026-09-03 (Task 2 of 3).
