@@ -557,3 +557,13 @@ patient currently sees only as silent English. Backend only — consuming the
 signal is design frame 07, deferred until a frontend task lands.
 Scope: `backend/app/api/v1/endpoints/ai.py`, `backend/run_chat_stream_sentinel_test.py`.
 Related: CURRENT_TASK.md dated 2026-09-03 (Task 2 of 3).
+
+### 2026-09-03 — IRIS design token addendum
+
+Not in the original plan. Added three tokens to the `@theme` block in
+`frontend/src/index.css` — `--color-iris-accent-surface` (#EAF2F2),
+`--text-iris-ui-ml` (15px/1.9, the Malayalam counterpart to `--text-iris-ui`),
+and `--radius-iris-sm` (12px) — closing the three genuine gaps found by the
+IRIS widget rebuild's token map. Two further reported mismatches were triaged
+as design-side and deliberately given no token. Nothing consumes the new
+tokens yet. Scope: `frontend/src/index.css`.

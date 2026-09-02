@@ -28,11 +28,14 @@
   --color-iris-text-muted: #5C6875;
   --color-iris-accent: #0E7C86;
   --color-iris-danger: #B04A2F;
+  --color-iris-accent-surface: #EAF2F2;
 
   --text-iris-label: 13px;
   --text-iris-label--line-height: 1.5;
   --text-iris-ui: 15px;
   --text-iris-ui--line-height: 1.6;
+  --text-iris-ui-ml: 15px;
+  --text-iris-ui-ml--line-height: 1.9;
   --text-iris-body: 17px;
   --text-iris-body--line-height: 1.6;
   --text-iris-body-ml: 17px;
@@ -41,6 +44,7 @@
   --text-iris-title--line-height: 1.35;
 
   --radius-iris: 16px;
+  --radius-iris-sm: 12px;
   --shadow-iris: 0 2px 8px rgba(28,36,48,0.10);
 }
 
