@@ -1223,8 +1223,8 @@ Deferred: none — a single, self-contained backend signal addition.
 **Task 1b — IRIS design token addendum — CODE COMPLETE
 (branch `feat/iris-token-addendum`, cut from `origin/main`).**
 
-PR: pending
-Commits: pending
+PR: #28
+Commits: a972eda
 
 Added three tokens to the `@theme` block in `frontend/src/index.css`, closing
 three of the five gaps found by Task 3's Order step 6 token map — Task 3
