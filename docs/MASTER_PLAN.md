@@ -521,3 +521,12 @@ permission in `~/.gemini/antigravity-cli/settings.json` (outside the repo,
 no diff) so mechanical work can actually run there per §12.3, and added
 AGENTS.md §12.10a listing the hard limits the grant excludes.
 Scope: `.agents/AGENTS.md`. Related: CURRENT_TASK.md dated 2026-09-01.
+
+### 2026-09-02 — Unattended halt loop
+Unattended halt loop. Added a Claude Code `Stop` hook
+(`.agents/hooks/halt_answerer.py`) that dispatches a tool-restricted Sonnet answerer
+to auto-write `.agents/DECISION.md` for AGENTS.md §12.5 conditions 3 (stay-in-scope
+only), 4 and 6. Conditions 1, 2 and 5 always halt for the developer. Three AGENTS.md
+edits: §12.10 bans bypass flags, §12.10a requires `--add-dir`, §12.15 narrows the
+DECISION.md write exception. Scope: `.agents/hooks/`, `.claude/settings.json`,
+`.agents/AGENTS.md`.
