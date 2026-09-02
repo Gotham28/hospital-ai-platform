@@ -1217,3 +1217,63 @@ created. No frontend file touched — this task has no consumer for the
 sentinel; that is design frame 07, deferred until a frontend task picks it up.
 
 Deferred: none — a single, self-contained backend signal addition.
+
+### Catch-up — 2026-09-03 (third entry)
+
+**Task 1b — IRIS design token addendum — CODE COMPLETE
+(branch `feat/iris-token-addendum`, cut from `origin/main`).**
+
+PR: #28
+Commits: a972eda
+
+Added three tokens to the `@theme` block in `frontend/src/index.css`, closing
+three of the five gaps found by Task 3's Order step 6 token map — Task 3
+remains halted, waiting on these, and resumes once this merges:
+
+- `--color-iris-accent-surface: #EAF2F2` — a pale tint of `--color-iris-accent`
+  (#0E7C86), used as the background of the language-switch notice in design
+  frame 06.
+- `--text-iris-ui-ml: 15px` / `--text-iris-ui-ml--line-height: 1.9` — the
+  Malayalam counterpart to `--text-iris-ui` (15px/1.6). Task 1 defined only
+  one Malayalam size (`--text-iris-body-ml`, 17px); Malayalam needs the taller
+  line-height at every size, not just body.
+- `--radius-iris-sm: 12px` — the nested radius for the language-toggle pill's
+  inner rounded rectangle (sits inside the 16px `--radius-iris` container).
+  Deliberate naming asymmetry with `--radius-iris` (no `-md` suffix) — not
+  "fixed" here, since renaming a merged Task 1 token is out of scope.
+
+Two further mismatches from Task 3's report were triaged as design-side, not
+token gaps, and deliberately get no token: 13px/line-height-1 on the
+language-toggle pill labels (an export artifact — `--text-iris-label`'s
+13px/1.5 centres identically in a flex-centred pill), and 15px at two
+different line-heights (1.9 in most places, 1.4 on the stop-button labels) —
+an inconsistency in the design file itself, which the developer is
+correcting to 1.9 everywhere so `--text-iris-ui-ml` covers every site.
+
+All 22 of Task 1's existing properties are unchanged — confirmed by reading
+the `@theme` block off disk before editing and by `git diff` after.
+
+**Verification.** `npm run build` exits 0 — noted explicitly that this proves
+only that the file compiles, not that the tokens work; Tailwind v4 generates
+no output at all for a class referencing a missing token, silently. The real
+check: a scratch element was added to a real source file
+(`frontend/src/main.tsx`, temporarily, then fully reverted — confirmed absent
+from the final `git diff`) using all three new utility classes, since
+Tailwind's JIT only generates CSS for classes it finds in scanned source
+files — an earlier attempt to inject the classes via a live browser-console
+script produced a false negative (zero effect) on even Task 1's own already-merged
+tokens (`text-iris-body-ml`, `rounded-iris`, `bg-iris-primary` all read as
+unstyled too), which is what surfaced this methodology issue rather than an
+actual regression. Computed styles read via the real dev server:
+
+```text
+{"fontSize":"15px","lineHeight":"28.5px","borderRadius":"12px","backgroundColor":"rgb(234, 242, 242)"}
+```
+
+All three match expected exactly: `text-iris-ui-ml` → 15px / 28.5px (15×1.9);
+`rounded-iris-sm` → 12px; `bg-iris-accent-surface` → rgb(234, 242, 242) (#EAF2F2).
+
+Nothing consumes any of the 25 `iris-*` properties yet — Task 3 remains the
+first consumer, once it resumes.
+
+Deferred: none — three tokens added, two explicitly declined as design-side.
