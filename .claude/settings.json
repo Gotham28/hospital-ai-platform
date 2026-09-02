@@ -31,5 +31,17 @@
     "gsd-review": "user-invocable-only",
     "gsd-fast": "user-invocable-only",
     "gsd-quick": "user-invocable-only"
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .agents/hooks/halt_answerer.py"
+          }
+        ]
+      }
+    ]
   }
 }

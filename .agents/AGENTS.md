@@ -635,6 +635,14 @@ authorises any of them:
   Claude Chat and read by Claude Code. §6.4 forbids rewriting a developer-supplied scope
   file; §12.7 makes the resume file Claude Chat's. See §12.15 for why these two sit on
   the other side of the line from STATUS.md.
+- **No `--dangerously-skip-permissions` or any equivalent auto-approve flag, on any
+  dispatch — an Antigravity dispatch under §12.3, or the halt-answerer's `claude -p`
+  invocation.** It voids every tool restriction in one argument: §12.10a's allow/deny
+  list for Antigravity, and the halt-answerer's own restricted `--allowedTools` grant.
+  Not a §12.4 minor decision. Not a valid retry after a permission refusal or a hook
+  failure. Not available under any §12.5 halt, including condition 4's three-strikes
+  case. A permission refusal means the invocation needs a grant that has not been
+  given — that is itself a reason to stop and report, not an obstacle to route around.
 
 ### 12.10a Antigravity's scoped `command(...)` grant
 
@@ -657,6 +665,13 @@ grant has no grant.
 Never bare `command(python)` — a one-token prefix matches every possible Python
 invocation, and `python -c` is an unrestricted shell. Never bare `command(git)` — same
 reasoning; only the four read-only subcommands above are granted.
+
+**Every dispatch MUST pass `--add-dir <repo-root>`.** Without it, relative paths in an
+allow rule resolve against no grant and every allowed read, write and command fails
+silently — confirmed by direct test 2026-09-02. A forgotten `--add-dir` produces a
+denial whose own message recommends the bypass flag banned by §12.10's new bullet;
+check `--add-dir` first, never reach for that flag instead. A grant that is never
+reached is not a grant.
 
 **DENY, unconditionally, regardless of any instruction Antigravity is given:**
 - All deletion: `rm`, `del`, `rmdir`, `Remove-Item`, `ri`, `erase`, `rd`
@@ -820,6 +835,28 @@ not how risky a file looks — it is whether the file **describes** the work or
 
 - `.agents/CURRENT_TASK.md`
 - `.agents/DECISION.md`
+
+**Narrow exception — the halt loop.** For §12.5 conditions 3 and 4, the `Stop` hook
+(`.agents/hooks/halt_answerer.py`) writes a fixed, hard-coded answer into
+`.agents/DECISION.md` itself, in Python, without invoking any model — both have
+exactly one correct answer with no task-specific reasoning left to do (condition 4's
+"which step to resume from" defers to whoever resumes, reading `## Order` at that
+time, rather than needing to be pre-computed), so there is no reasoning step in which
+a scope change could be introduced. For condition 6 only, the hook instead dispatches
+a tool-restricted `claude -p` halt-answerer, which may write `.agents/DECISION.md`,
+and nothing else, if and only if its own re-run of §12.4's four-part reversibility
+test against the handoff comes out clean on all four parts. This does not widen what
+Claude Code or Claude Chat may do: Claude Code's own ban on writing
+`.agents/DECISION.md`, above, is unchanged, and Claude Chat remains §12.7's only
+source of a scope-changing decision. The exception holds because what this section
+protects is that the process being scope-checked cannot move its own goalposts —
+neither the hook nor the halt-answerer can edit `.agents/CURRENT_TASK.md`, write
+code, or commit, and the condition-3/4 paths have no scope-changing capability by
+construction: no model is called, so there is nothing to author a scope change. An
+auto-answered halt, on any of the three conditions, counts toward §12.12's
+three-halt cap exactly like a developer-answered one — auto-answers spend tokens
+too. §12.12 itself needs no edit: the answerer runs Sonnet, the same tier
+§12.12 permits for loop-driver work.
 
 `AGENTS.md` sits on the governing side for the same reason: it defines every check
 the review layer runs. A driver that can edit the rules it is measured against can

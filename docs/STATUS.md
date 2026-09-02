@@ -994,3 +994,59 @@ Known and NOT fixed here: the STATUS.md archive split; the out-of-order Catch-up
 entries after the Notes section; the `PR #TBD` in Catch-up 2026-08-27;
 MASTER_PLAN.md's overlapping §7/§7a/§7b schedules; and §10's Sonnet list naming
 "frontend admin UI", which does not cover patient-facing frontend.
+
+### Catch-up — 2026-09-02 (second entry)
+
+**Unattended halt loop — code complete, tested, registered, and live-verified.**
+
+Added `.agents/hooks/halt_answerer.py`, a Claude Code `Stop` hook that auto-answers
+AGENTS.md §12.5 halt conditions 3 and 4 (both fully deterministic, fixed answers
+written directly in Python — no model is ever invoked for either, so "no scope
+change possible" is true by construction) and condition 6 (a tool-restricted
+`claude -p --model sonnet --restricted` dispatch that independently re-runs §12.4's
+four-part reversibility test and writes nothing if any part fails). Conditions 1, 2
+and 5 always halt for the developer, no exceptions. Never passes
+`--dangerously-skip-permissions`; every dispatch passes `--add-dir <repo-root>`;
+`ANTHROPIC_API_KEY` presence (never its value) gates every path before any dispatch.
+A three-halt cap persists to `.agents/runs/` and resets on a new task; a stale
+handoff left over from an already-closed task is now detected and skipped rather
+than silently reprocessed. `.agents/hooks/run_halt_answerer_test.py` covers all of
+this in 22 synthetic-fixture cases with zero real `claude` calls.
+
+Three AGENTS.md edits, as approved (revised once mid-task at the developer's
+correction — condition 4 was originally designed to dispatch a model for no real
+reason and was converted to pure Python to match condition 3): §12.10 bans the
+bypass flag on any dispatch; §12.10a requires `--add-dir` on every Antigravity
+dispatch; §12.15 adds the narrow DECISION.md write exception, now correctly scoped
+to conditions 3/4 (deterministic) and 6 (dispatched) after the mid-task correction.
+
+**A four-lens code review caught two Critical bugs before this report, both fixed
+and re-tested:** an uncaught crash on non-UTF-8 handoff content, and a stale
+leftover handoff from a closed task being silently reprocessable on a fresh task's
+first Stop event.
+
+**A separate, more serious design gap was caught by the developer, not the
+automated review: the write-restriction mechanism (`--allowedTools
+"Write(.agents/DECISION.md)"`) does not actually restrict anything.** Claude Code
+only enforces path-scoped permission rules for `Edit`/`Read`, never `Write` — a
+`Write(<path>)` rule is silently unconsulted. Two open GitHub issues
+(anthropics/claude-code #1188, #67849) describe exactly this failure mode in
+headless `-p` mode on Windows. Redesigned to use `Edit(.agents/DECISION.md)`
+instead (the hook now pre-creates the file with a placeholder for the answerer to
+Edit, since Edit needs existing content), plus `--disallowedTools "Bash PowerShell
+WebFetch Write"` as defense in depth.
+
+**Finding 6 is resolved.** Two real adversarial `claude -p` dispatches (isolated temp
+directories, the exact shipping command) confirmed the write restriction live, in
+both directions: round 1 showed the bare `Write` tool fully blocked; round 2 targeted
+`Edit`'s own path-scoping specifically — the model was explicitly instructed to use
+Edit against a pre-existing decoy file and was denied, while in the SAME run Edit
+succeeded against `.agents/DECISION.md`. Because the same tool both failed against
+one path and succeeded against the other in one session, the denial can only be
+explained by path-scoping, not a blanket Edit-tool block. This directly answers the
+failure mode described in two open GitHub issues (anthropics/claude-code #1188,
+#67849 — path-specific `allowedTools` rules silently ignored in headless `-p` mode on
+Windows): it did not reproduce here, on Claude Code `2.1.250`, with this exact flag
+set. `halt_answerer.py`'s docstring now carries this result instead of a pending-test
+note. `.claude/settings.json` registration remains the developer's own action
+regardless — nothing here authorizes registering the hook automatically.
