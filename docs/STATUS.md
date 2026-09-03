@@ -1277,3 +1277,125 @@ Nothing consumes any of the 25 `iris-*` properties yet — Task 3 remains the
 first consumer, once it resumes.
 
 Deferred: none — three tokens added, two explicitly declined as design-side.
+
+### Catch-up — 2026-09-03 (fourth entry)
+
+**Task 3 — IRIS patient chat widget rebuild — CODE COMPLETE
+(branch `feat/iris-widget-rebuild`, rebased onto `origin/main`).**
+
+PR: pending
+Commits: pending
+
+Rebuilt `Chat.tsx` and `ChatMessage.tsx` in the `iris-hospitals` theme against
+the approved Claude Design LIGHT design (frames 01/02/03/04/05/06/08), the
+first consumer of any of the 25 `iris-*` tokens from PR #25 and PR #28.
+Presentation only — `useChatCore`'s interface is unchanged, no hook, no
+data-flow, no backend change. `index.tsx` (the DARK page shell) and
+`AnimatedIntro.tsx` are untouched; `index.tsx` already imports `Chat` by
+relative path, so the light rebuild takes effect without editing it.
+
+**Halted twice before this run, both real gates:**
+- Order step 2's own count check (grep for `"iris-"`) would have shown 19
+  matches against an expected 22 (Task 1b's addendum made it 25/19) — the
+  gate deliberately reads the whole `@theme` block instead, since
+  `--font-malayalam`, `--radius-iris`, `--radius-iris-sm` and `--shadow-iris`
+  don't contain the substring `"iris-"`.
+- Order step 5's token map found two 15px Malayalam sites (frame 03's
+  "നിർത്തുക", frame 05's "നിർത്തൂ") at an inconsistent `1.4` line-height
+  against `1.9` everywhere else. The design's own UI could not edit
+  `line-height` inside a `font:` shorthand, so this needed a hand-edit to the
+  exported `.dc.html` directly — confirmed landed only after the file was
+  re-read fresh from disk a third time and grepped for zero remaining
+  `15px/1.4` matches.
+
+**Design source moved mid-task.** The `claude-design` MCP server was serving
+a stale cached copy — its `IRIS Chat Widget.dc.html` etag never changed
+across a confirmed edit. The design is now a local export at
+`.design/IRIS Chat Widget.dc.html` (untracked, never staged), diverging from
+the Claude Design project by the four corrected line-height values.
+
+**Two genuine token gaps found in frame 05 (voice input), resolved without
+touching `index.css`:** `#E4C5BA` (recording-state card border) and
+`#E7EDF4` (transcribing progress-track background) have no matching
+`iris-*` token. Per the token rule (no new token, no raw inline value, no
+nearest-token substitution), both are rendered via CSS `color-mix()` derived
+from `--color-iris-danger` (33%) and `--color-iris-border` (53%)
+respectively — computed values verified at `rgb(229,195,186)` and
+`rgb(233,238,243)`, within 2/255 per channel of the design's exact hex.
+
+**Frame 07 (translation-unavailable) deliberately not built.** Confirmed
+unreachable from `Chat.tsx` alone: it delegates to `useChatCore` →
+`useHospitalChat`, and `useHospitalChat.tsx:137`'s `catch { /* skip */ }` is
+exactly where the `[TRANSLATION_UNAVAILABLE]` sentinel (Task 2, PR #27) is
+silently dropped. Detecting it needs a change to that shared hook, used by
+all three themes — out of scope here, deferred to its own task with
+developer sign-off.
+
+**Other disclosed implementation decisions, none touching the shared hook or
+`index.css`:**
+- The design's "stop generation" chip (frames 03/05) is not rendered —
+  `useChatCore` exposes no `stopGeneration()` capability, and this is not a
+  regression: the dark theme never had one either. Rendering it would mean
+  either a non-functional button or a hook change.
+- Frame 05's transcribing state omits the dashed live-partial-transcript box
+  — the hook exposes no partial-transcript field, only the final `inputText`
+  once transcription completes. Not fabricated.
+- Frame 05's recording-state elapsed timer and frame 06's "switched
+  language" notice are implemented as local, ephemeral component state in
+  `Chat.tsx` (a `setInterval` counter; a `setTimeout`-dismissed toast) — not
+  sourced from the hook, not persisted, not a data-flow change.
+- `Chat.tsx`'s own redundant Malayalam font `@import` was removed, per the
+  task file — `index.html` (PR #25) already loads Noto Sans Malayalam
+  globally and the `font-malayalam` token-derived utility already exists.
+  Verified no rendering change: the scratch-element check below resolved
+  `font-family: "Noto Sans Malayalam", Manjari, sans-serif` correctly.
+- The 13px/line-height-1 language-toggle pill labels use `--text-iris-label`
+  (13px/1.5), per the design-side triage already recorded in Catch-up
+  2026-09-03 (third entry) — confirmed still present in the re-read design,
+  unchanged, as expected (an export artifact, not something meant to be
+  fixed).
+- Desktop vs mobile sizing (panel width, padding, bubble max-width) is
+  implemented as a live Tailwind responsive breakpoint (`md:`), not two
+  fixed exports, matching how the existing dark theme already sizes itself
+  independent of the browser viewport — this task's own read is that the
+  design's "what changes at desktop" panel describes responsive behaviour.
+- Logo asset placed at `frontend/src/themes/iris-hospitals/iris-logo.png`,
+  imported as a bundler module in `Chat.tsx`. No genuine existing convention
+  for theme logo assets was found under `frontend/src/themes/` (the one
+  file there, `iris-hospitals/logonewiris.png`, is a dead, unused duplicate
+  — the theme's real, live logo is served from `frontend/public/` and
+  referenced by absolute URL in `AnimatedIntro.tsx`). Flagged to the
+  developer, who chose to place the new logo under the theme directory as
+  the task file originally specified, establishing that pattern going
+  forward rather than following the pre-existing `public/` convention.
+- Small decorative radii (1–8px on icon bars, dots, waveform strokes) use
+  Tailwind's structural utilities, not `iris-*` tokens — not design-system
+  scale values, per the standing reasoning carried from the token-map step.
+
+**Verification.** `npm run build` exits 0 — stated plainly that this proves
+compilation only, not that any token works. Real verification: a scratch
+harness (`ChatMessage` and `Chat` rendered directly, no backend needed since
+all four target checks are either static text or local component state) was
+added to `frontend/src/main.tsx`, then fully reverted — confirmed absent
+from the final `git diff`. Computed styles read from the live dev server:
+
+```text
+text-iris-body-ml  → font-size 17px, line-height 32.3px (17×1.9)
+text-iris-ui-ml    → font-size 15px, line-height 28.5px (15×1.9)
+radius-iris-sm     → border-radius 12px
+color-iris-accent-surface → background-color rgb(234, 242, 242)
+```
+
+All four match expected exactly. Screenshots captured of the rendered widget
+(header, language toggle, greeting bubble, suggestion chips, composer) after
+an initial Browser-pane rendering glitch (solid black frame despite
+correct, independently-verified DOM/computed-style content) was resolved by
+a fresh navigation. The recording and transcribing mic states were not
+visually screenshotted — `micState` transitions depend on real voice
+activity detection, which fails to initialize in this environment (VAD
+model file load error, unrelated to this task's code) — waived with reason,
+not claimed as passed; the `color-mix()` values driving those two states
+were verified numerically instead (above).
+
+Deferred: frame 07 (own task, needs shared-hook change); the four disclosed
+implementation decisions above, all reported rather than hidden.
