@@ -1399,3 +1399,30 @@ were verified numerically instead (above).
 
 Deferred: frame 07 (own task, needs shared-hook change); the four disclosed
 implementation decisions above, all reported rather than hidden.
+
+### Catch-up — 2026-09-03 (fifth entry)
+
+**PR #29 follow-up — fixed duplicate "IRIS സഹായി" render during streaming.**
+
+While the developer was testing PR #29's rebuilt widget live, a real UI bug
+surfaced: the moment a new assistant reply starts streaming, two "IRIS
+സഹായി" blocks appeared simultaneously — an empty `ChatMessage` bubble (the
+just-appended placeholder message, `content: ''`) rendered by the
+`messages.map()` loop, and the separate "thinking" indicator block, since
+both check the same condition (`isStreaming && last message content === ''`).
+The dark theme has this identical structural pattern and is presumed to have
+had the same defect, just visually unnoticeable against a dark background;
+the light theme's visible white bubble/shadow made it obvious.
+
+Fix: skip rendering the real `ChatMessage` bubble specifically for the last
+message while it is still the empty streaming placeholder — the thinking
+indicator covers that exact state, and the real bubble takes over normally
+once content starts arriving.
+
+Verified live: sent a real message against the local backend; confirmed only
+one "IRIS സഹായി" label renders before/during the reply. (The reply itself
+failed with `openai.RateLimitError: insufficient_quota` — the local OpenAI
+key has no credits remaining — unrelated to this fix.)
+
+PR: pending
+Commits: pending

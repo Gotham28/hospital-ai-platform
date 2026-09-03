@@ -165,7 +165,14 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
           </div>
         )}
 
-        {messages.map((msg, idx) => (
+        {messages.map((msg, idx) => {
+          // The last message starts as an empty placeholder while streaming
+          // begins — skip rendering it as its own bubble here, since the
+          // "thinking" indicator below covers that exact same state. Once
+          // real content arrives, content !== '' and this renders normally.
+          const isPendingPlaceholder = idx === messages.length - 1 && isStreaming && msg.content === '';
+          if (isPendingPlaceholder) return null;
+          return (
           <ChatMessage
             key={idx}
             role={msg.role}
@@ -173,7 +180,8 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
             isStreaming={msg.isStreaming}
             language={language}
           />
-        ))}
+          );
+        })}
 
         {showChips && suggestions[language]?.length > 0 && (
           <div className="flex flex-wrap gap-[12px]">
