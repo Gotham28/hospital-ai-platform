@@ -1283,8 +1283,8 @@ Deferred: none — three tokens added, two explicitly declined as design-side.
 **Task 3 — IRIS patient chat widget rebuild — CODE COMPLETE
 (branch `feat/iris-widget-rebuild`, rebased onto `origin/main`).**
 
-PR: pending
-Commits: pending
+PR: #29
+Commits: 529fc5c
 
 Rebuilt `Chat.tsx` and `ChatMessage.tsx` in the `iris-hospitals` theme against
 the approved Claude Design LIGHT design (frames 01/02/03/04/05/06/08), the
