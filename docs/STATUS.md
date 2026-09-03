@@ -1424,5 +1424,5 @@ one "IRIS സഹായി" label renders before/during the reply. (The reply its
 failed with `openai.RateLimitError: insufficient_quota` — the local OpenAI
 key has no credits remaining — unrelated to this fix.)
 
-PR: pending
-Commits: pending
+PR: #29
+Commits: fdf60dd
