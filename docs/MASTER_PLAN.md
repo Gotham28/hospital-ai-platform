@@ -577,3 +577,14 @@ only — no hook, data-flow or backend change. `index.tsx` (DARK) and
 `AnimatedIntro.tsx` untouched. Design frame 07 deferred: rendering it needs
 a change to the shared `useHospitalChat` hook, which affects all three
 themes. Scope: `frontend/src/themes/iris-hospitals/`.
+
+### 2026-09-03 — IRIS page shell light theme, faster intro, dev overlay fix
+
+Not in the original plan. Reworked the iris-hospitals page shell
+(`index.tsx`) from dark to light theme using the existing `iris-*` tokens,
+for visual consistency with the PR #29 widget rebuild. Compressed the entry
+animation (`AnimatedIntro.tsx`) from ~12.6s to ~7s. Added
+`frontend/vite.config.js` to suppress Vite's dev-only HMR error overlay (a
+pre-existing, unrelated voice-detection library warning was blocking the
+page). Scope: `frontend/src/themes/iris-hospitals/index.tsx`,
+`frontend/src/themes/iris-hospitals/AnimatedIntro.tsx`, `frontend/vite.config.js`.
