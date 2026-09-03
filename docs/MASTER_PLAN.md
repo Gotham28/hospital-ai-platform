@@ -567,3 +567,13 @@ and `--radius-iris-sm` (12px) — closing the three genuine gaps found by the
 IRIS widget rebuild's token map. Two further reported mismatches were triaged
 as design-side and deliberately given no token. Nothing consumes the new
 tokens yet. Scope: `frontend/src/index.css`.
+
+### 2026-09-03 — IRIS patient chat widget rebuild
+
+Not in the original plan. Rebuilt `Chat.tsx` and `ChatMessage.tsx` in the
+`iris-hospitals` theme against the approved Claude Design LIGHT design, the
+first consumer of the `iris-*` tokens from PR #25 and PR #28. Presentation
+only — no hook, data-flow or backend change. `index.tsx` (DARK) and
+`AnimatedIntro.tsx` untouched. Design frame 07 deferred: rendering it needs
+a change to the shared `useHospitalChat` hook, which affects all three
+themes. Scope: `frontend/src/themes/iris-hospitals/`.

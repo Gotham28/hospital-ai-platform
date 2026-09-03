@@ -1,20 +1,31 @@
 /**
  * iris-hospitals/Chat.tsx
  * ─────────────────────────────────────────────────────────────────
- * IRIS THEME — full chat widget UI (voice + text + suggestions).
+ * IRIS THEME — full chat widget UI, LIGHT rebuild (voice + text +
+ * suggestions), against the approved Claude Design frames
+ * 01/02/03/04/05/06/08.
  *
- * Mirrors arogya-specialty/Chat.tsx pattern.
- * ALL logic comes from useChatCore(). Zero API calls here.
+ * ALL data logic comes from useChatCore(). Zero API calls here.
+ * Presentation only.
  *
- * Palette: Indigo/Violet on dark slate
+ * Design frame 07 (translation-unavailable notice) is deliberately
+ * NOT built here — detecting the [TRANSLATION_UNAVAILABLE] sentinel
+ * requires a change to the shared useHospitalChat hook, out of
+ * scope for this task. See docs/STATUS.md / .agents/REPORT.md for
+ * the reachability evidence and the deferral.
+ *
+ * A few design elements assume data useChatCore does not expose
+ * (a live partial transcript during voice-to-text, elapsed
+ * recording time). Handled per-element below with a comment at the
+ * point of divergence — full list in the task's close-out report.
  * ─────────────────────────────────────────────────────────────────
  */
 
-import 'regenerator-runtime/runtime';
-import React, { useEffect, useRef } from 'react';
-import { Mic, MicOff, Send, Zap, Activity, Loader2, AlertCircle } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Mic, MicOff, Send, Loader2, AlertCircle } from 'lucide-react';
 import ChatMessage from './ChatMessage';
 import { useChatCore } from '../../components/common/ChatCore';
+import irisLogo from './iris-logo.png';
 
 interface ChatProps {
   hospitalId: string;
@@ -51,66 +62,117 @@ const Chat: React.FC<ChatProps> = ({ hospitalId }) => {
     micState, micError,
     suggestions,
     handleSend, toggleMic,
-    vadLoading
+    vadLoading,
   } = useChatCore(hospitalId) as ChatCoreReturn;
 
+  const isMalayalam = language === 'ml';
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // ── Mic button appearance ──────────────────────────────────
-  const micBtnClass: Record<MicState, string> = {
-    idle:         'text-indigo-300 hover:bg-white/10',
-    recording:    'bg-red-500 text-white ring-4 ring-red-400/30 animate-pulse',
-    transcribing: 'bg-indigo-600 text-white opacity-80',
+  // ── "Switched to <language>" transient notice — frame 06 ──────
+  // Local, ephemeral UI state only; not sourced from the hook, not
+  // persisted, not a data-flow change.
+  const [showSwitchNotice, setShowSwitchNotice] = useState(false);
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    setShowSwitchNotice(true);
+    const t = setTimeout(() => setShowSwitchNotice(false), 3000);
+    return () => clearTimeout(t);
+  }, [language]);
+
+  // ── Recording elapsed time — frame 05 ──────────────────────────
+  // useChatCore exposes no elapsed-time field; this is a local,
+  // presentation-only timer, not a hook or data-flow change.
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  useEffect(() => {
+    if (micState !== 'recording') {
+      setRecordingSeconds(0);
+      return;
+    }
+    const interval = setInterval(() => setRecordingSeconds(s => s + 1), 1000);
+    return () => clearInterval(interval);
+  }, [micState]);
+  const recordingTimeLabel = `${Math.floor(recordingSeconds / 60)}:${String(recordingSeconds % 60).padStart(2, '0')}`;
+
+  const micHint: Record<MicState, string> = {
+    idle:         vadLoading
+                    ? (isMalayalam ? 'ലോഡുചെയ്യുന്നു…' : 'Loading…')
+                    : (isMalayalam ? 'സംസാരിക്കാൻ മൈക്ക് അമർത്തൂ' : 'Tap the mic to speak'),
+    recording:    isMalayalam ? 'കേൾക്കുന്നു. പൂർത്തിയായാൽ നിർത്തൂ അമർത്തൂ.' : 'Listening. Tap stop when finished.',
+    transcribing: isMalayalam ? 'പറഞ്ഞത് എഴുതി മാറ്റുന്നു' : 'Transcribing what you said',
   };
 
-  const micLabel: Record<MicState, string> = {
-    idle:         vadLoading
-                    ? (language === 'en' ? 'Loading AI…' : 'ലോഡുചെയ്യുന്നു…')
-                    : (language === 'en' ? 'Tap to speak' : 'സംസാരിക്കുക'),
-    recording:    language === 'en' ? 'Listening…'   : 'ശ്രദ്ധിക്കുന്നു…',
-    transcribing: language === 'en' ? 'Translating…' : 'വിവർത്തനം ചെയ്യുന്നു…',
-  };
+  const showChips = messages.length <= 1;
 
   return (
-    <div
-className="w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col border"
-
-      style={{ background: '#0f172a', borderColor: 'rgba(99,102,241,0.3)' }}
-    >
-      {/* Malayalam font import */}
+    <div className="w-full max-w-[375px] md:max-w-[440px] bg-iris-surface border border-iris-border rounded-iris shadow-iris overflow-hidden flex flex-col">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Malayalam:wght@400;500;700&display=swap');
-        .ml-text { font-family: 'Noto Sans Malayalam', sans-serif !important; }
         .iris-scrollbar::-webkit-scrollbar { width: 4px; }
         .iris-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .iris-scrollbar::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.3); border-radius: 2px; }
+        .iris-scrollbar::-webkit-scrollbar-thumb { background: var(--color-iris-border); border-radius: 2px; }
+        @keyframes irisBlink { 0%, 100% { opacity: 1 } 50% { opacity: 0 } }
+        @keyframes irisDot { 0%, 80%, 100% { transform: translateY(0); opacity: .35 } 40% { transform: translateY(-4px); opacity: 1 } }
+        @keyframes irisSweep { 0% { transform: translateX(-100%) } 100% { transform: translateX(320%) } }
+        @keyframes irisRipple {
+          0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-iris-danger) 34%, transparent) }
+          100% { box-shadow: 0 0 0 16px color-mix(in srgb, var(--color-iris-danger) 0%, transparent) }
+        }
       `}</style>
 
       {/* ── Header ──────────────────────────────────────────────── */}
-      <div className="p-4 text-white shrink-0" style={{ background: 'linear-gradient(135deg, #4338ca, #6d28d9)' }}>
-        <div className="flex justify-between items-center">
-          <h3 className="font-bold flex items-center gap-2 text-sm">
-            <Activity className="w-4 h-4" />
-            {language === 'ml' ? 'IRIS-നോട് ചോദിക്കൂ' : 'Ask IRIS'}
-          </h3>
+      <div className="flex items-center justify-between gap-[12px] md:gap-[16px] p-[16px] md:px-[24px] bg-iris-surface-raised border-b border-iris-border">
+        <img src={irisLogo} alt="IRIS" className="h-[24px] md:h-[28px] w-auto block" />
+        <div className="flex items-center gap-[4px] p-[4px] bg-iris-surface border border-iris-border rounded-iris">
           <button
-            onClick={() => setLanguage(l => l === 'en' ? 'ml' : 'en')}
+            onClick={() => setLanguage('ml')}
             disabled={micState !== 'idle'}
-            className="px-3 py-1 rounded-md text-xs font-bold border border-white/20 disabled:opacity-50 ml-text"
-            style={{ background: 'rgba(255,255,255,0.15)' }}
+            className={`px-[12px] py-[8px] rounded-iris-sm font-malayalam text-iris-label font-semibold disabled:opacity-50 transition-colors ${
+              isMalayalam ? 'bg-iris-primary text-white' : 'text-iris-text-muted'
+            }`}
           >
-            {language === 'en' ? 'English' : 'മലയാളം'}
+            മലയാളം
+          </button>
+          <button
+            onClick={() => setLanguage('en')}
+            disabled={micState !== 'idle'}
+            className={`px-[12px] py-[8px] rounded-iris-sm text-iris-label font-semibold disabled:opacity-50 transition-colors ${
+              !isMalayalam ? 'bg-iris-primary text-white' : 'text-iris-text-muted'
+            }`}
+          >
+            English
           </button>
         </div>
       </div>
 
       {/* ── Messages ─────────────────────────────────────────────── */}
-      <div className="overflow-y-auto p-4 space-y-4 iris-scrollbar"
-style={{ height: '400px' }}>
-        {messages.map((msg, idx) => (
+      <div
+        className="overflow-y-auto p-[24px] md:p-[32px] flex flex-col gap-[32px] iris-scrollbar"
+        style={{ minHeight: '320px', height: '400px' }}
+      >
+        {showSwitchNotice && (
+          <div className="flex justify-center -mt-[8px] mb-[-24px]">
+            <div className="px-[12px] py-[8px] rounded-iris bg-iris-accent-surface text-iris-label text-iris-accent text-center">
+              {isMalayalam
+                ? 'മലയാളത്തിലേക്ക് മാറി. മുൻ സന്ദേശങ്ങൾ ഇംഗ്ലീഷിൽ തുടരും.'
+                : 'Switched to English. Earlier messages stay in Malayalam.'}
+            </div>
+          </div>
+        )}
+
+        {messages.map((msg, idx) => {
+          // The last message starts as an empty placeholder while streaming
+          // begins — skip rendering it as its own bubble here, since the
+          // "thinking" indicator below covers that exact same state. Once
+          // real content arrives, content !== '' and this renders normally.
+          const isPendingPlaceholder = idx === messages.length - 1 && isStreaming && msg.content === '';
+          if (isPendingPlaceholder) return null;
+          return (
           <ChatMessage
             key={idx}
             role={msg.role}
@@ -118,85 +180,159 @@ style={{ height: '400px' }}>
             isStreaming={msg.isStreaming}
             language={language}
           />
-        ))}
-        {isStreaming && messages[messages.length - 1]?.content === '' && (
-          <div className="flex items-center gap-2 p-2 rounded-lg w-fit shadow-sm" style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.2)' }}>
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span className="text-[10px] font-bold ml-text">
-              {language === 'ml' ? 'IRIS പരിശോധിക്കുന്നു…' : 'IRIS is checking…'}
-            </span>
+          );
+        })}
+
+        {showChips && suggestions[language]?.length > 0 && (
+          <div className="flex flex-wrap gap-[12px]">
+            {suggestions[language].map((text, i) => (
+              <button
+                key={i}
+                disabled={isStreaming || micState !== 'idle'}
+                onClick={() => handleSend(text)}
+                className={`px-[16px] py-[12px] bg-iris-surface-raised border border-iris-border rounded-iris disabled:opacity-40 transition-all active:scale-95 ${
+                  isMalayalam ? 'font-malayalam text-iris-ui-ml' : 'text-iris-ui'
+                } text-iris-text-primary`}
+              >
+                {text}
+              </button>
+            ))}
           </div>
         )}
+
+        {isStreaming && messages[messages.length - 1]?.content === '' && (
+          <div className="flex flex-col items-start gap-[8px]">
+            <div className="text-iris-label uppercase tracking-[0.04em] font-semibold text-iris-text-muted">
+              {isMalayalam ? 'IRIS സഹായി' : 'IRIS assistant'}
+            </div>
+            <div className="flex items-center gap-[12px] bg-iris-surface-raised border border-iris-border rounded-iris shadow-iris px-[16px] py-[12px]">
+              <div className="flex items-end gap-[4px] h-[16px]">
+                <span className="w-[8px] h-[8px] rounded-[4px] bg-iris-primary" style={{ animation: 'irisDot 1.4s ease-in-out infinite' }} />
+                <span className="w-[8px] h-[8px] rounded-[4px] bg-iris-primary" style={{ animation: 'irisDot 1.4s ease-in-out .2s infinite' }} />
+                <span className="w-[8px] h-[8px] rounded-[4px] bg-iris-primary" style={{ animation: 'irisDot 1.4s ease-in-out .4s infinite' }} />
+              </div>
+              <span className={`${isMalayalam ? 'font-malayalam text-iris-ui-ml' : 'text-iris-ui'} text-iris-text-muted`}>
+                {isMalayalam ? 'സഹായി ചിന്തിക്കുന്നു' : 'IRIS is thinking'}
+              </span>
+            </div>
+          </div>
+        )}
+
         <div ref={scrollRef} />
       </div>
 
-      {/* ── Suggestion chips ─────────────────────────────────────── */}
-      <div className="px-4 py-2 border-t" style={{ background: '#0f172a', borderColor: 'rgba(99,102,241,0.2)' }}>
-        <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-          {suggestions[language].map((text, i) => (
-            <button
-              key={i}
-              disabled={isStreaming || micState !== 'idle'}
-              onClick={() => handleSend(text)}
-              className="flex-none text-[11px] px-3 py-1.5 rounded-full shadow-sm active:scale-95 transition-all disabled:opacity-40 whitespace-nowrap ml-text"
-              style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.25)', color: '#a5b4fc' }}
-            >
-              <Zap className="w-3 h-3 inline mr-1" style={{ color: '#fbbf24', fill: '#fbbf24' }} />
-              {text}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Input + mic ──────────────────────────────────────────── */}
-      <div className="p-4 border-t shrink-0 space-y-3" style={{ background: '#0f172a', borderColor: 'rgba(99,102,241,0.2)' }}>
+      {/* ── Composer ─────────────────────────────────────────────── */}
+      <div className="p-[16px] md:px-[24px] bg-iris-surface-raised border-t border-iris-border">
         {micError && (
-          <div className="flex items-start gap-2 rounded-lg px-3 py-2" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>
-            <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-            <p className="text-xs text-red-400 ml-text">{micError}</p>
+          <div className="flex items-start gap-[8px] rounded-iris px-[12px] py-[8px] mb-[12px] bg-iris-surface border border-iris-border">
+            <AlertCircle className="w-4 h-4 text-iris-danger shrink-0 mt-0.5" />
+            <p className={`${isMalayalam ? 'font-malayalam text-iris-ui-ml' : 'text-iris-ui'} text-iris-danger`}>{micError}</p>
           </div>
         )}
 
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={inputText}
-            onChange={e => setInputText(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && !isStreaming && handleSend()}
-            placeholder={language === 'en' ? 'Ask anything…' : 'ചോദിക്കൂ…'}
-            disabled={isStreaming || micState !== 'idle'}
-            className="flex-1 rounded-full px-4 py-2 text-sm outline-none disabled:opacity-60 ml-text text-white placeholder-slate-500"
-            style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(99,102,241,0.25)', focusRing: 'none' }}
-          />
-          <button
-            onClick={() => handleSend()}
-            disabled={isStreaming || !inputText.trim() || micState !== 'idle'}
-            className="p-2 rounded-full disabled:opacity-40 transition-all"
-            style={{ background: 'linear-gradient(135deg, #4338ca, #6d28d9)', color: 'white' }}
-          >
-            <Send className="w-4 h-4" />
-          </button>
-        </div>
+        {micState === 'idle' && (
+          <div className="flex flex-col gap-[8px]">
+            <div className="flex items-end gap-[12px]">
+              <button
+                type="button"
+                onClick={toggleMic}
+                disabled={vadLoading}
+                aria-label={micHint.idle}
+                className="w-[44px] h-[44px] flex-none rounded-iris bg-iris-surface border border-iris-border flex flex-col items-center justify-center gap-[2px] disabled:opacity-50"
+              >
+                {vadLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin text-iris-primary" />
+                ) : (
+                  <Mic className="w-5 h-5 text-iris-primary" />
+                )}
+              </button>
+              <input
+                type="text"
+                value={inputText}
+                onChange={e => setInputText(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && !isStreaming && handleSend()}
+                placeholder={isMalayalam ? 'ചോദ്യം ചോദിക്കൂ' : 'Ask a question'}
+                disabled={isStreaming}
+                className={`flex-1 min-w-0 p-[12px] rounded-iris bg-iris-surface border border-iris-border outline-none focus:outline-2 focus:outline-iris-primary focus:outline-offset-2 focus:border-iris-primary disabled:opacity-60 text-iris-text-primary ${
+                  isMalayalam ? 'font-malayalam text-iris-ui-ml' : 'text-iris-body'
+                }`}
+              />
+              <button
+                onClick={() => handleSend()}
+                disabled={isStreaming || !inputText.trim()}
+                aria-label={isMalayalam ? 'അയയ്ക്കൂ' : 'Send'}
+                className="w-[44px] h-[44px] flex-none rounded-iris bg-iris-primary disabled:bg-iris-border disabled:opacity-100 flex items-center justify-center transition-colors"
+              >
+                <Send className="w-4 h-4 text-white" />
+              </button>
+            </div>
+            <div className={`${isMalayalam ? 'font-malayalam text-iris-ui-ml' : 'text-iris-ui'} text-iris-text-muted`}>
+              {micHint.idle}
+            </div>
+          </div>
+        )}
 
-        {/* Mic — centred below input, exactly like Arogya */}
-        <div className="flex flex-col items-center">
-          <button
-            type="button"
-            onClick={toggleMic}
-            disabled={isStreaming || micState === 'transcribing' || vadLoading}
-            className={`p-4 rounded-full transition-all transform active:scale-90 shadow-lg disabled:opacity-50 flex items-center justify-center ${micBtnClass[micState]}`}
-            style={micState === 'idle' ? { background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)' } : {}}
-            aria-label={micLabel[micState]}
+        {micState === 'recording' && (
+          <div
+            className="flex flex-col gap-[12px] -m-[16px] md:-mx-[24px] md:-my-[16px] p-[16px] rounded-iris"
+            style={{ border: '1px solid color-mix(in srgb, var(--color-iris-danger) 33%, white)' }}
           >
-            {vadLoading             ? <Loader2 className="w-6 h-6 animate-spin" /> :
-             micState === 'recording'    ? <MicOff className="w-6 h-6" /> :
-             micState === 'transcribing' ? <Loader2 className="w-6 h-6 animate-spin" /> :
-                                           <Mic className="w-6 h-6" />}
-          </button>
-          <p className="text-[9px] uppercase tracking-widest font-black mt-2 text-center ml-text" style={{ color: '#475569' }}>
-            {micLabel[micState]}
-          </p>
-        </div>
+            <div className="flex items-center gap-[12px]">
+              <button
+                type="button"
+                onClick={toggleMic}
+                aria-label={isMalayalam ? 'നിർത്തൂ' : 'Stop'}
+                className="w-[44px] h-[44px] flex-none rounded-iris bg-iris-danger flex items-center justify-center"
+                style={{ animation: 'irisRipple 1.8s ease-out infinite' }}
+              >
+                <MicOff className="w-5 h-5 text-white" />
+              </button>
+              <div className="flex-1 min-w-0 flex items-center gap-[12px]">
+                <span className="font-mono text-iris-label text-iris-text-muted">{recordingTimeLabel}</span>
+              </div>
+              <button
+                type="button"
+                onClick={toggleMic}
+                className={`px-[16px] py-[12px] flex-none rounded-iris bg-iris-danger text-white font-semibold ${
+                  isMalayalam ? 'font-malayalam text-iris-ui-ml' : 'text-iris-ui'
+                }`}
+              >
+                {isMalayalam ? 'നിർത്തൂ' : 'Stop'}
+              </button>
+            </div>
+            <div className={`${isMalayalam ? 'font-malayalam text-iris-ui-ml' : 'text-iris-ui'} text-iris-text-primary`}>
+              {micHint.recording}
+            </div>
+          </div>
+        )}
+
+        {micState === 'transcribing' && (
+          <div className="flex flex-col gap-[12px]">
+            <div className="flex items-center gap-[12px]">
+              <div className="w-[44px] h-[44px] flex-none rounded-iris bg-iris-surface border border-iris-border flex items-center justify-center opacity-45">
+                <Mic className="w-5 h-5 text-iris-primary" />
+              </div>
+              <div className="flex-1 min-w-0 flex flex-col gap-[8px]">
+                <div className={`${isMalayalam ? 'font-malayalam text-iris-ui-ml' : 'text-iris-ui'} text-iris-text-muted`}>
+                  {micHint.transcribing}
+                </div>
+                <div
+                  className="h-[4px] rounded-[2px] overflow-hidden"
+                  style={{ background: 'color-mix(in srgb, var(--color-iris-border) 53%, white)' }}
+                >
+                  <div className="w-[30%] h-[4px] rounded-[2px] bg-iris-accent" style={{ animation: 'irisSweep 1.4s ease-in-out infinite' }} />
+                </div>
+              </div>
+            </div>
+            {/*
+              Design frame 05 shows a live partial transcript in a dashed
+              box here. useChatCore exposes no partial-transcript field —
+              only the final `inputText` once transcription completes —
+              so there is no real data to show mid-transcription. Omitted
+              rather than fabricated; see close-out report.
+            */}
+          </div>
+        )}
       </div>
     </div>
   );

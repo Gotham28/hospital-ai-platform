@@ -1,10 +1,11 @@
 /**
  * iris-hospitals/ChatMessage.tsx
  * ─────────────────────────────────────────────────────────────────
- * IRIS THEME — message bubble UI only.
- * Mirrors arogya-specialty/ChatMessage.tsx.
+ * IRIS THEME — message bubble UI only, LIGHT rebuild.
+ * Mirrors the approved Claude Design frames 02/03/04/06/08.
  *
- * Palette: Indigo/Violet on dark slate
+ * Sender is identified by a text label above the bubble, not an
+ * avatar — a deliberate design decision (frame 02's own caption).
  * ─────────────────────────────────────────────────────────────────
  */
 
@@ -27,65 +28,56 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   const isUser = role === 'user';
   const isMalayalam = language === 'ml';
 
-  const malayalamStyle = isMalayalam
-    ? { fontFamily: "'Noto Sans Malayalam', 'Manjari', 'Rachana', sans-serif", lineHeight: '1.9' }
-    : {};
+  const senderLabel = isMalayalam
+    ? (isUser ? 'നിങ്ങൾ' : 'IRIS സഹായി')
+    : (isUser ? 'You' : 'IRIS assistant');
+
+  const bodyTextClass = isMalayalam ? 'font-malayalam text-iris-body-ml' : 'text-iris-body';
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
-
-      {/* Bot avatar */}
-      {!isUser && (
-        <div
-          className="w-8 h-8 rounded-full flex items-center justify-center mr-2 text-xs font-bold shrink-0"
-          style={{ background: 'rgba(99,102,241,0.2)', color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.3)' }}
-        >
-          I
+    <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} gap-[8px]`}>
+      <div className="flex items-center gap-[8px]">
+        <div className="text-iris-label uppercase tracking-[0.04em] font-semibold text-iris-text-muted">
+          {senderLabel}
         </div>
-      )}
+        {isStreaming && !isUser && content !== '' && (
+          <div className={`${isMalayalam ? 'font-malayalam' : ''} text-iris-label font-medium text-iris-accent`}>
+            {isMalayalam ? 'എഴുതുന്നു' : 'writing'}
+          </div>
+        )}
+      </div>
 
-      {/* Bubble */}
       <div
-        className="max-w-[85%] p-4 rounded-2xl shadow-sm text-sm leading-relaxed"
-        style={isUser
-          ? { background: 'linear-gradient(135deg, #4338ca, #6d28d9)', color: 'white', borderTopRightRadius: '4px', ...malayalamStyle }
-          : { background: 'rgba(255,255,255,0.05)', color: '#e2e8f0', border: '1px solid rgba(99,102,241,0.2)', borderTopLeftRadius: '4px', ...malayalamStyle }
-        }
+        className={`max-w-[88%] md:max-w-[76%] rounded-iris shadow-iris p-[16px] ${bodyTextClass} ${
+          isUser
+            ? 'bg-iris-primary text-white'
+            : 'bg-iris-surface-raised border border-iris-border text-iris-text-primary'
+        }`}
       >
-        <div className="prose prose-sm max-w-none" style={{ ...malayalamStyle, color: 'inherit' }}>
+        <div className="prose prose-sm max-w-none [&_*]:!m-0 [&_p+p]:!mt-[8px]" style={{ color: 'inherit' }}>
           <ReactMarkdown
             components={{
-              p:      ({ children }) => <p style={{ ...malayalamStyle, margin: '0 0 0.5em' }}>{children}</p>,
-              li:     ({ children }) => <li style={malayalamStyle}>{children}</li>,
-              strong: ({ children }) => <strong style={malayalamStyle}>{children}</strong>,
+              p:      ({ children }) => <p>{children}</p>,
+              li:     ({ children }) => <li>{children}</li>,
+              strong: ({ children }) => <strong>{children}</strong>,
             }}
           >
             {content}
           </ReactMarkdown>
         </div>
 
-        {/* Streaming cursor */}
+        {/* Streaming caret — 3px per design, lands on the last token */}
         {isStreaming && !isUser && (
-          <span style={{
-            display: 'inline-block', width: '2px', height: '14px',
-            backgroundColor: '#818cf8', marginLeft: '2px',
-            verticalAlign: 'middle',
-            animation: 'blink 1s step-start infinite',
-          }} />
+          <span
+            className={`inline-block w-[3px] h-[20px] ml-[2px] align-[-4px] rounded-[2px] ${
+              isUser ? 'bg-white' : 'bg-iris-primary'
+            }`}
+            style={{ animation: 'irisBlink 1s step-start infinite' }}
+          />
         )}
       </div>
 
-      {/* User avatar */}
-      {isUser && (
-        <div
-          className="w-8 h-8 rounded-full flex items-center justify-center ml-2 text-xs font-bold shrink-0"
-          style={{ background: 'rgba(255,255,255,0.1)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.1)' }}
-        >
-          U
-        </div>
-      )}
-
-      <style>{`@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }`}</style>
+      <style>{`@keyframes irisBlink { 0%, 100% { opacity: 1 } 50% { opacity: 0 } }`}</style>
     </div>
   );
 };
