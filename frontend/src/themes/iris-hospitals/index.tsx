@@ -18,15 +18,9 @@ const IrisTheme: React.FC<IrisThemeProps> = ({ hospitalId, hospitalName }) => {
   const [showIntro, setShowIntro] = useState(true);
 
   return (
-    <div
-      className="min-h-screen w-full font-sans text-slate-900 overflow-x-hidden"
-      style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)' }}
-    >
+    <div className="min-h-screen w-full font-sans overflow-x-hidden bg-iris-surface">
       {/* ── Header ──────────────────────────────────────────────── */}
-      <header
-        className="border-b border-white/10 px-6 py-4 flex justify-between items-center sticky top-0 z-10 backdrop-blur-sm w-full"
-        style={{ background: 'rgba(15,23,42,0.8)' }}
-      >
+      <header className="border-b border-iris-border px-6 py-4 flex justify-between items-center sticky top-0 z-10 w-full bg-iris-surface-raised">
         <div className="flex items-center gap-3">
           <div
             className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-xl shadow-md"
@@ -34,14 +28,14 @@ const IrisTheme: React.FC<IrisThemeProps> = ({ hospitalId, hospitalName }) => {
           >
             I
           </div>
-          <h1 className="text-xl font-bold tracking-tight text-white">
+          <h1 className="text-xl font-bold tracking-tight text-iris-text-primary">
             {hospitalName || (
-              <>IRIS <span style={{ color: '#818cf8' }}>Hospitals</span></>
+              <>IRIS <span className="text-iris-primary">Hospitals</span></>
             )}
           </h1>
         </div>
-        <div className="hidden md:flex items-center gap-2 text-xs text-slate-400 font-medium">
-          <ShieldCheck className="w-4 h-4" style={{ color: '#818cf8' }} />
+        <div className="hidden md:flex items-center gap-2 text-xs text-iris-text-muted font-medium">
+          <ShieldCheck className="w-4 h-4 text-iris-primary" />
           Powered by Gothos Labs
         </div>
       </header>
@@ -60,21 +54,18 @@ const IrisTheme: React.FC<IrisThemeProps> = ({ hospitalId, hospitalName }) => {
 
                 {/* Left — hero copy: hidden on mobile, visible on desktop */}
                 <div className="space-y-5 hidden lg:block">
-                <div
-                  className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium"
-                  style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc' }}
-                >
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium bg-iris-accent-surface text-iris-accent">
                   <ShieldCheck className="w-4 h-4" /> AI-Powered Reception
                 </div>
-                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold leading-tight text-white">
+                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold leading-tight text-iris-text-primary">
                   വിദഗ്ധ പരിചരണം, <br />
-                  <span style={{ color: '#818cf8' }}>AI-സഹായത്തോടെ.</span>
+                  <span className="text-iris-primary">AI-സഹായത്തോടെ.</span>
                 </h2>
-                <p className="text-base sm:text-lg leading-relaxed" style={{ color: '#94a3b8' }}>
+                <p className="text-base sm:text-lg leading-relaxed text-iris-text-muted">
                   {hospitalName || 'IRIS Hospitals'}-ലേക്ക് സ്വാഗതം.{' '}
                   ഡോക്ടർ ലഭ്യത, അപ്പോയിന്റ്മെന്റ്, ലാബ് ടെസ്റ്റ് — ഇവ ഇംഗ്ലീഷിലോ മലയാളത്തിലോ ചോദിക്കൂ.
                 </p>
-                <ul className="space-y-2 text-sm" style={{ color: '#64748b' }}>
+                <ul className="space-y-2 text-sm text-iris-text-muted">
                   {[
                     '🩺 ഡോക്ടർ ലഭ്യത തൽക്കാലം അറിയുക',
                     '📅 ശബ്ദം കൊണ്ടോ ടെക്സ്റ്റ് കൊണ്ടോ അപ്പോയിന്റ്മെന്റ് ബുക്ക് ചെയ്യുക',

@@ -1426,3 +1426,47 @@ key has no credits remaining — unrelated to this fix.)
 
 PR: #29
 Commits: fdf60dd
+
+### Catch-up — 2026-09-03 (sixth entry)
+
+**IRIS page shell — light theme + faster intro + dev-tooling overlay fix —
+CODE COMPLETE (branch `feat/iris-intro-lighter-and-faster`, cut from
+`origin/main`).**
+
+PR: pending
+Commits: pending
+
+Developer-directed, iterative visual work discovered live while testing PR
+#29's rebuilt widget in a browser — outside that PR's scope (`index.tsx` and
+`AnimatedIntro.tsx` were explicitly untouched by Task 3), kept as separate,
+unrelated-feature work per §5.8.
+
+- `frontend/src/themes/iris-hospitals/index.tsx` — the persistent page shell
+  around the chat widget (header, hero copy, background) is now a light
+  theme, reusing the same `iris-*` tokens the widget itself uses
+  (`bg-iris-surface`, `bg-iris-surface-raised`, `text-iris-text-primary`,
+  `text-iris-text-muted`, `text-iris-primary`, `bg-iris-accent-surface`/
+  `text-iris-accent`) rather than inventing new ad hoc colours. Previously a
+  dark navy/indigo gradient with white/light-indigo text.
+- `frontend/src/themes/iris-hospitals/AnimatedIntro.tsx` — the entry
+  animation (logo → tagline → demo conversation → CTA → transition) is
+  compressed from ~12.6s to ~7s total. Every internal timeout scaled
+  proportionally (verified by hand to land within a few ms of 7000ms), so
+  the same sequence of beats still plays, just faster. Its own background
+  gradient (blue, distinct from the page shell's) was left unchanged — only
+  the page shell's persistent background was reported as "purple."
+- `frontend/vite.config.js` — new file (none existed before). Sets
+  `server.hmr.overlay: false` only. Discovered while testing the above:
+  Vite's dev-only fullscreen HMR error overlay was blocking the page,
+  triggered by a pre-existing, unrelated issue (the `@ricky0123/vad-web`
+  voice-detection library's WASM asset path being flagged by Vite's
+  module-import checker, even though the asset loads fine via a plain URL
+  string at runtime). This suppresses the on-page popup only — the
+  underlying warning still prints to the browser console, and the actual
+  voice-detection initialization issue is untouched (would need a change to
+  the shared `useHospitalChat.tsx` hook, out of scope here).
+
+No `iris-*` design tokens were added, edited or removed — `index.css`
+untouched. No hook, data-flow or backend change.
+
+Deferred: none.

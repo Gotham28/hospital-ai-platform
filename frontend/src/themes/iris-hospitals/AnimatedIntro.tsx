@@ -70,9 +70,11 @@ const AnimatedIntro: React.FC<AnimatedIntroProps> = ({ onComplete, hospitalName 
   const [logoError, setLogoError] = useState(false);
   const chatRef = useRef<HTMLDivElement>(null);
 
+  // Timings scaled so the whole intro (logo -> text -> demo conversation
+  // -> CTA -> transition) lands at ~7s total instead of the original ~12.6s.
   useEffect(() => {
-    const t1 = setTimeout(() => setPhase('text'), 1800);
-    const t2 = setTimeout(() => setPhase('chat'), 3500);
+    const t1 = setTimeout(() => setPhase('text'), 1000);
+    const t2 = setTimeout(() => setPhase('chat'), 1950);
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
@@ -81,8 +83,8 @@ const AnimatedIntro: React.FC<AnimatedIntroProps> = ({ onComplete, hospitalName 
     let idx = 0;
     const next = () => {
       if (idx >= demoConversation.length) {
-        setTimeout(() => setShowCTA(true), 300);
-        setTimeout(() => setPhase('transition'), 2000);
+        setTimeout(() => setShowCTA(true), 150);
+        setTimeout(() => setPhase('transition'), 1100);
         return;
       }
       const msg = demoConversation[idx];
@@ -92,15 +94,15 @@ const AnimatedIntro: React.FC<AnimatedIntroProps> = ({ onComplete, hospitalName 
           setShowTyping(false);
           setVisibleMessages(p => [...p, msg]);
           idx++;
-          setTimeout(next, 500);
-        }, 800);
+          setTimeout(next, 300);
+        }, 450);
       } else {
         setVisibleMessages(p => [...p, msg]);
         idx++;
-        setTimeout(next, 400);
+        setTimeout(next, 200);
       }
     };
-    const t = setTimeout(next, 500);
+    const t = setTimeout(next, 300);
     return () => clearTimeout(t);
   }, [phase]);
 
@@ -109,7 +111,7 @@ const AnimatedIntro: React.FC<AnimatedIntroProps> = ({ onComplete, hospitalName 
   }, [visibleMessages, showTyping]);
 
   useEffect(() => {
-    if (phase === 'transition') setTimeout(onComplete, 1500);
+    if (phase === 'transition') setTimeout(onComplete, 800);
   }, [phase, onComplete]);
 
   return (
