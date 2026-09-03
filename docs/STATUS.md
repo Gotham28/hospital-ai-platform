@@ -1433,8 +1433,8 @@ Commits: fdf60dd
 CODE COMPLETE (branch `feat/iris-intro-lighter-and-faster`, cut from
 `origin/main`).**
 
-PR: pending
-Commits: pending
+PR: #30
+Commits: 8a31a6e
 
 Developer-directed, iterative visual work discovered live while testing PR
 #29's rebuilt widget in a browser — outside that PR's scope (`index.tsx` and
