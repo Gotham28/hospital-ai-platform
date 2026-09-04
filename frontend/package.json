@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "node scripts/copy-vad-assets.js",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
