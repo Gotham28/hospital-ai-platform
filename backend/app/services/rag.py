@@ -379,22 +379,39 @@ def build_context(
     # and kill the whole chat-stream response. max_retries=0 because retrying a
     # non-retryable error (e.g. insufficient_quota) here only adds latency the
     # patient waits through before the fallback kicks in anyway.
+    #
+    # Embedding failure and the KnowledgeBase lookup are deliberately separate
+    # try blocks: collapsing them into one made a genuine database failure
+    # indistinguishable from a quota error, both logged the same way. Keeping
+    # them apart lets a real DB problem log at a higher severity while both
+    # still degrade to an empty result rather than raising.
+    embed_resp = None
     try:
         embed_resp = client.with_options(max_retries=0).embeddings.create(
             input=question, model="text-embedding-3-small"
         )
-        raw_results = (
-            db.query(KnowledgeBase)
-            .filter(KnowledgeBase.hospital_id == hospital_id)
-            .order_by(KnowledgeBase.embedding.cosine_distance(embed_resp.data[0].embedding))
-            .limit(3).all()
-        )
     except Exception as e:
         logger.warning(
-            "KB embedding search failed (question_len=%d): %s: %s",
-            len(question), type(e).__name__, e,
+            "KB embedding search failed (question_len=%d): %s",
+            len(question), type(e).__name__,
         )
-        raw_results = []
+
+    raw_results = []
+    if embed_resp is not None:
+        try:
+            raw_results = (
+                db.query(KnowledgeBase)
+                .filter(KnowledgeBase.hospital_id == hospital_id)
+                .order_by(KnowledgeBase.embedding.cosine_distance(embed_resp.data[0].embedding))
+                .limit(3).all()
+            )
+        except Exception as e:
+            logger.error(
+                "KB document lookup failed (question_len=%d): %s",
+                len(question), type(e).__name__,
+                exc_info=True,
+            )
+            raw_results = []
     kb_context, chunks_included = build_kb_context(raw_results)
 
     lang_instruction = (

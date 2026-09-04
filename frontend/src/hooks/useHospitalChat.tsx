@@ -18,9 +18,9 @@ const FALLBACK_SUGGESTIONS = {
 // Shown instead of a blank assistant bubble when the chat-stream connection
 // closes having produced no content (backend crash, network drop) or emits
 // the [STREAM_ERROR] sentinel. No dedicated i18n mechanism exists in this
-// project (see .agents/REPORT.md) — this project's convention is a hardcoded
-// per-language literal at the point of use, same as the other strings in this
-// file. Wording approved by the developer 2026-09-04.
+// project — this project's convention is a hardcoded per-language literal at
+// the point of use, same as the other strings in this file. Wording approved
+// by the developer 2026-09-04.
 const STREAM_FALLBACK_MESSAGE = {
   en: "Sorry, I couldn't answer that just now. Please try again.",
   ml: "ക്ഷമിക്കണം, ഇപ്പോൾ ഉത്തരം നൽകാൻ കഴിഞ്ഞില്ല. ദയവായി വീണ്ടും ശ്രമിക്കുക.",
@@ -129,6 +129,7 @@ export function useHospitalChat(hospitalId: string) {
       const decoder = new TextDecoder();
       let buffer = '';
       let streamErrored = false;
+      let sawDone = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -140,6 +141,7 @@ export function useHospitalChat(hospitalId: string) {
           if (!frame.startsWith('data: ')) continue;
           const payload = frame.slice(6);
           if (payload === '[DONE]') {
+            sawDone = true;
             setMessages(prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, isStreaming: false } : m));
             break;
           }
@@ -154,17 +156,37 @@ export function useHospitalChat(hospitalId: string) {
         }
       }
 
-      // Never leave the assistant bubble blank: the backend sent [STREAM_ERROR],
-      // or the connection closed (cleanly or not) without a single content
-      // frame ever arriving.
+      // Three distinct outcomes once the loop exits — do not collapse them:
+      //  - streamErrored, or no content ever arrived: replace with the
+      //    fallback and stop streaming. (Also covers [STREAM_ERROR] followed
+      //    by [DONE], the real backend pairing — sawDone alone must never
+      //    suppress the fallback here.)
+      //  - content arrived but the connection dropped without [DONE] or
+      //    [STREAM_ERROR] (wifi loss, mobile handoff, worker timeout): keep
+      //    the partial answer visible, just stop the spinner. Replacing real
+      //    partial content with a generic error would be worse than leaving
+      //    it as-is.
+      //  - a normal completed stream: already handled by the [DONE] branch
+      //    above, nothing left to do here.
       setMessages(prev => {
         const last = prev[prev.length - 1];
         if (!last || last.role !== 'assistant') return prev;
-        if (!streamErrored && last.content.trim()) return prev;
-        const fallback = STREAM_FALLBACK_MESSAGE[language] || STREAM_FALLBACK_MESSAGE.en;
-        return prev.map((m, i) => i === prev.length - 1
-          ? { ...m, content: fallback, isStreaming: false }
-          : m);
+        const hasContent = last.content.trim().length > 0;
+
+        if (streamErrored || !hasContent) {
+          const fallback = STREAM_FALLBACK_MESSAGE[language] || STREAM_FALLBACK_MESSAGE.en;
+          return prev.map((m, i) => i === prev.length - 1
+            ? { ...m, content: fallback, isStreaming: false }
+            : m);
+        }
+
+        if (!sawDone) {
+          return prev.map((m, i) => i === prev.length - 1
+            ? { ...m, isStreaming: false }
+            : m);
+        }
+
+        return prev;
       });
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') return;

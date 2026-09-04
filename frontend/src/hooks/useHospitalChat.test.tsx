@@ -58,7 +58,12 @@ function ChatHarness({ hospitalId }: { hospitalId: string }) {
       <button onClick={() => chat.handleSend()}>send</button>
       <div aria-label="messages">
         {chat.messages.map((m, i) => (
-          <div key={i} data-role={m.role} data-testid={`message-${i}`}>
+          <div
+            key={i}
+            data-role={m.role}
+            data-testid={`message-${i}`}
+            data-streaming={String(!!m.isStreaming)}
+          >
             {m.content}
           </div>
         ))}
@@ -156,6 +161,39 @@ describe('useHospitalChat — chat-stream SSE consumption (A5)', () => {
     });
     expect(lastMessage()).not.toHaveTextContent(FALLBACK_ML);
     expect(lastMessage()).not.toHaveTextContent(FALLBACK_EN);
+  });
+});
+
+describe('useHospitalChat — dropped connection without [DONE] or [STREAM_ERROR] (review finding 1)', () => {
+  it('keeps partial content visible and stops streaming when the connection drops with no [DONE]/[STREAM_ERROR]', async () => {
+    mockChatStreamFrames([
+      contentFrame('Dr. Anjali is '),
+      contentFrame('available today.'),
+    ]);
+    render(<ChatHarness hospitalId="1" />);
+
+    await sendMessage('which doctors are available');
+
+    await waitFor(() => {
+      const el = lastMessage();
+      expect(el).toHaveTextContent('Dr. Anjali is available today.');
+      expect(el).toHaveAttribute('data-streaming', 'false');
+    });
+    expect(lastMessage()).not.toHaveTextContent(FALLBACK_ML);
+    expect(lastMessage()).not.toHaveTextContent(FALLBACK_EN);
+  });
+
+  it('shows the fallback and stops streaming when zero content arrives and the connection drops with no [DONE]/[STREAM_ERROR]', async () => {
+    mockChatStreamFrames([]);
+    render(<ChatHarness hospitalId="1" />);
+
+    await sendMessage('which doctors are available');
+
+    await waitFor(() => {
+      const el = lastMessage();
+      expect(el).toHaveTextContent(FALLBACK_ML);
+      expect(el).toHaveAttribute('data-streaming', 'false');
+    });
   });
 });
 
