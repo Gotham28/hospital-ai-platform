@@ -15,6 +15,17 @@ const FALLBACK_SUGGESTIONS = {
   ml: ["നിങ്ങൾക്ക് എന്നെ എങ്ങനെ സഹായിക്കാനാകും?", "ഏത് ഡോക്ടർമാരുണ്ട്?", "ആശുപത്രിയുമായി എങ്ങനെ ബന്ധപ്പെടാം?", "ഈ ആശുപത്രിയെക്കുറിച്ച് പറയൂ"],
 };
 
+// Shown instead of a blank assistant bubble when the chat-stream connection
+// closes having produced no content (backend crash, network drop) or emits
+// the [STREAM_ERROR] sentinel. No dedicated i18n mechanism exists in this
+// project (see .agents/REPORT.md) — this project's convention is a hardcoded
+// per-language literal at the point of use, same as the other strings in this
+// file. Wording approved by the developer 2026-09-04.
+const STREAM_FALLBACK_MESSAGE = {
+  en: "Sorry, I couldn't answer that just now. Please try again.",
+  ml: "ക്ഷമിക്കണം, ഇപ്പോൾ ഉത്തരം നൽകാൻ കഴിഞ്ഞില്ല. ദയവായി വീണ്ടും ശ്രമിക്കുക.",
+};
+
 function getBaseURL(): string {
   return (import.meta as any).env?.VITE_API_URL
     || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
@@ -117,6 +128,7 @@ export function useHospitalChat(hospitalId: string) {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      let streamErrored = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -131,12 +143,29 @@ export function useHospitalChat(hospitalId: string) {
             setMessages(prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, isStreaming: false } : m));
             break;
           }
+          if (payload === '[STREAM_ERROR]') {
+            streamErrored = true;
+            continue;
+          }
           try {
             const t = JSON.parse(payload);
             setMessages(prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, content: m.content + t } : m));
           } catch { /* skip */ }
         }
       }
+
+      // Never leave the assistant bubble blank: the backend sent [STREAM_ERROR],
+      // or the connection closed (cleanly or not) without a single content
+      // frame ever arriving.
+      setMessages(prev => {
+        const last = prev[prev.length - 1];
+        if (!last || last.role !== 'assistant') return prev;
+        if (!streamErrored && last.content.trim()) return prev;
+        const fallback = STREAM_FALLBACK_MESSAGE[language] || STREAM_FALLBACK_MESSAGE.en;
+        return prev.map((m, i) => i === prev.length - 1
+          ? { ...m, content: fallback, isStreaming: false }
+          : m);
+      });
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') return;
       setMessages(prev => prev.map((m, i) => i === prev.length - 1

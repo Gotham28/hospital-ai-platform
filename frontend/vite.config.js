@@ -12,4 +12,7 @@ export default defineConfig({
       overlay: false,
     },
   },
+  test: {
+    environment: 'jsdom',
+  },
 });
