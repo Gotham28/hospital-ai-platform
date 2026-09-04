@@ -1051,8 +1051,29 @@ IMPORTANT:
             except Exception as e:
                 logger.warning("[chat-stream] Usage logging failed: %s", e)
 
+    async def safe_event_stream() -> AsyncGenerator[str, None]:
+        # Hard guarantee at the stream boundary: event_generator() runs a long
+        # sequence of DB/LLM/translation calls after the initial 200 OK has
+        # already gone out, so an unhandled exception anywhere inside it would
+        # otherwise just kill the connection — the client sees a stream that
+        # opens and closes with zero content, no error, nothing to show the
+        # patient. Wrapping the iteration (not the generator body itself) means
+        # every existing yield/return path above is untouched; this only
+        # catches what would otherwise escape.
+        try:
+            async for chunk in event_generator():
+                yield chunk
+        except Exception as e:
+            logger.error(
+                "[chat-stream] Unhandled exception in event_generator (question_len=%d): %s",
+                len(request.question), type(e).__name__,
+                exc_info=True,
+            )
+            yield "data: [STREAM_ERROR]\n\n"
+            yield "data: [DONE]\n\n"
+
     return StreamingResponse(
-        event_generator(),
+        safe_event_stream(),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"}
     )

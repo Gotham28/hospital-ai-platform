@@ -122,7 +122,7 @@ def build_doctor_context(question: str, hospital_id: int, db: Session) -> tuple[
     doctors = []
     if not is_broad:
         try:
-            q_embedding = client.embeddings.create(
+            q_embedding = client.with_options(max_retries=0).embeddings.create(
                 input=question, model="text-embedding-3-small"
             ).data[0].embedding
             doctors = (
@@ -373,13 +373,28 @@ def build_context(
     pharmacy_context  = build_pharmacy_context(question, all_medicines)
     lab_tests_context = build_lab_tests_context(question, all_tests)
 
-    embed_resp = client.embeddings.create(input=question, model="text-embedding-3-small")
-    raw_results = (
-        db.query(KnowledgeBase)
-        .filter(KnowledgeBase.hospital_id == hospital_id)
-        .order_by(KnowledgeBase.embedding.cosine_distance(embed_resp.data[0].embedding))
-        .limit(3).all()
-    )
+    # KB retrieval is best-effort augmentation, not a hard requirement — if the
+    # embedding call fails for any reason (quota, rate limit, network, timeout),
+    # degrade to an empty retrieval result rather than let the exception escape
+    # and kill the whole chat-stream response. max_retries=0 because retrying a
+    # non-retryable error (e.g. insufficient_quota) here only adds latency the
+    # patient waits through before the fallback kicks in anyway.
+    try:
+        embed_resp = client.with_options(max_retries=0).embeddings.create(
+            input=question, model="text-embedding-3-small"
+        )
+        raw_results = (
+            db.query(KnowledgeBase)
+            .filter(KnowledgeBase.hospital_id == hospital_id)
+            .order_by(KnowledgeBase.embedding.cosine_distance(embed_resp.data[0].embedding))
+            .limit(3).all()
+        )
+    except Exception as e:
+        logger.warning(
+            "KB embedding search failed (question_len=%d): %s: %s",
+            len(question), type(e).__name__, e,
+        )
+        raw_results = []
     kb_context, chunks_included = build_kb_context(raw_results)
 
     lang_instruction = (
