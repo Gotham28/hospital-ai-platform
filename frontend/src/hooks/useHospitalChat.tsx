@@ -20,12 +20,10 @@ const FALLBACK_SUGGESTIONS = {
 // the [STREAM_ERROR] sentinel. No dedicated i18n mechanism exists in this
 // project (see .agents/REPORT.md) — this project's convention is a hardcoded
 // per-language literal at the point of use, same as the other strings in this
-// file. The `ml` value is intentionally left empty pending developer-approved
-// Malayalam wording; until then the English string is shown for both
-// languages so the user is never shown nothing.
+// file. Wording approved by the developer 2026-09-04.
 const STREAM_FALLBACK_MESSAGE = {
-  en: "Sorry, something went wrong and I couldn't generate a response. Please try again.",
-  ml: "",
+  en: "Sorry, I couldn't answer that just now. Please try again.",
+  ml: "ക്ഷമിക്കണം, ഇപ്പോൾ ഉത്തരം നൽകാൻ കഴിഞ്ഞില്ല. ദയവായി വീണ്ടും ശ്രമിക്കുക.",
 };
 
 function getBaseURL(): string {
