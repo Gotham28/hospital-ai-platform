@@ -588,3 +588,11 @@ animation (`AnimatedIntro.tsx`) from ~12.6s to ~7s. Added
 pre-existing, unrelated voice-detection library warning was blocking the
 page). Scope: `frontend/src/themes/iris-hospitals/index.tsx`,
 `frontend/src/themes/iris-hospitals/AnimatedIntro.tsx`, `frontend/vite.config.js`.
+
+### 2026-09-03 — IRIS design token addendum: ripple, elevation, motion
+
+Not in the original plan. Added ten tokens to the `@theme` block in
+`frontend/src/index.css` — two wash colours, a ripple line colour, a panel surface
+colour, two elevation steps, a panel blur radius, and three motion values. Nothing
+consumes them; the consumer is a later task.
+Scope: `frontend/src/index.css`. Related: CURRENT_TASK.md dated 2026-09-03.
