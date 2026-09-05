@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     TWILIO_AUTH_TOKEN: str = ""
     TWILIO_WHATSAPP_NUMBER: str = ""
 
+    # CORS allowed origins — read from backend/.env for local dev, or from the
+    # hosting platform's environment variables for production. The default is
+    # dev-origins-only; production must supply its own explicit value via env var.
+    ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
+
     # Helper to build the URL dynamically
     @property
     def SQLALCHEMY_DATABASE_URL(self) -> str:

@@ -12,18 +12,15 @@ from app.api.v1.endpoints.medicines import router as medicines_router
 from app.api.v1.endpoints.lab_tests import router as lab_tests_router
 from app.api.v1.endpoints.doctor_availability import router as availability_router
 from app.api.v1.endpoints.whatsapp import router as whatsapp_router
-import os
+from app.core.config import settings
 
 app = FastAPI(title="Hospital AI Platform")
 
 
-# Single source of truth for allowed origins
-ALLOWED_ORIGINS = [
-    o.strip() for o in os.getenv(
-        "ALLOWED_ORIGINS",
-        "https://hospital-ai-platform.vercel.app,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
-    ).split(",") if o.strip()
-]
+# Single source of truth for allowed origins. Set ALLOWED_ORIGINS in backend/.env for
+# local dev, or via the hosting platform's env vars for production — the class default
+# here is dev-only and deliberately contains no production origin.
+ALLOWED_ORIGINS = [o.strip() for o in settings.ALLOWED_ORIGINS.split(",") if o.strip()]
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
