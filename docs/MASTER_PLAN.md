@@ -588,3 +588,97 @@ animation (`AnimatedIntro.tsx`) from ~12.6s to ~7s. Added
 pre-existing, unrelated voice-detection library warning was blocking the
 page). Scope: `frontend/src/themes/iris-hospitals/index.tsx`,
 `frontend/src/themes/iris-hospitals/AnimatedIntro.tsx`, `frontend/vite.config.js`.
+
+### 2026-09-04 — chat-stream failure fallback
+
+Not in the original plan. An unhandled exception inside `/chat-stream`'s event
+generator killed the SSE connection after `200 OK` had already been sent, so the
+client received a stream that opened and closed with zero content and the patient
+saw a blank assistant bubble with no error. Found in production when the OpenAI
+embeddings call returned 429 `insufficient_quota`. `build_context` now degrades to
+an empty retrieval result instead of raising; `safe_event_stream` wraps iteration
+over `event_generator` so no exception can escape the stream, emitting
+`[STREAM_ERROR]` then `[DONE]`; both chat-path embedding calls use
+`max_retries=0`; the frontend shows a per-language fallback instead of a blank
+bubble. The frontend had no test infrastructure before this — Vitest, jsdom and
+React Testing Library added as devDependencies, verified absent from the
+production bundle. Scope: `backend/app/services/rag.py`,
+`backend/app/api/v1/endpoints/ai.py`, `frontend/src/hooks/useHospitalChat.tsx`,
+`backend/run_rag_resilience_test.py`,
+`frontend/src/hooks/useHospitalChat.test.tsx`, `frontend/package.json`,
+`frontend/vite.config.js`. Related: PR #31, merge commit `e030401`.
+
+### 2026-09-04 — chat-stream review findings
+
+Not in the original plan. Four issues found by a line-by-line read of the merged
+PR #31 diff, none caught before it landed. A stream that delivered partial content
+and then dropped without `[DONE]` or `[STREAM_ERROR]` left `isStreaming` true
+forever, showing half an answer under a typing indicator that never stopped;
+`safe_event_stream` cannot cover this because a dropped TCP connection never
+reaches its except block. Fixed with a `sawDone` flag and three distinct outcomes,
+where partial content on a silent drop is kept rather than replaced by the generic
+fallback. `rag.py`'s single try wrapped both the embedding call and the
+`KnowledgeBase` query, making a real database failure indistinguishable from a
+quota error; split into separate blocks, DB failure now logs at ERROR, with the
+`hospital_id` filter unchanged and failure still yielding an empty list. Both new
+`rag.py` log lines dropped their interpolated exception message, which could carry
+patient text from the embedding input. A production source comment pointing at
+`.agents/REPORT.md`, an agent working file rewritten every task, was removed.
+Scope: `backend/app/services/rag.py`, `frontend/src/hooks/useHospitalChat.tsx`,
+`frontend/src/hooks/useHospitalChat.test.tsx`. Related: PR #32, commit `038b934`.
+
+### 2026-09-04 — frontend dependency vulnerabilities, part 1
+
+Not in the original plan. `npm audit --omit=dev` reported 7 vulnerable packages in
+the shipped frontend bundle. Bumped `axios` 1.13.5 → 1.20.0 and `react-router-dom`
+7.13.1 → 7.18.3, both minor, no migration and no source change. The axios bump
+resolved `follow-redirects` to 1.16.0 and `form-data` to 4.0.6 transitively; those
+two are axios's Node `http` adapter internals and were verified absent from the
+browser bundle by grepping `dist/`, so they were never reachable by patients. 8 of
+react-router's 12 advisories are framework-mode only (RSC, SSR, `__manifest`,
+single-fetch) and this app uses declarative `BrowserRouter` with no data router.
+`protobufjs` and `@protobufjs/utf8` were deliberately left open — they sit under
+`@ricky0123/vad-react` → `onnxruntime-web`, the browser voice-activity detection,
+and no automated test covers voice input. Scope: `frontend/package.json`,
+`frontend/package-lock.json`. Related: PR #33.
+
+### 2026-09-04 — correction to the 2026-09-03 dev overlay entry
+
+The 2026-09-03 entry above describes the suppressed Vite HMR overlay as hiding
+"a pre-existing, unrelated voice-detection library warning". Investigation on
+2026-09-04 (branch `investigate/vad-assets-500`) showed that description is wrong
+on two counts, and the same wording is in the comment at the top of
+`frontend/vite.config.js`. It is not a warning: the dev server returns a hard
+HTTP 500 with a stack trace. And it is not unrelated: VAD genuinely fails to
+initialize in dev, with the console showing "Encountered an error while loading
+model file /vad-assets/silero_vad_legacy.onnx" immediately after the 500. Setting
+`hmr.overlay: false` hid the on-page crash screen while the microphone kept
+failing silently underneath.
+
+The real cause is two Vite dev-server limitations, triggered only when the code
+loads these files via dynamic `import()` rather than a plain URL fetch. Vite
+refuses to run `/public` files through its module-transform pipeline, which breaks
+the `.mjs` glue file, and it does not support the native ESM-WebAssembly import
+syntax at all, which breaks the `.wasm`. A plain `fetch()` of the same paths
+returns 200, which is why the original diagnosis looked correct. Confirmed
+dev-only: the identical dynamic `import()` succeeds against a `vite preview`
+production build, and the production deployment on Render serves these assets
+statically. The mic works for patients — a Malayalam transcript was produced in
+production on 2026-09-04.
+
+Also found: `frontend/scripts/copy-vad-assets.js` has never executed successfully
+in this repo's history. It uses CommonJS `require()` while `frontend/package.json`
+declares `"type": "module"`, so Node refuses to run it, and it is wired into no
+npm script hook. The six files in `frontend/public/vad-assets/` were committed by
+hand on 2026-04-27 in commit `de6c1da`, whose message concerns an Alembic
+migration. Nothing regenerates them, so any future bump of `onnxruntime-web` or
+`@ricky0123/vad-web` would update the JavaScript glue from `node_modules` while
+leaving the WASM binaries at their April versions, with no test covering voice
+input to catch the mismatch.
+
+A separate unverified risk was raised and is recorded here as open: the copied
+`ort-wasm-simd-threaded.wasm` is the multi-threaded ONNX Runtime build, which
+needs `Cross-Origin-Opener-Policy` and `Cross-Origin-Embedder-Policy` headers to
+use `SharedArrayBuffer`, and no such headers are set anywhere in the repo.
+Production transcription working on 2026-09-04 suggests ONNX Runtime is falling
+back to single-threaded rather than failing, but this was not directly tested.

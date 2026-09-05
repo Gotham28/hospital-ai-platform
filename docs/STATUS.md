@@ -1,6 +1,6 @@
 # STATUS.md — Current Sprint Status
 
-Last updated: 2026-09-01
+Last updated: 2026-09-04
 
 This file tracks what's actually done vs. in progress vs. next, across the whole
 project. Update this after every verified feature — not before. See `docs/MASTER_PLAN.md`
@@ -1470,3 +1470,16 @@ No `iris-*` design tokens were added, edited or removed — `index.css`
 untouched. No hook, data-flow or backend change.
 
 Deferred: none.
+
+### Catch-up — 2026-09-04
+**Chat-stream failure fallback — MERGED (PR #31, merge commit `e030401`, branch `fix/chat-stream-failure-fallback`, commits `16178f5`, `5f64fbe`, `e76d51b`).** An unhandled exception inside the chat-stream generator killed the SSE connection after `200 OK` had already been sent, so the client received a stream that opened and closed with zero content and the patient saw a blank assistant bubble with no error. Found in production 2026-09-04 when the OpenAI embeddings call returned 429 (`insufficient_quota`); any embeddings outage, timeout or network failure reproduces it.
+
+Fixed in four places: `rag.py` `build_context` degrades to an empty retrieval result instead of raising, so the patient still gets an answer without retrieved documents; `ai.py` `safe_event_stream` wraps iteration over `event_generator` so no exception can escape the stream, emitting `[STREAM_ERROR]` then `[DONE]`; both chat-path embedding calls use `max_retries=0`; `useHospitalChat.tsx` shows a fallback message when a stream ends with zero content or emits `[STREAM_ERROR]`, discarding partial content rather than showing a half-finished answer. Fallback wording added in English and Malayalam, generic, no hospital name or medical content.
+
+Verified with 11 backend assertions (mocked 429 and mocked generic exception) and 6 frontend assertions. The frontend had no test infrastructure before this branch — Vitest, jsdom and React Testing Library added as devDependencies, confirmed absent from the production bundle by grep of `dist/assets/*.js`.
+
+**Review findings raised after merge — PR #32 open, branch `fix/chat-stream-review-findings`, commit `038b934`.** A line-by-line read of the merged diff found four issues, none of which had been caught before #31 landed. (1) A stream that delivered partial content and then dropped without `[DONE]` or `[STREAM_ERROR]` left `isStreaming` true forever — the patient saw half an answer under a typing indicator that never stopped. `safe_event_stream` cannot cover this case; a dropped TCP connection never reaches its except block. Fixed with a `sawDone` flag and three distinct outcomes, where partial content on a silent drop is KEPT rather than replaced by the generic fallback. (2) `rag.py`'s single try wrapped both the embedding call and the `KnowledgeBase` query, so a real database failure degraded silently at WARNING level and was indistinguishable from a quota error; split into separate blocks, DB failure now logs at ERROR. The `hospital_id` tenant filter is unchanged and failure still yields an empty list, never an unfiltered query. (3) Both new `rag.py` log lines interpolated the exception message, which could carry patient text from the embedding input; they now log only `question_len` and the exception type, matching the pattern already used in `ai.py`. (4) A production source comment in `useHospitalChat.tsx` pointed at `.agents/REPORT.md`, an agent working file rewritten every task; reference removed. Frontend suite now 8 tests.
+
+Also this session: in-progress IRIS design work was rescued from a git stash and committed to `feat/iris-intro-lighter-and-faster` as `3cf87c9`, content verified byte-identical via patch comparison rather than line counts.
+
+Known and deferred: `npm audit --omit=dev` reports 7 vulnerabilities (5 high, 2 moderate) in shipped frontend dependencies (`axios`, `protobufjs`, `follow-redirects`, `form-data`, `react-router`) — pre-existing, chosen as the next task. Every chat turn makes two separate embeddings calls (`rag.py:125` in `build_doctor_context` and `rag.py:376` in `build_context`), a cost and latency issue not addressed here. `POST /transcribe` accepts `hospital_id` and never uses it — dead parameter, no tenant scoping on that endpoint. Malayalam speech-to-text mis-transcription was investigated only, report at `docs/malayalam-stt-accuracy-investigation-2026-09-04.md`, no fix shipped.
