@@ -1471,8 +1471,8 @@ Deferred: none.
 COMPLETE (branch `fix/chat-stream-welcome-translation`, cut from
 `origin/main` at `168392f`, PR #35).**
 
-PR: pending
-Commits: pending
+PR: #36
+Commits: 58cdcf5
 
 Fixes the bug recorded as suspected/unconfirmed in the Notes/Open Questions
 entry above (found 2026-08-29). `chat_stream`'s new-session greeting block
