@@ -423,24 +423,18 @@ Not started. Do not begin until Phase 1 is complete and demoed end-to-end.
   and MASTER_PLAN.md §1.3a order item 1 now records the Sarvam key as received. §1.3a's
   "close-out for every task above is manual" paragraph was deliberately left unchanged —
   see Catch-up 2026-08-29 (second entry) for why.
-- **Suspected pre-existing bug (found 2026-08-29, unconfirmed, NOT fixed) —
-  chat-stream's own new-session greeting bypasses translation entirely.**
-  `ai.py:442-445`:
-```python
-          if _turn_ctx.get("_is_new_session"):
-              hospital_for_welcome = db.query(Hospital).filter(Hospital.id == request.hospital_id).first()
-              if hospital_for_welcome and hospital_for_welcome.welcome_message:
-                  yield f"data: {json.dumps(hospital_for_welcome.welcome_message)}\n\n"
-```
-  This yields `hospital.welcome_message` raw, with no `_translate_async()` or
-  `normalise_malayalam()` call at all — unlike `get_welcome()`'s handling of the same
-  field (line 228, which Task B1b wired). A patient starting a new session with
-  `language="ml"` at a hospital with a custom `welcome_message` set may receive that
-  greeting in plain English via `/chat-stream`, even though the same greeting is
-  correctly translated when served via `GET /welcome/{hospital_id}`. Pre-existing (not
-  introduced by Task B1b), unconfirmed (no hospital in the local DB has a
-  `welcome_message` set, so this has not been observed live), and deliberately not fixed
-  here — out of scope under §5.8.
+- **RESOLVED 2026-09-15 (see Catch-up below) — chat-stream's new-session greeting
+  bypassed translation entirely.** Previously recorded here as suspected and
+  unconfirmed (found 2026-08-29). Confirmed live via before-evidence
+  (`language="ml"`, English-authored `welcome_message`, greeting arrived
+  untranslated) and fixed on branch `fix/chat-stream-welcome-translation`.
+  While investigating, a second, related gap was found and fixed in the same
+  task: `get_welcome()`'s existing translation call (the pattern being
+  copied) also assumed `welcome_message` is always English-authored, which
+  would garble a Malayalam-authored greeting post-fix. Both call sites now
+  share a `contains_malayalam()` guard that skips en→ml translation when the
+  source text is already Malayalam. See Catch-up entry below for evidence and
+  detail.
 - **`mayura:v1` is unusable for AROGYA (2026-08-23):** it inverts availability wording
   and renders positive and negative identically. Task A must use `sarvam-translate:v1`,
   cap 2000 chars. Full detail in Catch-up 2026-08-23.
@@ -1470,3 +1464,55 @@ No `iris-*` design tokens were added, edited or removed — `index.css`
 untouched. No hook, data-flow or backend change.
 
 Deferred: none.
+
+### Catch-up — 2026-09-15
+
+**Chat-stream welcome-message translation fix, both call sites — CODE
+COMPLETE (branch `fix/chat-stream-welcome-translation`, cut from
+`origin/main` at `168392f`, PR #35).**
+
+PR: #36
+Commits: 58cdcf5
+
+Fixes the bug recorded as suspected/unconfirmed in the Notes/Open Questions
+entry above (found 2026-08-29). `chat_stream`'s new-session greeting block
+yielded `hospital.welcome_message` raw into the SSE stream with no
+translation call, regardless of `request.language` — a Malayalam session
+(`language="ml"`) with an English-authored `welcome_message` would see the
+greeting in English. Fixed by capturing the greeting into a local variable,
+translating it via the same `normalise_malayalam(await _translate_async(...))`
+pattern already used by `GET /welcome/{hospital_id}`, and yielding the
+(possibly translated) local variable instead of the raw ORM field. On
+translation failure, falls back to the untranslated text rather than killing
+the stream; failures log only `type(e).__name__`, never greeting text.
+
+**Scope widened mid-task, developer-directed:** before-evidence proved a
+Malayalam-authored `welcome_message` is a real, buildable case, and both this
+new call site and the existing `get_welcome()` pattern it copies assumed the
+source text is always English. Fixing only the new site would have shipped a
+fresh bug (garbling Malayalam-authored greetings) while leaving the identical
+latent assumption in `get_welcome()` untouched. Added a new pure predicate,
+`contains_malayalam(text: str) -> bool` (`backend/app/services/ml_postprocess.py`),
+and gated the en→ml translation call at both sites on it: already-Malayalam
+text skips translation and passes through as-is.
+
+Verification: before/after raw SSE evidence pasted in full in
+`.agents/runs/before-evidence-chat-stream-welcome.md` and
+`after-evidence-chat-stream-welcome.md`, covering all four combinations
+(English/Malayalam-authored `welcome_message` × `language="en"`/`"ml"`).
+`contains_malayalam` unit-tested directly (pure English/pure
+Malayalam/mixed/empty), re-run fresh during review with identical output.
+Four independent read-only review lenses (scope, rules, evidence, blast
+radius) confirmed the diff touches only the three scoped files, no `## Do NOT
+touch` item was touched, and both functions' output shapes are unchanged on
+every code path.
+
+**Review tier escalated during first-pass review: Opus 5, high effort**, not
+the Sonnet 5/medium originally scoped — the diff adds two new
+`logger.warning(...)` calls in a previously unlogged branch, which
+independently fires `AGENTS.md` §10's "touches logging" trigger regardless of
+the (confirmed clean) log content. Full report: `.agents/REPORT.md`.
+
+Deferred: no general source-language detection — `contains_malayalam` only
+distinguishes English from Malayalam. A `welcome_message` authored in a third
+language would still be fed into the en→ml translator unchanged.
