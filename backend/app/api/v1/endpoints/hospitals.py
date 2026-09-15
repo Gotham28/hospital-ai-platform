@@ -21,6 +21,9 @@ from app.models.usage import UsageLedger
 
 router = APIRouter()
 
+ADMIN_ALLOWLIST = {"welcome_message", "post_booking_disclaimer", "relevance_criteria"}
+SUPERADMIN_ALLOWLIST = {"welcome_message", "post_booking_disclaimer", "relevance_criteria", "name", "address", "system_prompt", "google_sheet_id", "is_active"}
+
 # =============================================================================
 # FIX #3: ROUTE ORDER — Static/named routes MUST come before /{hospital_id}.
 # FastAPI matches routes top-to-bottom. If /{hospital_id} is registered first,
@@ -54,6 +57,11 @@ def update_my_hospital_settings(
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
     if not hospital:
         raise HTTPException(status_code=404, detail="Hospital not found")
+        
+    rejected_keys = [k for k in payload.keys() if k not in ADMIN_ALLOWLIST]
+    if rejected_keys:
+        raise HTTPException(status_code=422, detail=f"Rejected keys: {', '.join(rejected_keys)}")
+
     for key, value in payload.items():
         if hasattr(hospital, key):
             setattr(hospital, key, value)
@@ -69,8 +77,7 @@ def get_hospital_by_slug(slug: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Hospital not found")
     return {
         "id": hospital.id,
-        "name": hospital.name,
-        "google_sheet_id": hospital.google_sheet_id
+        "name": hospital.name
     }
 
 
@@ -83,6 +90,7 @@ def create_hospital(
     *,
     db: Session = Depends(get_db),
     hospital_in: schemas.hospital.HospitalCreate,
+    _: str = Depends(require_superadmin),
 ):
     """Create a new hospital tenant."""
     hospital = crud.crud_hospital.get_hospital_by_slug(db, slug=hospital_in.slug)
@@ -98,9 +106,16 @@ def read_hospitals(
     db: Session = Depends(get_db),
     skip: int = 0,
     limit: int = 100,
+    token_data: dict = Depends(get_token_payload),
 ):
     """List all registered hospitals."""
-    return crud.crud_hospital.get_hospitals(db, skip=skip, limit=limit)
+    user_role = token_data.get("role")
+    user_hospital = token_data.get("hospital_id")
+    if user_role == "superadmin":
+        return crud.crud_hospital.get_hospitals(db, skip=skip, limit=limit)
+    else:
+        hospital = db.query(Hospital).filter(Hospital.id == user_hospital).first()
+        return [hospital] if hospital else []
 
 
 # -------------------------------------------------
@@ -110,9 +125,14 @@ def read_hospitals(
 @router.get("/{hospital_id}", response_model=schemas.hospital.Hospital)
 def get_hospital_by_id(
     hospital_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    token_data: dict = Depends(get_token_payload)
 ):
     """Fetch specific hospital info."""
+    user_role = token_data.get("role")
+    user_hospital = token_data.get("hospital_id")
+    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied.")
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
     if not hospital:
         raise HTTPException(status_code=404, detail="Hospital not found")
@@ -127,11 +147,22 @@ def update_specific_hospital(
     # knowing a sequential hospital_id could overwrite system_prompt or
     # google_sheet_id. Now requires a valid JWT.
     _current_tenant: int = Depends(get_current_tenant),
+    token_data: dict = Depends(get_token_payload),
 ):
     """Update settings for a specific hospital (requires auth)."""
+    user_role = token_data.get("role")
+    user_hospital = token_data.get("hospital_id")
+    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied.")
+
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
     if not hospital:
         raise HTTPException(status_code=404, detail="Hospital not found")
+
+    allowlist = SUPERADMIN_ALLOWLIST if user_role == "superadmin" else ADMIN_ALLOWLIST
+    rejected_keys = [k for k in payload.keys() if k not in allowlist]
+    if rejected_keys:
+        raise HTTPException(status_code=422, detail=f"Rejected keys: {', '.join(rejected_keys)}")
 
     for key, value in payload.items():
         if hasattr(hospital, key):
@@ -143,9 +174,14 @@ def update_specific_hospital(
 @router.get("/{hospital_id}/doctors")
 def get_hospital_doctors(
     hospital_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    token_data: dict = Depends(get_token_payload)
 ):
     """Fetch the staff directory for a specific hospital."""
+    user_role = token_data.get("role")
+    user_hospital = token_data.get("hospital_id")
+    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied.")
     doctors = db.query(Doctor).filter(Doctor.hospital_id == hospital_id).all()
     
     # Return a formatted dict, leaving behind the 'embedding' column
@@ -161,7 +197,11 @@ def get_hospital_doctors(
     ]
 
 @router.post("/{hospital_id}/doctors")
-def add_doctor(hospital_id: int, payload: dict = Body(...), db: Session = Depends(get_db)):
+def add_doctor(hospital_id: int, payload: dict = Body(...), db: Session = Depends(get_db), token_data: dict = Depends(get_token_payload)):
+    user_role = token_data.get("role")
+    user_hospital = token_data.get("hospital_id")
+    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied.")
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
     if not hospital:
         raise HTTPException(status_code=404, detail="Hospital not found")
@@ -279,7 +319,11 @@ async def bulk_upload_and_sync(
         raise HTTPException(status_code=500, detail=f"Database Sync Failed: {str(e)}")
 
 @router.get("/{hospital_id}/billing")
-async def get_hospital_billing(hospital_id: int, db: Session = Depends(get_db)):
+async def get_hospital_billing(hospital_id: int, db: Session = Depends(get_db), token_data: dict = Depends(get_token_payload)):
+    user_role = token_data.get("role")
+    user_hospital = token_data.get("hospital_id")
+    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied.")
     first_day = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     stats = db.query(
@@ -312,7 +356,11 @@ async def get_hospital_billing(hospital_id: int, db: Session = Depends(get_db)):
         }
     }
 @router.delete("/{hospital_id}/doctors/{doctor_id}")
-def delete_doctor(hospital_id: int, doctor_id: int, db: Session = Depends(get_db)):
+def delete_doctor(hospital_id: int, doctor_id: int, db: Session = Depends(get_db), token_data: dict = Depends(get_token_payload)):
+    user_role = token_data.get("role")
+    user_hospital = token_data.get("hospital_id")
+    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied.")
     doctor = db.query(Doctor).filter(Doctor.id == doctor_id, Doctor.hospital_id == hospital_id).first()
     if not doctor:
         raise HTTPException(status_code=404, detail="Doctor not found")
@@ -321,7 +369,11 @@ def delete_doctor(hospital_id: int, doctor_id: int, db: Session = Depends(get_db
     return {"status": "success"}
 
 @router.patch("/{hospital_id}/doctors/{doctor_id}")
-def update_doctor(hospital_id: int, doctor_id: int, payload: dict = Body(...), db: Session = Depends(get_db)):
+def update_doctor(hospital_id: int, doctor_id: int, payload: dict = Body(...), db: Session = Depends(get_db), token_data: dict = Depends(get_token_payload)):
+    user_role = token_data.get("role")
+    user_hospital = token_data.get("hospital_id")
+    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied.")
     doctor = db.query(Doctor).filter(Doctor.id == doctor_id, Doctor.hospital_id == hospital_id).first()
     if not doctor:
         raise HTTPException(status_code=404, detail="Doctor not found")
@@ -371,7 +423,7 @@ def create_staff_account(
     return {"status": "success", "email": user.email}
 
 @router.delete("/{hospital_id}/billing/reset")
-def reset_hospital_billing(hospital_id: int, db: Session = Depends(get_db)):
+def reset_hospital_billing(hospital_id: int, db: Session = Depends(get_db), _: str = Depends(require_superadmin)):
     db.query(UsageLedger).filter(UsageLedger.hospital_id == hospital_id).delete()
     db.commit()
     return {"status": "success", "message": "Billing cycle reset successfully"}

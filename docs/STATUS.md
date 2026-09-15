@@ -1,6 +1,6 @@
 # STATUS.md — Current Sprint Status
 
-Last updated: 2026-09-01
+Last updated: 2026-09-15
 
 This file tracks what's actually done vs. in progress vs. next, across the whole
 project. Update this after every verified feature — not before. See `docs/MASTER_PLAN.md`
@@ -358,7 +358,7 @@ Scope: `.agents/AGENTS.md`, `docs/MASTER_PLAN.md`, `.claude/skills/drive/` (dele
 | 1.2 Extract services out of ai.py | ✅ Done — all 5 stages complete (see detail below) |
 | 1.3 Sarvam translation upgrade | 🟡 In progress — Task B (normaliser, PR #17) and Task A (Sarvam client + Google fallback + circuit breaker, PR #19) both done; Task C (Redis translation cache, Opus tier) remaining |
 | 1.4 Security hardening | ⬜ Not started |
-| 1.5 Multi-tenant isolation hardening | ⬜ Not started |
+| 1.5 Multi-tenant isolation hardening | 🟡 Appears already satisfied (`rag.py`, commit `aa99831`, 2026-08-02) — never explicitly verified/signed off as this phase; flagged 2026-09-15, see Catch-up entry |
 
 **§1.2 Service extraction detail (completed 2026-08-07):**
 `ai.py` has been split into 5 dedicated service modules across 5 commits:
@@ -485,6 +485,19 @@ Not started. Do not begin until Phase 1 is complete and demoed end-to-end.
   publicly-known key. Confirm `JWT_SECRET` is set in every deployed environment —
   worth re-checking during the Neon `DATABASE_URL` cutover, when env vars are being
   edited.
+
+- **JWT_SECRET has a third, different fallback default (found 2026-09-15, not
+  fixed — docs-only sweep).** The 2026-08-08 note above covers `deps.py:10`.
+  `auth.py:13` independently reads the same `JWT_SECRET` env var via
+  `os.getenv("JWT_SECRET", "dev-secret-key-change-in-production")` — the same
+  fallback string as `deps.py` — but `backend/app/core/config.py`'s `Settings`
+  class carries a *third*, different default (`"supersecret"`). Three separate
+  code paths read this one env var, two of them agreeing and one silently
+  different, so the effective fallback depends on which path executes. Confirm
+  `JWT_SECRET` is set in every deployed environment (same action item as
+  2026-08-08, now with one more reason), and consider consolidating all three
+  reads onto `config.py`'s `Settings` field so there is only one default left
+  to secure.
 
 - **Repo hygiene (resolved 2026-08-09):** the stale `.agents/agents_md_review_routing.md`
   duplicate was deleted, `.repomixignore` was added, and the
@@ -1516,3 +1529,101 @@ the (confirmed clean) log content. Full report: `.agents/REPORT.md`.
 Deferred: no general source-language detection — `contains_malayalam` only
 distinguishes English from Malayalam. A `welcome_message` authored in a third
 language would still be fed into the en→ml translator unchanged.
+
+### Catch-up — 2026-09-15 (second entry)
+
+**Documentation staleness sweep — STATUS.md and file-table drift, docs only.**
+
+Prompted by a request to reconcile the governing docs with the actual code. A
+read-only investigation compared `.agents/AGENTS.md`'s §3 file-location table,
+`backend/app/core/config.py`, and MASTER_PLAN.md §1.5 against the live
+codebase.
+
+**Removed: `docs/SECURITY_FIXES.md` (untracked, never committed).** This file
+did not describe this project. It was a batch-fix prompt for an unrelated
+system — a Node/TypeScript hospital-resident logbook ("Arogya Electronic
+LogBook", `drizzle-orm`, `student.ts`/`professor.ts`/`admin.ts` routes) for a
+live pilot at a named medical college with real patient/resident records.
+Nothing in it matched this repo's actual stack. Confirmed untracked via
+`git status` before deletion, so removal has no git-history impact. Developer
+confirmed deletion 2026-09-15.
+
+**Phase 1.5 (Multi-tenant isolation hardening) corrected from "Not started"
+to reflect reality.** MASTER_PLAN.md §1.5 names three concrete checks; all
+three were independently confirmed already present in `rag.py`, dating to
+the 2026-08-02 service-extraction refactor (commit `aa99831`) — long before
+this phase was ever flagged as upcoming:
+- Doctor embedding search always filters by `hospital_id` — `rag.py:439`,
+  explicitly commented "always tenant-scoped".
+- Runtime cross-tenant assertion in context-building — `rag.py:365-366`.
+- `hospital.system_prompt` wired into `build_context()` — `rag.py:474`.
+
+This was never a deliberate phase completion — it landed as a byproduct of
+the service extraction and was never checked off. See the Phase 1 table
+update above.
+
+**New Notes entry added above, extending the 2026-08-08 JWT fallback-secret
+finding: a third, undocumented default was found in `auth.py`.** See Notes
+section.
+
+**Two remaining gaps live in `.agents/AGENTS.md` and were NOT fixed here —
+Claude Code does not write that file, per AGENTS.md §12.15, approved or
+not.** Reported to the developer for direct or Claude-Chat action:
+1. AGENTS.md §3's file table names only `ai.py` under
+   `backend/app/api/v1/endpoints/` — eight further files exist there
+   (`auth.py`, `hospitals.py`, `lab_tests.py`, `medicines.py`,
+   `appointments.py`, `doctor_availability.py`, `usage.py`, and an
+   endpoints-level `whatsapp.py` distinct from the already-listed
+   `services/whatsapp.py`).
+2. AGENTS.md's config/tech-stack description does not mention the
+   `ALLOWED_ORIGINS` Settings field added to `config.py` by PR #35 (the CORS
+   fix), or CORS behavior at all.
+
+Everything else checked out clean: every file in `backend/app/services/` and
+`backend/app/models/` matches AGENTS.md's tables exactly; `GROQ_API_KEY` is
+still absent from `config.py`, matching AGENTS.md's "(soon)" wording; no new
+undocumented TODO/FIXME found.
+
+No code, schema, or migration touched. `docs/SECURITY_FIXES.md` was
+untracked, so its removal produces no tracked diff.
+
+### Catch-up — 2026-09-15 (third entry)
+
+**Unauthenticated and cross-tenant admin routes locked down — CODE COMPLETE
+(branch `fix/lock-down-open-endpoints`, cut from `origin/main` at `948495f`,
+PR #36).**
+
+PR: #37
+Commits: 5db72cc
+
+The 2026-09-15 full audit found 15 admin and internal routes with no
+authentication or no tenant check. Added the existing superadmin-or-same-hospital
+check (the `get_token_payload` pattern already used by `bulk_upload_and_sync`)
+to seven routes in `hospitals.py` (get and patch a hospital; list, add, update and
+delete doctors; billing), to `ai.py` `POST /ingest`, `POST /upload-pdf` and
+`GET /knowledge/{hospital_id}`, and to `appointments.py` `POST /` and
+`GET /status/{hospital_id}/{phone}`. `create_hospital` and
+`reset_hospital_billing` are now superadmin-only. `GET /hospitals/` returns all
+hospitals to a superadmin and only the caller's own hospital to anyone else.
+`PATCH /hospitals/{id}` and `PATCH /hospitals/me` now accept only allowlisted
+fields by role (hospital admin: `welcome_message`, `post_booking_disclaimer`,
+`relevance_criteria`; superadmin adds `name`, `address`, `system_prompt`,
+`google_sheet_id`, `is_active`) and return 422 on any other key without writing.
+`GET /hospitals/slug/{slug}` no longer returns `google_sheet_id`. Patient-facing
+routes are unchanged.
+
+Verification: new offline script `backend/run_endpoint_auth_test.py` (mocked DB
+and OpenAI, network tripwire) — 57 passed, 0 failed: no-token 401 and
+cross-hospital 403 on every locked route, allowlist 422, slug field removal,
+`GET /hospitals/` scoping. Existing offline scripts unchanged (26/10/11/8). This
+is a mocked auth-layer test, not a live-server check: several "allowed" cases
+pass the gate and then fail on mock data (500/400/422), so it proves the gate,
+not the handlers behind it. No live-server or staging check was run.
+
+Deferred: JWT secret defaults (`deps.py:10`, `auth.py:13`, `config.py:30`) — a
+separate task; whether anything outside this repo (for example the WhatsApp Node
+app) calls the two appointment routes — developer to check before merge; the
+404-before-403 ordering on already-secured routes; frontend handling of the new
+403/422 responses.
+
+Review tier: Opus 5, xhigh effort.
