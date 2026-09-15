@@ -1593,8 +1593,8 @@ untracked, so its removal produces no tracked diff.
 (branch `fix/lock-down-open-endpoints`, cut from `origin/main` at `948495f`,
 PR #36).**
 
-PR: #TBD
-Commits: TBD
+PR: #37
+Commits: 5db72cc
 
 The 2026-09-15 full audit found 15 admin and internal routes with no
 authentication or no tenant check. Added the existing superadmin-or-same-hospital
