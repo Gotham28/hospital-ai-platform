@@ -3,7 +3,9 @@ app/api/v1/endpoints/appointments.py
 
 All appointment-related REST endpoints consumed by:
   - The admin dashboard (list, approve, reject, config)
-  - The chat bot via ai.py (create, status check)
+
+Note: The chat flow in ai.py writes and reads Appointment rows directly and does not call these HTTP routes.
+POST / and GET /status/{hospital_id}/{phone} require a staff token.
 """
 
 import json
@@ -58,11 +60,15 @@ class BookingConfigPayload(BaseModel):
 
 
 # =============================================================================
-# CREATE — called by the chatbot after patient confirms (Public)
+# CREATE — called by the chatbot after patient confirms (staff/admin-only)
 # =============================================================================
 
 @router.post("/")
-def create_appointment(payload: AppointmentCreate, db: Session = Depends(get_db)):
+def create_appointment(payload: AppointmentCreate, db: Session = Depends(get_db), token_data: dict = Depends(get_token_payload)):
+    user_role = token_data.get("role")
+    user_hospital = token_data.get("hospital_id")
+    if user_role != "superadmin" and str(user_hospital) != str(payload.hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied.")
     hospital = db.query(Hospital).filter(Hospital.id == payload.hospital_id).first()
     if not hospital:
         raise HTTPException(status_code=404, detail="Hospital not found")
@@ -257,7 +263,7 @@ def reject_appointment(
 
 
 # =============================================================================
-# STATUS CHECK — patient checks via bot using phone + hospital (Public)
+# STATUS CHECK — patient checks via bot using phone + hospital (now staff/admin-only, requires a token scoped to the hospital)
 # =============================================================================
 
 @router.get("/status/{hospital_id}/{phone}")
@@ -265,7 +271,12 @@ def get_appointment_status(
     hospital_id: int,
     phone: str,
     db: Session = Depends(get_db),
+    token_data: dict = Depends(get_token_payload)
 ):
+    user_role = token_data.get("role")
+    user_hospital = token_data.get("hospital_id")
+    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied.")
     appts = (
         db.query(Appointment)
         .filter(

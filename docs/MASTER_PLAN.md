@@ -588,3 +588,15 @@ animation (`AnimatedIntro.tsx`) from ~12.6s to ~7s. Added
 pre-existing, unrelated voice-detection library warning was blocking the
 page). Scope: `frontend/src/themes/iris-hospitals/index.tsx`,
 `frontend/src/themes/iris-hospitals/AnimatedIntro.tsx`, `frontend/vite.config.js`.
+
+### 2026-09-15 — Lock down unauthenticated and cross-tenant admin routes
+
+The 2026-09-15 full audit found 15 admin and internal routes in
+`hospitals.py`, `ai.py` and `appointments.py` with no authentication or no
+tenant check, and unrestricted field assignment in `PATCH /hospitals/{id}`
+and `PATCH /hospitals/me`. Added the existing superadmin-or-same-hospital
+check to twelve of them, made hospital creation and billing reset
+superadmin-only, scoped the hospital list to the caller's own hospital, added
+role-based field allowlists to both hospital PATCH routes, and removed
+`google_sheet_id` from the public slug response. Not one of §1.4's listed
+items; a prerequisite for them.

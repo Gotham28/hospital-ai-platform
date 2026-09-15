@@ -294,7 +294,11 @@ async def get_suggestions(hospital_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/ingest")
-async def ingest_knowledge(request: IngestRequest, db: Session = Depends(get_db)):
+async def ingest_knowledge(request: IngestRequest, db: Session = Depends(get_db), token_data: dict = Depends(get_token_payload)):
+    user_role = token_data.get("role")
+    user_hospital = token_data.get("hospital_id")
+    if user_role != "superadmin" and str(user_hospital) != str(request.hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied.")
     try:
         resp = client.embeddings.create(input=request.text, model="text-embedding-3-small")
         db.add(KnowledgeBase(
@@ -312,7 +316,11 @@ async def ingest_knowledge(request: IngestRequest, db: Session = Depends(get_db)
 
 
 @router.post("/upload-pdf")
-async def upload_pdf(file: UploadFile = File(...), hospital_id: int = Form(...), entry_type: str = Form("fact"),db: Session = Depends(get_db)):
+async def upload_pdf(file: UploadFile = File(...), hospital_id: int = Form(...), entry_type: str = Form("fact"),db: Session = Depends(get_db), token_data: dict = Depends(get_token_payload)):
+    user_role = token_data.get("role")
+    user_hospital = token_data.get("hospital_id")
+    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied.")
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=422, detail="Only PDF files are accepted.")
     hospital = db.query(Hospital).filter(Hospital.id == hospital_id).first()
@@ -1149,7 +1157,11 @@ async def transcribe_audio(
             os.remove(temp_filename)
 
 @router.get("/knowledge/{hospital_id}")
-async def list_knowledge(hospital_id: int, db: Session = Depends(get_db)):
+async def list_knowledge(hospital_id: int, db: Session = Depends(get_db), token_data: dict = Depends(get_token_payload)):
+    user_role = token_data.get("role")
+    user_hospital = token_data.get("hospital_id")
+    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied.")
     entries = (
         db.query(KnowledgeBase)
         .filter(KnowledgeBase.hospital_id == hospital_id)

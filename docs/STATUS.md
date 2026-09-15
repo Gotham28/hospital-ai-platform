@@ -1586,3 +1586,44 @@ undocumented TODO/FIXME found.
 
 No code, schema, or migration touched. `docs/SECURITY_FIXES.md` was
 untracked, so its removal produces no tracked diff.
+
+### Catch-up — 2026-09-15 (third entry)
+
+**Unauthenticated and cross-tenant admin routes locked down — CODE COMPLETE
+(branch `fix/lock-down-open-endpoints`, cut from `origin/main` at `948495f`,
+PR #36).**
+
+PR: #TBD
+Commits: TBD
+
+The 2026-09-15 full audit found 15 admin and internal routes with no
+authentication or no tenant check. Added the existing superadmin-or-same-hospital
+check (the `get_token_payload` pattern already used by `bulk_upload_and_sync`)
+to seven routes in `hospitals.py` (get and patch a hospital; list, add, update and
+delete doctors; billing), to `ai.py` `POST /ingest`, `POST /upload-pdf` and
+`GET /knowledge/{hospital_id}`, and to `appointments.py` `POST /` and
+`GET /status/{hospital_id}/{phone}`. `create_hospital` and
+`reset_hospital_billing` are now superadmin-only. `GET /hospitals/` returns all
+hospitals to a superadmin and only the caller's own hospital to anyone else.
+`PATCH /hospitals/{id}` and `PATCH /hospitals/me` now accept only allowlisted
+fields by role (hospital admin: `welcome_message`, `post_booking_disclaimer`,
+`relevance_criteria`; superadmin adds `name`, `address`, `system_prompt`,
+`google_sheet_id`, `is_active`) and return 422 on any other key without writing.
+`GET /hospitals/slug/{slug}` no longer returns `google_sheet_id`. Patient-facing
+routes are unchanged.
+
+Verification: new offline script `backend/run_endpoint_auth_test.py` (mocked DB
+and OpenAI, network tripwire) — 57 passed, 0 failed: no-token 401 and
+cross-hospital 403 on every locked route, allowlist 422, slug field removal,
+`GET /hospitals/` scoping. Existing offline scripts unchanged (26/10/11/8). This
+is a mocked auth-layer test, not a live-server check: several "allowed" cases
+pass the gate and then fail on mock data (500/400/422), so it proves the gate,
+not the handlers behind it. No live-server or staging check was run.
+
+Deferred: JWT secret defaults (`deps.py:10`, `auth.py:13`, `config.py:30`) — a
+separate task; whether anything outside this repo (for example the WhatsApp Node
+app) calls the two appointment routes — developer to check before merge; the
+404-before-403 ordering on already-secured routes; frontend handling of the new
+403/422 responses.
+
+Review tier: Opus 5, xhigh effort.
