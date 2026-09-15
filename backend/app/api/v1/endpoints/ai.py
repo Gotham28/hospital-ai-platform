@@ -22,7 +22,7 @@ from app.services.security import detect_prompt_injection
 # in this file or the rest of the repo (only _translate_async is used).
 # TODO: Remove in future cleanup task alongside _session_key and resolve_doctor_id.
 from app.services.translation import _translate, _translate_async, TranslationUnavailableError
-from app.services.ml_postprocess import normalise_malayalam
+from app.services.ml_postprocess import normalise_malayalam, contains_malayalam
 from app.services.vocabulary import (
     _DEPT_SYNONYMS,
     _expand_with_synonyms,
@@ -224,15 +224,18 @@ async def get_welcome(hospital_id: int, db: Session = Depends(get_db)):
     # Custom Welcome Message Logic
     if hospital.welcome_message and hospital.welcome_message.strip():
         base_en_greeting = hospital.welcome_message.strip()
-        try:
-            base_ml_greeting = normalise_malayalam(await _translate_async(base_en_greeting, source="en", target="ml"))
-        except TranslationUnavailableError as e:
-            logger.warning("[Translation] en->ml failed at welcome greeting: %s", type(e).__name__)
-            # Fallback: Just show the English text rather than awkwardly mixing two languages in one sentence
-            base_ml_greeting = f"{base_en_greeting}"
-        except Exception as e:
-            logger.warning("[Translation] en->ml unexpected failure at welcome greeting: %s", type(e).__name__)
-            base_ml_greeting = f"{base_en_greeting}"
+        if contains_malayalam(base_en_greeting):
+            base_ml_greeting = base_en_greeting
+        else:
+            try:
+                base_ml_greeting = normalise_malayalam(await _translate_async(base_en_greeting, source="en", target="ml"))
+            except TranslationUnavailableError as e:
+                logger.warning("[Translation] en->ml failed at welcome greeting: %s", type(e).__name__)
+                # Fallback: Just show the English text rather than awkwardly mixing two languages in one sentence
+                base_ml_greeting = f"{base_en_greeting}"
+            except Exception as e:
+                logger.warning("[Translation] en->ml unexpected failure at welcome greeting: %s", type(e).__name__)
+                base_ml_greeting = f"{base_en_greeting}"
     else:
         base_en_greeting = f"Hello! I am **Arogya**, the AI assistant for **{hospital_name}**."
         base_ml_greeting = f"നമസ്കാരം! ഞാൻ **ആരോഗ്യ**, **{hospital_name}**-ന്റെ AI അസിസ്റ്റന്റ്."
@@ -453,7 +456,15 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
         if _turn_ctx.get("_is_new_session"):
             hospital_for_welcome = db.query(Hospital).filter(Hospital.id == request.hospital_id).first()
             if hospital_for_welcome and hospital_for_welcome.welcome_message:
-                yield f"data: {json.dumps(hospital_for_welcome.welcome_message)}\n\n"
+                welcome_text = hospital_for_welcome.welcome_message
+                if is_malayalam and not contains_malayalam(welcome_text):
+                    try:
+                        welcome_text = normalise_malayalam(await _translate_async(welcome_text, source="en", target="ml"))
+                    except TranslationUnavailableError as e:
+                        logger.warning("[Translation] en->ml failed at welcome greeting: %s", type(e).__name__)
+                    except Exception as e:
+                        logger.warning("[Translation] en->ml unexpected failure at welcome greeting: %s", type(e).__name__)
+                yield f"data: {json.dumps(welcome_text)}\n\n"
         # ── CANCEL ───────────────────────────────────────────────────────────
         if intent == "CANCEL":
             msg = (

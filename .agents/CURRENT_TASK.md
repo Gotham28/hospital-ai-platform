@@ -1,196 +1,266 @@
 # Current Task
 
 ## Feature
-A Claude Code `Stop` hook (`.agents/hooks/halt_answerer.py`) that fires when Claude
-Code halts under AGENTS.md §12.5, reads `.agents/LOOP_HANDOFF.md`, and dispatches a
-tool-restricted, headless `claude -p` answerer that may write `.agents/DECISION.md`
-automatically for a narrow set of halt conditions — removing the developer from the
-middle of cheap, mechanical halts without giving away any real decision.
+Fix the chat-stream new-session greeting so it goes through the same
+translation and normalisation treatment that `GET /welcome/{hospital_id}`
+already applies to `hospital.welcome_message`. Today the greeting block inside
+`chat_stream`'s `event_generator` (guarded by
+`_turn_ctx.get("_is_new_session")`) yields `hospital.welcome_message` directly
+into the SSE stream with no translation call at all, regardless of
+`request.language`. When a hospital has a Malayalam-serving session
+(`language="ml"`) and an English `welcome_message` configured, the greeting
+would arrive untranslated.
+
+This bug has never been observed live — `docs/STATUS.md` records it as
+suspected/unconfirmed, because no hospital in the local dev DB currently has
+`welcome_message` set. Confirmed via read-only SQL against the local DB
+(`SELECT id, name, welcome_message FROM hospital`) — all rows show `NULL`.
 
 ## Plan reference
-Not in MASTER_PLAN.md. Unplanned agent-tooling work. Follows the Antigravity scoped
-command grant (PR #22, merged `8080da0`) and the governing-doc corrections (PR #21,
-merged `1357752`). Both confirmed on `origin/main` 2026-09-02 via `git log`.
+Not in `docs/MASTER_PLAN.md`. Targeted bug fix, scoped directly in chat by the
+developer. Not part of MASTER_PLAN.md §1.3a (Sarvam translation upgrade tasks
+A/B/C) — this is a call-site gap in existing translation wiring, not new
+translation-provider work.
 
-Branch: `feat/unattended-halt-loop`, cut from `origin/main` by the developer.
+Branch: `fix/chat-stream-welcome-translation`, cut from `origin/main`
+(`168392f`, PR #35) by Claude Code per AGENTS.md §6.10.
 
-## How the answerer must behave
+## Investigation findings (read-only, already done)
 
-**Model and billing.** The answerer runs Sonnet on the developer's Claude Pro
-subscription via `claude -p`. AGENTS.md §12.12 needs NO edit — Sonnet is already the
-permitted tier for loop-driver-level work. `ANTHROPIC_API_KEY` must be unset; if set,
-`claude -p` bills API credits instead of the subscription.
+- **Buggy block** — `backend/app/api/v1/endpoints/ai.py`, inside `chat_stream`
+  (`POST /chat-stream`), inside the nested `event_generator`, currently at
+  lines 453-456 (STATUS.md's cited 442-445 has drifted since PRs #31/#32 added
+  `safe_event_stream`):
+  ```python
+  if _turn_ctx.get("_is_new_session"):
+      hospital_for_welcome = db.query(Hospital).filter(Hospital.id == request.hospital_id).first()
+      if hospital_for_welcome and hospital_for_welcome.welcome_message:
+          yield f"data: {json.dumps(hospital_for_welcome.welcome_message)}\n\n"
+  ```
+  The query already filters by `request.hospital_id` (tenant-safe). No
+  translation call of any kind is made before the `yield`.
 
-**Hard cost guard (added at scoping).** Before dispatching anything, the hook checks
-`os.environ` for `ANTHROPIC_API_KEY`. If it is set, the hook writes nothing, dispatches
-nothing, and exits — leaving the halt exactly as it would be with no hook installed.
-This needs its own test case.
+- **Correct existing pattern** — `GET /welcome/{hospital_id}` (`get_welcome`),
+  currently at lines 224-238 (STATUS.md's cited line 228 has drifted the same
+  way):
+  ```python
+  if hospital.welcome_message and hospital.welcome_message.strip():
+      base_en_greeting = hospital.welcome_message.strip()
+      try:
+          base_ml_greeting = normalise_malayalam(await _translate_async(base_en_greeting, source="en", target="ml"))
+      except TranslationUnavailableError as e:
+          logger.warning("[Translation] en->ml failed at welcome greeting: %s", type(e).__name__)
+          base_ml_greeting = f"{base_en_greeting}"
+      except Exception as e:
+          logger.warning("[Translation] en->ml unexpected failure at welcome greeting: %s", type(e).__name__)
+          base_ml_greeting = f"{base_en_greeting}"
+  else:
+      ...
+  ```
+  On any translation failure it falls back to the untranslated English text
+  and logs a type-only warning (no greeting text logged) — matches §5.6.
 
-**Tool restriction.** The answerer may use only read-type tools needed to inspect
-`.agents/LOOP_HANDOFF.md` and files it references, and may write exactly one file:
-`.agents/DECISION.md`. No Bash. No git. No other write path.
+- `is_malayalam = request.language == "ml"` is already computed earlier in
+  `chat_stream` (before `event_generator` is defined) and is already read as a
+  closure variable inside `event_generator` elsewhere in the same function
+  (e.g. the CANCEL branch). No new variable is needed to gate the fix.
 
-**Per-condition behaviour — this is the safety-critical core:**
+- `_translate_async`, `TranslationUnavailableError`, and `normalise_malayalam`
+  are already imported at the top of `ai.py` (lines 24-25). No new imports
+  needed.
 
-- **§12.5 conditions 1, 2, 5** (any Alembic migration; any §10 Opus trigger; anything
-  under AGENTS.md §9 "When In Doubt") — the hook must never dispatch the answerer.
-  It exits, leaving `LOOP_HANDOFF.md` for the developer. No exceptions, no flags.
-
-- **§12.5 condition 3 (scope change)** — one-way door. The answerer may only ever
-  answer "stay in scope: do not touch anything outside the `## Files/areas in scope`
-  list; report the needed change instead." It may NEVER authorise a scope change.
-  A scope widening is always the developer's.
-
-- **§12.5 condition 4 (same error hit three times)** — one fixed answer, no reasoning
-  about the error itself:
-  > "Do not attempt a fourth time. Skip this step, record it as blocked in the
-  > end-of-task report, and continue from the next step in `## Order` that does not
-  > depend on it. If every remaining step depends on it, stop and report."
-
-- **§12.5 condition 6 (fails the §12.4 reversibility test)** — the answerer is a
-  false-positive filter, NOT an approver. It independently re-runs §12.4's four-part
-  reversibility test against the handoff. It may write `DECISION.md` only if all four
-  come out true, i.e. the original halt was a false alarm. If any one is false, it
-  writes nothing and the halt stands for the developer.
-
-**Halt-cycle budget.** An auto-answered halt counts toward AGENTS.md §12.12's
-three-halt cap exactly like a developer-answered one. Auto-answers spend tokens too.
-
-**Exit code.** The hook exits 0 in every path. On a `Stop` hook, exit code 2 means
-"do not stop, keep going", which is not the signal wanted here — resumption is driven
-by `DECISION.md` being newer than `LOOP_HANDOFF.md` (§12.7), not by the hook's exit
-code. Verified against Claude Code hooks reference, 2026-09-02.
+- A third pattern also exists in the same file, inside the STATUS-check branch
+  of the same `event_generator` (~line 527-535): on
+  `TranslationUnavailableError` it yields an extra
+  `data: [TRANSLATION_UNAVAILABLE]\n\n` sentinel event before still sending the
+  untranslated reply. This task does NOT use that pattern — the developer's
+  instruction is to match `GET /welcome/{hospital_id}` specifically, which has
+  no sentinel event. Do not invent a hybrid of the two.
 
 ## Files/areas in scope
-- `.agents/hooks/halt_answerer.py` — new.
-- `.agents/hooks/run_halt_answerer_test.py` — new. Standalone runnable script, no
-  pytest, matching the `backend/run_*_test.py` convention in spirit. Deliberately
-  placed beside the hook rather than under `backend/`: this is agent tooling, not
-  production backend code.
-- `.claude/settings.json` — new or edited. Registers the `Stop` hook. Committed
-  deliberately (not `settings.local.json`), matching how `.claude/skills/` is already
-  tracked.
-- `.agents/AGENTS.md` — exactly three edits, no others:
-  - **§12.10** — add a bullet banning any dispatch from passing
-    `--dangerously-skip-permissions` or any equivalent bypass flag. Recorded as
-    found-NOT-fixed in `docs/STATUS.md` Catch-up 2026-09-01; this closes it.
-  - **§12.10a** — add the `--add-dir <repo-root>` requirement. Without it, relative
-    paths resolve against no grant and every allow rule silently fails. Proved
-    empirically 2026-09-02, already recorded in STATUS.md prose.
-  - **§12.15** — add a narrow exception permitting the halt-answerer (not Claude
-    Code, not Claude Chat) to write `.agents/DECISION.md` automatically, for
-    conditions 3 (stay-in-scope only), 4 and 6 only.
-- `docs/MASTER_PLAN.md` — one append to §9 (Unplanned / Ad-hoc Work).
+- `backend/app/api/v1/endpoints/ai.py` — two blocks:
+  - The greeting block inside `chat_stream`'s `event_generator` (lines
+    453-456 pre-edit, now 456-467). Changed to:
+    1. Capture `hospital_for_welcome.welcome_message` into a local variable.
+    2. If `is_malayalam` AND the text does not already contain Malayalam
+       (`contains_malayalam` guard), translate via
+       `normalise_malayalam(await _translate_async(…, source="en", target="ml"))`
+       in a try/except with two except clauses
+       (`TranslationUnavailableError`, then `Exception`), each logging a
+       type-only warning (`type(e).__name__` only — never the greeting text,
+       per §5.6). On failure, leave the local variable at its original
+       (untranslated) value — do not raise, do not kill the stream.
+    3. Yield the (possibly translated) local variable, not the raw ORM field.
+    4. Do not add a `[TRANSLATION_UNAVAILABLE]` sentinel event.
+    5. Do not change the existing `if hospital_for_welcome and
+       hospital_for_welcome.welcome_message:` truthiness guard.
+  - The `GET /welcome/{hospital_id}` (`get_welcome`) translation call (lines
+    226-235 pre-edit, now 226-238). Wrapped the existing en→ml translation in
+    a `contains_malayalam` guard: if the source text already contains
+    Malayalam, skip translation and use the text as-is for `base_ml_greeting`.
+    Try/except shape, fallback values, and return unchanged.
+- `backend/app/services/ml_postprocess.py` — one new pure function
+  `contains_malayalam(text: str) -> bool` and its backing constant
+  `_MALAYALAM_RANGE`. No existing function changed.
+- `.agents/CURRENT_TASK.md` — this file.
 
-## MASTER_PLAN.md update
-- [ ] Append to §9, dated 2026-09-02: "Unattended halt loop. Added a Claude Code
-      `Stop` hook (`.agents/hooks/halt_answerer.py`) that dispatches a tool-restricted
-      Sonnet answerer to auto-write `.agents/DECISION.md` for AGENTS.md §12.5
-      conditions 3 (stay-in-scope only), 4 and 6. Conditions 1, 2 and 5 always halt for
-      the developer. Three AGENTS.md edits: §12.10 bans bypass flags, §12.10a requires
-      `--add-dir`, §12.15 narrows the DECISION.md write exception. Scope:
-      `.agents/hooks/`, `.claude/settings.json`, `.agents/AGENTS.md`."
+## Scope widened — 2026-09-11, developer-directed
 
-Pre-approved at scoping per §12.15 — no second gate when this step is reached.
+Original scope: the chat-stream new-session greeting block only, copying
+GET /welcome/{hospital_id}'s pattern verbatim without editing it.
+
+Widened to cover both call sites after before-evidence (Run C, in
+.agents/runs/before-evidence-chat-stream-welcome.md) confirmed that the
+pattern being copied carries an inherited defect: both sites assume
+source="en" unconditionally. Post-fix, a Malayalam-authored welcome_message
+would be fed into an en->ml translation call and likely garbled. Today it
+passes through clean, so shipping the narrow fix alone would REPLACE a
+working behaviour with a broken one at the new site, while leaving the same
+latent defect untouched at the old one.
+
+Fixing one site and not the other would leave two copies of one bug in two
+different states. Both are therefore in scope for this task.
+
+Added to scope:
+- backend/app/api/v1/endpoints/ai.py — GET /welcome/{hospital_id}
+  (get_welcome), previously "do not touch, pattern only"
+- backend/app/services/ml_postprocess.py — one new pure predicate function
+
+Not in scope, still: the non-streaming POST /chat welcome handling, any
+Redis/cache work, any frontend file, any translation.py change.
 
 ## Do NOT touch
-- Any file under `backend/` or `frontend/`. This task contains no product code.
-- `backend/google_credentials.json` — separate, unresolved security item (tracked in
-  git since `d2b2828`, key revocation outstanding). Not this task.
-- Any AGENTS.md section other than the three named above.
-- `MASTER_PLAN.md` §1.3a's "Close-out for every task above is manual" paragraph.
-- `~/.gemini/antigravity-cli/settings.json` — developer-edited only, per §12.10a.
-- The untracked files currently in `git status` and unrelated to this task:
-  `.claude/launch.json`, `backend/mock_test.py`, `backend/test_welcome.py`,
-  `cleanup.md`, `scratch_token_volume.py`, `test_httpx_leak.py`,
-  `test_relevance.py`, `test_req.py`. Leave every one untouched.
-- `.agents/DECISION.md`, `.agents/DECISIONS_TAKEN.md`, `.agents/LOOP_HANDOFF.md`,
-  `.agents/REPORT.md`, `.agents/RUN_REPORT.md` — leftovers from the closed-out PR #21
-  task. The developer deletes these by hand; the agent layer must not.
-- `.agents/CURRENT_TASK.md` and `.agents/DECISION.md` as governing files (§12.15).
+- `backend/app/services/translation.py` — no change needed there for this fix.
+- Any Redis code — the translation cache is a separate, unstarted task
+  (MASTER_PLAN.md §1.3a Task C).
+- The non-streaming `POST /chat` endpoint's own welcome-message handling
+  (~lines 395-398), which prepends `hospital.welcome_message` to `answer`
+  rather than streaming it — different call site, not part of this bug report,
+  not touched.
+- ~~The `GET /welcome/{hospital_id}` handler itself — originally read as a
+  pattern to copy, never edited.~~ **Moved into scope** per the widening
+  block above: the `contains_malayalam` guard was added to its existing
+  translation call to prevent garbling already-Malayalam text.
+- Any file under `frontend/`.
+- `docs/STATUS.md` — append-only log, written at close-out with developer
+  approval, not part of this task's file scope.
+- The untracked clutter already present in `git status` (`.design/`, `assets/`,
+  `uploads/`, `.agents/REPORT.md`, `.claude/launch.json`, `.thumbnail`,
+  `backend/mock_test.py`, `backend/test_welcome.py`, `cleanup.md`,
+  `deck-stage.js`, `docs/SECURITY_FIXES.md`, `scratch_token_volume.py`,
+  `support.js`, `test_httpx_leak.py`, `test_relevance.py`, `test_req.py`).
+- No Alembic migration — there is no schema change in this task.
 
 ## Execution route
-- B — Claude Code writes, developer reviews.
-- Close-out: manual. Commit, push and PR are `close-task`, developer-driven, per
-  AGENTS.md §6.11. No loop runner opens or merges a PR for this task.
+- B — Claude Code drives Antigravity for the mechanical `ai.py` edit, then
+  reviews.
+- **Narrowing, developer-directed:** neither Claude Code (per the active
+  `antigravity-guard.ps1` hook, which blocks all `Edit`/`Write`/`Bash` writes
+  outside `.agents/`, `docs/`, `HANDOFF.md`) nor Antigravity (per AGENTS.md
+  §12.10a — dev servers are "NOT GRANTED", and its only permitted Python
+  invocations are four unrelated enumerated test scripts) can execute the live
+  reproduction (before the fix) or live re-verification (after the fix)
+  against a running dev server and local DB. Those two steps are `## Manual
+  (developer does)` items below, not agent-executed, for this task only.
+- Close-out: manual. Commit, push and PR are `close-task`, developer-driven,
+  per AGENTS.md §6.11. The developer stopped this task explicitly at "code
+  complete + evidence pasted" — no commit, push, PR, or STATUS.md write from
+  the agent layer for this task.
 
 ## Manual (developer does)
-- [ ] Delete the five leftover `.agents/` files listed above, then confirm.
-- [ ] Confirm `ANTHROPIC_API_KEY` is unset in the environment that actually runs the
-      hook — this is the condition the entire cost design rests on.
-- [ ] Approve this task file (AGENTS.md §6.3).
-- [ ] Approve the STATUS.md draft entry.
-- [ ] All of close-out: commit, push, PR, merge.
+- [ ] **Before the fix** — set a Malayalam-triggering (i.e. any non-empty)
+      `welcome_message` on a local test hospital (e.g. hospital id 4, "Test
+      Hospital X", which currently has `welcome_message = NULL`), start a new
+      session against `POST /chat-stream` with `language="ml"`, and paste the
+      raw SSE response showing the greeting arriving untranslated. If it
+      arrives translated already, STOP and report that the bug does not
+      exist — do not let the fix proceed.
+- [ ] **After the fix** — re-run the identical `language="ml"` request and
+      paste the raw response showing the greeting now in Malayalam. Then
+      re-run with `language="en"` and paste that too, showing English is
+      unaffected.
+- [ ] Approve this task file.
+- [ ] Review Antigravity's returned diff / `HANDOFF.md` (Claude Code performs
+      the mechanical §12.13 first-pass review; the developer makes the final
+      call per `review-skill`).
 
 ## Agent (does on its own, once scope is confirmed)
-- [ ] Read `AGENTS.md`, `docs/STATUS.md` and this file fresh from disk.
-- [ ] Read the CURRENT text of §12.10, §12.10a and §12.15 off disk before editing.
-      Do not rely on any copy pasted into a chat transcript.
-- [ ] Write the hook and the test script.
-- [ ] Register the hook. Make the three AGENTS.md edits. Append MASTER_PLAN §9.
-- [ ] Draft the STATUS.md entry per §6.8. Do not write it.
-- [ ] Regenerate the repomix snapshot in place (AGENTS.md §6.9).
+- [ ] Dispatch Antigravity to make the three edits described under
+      `## Files/areas in scope`: the `chat_stream` greeting block and the
+      `get_welcome` `contains_malayalam` guard, both in `ai.py`, plus the new
+      `contains_malayalam` function in `ml_postprocess.py`.
+- [ ] Read Antigravity's raw output; confirm the diff touches only the named
+      lines inside `chat_stream`'s `event_generator`, the named lines inside
+      `get_welcome`'s translation call, and the new function in
+      `ml_postprocess.py` — nothing else.
+- [ ] Run `git diff -- backend/app/api/v1/endpoints/ai.py` and paste it in
+      full.
+- [ ] Confirm the `hospital_id` filter on the query the fix touches is
+      unchanged (§5.1) and that no `if hospital_id == X` branching was
+      introduced (§5.2).
+- [ ] Produce the §12.13 seven-section first-pass review report.
+- [ ] State the §10 suggested review model line.
 
 ## Order
-1. Read `AGENTS.md`, `docs/STATUS.md` and this file fresh.
-2. Read §12.10, §12.10a and §12.15 off disk. Present the exact proposed replacement
-   wording for all three. STOP and wait for developer confirmation before any code.
-3. Write `.agents/hooks/halt_answerer.py`.
-4. Write `.agents/hooks/run_halt_answerer_test.py`. Must include, at minimum: a case
-   per §12.5 condition 1–6; the `ANTHROPIC_API_KEY`-set refusal; the condition 3
-   one-way door (assert it can never emit a scope widening); the condition 6 filter
-   rejecting a case where one of the four reversibility parts is false.
-5. Run the test script. Paste full raw output and exit code.
-6. Register the `Stop` hook in `.claude/settings.json`.
-7. Make the three AGENTS.md edits.
-8. Append the MASTER_PLAN.md §9 entry.
-9. Capture every item under `## Verification required`.
-10. Run `code-review`. Produce the §12.13 seven-section report.
-11. Draft the STATUS.md entry. Do not write it.
-12. Regenerate the repomix snapshot in place.
+1. Dispatch Antigravity with the exact before/after code for all three edits
+   (below): the `chat_stream` greeting block, the `get_welcome`
+   `contains_malayalam` guard, and the new `contains_malayalam` function in
+   `ml_postprocess.py`.
+2. Read Antigravity's raw output and diff.
+3. Report the diff to the developer for the "after the fix" manual
+   verification step above.
+4. Produce the first-pass review report.
+5. Stop. No commit, push, PR, or STATUS.md write — the developer said close-out
+   is manual and theirs for this task.
 
 ## Verification required before this is considered done
-- [ ] `git status --short` — full raw output. Paste it, do not summarise (§5.10).
-- [ ] `git diff --stat` showing exactly the in-scope files and nothing else. If any
-      `backend/` or `frontend/` file appears, HALT under §12.5 condition 3.
-- [ ] `run_halt_answerer_test.py` full raw output and exit code.
-- [ ] Evidence that the hook is actually registered and fires: the `/hooks` menu
-      listing it, or a live `Stop` event showing it ran.
-- [ ] A live end-to-end run: a real halt written to `LOOP_HANDOFF.md` under a
-      condition 4 scenario, showing `DECISION.md` written with the fixed answer.
-      Paste the resulting `DECISION.md` in full.
-- [ ] A live negative run: a halt under condition 2 (any §10 Opus trigger), showing
-      NO `DECISION.md` was written and the halt was left for the developer.
-- [ ] Evidence the `ANTHROPIC_API_KEY` guard fires: set it, trigger a halt, show
-      nothing was dispatched and nothing written.
-- [ ] `git diff .agents/AGENTS.md` — full raw output, showing only the three intended
-      edits and no other section changed.
-- [ ] No claim of "works", "passes" or "verified" anywhere without the raw output
-      pasted directly above it (§5.10). A description of what output said is not
-      the output.
+- [ ] Raw SSE response from `POST /chat-stream`, `language="ml"`, new session,
+      test hospital with `welcome_message` set — BEFORE the fix — showing the
+      greeting untranslated.
+- [ ] `git diff` — full raw output, showing exactly three files changed:
+      `backend/app/api/v1/endpoints/ai.py` (two hunks: `get_welcome` guard +
+      `chat_stream` translation, plus the import line for
+      `contains_malayalam`, all inside this one file),
+      `backend/app/services/ml_postprocess.py` (new function), and
+      `.agents/CURRENT_TASK.md`.
+- [ ] Raw SSE response from the same request — AFTER the fix — showing the
+      greeting translated to Malayalam.
+- [ ] Raw SSE response from the same request with `language="en"` — AFTER the
+      fix — showing English unaffected.
+- [ ] Confirm only the expected hunks in `ai.py` changed (`git diff --stat`).
 
 ## Flags (AGENTS.md rule triggers)
-- §5.1 / §5.2 — no query, no `hospital_id`, no tenant-specific behaviour. None apply.
-- §5.3 — real restructuring risk in the AGENTS.md edits. Three sections, named
-  explicitly. Any fourth section touched is a §12.5 condition 3 halt.
-- §5.5 — no legal, medical or disclaimer wording is authored anywhere in this task.
-- §5.6 — `LOOP_HANDOFF.md` may reference evidence files. The answerer must never
-  copy raw patient text into `DECISION.md`. §12.6 already bars it from handoffs.
-- §5.8 — one feature. The bypass-flag ban and the `--add-dir` rule are included
-  because both are prerequisites for the loop being safe to run unattended at all,
-  not as bundled extras.
-- §5.10 — every claim needs pasted raw output.
-- §12.5 condition 3 — halt if any file outside `## Files/areas in scope` needs
-  touching, including a fourth AGENTS.md section.
+- §5.1 tenant isolation — the fix touches a query already filtered by
+  `request.hospital_id`; the filter itself is not changed, only what happens
+  to the field after it is fetched. No cross-tenant read is introduced.
+- §5.2 — no `if hospital_id == X` branching anywhere in the fix. The
+  translate-if-`is_malayalam` gate is generic per-request-language behavior,
+  not per-hospital.
+- §5.5 — no disclaimer, legal, or medical wording is authored. If
+  `welcome_message` is empty, the block still doesn't fire (unchanged guard).
+- §5.6 — the fix's warning logs carry only `type(e).__name__`, never greeting
+  text or any patient/user text.
+- §5.8 — one feature: the chat-stream greeting translation gap. No unrelated
+  cleanup bundled in.
+- §5.10 — every claim in this task's evidence must carry pasted raw command
+  output, not a description of output.
+- §10 Opus triggers — none of the enumerated Opus triggers fire: no new or
+  modified query against `Doctor`/`KnowledgeBase`/`Appointment`/`LabTest`, no
+  `hospital_id` filter added/removed/edited, no migration, no logging of raw
+  patient text, no touch to `services/security.py` or
+  `_INJECTION_PATTERNS`, no function signature change, no disclaimer/legal
+  wording, no `backend/research/` boundary crossing, no auth/session-token/
+  Redis-key change, no `DATABASE_URL`/connection-config change. The new
+  `contains_malayalam` function in `ml_postprocess.py` widens that module's
+  public surface but does not trigger any §10 Opus item — it is a pure
+  addition of a new function, not a signature change or cross-module move.
 
 ## Suggested review tier (set at scoping time)
-- Sonnet 5, medium effort. Mechanically, no §10 Opus trigger fires: no query, no
-  `hospital_id` filter, no migration, no logging of patient text, no
-  `services/security.py`, no function signature change, no disclaimer wording, no
-  `backend/research/` boundary, no auth or Redis session keys, no `DATABASE_URL`.
-- Noted separately, NOT a tier upgrade: this task widens what an automated process
-  may do without the developer, and edits the document that governs the review
-  layer. §10 does not list that as a trigger, so the tier stays Sonnet 5 per the
-  mechanical rule. The developer may choose to review it harder anyway.
-- If the agent layer comes back naming Opus, ask what triggered it rather than
-  accepting a quiet upgrade.
+- Sonnet 5, medium effort. No §10 Opus trigger fires (see Flags above); this
+  is an ordinary bug fix reusing an already-established translation call
+  pattern in the same file.
+
+## Suggested Antigravity model
+- Fastest/cheapest available in the selector. The before/after code for all
+  three edits, across both files, is fully specified in this file — no
+  judgement left for Antigravity to exercise.

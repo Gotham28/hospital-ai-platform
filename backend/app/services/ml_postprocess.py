@@ -29,3 +29,19 @@ def normalise_malayalam(text: str) -> str:
         result = pattern.sub(replacement, result)
 
     return result
+
+
+_MALAYALAM_RANGE = range(0x0D00, 0x0D80)
+
+
+def contains_malayalam(text: str) -> bool:
+    """True if any character falls in the Malayalam Unicode block.
+
+    Used as a guard before an en->ml translation call: text that already
+    contains Malayalam must not be sent through en->ml, which would treat
+    it as English and garble it. Deliberately conservative — ANY Malayalam
+    character suppresses translation, including in mixed English/Malayalam
+    text, because leaving mixed text untranslated is a smaller harm than
+    corrupting the Malayalam half of it.
+    """
+    return any(ord(ch) in _MALAYALAM_RANGE for ch in text)
