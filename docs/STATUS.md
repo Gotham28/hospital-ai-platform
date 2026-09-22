@@ -1639,8 +1639,8 @@ Review tier: Opus 5, xhigh effort.
 test dataset — CODE COMPLETE (branch `feat/research-test-queries`, cut from
 `origin/main` at `279dc28`).**
 
-PR: pending
-Commits: pending
+PR: #38
+Commits: d28bada
 
 Stood up `backend/research/` per MASTER_PLAN.md §3.1 and §0's isolation
 philosophy: `__init__.py`, `.env.example` (variable names only —
