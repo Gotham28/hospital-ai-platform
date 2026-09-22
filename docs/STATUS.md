@@ -1,6 +1,6 @@
 # STATUS.md — Current Sprint Status
 
-Last updated: 2026-09-15
+Last updated: 2026-09-22
 
 This file tracks what's actually done vs. in progress vs. next, across the whole
 project. Update this after every verified feature — not before. See `docs/MASTER_PLAN.md`
@@ -392,7 +392,12 @@ A Twilio-backed WhatsApp messaging feature has been added outside the original p
 
 ## Phase 2 — Research (MASTER_PLAN.md §3, later)
 
-Not started. Do not begin until Phase 1 is complete and demoed end-to-end.
+Started 2026-09-22 (`feat/research-test-queries`) — foundation dataset
+(`backend/research/test_queries.py`, 50 queries) and isolation-checker skeleton
+complete. Started deliberately ahead of Phase 1's full close (§1.3a Task C
+unscoped; IRIS Features 2/3 sign-off pending) — see Catch-up 2026-09-22. Next:
+`relevance_gate_eval.py` companion dataset (§3.9), then `retrieval_benchmark.py`
+(§3.2) once a research OpenAI key is available.
 
 ---
 
@@ -1627,3 +1632,72 @@ app) calls the two appointment routes — developer to check before merge; the
 403/422 responses.
 
 Review tier: Opus 5, xhigh effort.
+
+### Catch-up — 2026-09-22
+
+**Phase 2 foundation: isolated `backend/research/` package + 50-query synthetic
+test dataset — CODE COMPLETE (branch `feat/research-test-queries`, cut from
+`origin/main` at `279dc28`).**
+
+PR: pending
+Commits: pending
+
+Stood up `backend/research/` per MASTER_PLAN.md §3.1 and §0's isolation
+philosophy: `__init__.py`, `.env.example` (variable names only —
+`OPENAI_API_KEY`, `GROQ_API_KEY`), `requirements.txt` (the eight Phase 2
+dependencies named in MASTER_PLAN.md §3 — nothing installed this task),
+`README.md`, and `check_isolation.py` — an AST-based two-way import checker
+(`backend/app/` ↔ `backend/research/`) with a `--self-test` that plants and
+verifies a violation in both directions. Built `test_queries.py`: 50 labelled
+English/Malayalam patient-query dicts (`id`, `query_en`, `query_ml`,
+`reference_answer`, `category`, `complexity`, `query_type`, `hospital_id`)
+grounded in the real seeded catalog (`seed_rich_data.py`) for both demo
+tenants. Queries 1-15 were drafted by Claude Code and developer-approved
+as-is; queries 16-50 were then drafted by Claude Code matching that locked
+style and given final developer lock sign-off — both approvals given directly
+in-session (recorded in `.agents/DECISIONS_TAKEN.md`, since Claude Code cannot
+edit `CURRENT_TASK.md`'s own checkboxes).
+
+**Deliberate roadmap-sequencing override:** Phase 2 was started before Phase 1
+is fully closed (§1.3a Task C / Redis translation cache still unscoped; IRIS
+Features 2/3 disclaimer sign-off still pending; Feature 4 relevance criteria
+still partial) — an informed developer decision made in the scoping session on
+2026-09-21, not an oversight.
+
+A code review found, and a follow-up dispatch fixed, one Critical defect before
+this was accepted: `check_isolation.py`'s original import-detection missed the
+codebase's actual short-form import style (e.g.
+`from app.core.config import settings`), and its self-test only exercised one
+of the two required directions. Both are now fixed and independently
+re-verified.
+
+Verification (run this session, from repo root):
+```
+$ python -m backend.research.check_isolation
+Success: Zero isolation violations found.
+
+$ python -m backend.research.check_isolation --self-test
+Self-test passed: Caught both planted violations successfully.
+
+$ git check-ignore -v backend/research/.env backend/research/results/x.jsonl
+.gitignore:7:.env	backend/research/.env
+.gitignore:40:backend/research/results/	backend/research/results/x.jsonl
+
+$ git grep -n "research" -- backend/app
+(no output — zero matches)
+
+$ python -c "import backend.research.test_queries as t; assert len(t.QUERIES) == 50"
+(no exception — 50/50)
+```
+
+Deferred: `relevance_gate_eval.py`'s companion dataset (§3.9) — deliberately
+not bundled into this diff (kept as its own task per AGENTS.md §5.8, despite
+MASTER_PLAN.md's "build alongside" wording); `clients.py`/`ping.py`
+(OpenAI/Groq call wrappers, §3.2/§3.3); installing anything from
+`requirements.txt`. A pre-existing, unrelated finding surfaced during review:
+`backend/google_credentials.json` is a live, unredacted Google
+service-account key currently committed on `origin/main` — flagged to the
+developer for separate action (rotate + scrub history), not touched by this
+task.
+
+Review tier: Opus 5, high effort.

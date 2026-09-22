@@ -1,0 +1,8 @@
+ragas
+sacrebleu
+groq
+scipy
+sentence-transformers
+datasets
+transformers
+httpx
