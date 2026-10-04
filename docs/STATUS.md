@@ -1706,8 +1706,8 @@ Review tier: Opus 5, high effort.
 
 **IRIS patient page redesigned to the "Ease Health" style — CODE COMPLETE (branch `feat/iris-ease-health-redesign`, cut from `origin/main` at `952b7ab`).**
 
-PR: pending
-Commits: pending
+PR: #39
+Commits: f97a385
 
 Presentation-only redesign of the IRIS Hospitals patient page, frontend files only: forest-green/cream `iris-*` token values (`--shadow-iris` removed, `--radius-iris` 14px, new sage/mint/slate/border-strong tokens and a page background gradient), Fraunces + Inter with Noto Serif/Sans Malayalam in the font stacks, flat shadowless surfaces, the IRIS logo in the header and a keylime hero panel, new `themes/iris-hospitals/motion.ts` (shared easing, durations, fade/stagger variants), calmer chat motion, and the opening animation rebuilt (layered panels, logo reveal, tagline; skippable by click/Escape/Enter/Space; no intro under reduced motion; `onComplete` guarded to fire once). Files: `frontend/index.html`, `frontend/src/index.css`, `frontend/src/themes/iris-hospitals/{index,Chat,ChatMessage,AnimatedIntro}.tsx`, new `motion.ts`, `HANDOFF.md`. Look approved by the developer from inline previews (2026-10-04); the tagline was later changed to wrap onto two lines at every width, also developer-approved.
 
