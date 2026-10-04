@@ -16,19 +16,33 @@
   --color-brand-900: #064e3b;
   --color-brand-950: #022c22;
 
-  /* IRIS Rheumatology Clinic — patient chat widget. Approved 2026-08-31. */
+  /* IRIS palette — Refero 'Ease Health' style, approved by the developer 2026-10-04 */
   --font-malayalam: 'Noto Sans Malayalam', 'Manjari', sans-serif;
 
-  --color-iris-primary: #2A69B5;
-  --color-iris-primary-hover: #1E4E8C;
-  --color-iris-surface: #F7F9FC;
-  --color-iris-surface-raised: #FFFFFF;
-  --color-iris-border: #D5DEE8;
-  --color-iris-text-primary: #1C2430;
-  --color-iris-text-muted: #5C6875;
-  --color-iris-accent: #0E7C86;
+  --color-iris-primary: #0f3e17;
+  --color-iris-primary-hover: #0c2f10;
+  --color-iris-surface: #fffefc;
+  --color-iris-surface-raised: #ffffff;
+  --color-iris-border: #efeeeb;
+  --color-iris-text-primary: #0f3e17;
+  --color-iris-text-muted: #4b5b4f;
+  --color-iris-accent: #0f3e17;
   --color-iris-danger: #B04A2F;
-  --color-iris-accent-surface: #EAF2F2;
+  --color-iris-accent-surface: #e1f4df;
+
+  --color-iris-sage: #b1dbb8;
+  --color-iris-mint: #cfe7d3;
+  --color-iris-slate: #b6ced5;
+  --color-iris-border-strong: #7f9784;
+
+  --font-iris-display: 'Fraunces', 'Noto Serif Malayalam', Georgia, serif;
+  --font-iris-sans: 'Inter', 'Noto Sans Malayalam', system-ui, sans-serif;
+
+  --text-iris-display: 48px;
+  --text-iris-display--line-height: 1.1;
+  --text-iris-display--letter-spacing: -0.02em;
+  --text-iris-display-ml: 36px;
+  --text-iris-display-ml--line-height: 1.5;
 
   --text-iris-label: 13px;
   --text-iris-label--line-height: 1.5;
@@ -43,9 +57,15 @@
   --text-iris-title: 22px;
   --text-iris-title--line-height: 1.35;
 
-  --radius-iris: 16px;
+  --radius-iris: 14px;
   --radius-iris-sm: 12px;
-  --shadow-iris: 0 2px 8px rgba(28,36,48,0.10);
+}
+
+:root {
+  /* Page background gradient — cream at top, soft green at bottom.
+     Outside @theme because Tailwind 4 would attempt to generate a utility for it.
+     Consumers: bg-[image:var(--iris-bg-gradient)] */
+  --iris-bg-gradient: linear-gradient(180deg, #fffefc 0%, #f3faf1 45%, #e4f4e1 100%);
 }
 
 html {
