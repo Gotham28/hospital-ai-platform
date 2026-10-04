@@ -600,3 +600,6 @@ superadmin-only, scoped the hospital list to the caller's own hospital, added
 role-based field allowlists to both hospital PATCH routes, and removed
 `google_sheet_id` from the public slug response. Not one of §1.4's listed
 items; a prerequisite for them.
+
+### 2026-10-04 — IRIS patient page redesign to the Ease Health style
+Not in the original plan. Forest-green/cream `iris-*` token values, Fraunces + Inter with Noto Serif/Sans Malayalam, flat shadowless surfaces over a light-green page gradient, larger logo, shared theme motion constants, calmer chat motion, opening animation rebuilt (~2.4s, skippable, reduced-motion aware). Presentation only. Scope: `frontend/index.html`, `frontend/src/index.css`, `frontend/src/themes/iris-hospitals/`. Related: CURRENT_TASK.md dated 2026-10-04.

@@ -1701,3 +1701,40 @@ developer for separate action (rotate + scrub history), not touched by this
 task.
 
 Review tier: Opus 5, high effort.
+
+### Catch-up — 2026-10-04
+
+**IRIS patient page redesigned to the "Ease Health" style — CODE COMPLETE (branch `feat/iris-ease-health-redesign`, cut from `origin/main` at `952b7ab`).**
+
+PR: #39
+Commits: f97a385
+
+Presentation-only redesign of the IRIS Hospitals patient page, frontend files only: forest-green/cream `iris-*` token values (`--shadow-iris` removed, `--radius-iris` 14px, new sage/mint/slate/border-strong tokens and a page background gradient), Fraunces + Inter with Noto Serif/Sans Malayalam in the font stacks, flat shadowless surfaces, the IRIS logo in the header and a keylime hero panel, new `themes/iris-hospitals/motion.ts` (shared easing, durations, fade/stagger variants), calmer chat motion, and the opening animation rebuilt (layered panels, logo reveal, tagline; skippable by click/Escape/Enter/Space; no intro under reduced motion; `onComplete` guarded to fire once). Files: `frontend/index.html`, `frontend/src/index.css`, `frontend/src/themes/iris-hospitals/{index,Chat,ChatMessage,AnimatedIntro}.tsx`, new `motion.ts`, `HANDOFF.md`. Look approved by the developer from inline previews (2026-10-04); the tagline was later changed to wrap onto two lines at every width, also developer-approved.
+
+A four-lens code review (Sonnet) returned accept-with-fixes: 0 Critical, 4 Major. Three were fixed and re-measured: the tagline delay and widget duration were silently overridden by the fade variant's own transition, the report lacked raw output, and the report's scope line was wrong. The fourth, Claude Code switching branches (a `## Manual` item), was developer-waived in chat. Several Minor items and the audit follow-ups are left open (see Deferred). No second review pass ran on the fixes; Claude Code re-ran the checks itself.
+
+Verification (run this session, repo root unless noted):
+```
+$ cd frontend && npm run build
+✓ 2425 modules transformed. ... ✓ built in 7.45s    (exit 0)
+$ npx eslint src/themes/iris-hospitals
+Chat.tsx 86:5 and 97:7  react-hooks/set-state-in-effect  — 2 errors; the same 2 exist on origin/main's Chat.tsx (exit 1)
+$ grep -rnE "#[0-9a-fA-F]{3,8}|rgba?\(|blue-|gray-|indigo|violet|shadow-" frontend/src/themes/iris-hospitals/*.tsx    (no output)
+$ grep -rn "shadow-iris\|--shadow-iris" frontend/src    (no output)
+$ grep -rn "logonewiris\|DEMO_MESSAGES\|fonts.googleapis" frontend/src/themes/iris-hospitals    (no output)
+$ python contrast.py  (final index.css)
+primary/surface 12.10 | primary/keylime 10.57 | primary/mint 9.31 | white/primary 12.20 | muted/surface 7.16 | muted/keylime 6.26 | muted/border 6.22 | danger/surface 5.39 | border-strong/surface 3.13 | sage/white 1.53 (decorative only)
+$ curl http://localhost:8000/api/v1/hospitals/slug/iris-hospitals
+{"id":17,"name":"IRIS Rheumatology Clinic (LOCAL PREVIEW)"}  HTTP 200   (local DB localhost:5433)
+Browser, 1440 and 375 wide, dev servers on 5173/8000:
+  overlay visible 2412 ms; tagline opacity 0 at 500 ms, 1 at 1300 ms (>0.05 at 902 ms); logo panel >0.99 at 860 ms
+  skip: click at ~0.5 s -> removed in 241 ms; Space -> 223 ms (default prevented); Ctrl+Enter does not skip; <main> mounted once
+  reduced motion emulated: overlay never rendered, chat present at 910 ms
+  fonts: h2 Fraunces/Noto Serif Malayalam weight 300; chat bubble Noto Sans Malayalam; document.fonts.check true for all three
+  console: only the known /vad-assets/* HTTP 500 errors; mobile scrollWidth 375 = innerWidth 375
+  one English and one Malayalam chat exchange streamed and rendered
+```
+
+Deferred / not verified: the recording and transcribing states were not reached (the dev server cannot load the VAD assets); a native Malayalam reader has not checked the serif headline and tagline; the language-notice fade-out was not visually confirmed; `components/iris/*` (dead code) and the duplicate `logonewiris.png` files are not deleted; the shared `ThemeLoader` has no per-theme loading screen; the 2 ESLint errors above pre-date this task; intro timeline literals live in `AnimatedIntro.tsx` not `motion.ts`; `introComplete` state in `index.tsx` is redundant; hero list double-fades; the sage rectangle sits inside the hero panel, not behind it; unused `--text-iris-display` tokens; the new Google Fonts link loads for every tenant; input placeholder has no trailing ellipsis; no live region for streamed replies; second tagline line is slightly wider than the front panel on desktop. The response-quality work (`fix/response-quality`, local commit `b9eb827`, unpushed) is a separate paused task and is not in this PR.
+
+Review tier: Sonnet 5, medium effort. No Antigravity tier line existed, so this classification is unratcheted.

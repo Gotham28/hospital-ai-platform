@@ -10,7 +10,9 @@
  */
 
 import React from 'react';
+import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
+import { fadeUp } from './motion';
 
 interface ChatMessageProps {
   role: 'user' | 'assistant';
@@ -35,7 +37,12 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   const bodyTextClass = isMalayalam ? 'font-malayalam text-iris-body-ml' : 'text-iris-body';
 
   return (
-    <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} gap-[8px]`}>
+    <motion.div
+      variants={fadeUp}
+      initial="hidden"
+      animate="show"
+      className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} gap-[8px]`}
+    >
       <div className="flex items-center gap-[8px]">
         <div className="text-iris-label uppercase tracking-[0.04em] font-semibold text-iris-text-muted">
           {senderLabel}
@@ -48,10 +55,10 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
       </div>
 
       <div
-        className={`max-w-[88%] md:max-w-[76%] rounded-iris shadow-iris p-[16px] ${bodyTextClass} ${
+        className={`max-w-[88%] md:max-w-[76%] rounded-iris p-[16px] break-words ${bodyTextClass} ${
           isUser
             ? 'bg-iris-primary text-white'
-            : 'bg-iris-surface-raised border border-iris-border text-iris-text-primary'
+            : 'bg-iris-accent-surface text-iris-text-primary'
         }`}
       >
         <div className="prose prose-sm max-w-none [&_*]:!m-0 [&_p+p]:!mt-[8px]" style={{ color: 'inherit' }}>
@@ -69,16 +76,20 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         {/* Streaming caret — 3px per design, lands on the last token */}
         {isStreaming && !isUser && (
           <span
-            className={`inline-block w-[3px] h-[20px] ml-[2px] align-[-4px] rounded-[2px] ${
-              isUser ? 'bg-white' : 'bg-iris-primary'
-            }`}
+            aria-hidden="true"
+            className="inline-block w-[3px] h-[20px] ml-[2px] align-[-4px] rounded-[2px] bg-iris-primary iris-caret"
             style={{ animation: 'irisBlink 1s step-start infinite' }}
           />
         )}
       </div>
 
-      <style>{`@keyframes irisBlink { 0%, 100% { opacity: 1 } 50% { opacity: 0 } }`}</style>
-    </div>
+      <style>{`
+        @keyframes irisBlink { 0%, 100% { opacity: 1 } 50% { opacity: 0 } }
+        @media (prefers-reduced-motion: reduce) {
+          .iris-caret { animation: none !important; opacity: 1; }
+        }
+      `}</style>
+    </motion.div>
   );
 };
 
