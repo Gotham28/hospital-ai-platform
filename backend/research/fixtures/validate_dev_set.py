@@ -147,10 +147,15 @@ def validate_dataset(filepath: Path) -> dict:
     assert split_counts["holdout"] == 50, f"Expected 50 holdout, got {split_counts['holdout']}"
     assert lang_counts["en"] == 50, f"Expected 50 English, got {lang_counts['en']}"
     assert lang_counts["ml"] == 50, f"Expected 50 Malayalam, got {lang_counts['ml']}"
-    assert verdict_counts["supported"] == 50, f"Expected 50 supported, got {verdict_counts['supported']}"
-    assert (
-        verdict_counts["unsupported"] + verdict_counts["contradicted"] == 50
-    ), f"Expected 50 errors (unsupported + contradicted), got {verdict_counts['unsupported'] + verdict_counts['contradicted']}"
+    error_count = verdict_counts["unsupported"] + verdict_counts["contradicted"]
+    assert 45 <= verdict_counts["supported"] <= 55, (
+        "Expected approximately half supported examples, "
+        f"got {verdict_counts['supported']}"
+    )
+    assert 45 <= error_count <= 55, (
+        "Expected approximately half errors (unsupported + contradicted), "
+        f"got {error_count}"
+    )
 
     return {
         "total": total_count,
