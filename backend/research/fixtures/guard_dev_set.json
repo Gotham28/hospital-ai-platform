@@ -1,0 +1,4166 @@
+[
+  {
+    "id": 1,
+    "split": "tuning",
+    "lang": "en",
+    "category": "fee",
+    "phenomenon": "changed_fee",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Consultation fee for Dr. Test One (General Medicine) is 400 INR."
+    ],
+    "instructions": "State the doctor's consultation fee.",
+    "answer": "The consultation fee for Dr. Test One is 600 INR.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "The consultation fee for Dr. Test One is 600 INR.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Consultation fee for Dr. Test One (General Medicine) is 400 INR."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "The consultation fee for Dr. Test One is 600 INR.",
+          "text_b": "Consultation fee for Dr. Test One (General Medicine) is 400 INR.",
+          "evidence": "400 vs 600"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "400",
+          "type": "price",
+          "status": "changed",
+          "raw_extracted": "600",
+          "normalised": "600"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Exact fee changed from 400 to 600."
+  },
+  {
+    "id": 2,
+    "split": "tuning",
+    "lang": "en",
+    "category": "facility",
+    "phenomenon": "invented_detail",
+    "test_focus": "nli_entailment",
+    "context": [
+      "Hospital A - ENT OPD is open Monday to Wednesday from 9:00 AM to 1:00 PM."
+    ],
+    "instructions": "Answer clinic schedule questions.",
+    "answer": "ENT OPD is open Monday to Wednesday from 9:00 AM to 1:00 PM. Complimentary valet parking is provided at the main entrance.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ENT OPD is open Monday to Wednesday from 9:00 AM to 1:00 PM.",
+          "verdict": "supported",
+          "evidence": "Hospital A - ENT OPD is open Monday to Wednesday from 9:00 AM to 1:00 PM."
+        },
+        {
+          "claim_id": "c2",
+          "text": "Complimentary valet parking is provided at the main entrance.",
+          "verdict": "unsupported",
+          "evidence": "None"
+        }
+      ],
+      "overall_verdict": "unsupported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "9:00 AM to 1:00 PM",
+          "type": "time",
+          "status": "survived"
+        },
+        {
+          "item": "Monday to Wednesday",
+          "type": "weekday",
+          "status": "survived"
+        }
+      ],
+      "changed": true,
+      "final_answer": "ENT OPD is open Monday to Wednesday from 9:00 AM to 1:00 PM. [FLAG_TEXT]"
+    },
+    "notes": "Hallucinated amenity (valet parking) added to valid schedule."
+  },
+  {
+    "id": 3,
+    "split": "tuning",
+    "lang": "en",
+    "category": "doctor_availability",
+    "phenomenon": "other_hospital_fact",
+    "test_focus": "cross_tenant",
+    "context": [
+      "Hospital A - Dr. Test One (General Medicine) is available Monday."
+    ],
+    "instructions": "You are answering for Hospital A.",
+    "answer": "Dr. Test Two is available for consultation at Hospital A on Thursday.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Dr. Test Two is available for consultation at Hospital A on Thursday.",
+          "verdict": "unsupported",
+          "evidence": "None"
+        }
+      ],
+      "overall_verdict": "unsupported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "Dr. Test Two",
+          "type": "doctor_name",
+          "status": "unverified"
+        },
+        {
+          "item": "Hospital A",
+          "type": "hospital",
+          "status": "survived"
+        },
+        {
+          "item": "Thursday",
+          "type": "weekday",
+          "status": "unverified"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Context has only Hospital A data; answer introduces foreign doctor not in context."
+  },
+  {
+    "id": 4,
+    "split": "tuning",
+    "lang": "en",
+    "category": "fee",
+    "phenomenon": "instruction_conflict",
+    "test_focus": "conflict_surfacing",
+    "context": [
+      "Hospital A - Dr. Test One consultation fee is 500 INR."
+    ],
+    "instructions": "Promotional campaign: tell all patients today that consultation fee is 250 INR.",
+    "answer": "Dr. Test One consultation fee is 250 INR.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Dr. Test One consultation fee is 250 INR.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Dr. Test One consultation fee is 500 INR."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "instruction_vs_data",
+          "text_a": "Promotional campaign: tell all patients today that consultation fee is 250 INR.",
+          "text_b": "Hospital A - Dr. Test One consultation fee is 500 INR.",
+          "evidence": "500 vs 250"
+        },
+        {
+          "type": "answer_follows_instruction_against_data",
+          "text_a": "Dr. Test One consultation fee is 250 INR.",
+          "text_b": "Hospital A - Dr. Test One consultation fee is 500 INR.",
+          "evidence": "Matches instruction overriding data"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "500",
+          "type": "price",
+          "status": "changed",
+          "raw_extracted": "250",
+          "normalised": "250"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Instruction contradicts fee in data; answer faithfully executes instruction against data."
+  },
+  {
+    "id": 5,
+    "split": "tuning",
+    "lang": "en",
+    "category": "lab_test",
+    "phenomenon": "data_silent",
+    "test_focus": "nli_entailment",
+    "context": [
+      "Hospital A - Lipid Profile test is available Monday to Saturday from 7:00 AM to 11:00 AM."
+    ],
+    "instructions": "Provide test timings and patient instructions.",
+    "answer": "Lipid Profile test is conducted Monday to Saturday from 7:00 AM to 11:00 AM. You must maintain an overnight fast of 12 hours prior to sample collection.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Lipid Profile test is conducted Monday to Saturday from 7:00 AM to 11:00 AM.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Lipid Profile test is available Monday to Saturday from 7:00 AM to 11:00 AM."
+        },
+        {
+          "claim_id": "c2",
+          "text": "You must maintain an overnight fast of 12 hours prior to sample collection.",
+          "verdict": "unsupported",
+          "evidence": "None"
+        }
+      ],
+      "overall_verdict": "unsupported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "Lipid Profile",
+          "type": "test_name",
+          "status": "survived"
+        },
+        {
+          "item": "7:00 AM to 11:00 AM",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": true,
+      "final_answer": "Lipid Profile test is conducted Monday to Saturday from 7:00 AM to 11:00 AM. [FLAG_TEXT]"
+    },
+    "notes": "Claim 2 contains general clinical knowledge but is unsupported by the context passage."
+  },
+  {
+    "id": 6,
+    "split": "tuning",
+    "lang": "en",
+    "category": "lab_test",
+    "phenomenon": "supported",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Routine Hemogram fee is 350 INR and results are available within 4 hours."
+    ],
+    "instructions": "Answer lab inquiries.",
+    "answer": "The Routine Hemogram fee at Hospital A is 350 INR, and results are available within 4 hours.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "The Routine Hemogram fee at Hospital A is 350 INR, and results are available within 4 hours.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Routine Hemogram fee is 350 INR and results are available within 4 hours."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "350",
+          "type": "price",
+          "status": "survived"
+        },
+        {
+          "item": "4 hours",
+          "type": "time",
+          "status": "survived"
+        },
+        {
+          "item": "Routine Hemogram",
+          "type": "test_name",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "The Routine Hemogram fee at Hospital A is 350 INR, and results are available within 4 hours."
+    },
+    "notes": "Completely supported lab test query."
+  },
+  {
+    "id": 7,
+    "split": "tuning",
+    "lang": "en",
+    "category": "doctor_availability",
+    "phenomenon": "supported",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Dr. Test Two (Dermatology) is available Tuesday and Friday from 10:00 AM to 1:00 PM."
+    ],
+    "instructions": "State Dr. Test Two schedule.",
+    "answer": "Dr. Test Two is available on Tuesday and Friday from 10:00 AM to 1:00 PM.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Dr. Test Two is available on Tuesday and Friday from 10:00 AM to 1:00 PM.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Dr. Test Two (Dermatology) is available Tuesday and Friday from 10:00 AM to 1:00 PM."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "Dr. Test Two",
+          "type": "doctor_name",
+          "status": "survived"
+        },
+        {
+          "item": "Tuesday and Friday",
+          "type": "weekday",
+          "status": "survived"
+        },
+        {
+          "item": "10:00 AM to 1:00 PM",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "Dr. Test Two is available on Tuesday and Friday from 10:00 AM to 1:00 PM."
+    },
+    "notes": "Completely supported doctor availability statement."
+  },
+  {
+    "id": 8,
+    "split": "tuning",
+    "lang": "en",
+    "category": "timing",
+    "phenomenon": "changed_time",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Blood collection counter opens at 7:30 AM and closes at 2:00 PM."
+    ],
+    "instructions": "Provide blood sample collection hours.",
+    "answer": "The blood collection counter opens at 9:00 AM and closes at 4:00 PM.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "The blood collection counter opens at 9:00 AM and closes at 4:00 PM.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Blood collection counter opens at 7:30 AM and closes at 2:00 PM."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "The blood collection counter opens at 9:00 AM and closes at 4:00 PM.",
+          "text_b": "Blood collection counter opens at 7:30 AM and closes at 2:00 PM.",
+          "evidence": "7:30 AM vs 9:00 AM, 2:00 PM vs 4:00 PM"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "7:30 AM",
+          "type": "time",
+          "status": "changed",
+          "raw_extracted": "9:00 AM",
+          "normalised": "09:00"
+        },
+        {
+          "item": "2:00 PM",
+          "type": "time",
+          "status": "changed",
+          "raw_extracted": "4:00 PM",
+          "normalised": "16:00"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Operating hours shifted forward by 1.5 hours."
+  },
+  {
+    "id": 9,
+    "split": "tuning",
+    "lang": "en",
+    "category": "doctor_availability",
+    "phenomenon": "changed_weekday",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Cardiology clinic by Dr. Test Three runs on Wednesday and Saturday."
+    ],
+    "instructions": "State cardiology clinic days.",
+    "answer": "Dr. Test Three conducts Cardiology clinic on Monday and Thursday.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Dr. Test Three conducts Cardiology clinic on Monday and Thursday.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Cardiology clinic by Dr. Test Three runs on Wednesday and Saturday."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "Dr. Test Three conducts Cardiology clinic on Monday and Thursday.",
+          "text_b": "Cardiology clinic by Dr. Test Three runs on Wednesday and Saturday.",
+          "evidence": "Wednesday and Saturday vs Monday and Thursday"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "Wednesday and Saturday",
+          "type": "weekday",
+          "status": "changed",
+          "raw_extracted": "Monday and Thursday",
+          "normalised": "0,3"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Days of week swapped completely."
+  },
+  {
+    "id": 10,
+    "split": "tuning",
+    "lang": "en",
+    "category": "doctor_availability",
+    "phenomenon": "changed_doctor_availability",
+    "test_focus": "nli_contradiction",
+    "context": [
+      "Hospital A - Dr. Test One is on leave from October 10 to October 15."
+    ],
+    "instructions": "Check Dr. Test One availability for October 12.",
+    "answer": "Dr. Test One is available for regular consultations on October 12.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Dr. Test One is available for regular consultations on October 12.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Dr. Test One is on leave from October 10 to October 15."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "Dr. Test One is available for regular consultations on October 12.",
+          "text_b": "Dr. Test One is on leave from October 10 to October 15.",
+          "evidence": "On leave vs available"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "Dr. Test One",
+          "type": "doctor_name",
+          "status": "survived"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Doctor claimed available during an active leave window."
+  },
+  {
+    "id": 11,
+    "split": "tuning",
+    "lang": "en",
+    "category": "lab_test",
+    "phenomenon": "supported",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Thyroid Profile (T3, T4, TSH) costs 650 INR at the central lab."
+    ],
+    "instructions": "Provide test pricing.",
+    "answer": "The Thyroid Profile costs 650 INR at Hospital A central lab.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "The Thyroid Profile costs 650 INR at Hospital A central lab.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Thyroid Profile (T3, T4, TSH) costs 650 INR at the central lab."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "650",
+          "type": "price",
+          "status": "survived"
+        },
+        {
+          "item": "Thyroid Profile",
+          "type": "test_name",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "The Thyroid Profile costs 650 INR at Hospital A central lab."
+    },
+    "notes": "Accurate test cost matching context."
+  },
+  {
+    "id": 12,
+    "split": "tuning",
+    "lang": "en",
+    "category": "doctor_availability",
+    "phenomenon": "supported",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Pediatrics OPD operates Monday through Saturday from 9:00 AM to 4:00 PM with Dr. Test Four."
+    ],
+    "instructions": "Inform parent about pediatric timings.",
+    "answer": "Pediatrics OPD is open Monday through Saturday between 9:00 AM and 4:00 PM with Dr. Test Four.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Pediatrics OPD is open Monday through Saturday between 9:00 AM and 4:00 PM with Dr. Test Four.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Pediatrics OPD operates Monday through Saturday from 9:00 AM to 4:00 PM with Dr. Test Four."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "Dr. Test Four",
+          "type": "doctor_name",
+          "status": "survived"
+        },
+        {
+          "item": "Monday through Saturday",
+          "type": "weekday",
+          "status": "survived"
+        },
+        {
+          "item": "9:00 AM to 4:00 PM",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "Pediatrics OPD is open Monday through Saturday between 9:00 AM and 4:00 PM with Dr. Test Four."
+    },
+    "notes": "All doctor and clinic attributes match context."
+  },
+  {
+    "id": 13,
+    "split": "tuning",
+    "lang": "en",
+    "category": "facility",
+    "phenomenon": "changed_number",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Orthopaedics clinic limits consultations to 25 patients per session."
+    ],
+    "instructions": "State patient limit.",
+    "answer": "Orthopaedics clinic allows up to 50 patients per session.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Orthopaedics clinic allows up to 50 patients per session.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Orthopaedics clinic limits consultations to 25 patients per session."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "Orthopaedics clinic allows up to 50 patients per session.",
+          "text_b": "Orthopaedics clinic limits consultations to 25 patients per session.",
+          "evidence": "25 vs 50"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "25",
+          "type": "number",
+          "status": "changed",
+          "raw_extracted": "50",
+          "normalised": "50"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Capacity limit doubled in answer."
+  },
+  {
+    "id": 14,
+    "split": "tuning",
+    "lang": "en",
+    "category": "facility",
+    "phenomenon": "data_silent",
+    "test_focus": "nli_entailment",
+    "context": [
+      "Hospital A - General Medicine OPD is open daily from 8:00 AM to 1:00 PM."
+    ],
+    "instructions": "General inquiries.",
+    "answer": "General Medicine OPD is open daily from 8:00 AM to 1:00 PM. Inpatient rooms have dedicated Wi-Fi access.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "General Medicine OPD is open daily from 8:00 AM to 1:00 PM.",
+          "verdict": "supported",
+          "evidence": "Hospital A - General Medicine OPD is open daily from 8:00 AM to 1:00 PM."
+        },
+        {
+          "claim_id": "c2",
+          "text": "Inpatient rooms have dedicated Wi-Fi access.",
+          "verdict": "unsupported",
+          "evidence": "None"
+        }
+      ],
+      "overall_verdict": "unsupported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "8:00 AM to 1:00 PM",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": true,
+      "final_answer": "General Medicine OPD is open daily from 8:00 AM to 1:00 PM. [FLAG_TEXT]"
+    },
+    "notes": "Wi-Fi claim is unsupported by retrieved passage."
+  },
+  {
+    "id": 15,
+    "split": "tuning",
+    "lang": "en",
+    "category": "lab_test",
+    "phenomenon": "supported",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Liver Function Test (LFT) requires 10 to 12 hours of overnight fasting and costs 800 INR."
+    ],
+    "instructions": "State LFT preparation and cost.",
+    "answer": "Liver Function Test costs 800 INR and requires 10 to 12 hours of overnight fasting.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Liver Function Test costs 800 INR and requires 10 to 12 hours of overnight fasting.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Liver Function Test (LFT) requires 10 to 12 hours of overnight fasting and costs 800 INR."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "800",
+          "type": "price",
+          "status": "survived"
+        },
+        {
+          "item": "10 to 12 hours",
+          "type": "time",
+          "status": "survived"
+        },
+        {
+          "item": "Liver Function Test",
+          "type": "test_name",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "Liver Function Test costs 800 INR and requires 10 to 12 hours of overnight fasting."
+    },
+    "notes": "Accurate fee and fasting instructions."
+  },
+  {
+    "id": 16,
+    "split": "tuning",
+    "lang": "en",
+    "category": "lab_test",
+    "phenomenon": "changed_fee",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Ultrasound Abdomen scan fee is 1200 INR."
+    ],
+    "instructions": "Provide scan price.",
+    "answer": "The fee for an Ultrasound Abdomen scan is 1500 INR.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "The fee for an Ultrasound Abdomen scan is 1500 INR.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Ultrasound Abdomen scan fee is 1200 INR."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "The fee for an Ultrasound Abdomen scan is 1500 INR.",
+          "text_b": "Ultrasound Abdomen scan fee is 1200 INR.",
+          "evidence": "1200 vs 1500"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "1200",
+          "type": "price",
+          "status": "changed",
+          "raw_extracted": "1500",
+          "normalised": "1500"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Diagnostic scan price inflated in answer."
+  },
+  {
+    "id": 17,
+    "split": "tuning",
+    "lang": "en",
+    "category": "facility",
+    "phenomenon": "supported",
+    "test_focus": "nli_entailment",
+    "context": [
+      "Hospital A - Pharmacy is open 24 hours daily on the ground floor."
+    ],
+    "instructions": "State pharmacy hours and location.",
+    "answer": "Hospital A pharmacy operates 24 hours daily and is located on the ground floor.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Hospital A pharmacy operates 24 hours daily and is located on the ground floor.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Pharmacy is open 24 hours daily on the ground floor."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "24 hours daily",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "Hospital A pharmacy operates 24 hours daily and is located on the ground floor."
+    },
+    "notes": "Valid factual match for 24-hour service."
+  },
+  {
+    "id": 18,
+    "split": "tuning",
+    "lang": "en",
+    "category": "doctor_availability",
+    "phenomenon": "invented_detail",
+    "test_focus": "nli_entailment",
+    "context": [
+      "Hospital A - Dr. Test Five (Neurology) consults on Thursday from 2:00 PM to 5:00 PM."
+    ],
+    "instructions": "State neurology schedule.",
+    "answer": "Dr. Test Five consults on Thursday from 2:00 PM to 5:00 PM. First-time visitors receive a free wellness kit.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Dr. Test Five consults on Thursday from 2:00 PM to 5:00 PM.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Dr. Test Five (Neurology) consults on Thursday from 2:00 PM to 5:00 PM."
+        },
+        {
+          "claim_id": "c2",
+          "text": "First-time visitors receive a free wellness kit.",
+          "verdict": "unsupported",
+          "evidence": "None"
+        }
+      ],
+      "overall_verdict": "unsupported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "Dr. Test Five",
+          "type": "doctor_name",
+          "status": "survived"
+        },
+        {
+          "item": "Thursday",
+          "type": "weekday",
+          "status": "survived"
+        },
+        {
+          "item": "2:00 PM to 5:00 PM",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": true,
+      "final_answer": "Dr. Test Five consults on Thursday from 2:00 PM to 5:00 PM. [FLAG_TEXT]"
+    },
+    "notes": "Free promotional giveaway fabricated."
+  },
+  {
+    "id": 19,
+    "split": "tuning",
+    "lang": "en",
+    "category": "facility",
+    "phenomenon": "supported",
+    "test_focus": "nli_entailment",
+    "context": [
+      "Hospital A - Emergency department is operational 24/7 with dedicated trauma care."
+    ],
+    "instructions": "Emergency service details.",
+    "answer": "Emergency department provides 24/7 trauma care services at Hospital A.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Emergency department provides 24/7 trauma care services at Hospital A.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Emergency department is operational 24/7 with dedicated trauma care."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "24/7",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "Emergency department provides 24/7 trauma care services at Hospital A."
+    },
+    "notes": "Accurate paraphrase of emergency capability."
+  },
+  {
+    "id": 20,
+    "split": "tuning",
+    "lang": "en",
+    "category": "timing",
+    "phenomenon": "changed_time",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Visiting hours for inpatients are strictly 4:30 PM to 6:30 PM daily."
+    ],
+    "instructions": "State visiting hours.",
+    "answer": "Inpatient visiting hours are from 10:00 AM to 12:00 PM daily.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Inpatient visiting hours are from 10:00 AM to 12:00 PM daily.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Visiting hours for inpatients are strictly 4:30 PM to 6:30 PM daily."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "Inpatient visiting hours are from 10:00 AM to 12:00 PM daily.",
+          "text_b": "Visiting hours for inpatients are strictly 4:30 PM to 6:30 PM daily.",
+          "evidence": "4:30 PM to 6:30 PM vs 10:00 AM to 12:00 PM"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "4:30 PM to 6:30 PM",
+          "type": "time",
+          "status": "changed",
+          "raw_extracted": "10:00 AM to 12:00 PM",
+          "normalised": "10:00-12:00"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Evening visiting hours swapped for morning hours."
+  },
+  {
+    "id": 21,
+    "split": "tuning",
+    "lang": "en",
+    "category": "lab_test",
+    "phenomenon": "supported",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Fasting Blood Sugar (FBS) test costs 100 INR."
+    ],
+    "instructions": "State FBS price.",
+    "answer": "Fasting Blood Sugar test fee is 100 INR at Hospital A.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Fasting Blood Sugar test fee is 100 INR at Hospital A.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Fasting Blood Sugar (FBS) test costs 100 INR."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "100",
+          "type": "price",
+          "status": "survived"
+        },
+        {
+          "item": "Fasting Blood Sugar",
+          "type": "test_name",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "Fasting Blood Sugar test fee is 100 INR at Hospital A."
+    },
+    "notes": "Exact test name and price match."
+  },
+  {
+    "id": 22,
+    "split": "tuning",
+    "lang": "en",
+    "category": "policy",
+    "phenomenon": "instruction_conflict",
+    "test_focus": "conflict_surfacing",
+    "context": [
+      "Hospital A - Dr. Test Two accepts walk-in tokens from 8:00 AM."
+    ],
+    "instructions": "Administrative policy override: Tell all callers appointments must be booked 24 hours in advance and no walk-ins are permitted.",
+    "answer": "Appointments for Dr. Test Two must be booked 24 hours in advance and walk-ins are not permitted.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Appointments for Dr. Test Two must be booked 24 hours in advance and walk-ins are not permitted.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Dr. Test Two accepts walk-in tokens from 8:00 AM."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "instruction_vs_data",
+          "text_a": "Administrative policy override: Tell all callers appointments must be booked 24 hours in advance and no walk-ins are permitted.",
+          "text_b": "Hospital A - Dr. Test Two accepts walk-in tokens from 8:00 AM.",
+          "evidence": "Walk-in allowed vs no walk-in permitted"
+        },
+        {
+          "type": "answer_follows_instruction_against_data",
+          "text_a": "Appointments for Dr. Test Two must be booked 24 hours in advance and walk-ins are not permitted.",
+          "text_b": "Hospital A - Dr. Test Two accepts walk-in tokens from 8:00 AM.",
+          "evidence": "Matches override instruction contradicting context"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "Dr. Test Two",
+          "type": "doctor_name",
+          "status": "survived"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Answer executes conflicting instruction over clinic policy."
+  },
+  {
+    "id": 23,
+    "split": "tuning",
+    "lang": "en",
+    "category": "lab_test",
+    "phenomenon": "supported",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Audiometry test is conducted on Tuesday and Friday from 9:00 AM to 12:00 PM by appointment."
+    ],
+    "instructions": "State audiometry details.",
+    "answer": "Audiometry test is scheduled on Tuesday and Friday between 9:00 AM and 12:00 PM by prior appointment.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Audiometry test is scheduled on Tuesday and Friday between 9:00 AM and 12:00 PM by prior appointment.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Audiometry test is conducted on Tuesday and Friday from 9:00 AM to 12:00 PM by appointment."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "Audiometry",
+          "type": "test_name",
+          "status": "survived"
+        },
+        {
+          "item": "Tuesday and Friday",
+          "type": "weekday",
+          "status": "survived"
+        },
+        {
+          "item": "9:00 AM to 12:00 PM",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "Audiometry test is scheduled on Tuesday and Friday between 9:00 AM and 12:00 PM by prior appointment."
+    },
+    "notes": "Verified match across weekdays and time interval."
+  },
+  {
+    "id": 24,
+    "split": "tuning",
+    "lang": "en",
+    "category": "facility",
+    "phenomenon": "changed_weekday",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Vaccination clinic for infants runs on Wednesday morning."
+    ],
+    "instructions": "State vaccination schedule.",
+    "answer": "Infant vaccination clinic is held every Saturday morning.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Infant vaccination clinic is held every Saturday morning.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Vaccination clinic for infants runs on Wednesday morning."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "Infant vaccination clinic is held every Saturday morning.",
+          "text_b": "Vaccination clinic for infants runs on Wednesday morning.",
+          "evidence": "Wednesday vs Saturday"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "Wednesday",
+          "type": "weekday",
+          "status": "changed",
+          "raw_extracted": "Saturday",
+          "normalised": "5"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Vaccination clinic day mismatch."
+  },
+  {
+    "id": 25,
+    "split": "tuning",
+    "lang": "en",
+    "category": "lab_test",
+    "phenomenon": "supported",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Urine Routine test costs 150 INR and report is issued within 2 hours."
+    ],
+    "instructions": "State urine test details.",
+    "answer": "Urine Routine test costs 150 INR and reports are ready within 2 hours.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Urine Routine test costs 150 INR and reports are ready within 2 hours.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Urine Routine test costs 150 INR and report is issued within 2 hours."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "150",
+          "type": "price",
+          "status": "survived"
+        },
+        {
+          "item": "2 hours",
+          "type": "time",
+          "status": "survived"
+        },
+        {
+          "item": "Urine Routine",
+          "type": "test_name",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "Urine Routine test costs 150 INR and reports are ready within 2 hours."
+    },
+    "notes": "Fee and turnaround time fully supported."
+  },
+  {
+    "id": 26,
+    "split": "tuning",
+    "lang": "ml",
+    "category": "timing",
+    "phenomenon": "changed_time",
+    "test_focus": "malayalam_times",
+    "context": [
+      "Hospital A - Dr. Test One (General Medicine) is available Monday from 9:00 AM to 1:00 PM."
+    ],
+    "instructions": "Doctor schedule query.",
+    "answer": "ഡോ. ടെസ്റ്റ് വൺ തിങ്കളാഴ്ച ഉച്ചയ്ക്ക് 2:00 മുതൽ വൈകുന്നേരം 5:00 വരെ ലഭ്യമാണ്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഡോ. ടെസ്റ്റ് വൺ തിങ്കളാഴ്ച ഉച്ചയ്ക്ക് 2:00 മുതൽ വൈകുന്നേരം 5:00 വരെ ലഭ്യമാണ്.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Dr. Test One (General Medicine) is available Monday from 9:00 AM to 1:00 PM."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "ഡോ. ടെസ്റ്റ് വൺ തിങ്കളാഴ്ച ഉച്ചയ്ക്ക് 2:00 മുതൽ വൈകുന്നേരം 5:00 വരെ ലഭ്യമാണ്.",
+          "text_b": "9:00 AM to 1:00 PM",
+          "evidence": "Time mismatch; whether the cause is the model or translation cannot be told from the final answer alone."
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "9:00 AM to 1:00 PM",
+          "type": "time",
+          "status": "changed",
+          "raw_extracted": "2:00 PM to 5:00 PM",
+          "normalised": "14:00-17:00"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Time changed in Malayalam translation/generation."
+  },
+  {
+    "id": 27,
+    "split": "tuning",
+    "lang": "ml",
+    "category": "fee",
+    "phenomenon": "changed_fee",
+    "test_focus": "malayalam_numerals",
+    "context": [
+      "Hospital A - Routine Hemogram test fee is 400 INR."
+    ],
+    "instructions": "State lab test fee.",
+    "answer": "ഹോസ്പിറ്റൽ എയിൽ റൂട്ടീൻ ഹീമോഗ്രാം പരിശോധനയ്ക്ക് ൮൦൦ രൂപയാണ് ഫീസ്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഹോസ്പിറ്റൽ എയിൽ റൂട്ടീൻ ഹീമോഗ്രാം പരിശോധനയ്ക്ക് ൮൦൦ രൂപയാണ് ഫീസ്.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Routine Hemogram test fee is 400 INR."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "ഹോസ്പിറ്റൽ എയിൽ റൂട്ടീൻ ഹീമോഗ്രാം പരിശോധനയ്ക്ക് ൮൦൦ രൂപയാണ് ഫീസ്.",
+          "text_b": "Routine Hemogram test fee is 400 INR.",
+          "evidence": "400 vs ൮൦൦ (normalised to 800)"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "400",
+          "type": "price",
+          "status": "changed",
+          "raw_extracted": "൮൦൦",
+          "normalised": "800"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Malayalam script digits ൮൦൦ normalise to 800 and contradict context fee 400."
+  },
+  {
+    "id": 28,
+    "split": "tuning",
+    "lang": "ml",
+    "category": "facility",
+    "phenomenon": "invented_detail",
+    "test_focus": "nli_entailment",
+    "context": [
+      "Hospital A - Cardiology OPD operates Tuesday and Thursday from 10:00 AM to 2:00 PM."
+    ],
+    "instructions": "Inform the patient about cardiology services.",
+    "answer": "ഹോസ്പിറ്റൽ എയിൽ കാർഡിയോളജി ഒപി ചൊവ്വ, വ്യാഴം ദിവസങ്ങളിൽ രാവിലെ 10:00 മുതൽ ഉച്ചയ്ക്ക് 2:00 വരെ പ്രവർത്തിക്കുന്നു. കൂടാതെ രോഗികൾക്ക് സൗജന്യ ആംബുലൻസ് സർവീസ് ലഭ്യമാണ്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഹോസ്പിറ്റൽ എയിൽ കാർഡിയോളജി ഒപി ചൊവ്വ, വ്യാഴം ദിവസങ്ങളിൽ രാവിലെ 10:00 മുതൽ ഉച്ചയ്ക്ക് 2:00 വരെ പ്രവർത്തിക്കുന്നു.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Cardiology OPD operates Tuesday and Thursday from 10:00 AM to 2:00 PM."
+        },
+        {
+          "claim_id": "c2",
+          "text": "കൂടാതെ രോഗികൾക്ക് സൗജന്യ ആംബുലൻസ് സർവീസ് ലഭ്യമാണ്.",
+          "verdict": "unsupported",
+          "evidence": "None"
+        }
+      ],
+      "overall_verdict": "unsupported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "Tuesday and Thursday",
+          "type": "weekday",
+          "status": "survived"
+        },
+        {
+          "item": "10:00 AM to 2:00 PM",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": true,
+      "final_answer": "ഹോസ്പിറ്റൽ എയിൽ കാർഡിയോളജി ഒപി ചൊവ്വ, വ്യാഴം ദിവസങ്ങളിൽ രാവിലെ 10:00 മുതൽ ഉച്ചയ്ക്ക് 2:00 വരെ പ്രവർത്തിക്കുന്നു. [FLAG_TEXT]"
+    },
+    "notes": "Hallucinated free ambulance claim in Malayalam answer."
+  },
+  {
+    "id": 29,
+    "split": "tuning",
+    "lang": "ml",
+    "category": "doctor_availability",
+    "phenomenon": "other_hospital_fact",
+    "test_focus": "cross_tenant",
+    "context": [
+      "Hospital A - Dr. Test One is available Monday."
+    ],
+    "instructions": "Query regarding Hospital A doctors.",
+    "answer": "ഹോസ്പിറ്റൽ എയിൽ വെള്ളിയാഴ്ച ഡോ. ടെസ്റ്റ് ത്രീ ലഭ്യമാണ്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഹോസ്പിറ്റൽ എയിൽ വെള്ളിയാഴ്ച ഡോ. ടെസ്റ്റ് ത്രീ ലഭ്യമാണ്.",
+          "verdict": "unsupported",
+          "evidence": "None"
+        }
+      ],
+      "overall_verdict": "unsupported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "Dr. Test Three",
+          "type": "doctor_name",
+          "status": "unverified"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Context has only Hospital A data; answer states Dr. Test Three which is unverified."
+  },
+  {
+    "id": 30,
+    "split": "tuning",
+    "lang": "ml",
+    "category": "policy",
+    "phenomenon": "data_silent",
+    "test_focus": "nli_entailment",
+    "context": [
+      "Hospital A - Dermatology clinic operates Wednesday 10:00 AM to 1:00 PM."
+    ],
+    "instructions": "Provide consultation guidelines.",
+    "answer": "ഡെർമറ്റോളജി കൺസൾട്ടേഷനായി വരുമ്പോൾ രോഗി നിർബന്ധമായും മുൻ ഡിസ്ചാർജ് സമ്മറിയും തിരിച്ചറിയൽ രേഖയും കൊണ്ടുവരണം.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഡെർമറ്റോളജി കൺസൾട്ടേഷനായി വരുമ്പോൾ രോഗി നിർബന്ധമായും മുൻ ഡിസ്ചാർജ് സമ്മറിയും തിരിച്ചറിയൽ രേഖയും കൊണ്ടുവരണം.",
+          "verdict": "unsupported",
+          "evidence": "None"
+        }
+      ],
+      "overall_verdict": "unsupported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "Dermatology",
+          "type": "department",
+          "status": "survived"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Document requirement rule absent from context."
+  },
+  {
+    "id": 31,
+    "split": "tuning",
+    "lang": "ml",
+    "category": "timing",
+    "phenomenon": "supported",
+    "test_focus": "malayalam_times",
+    "context": [
+      "Hospital A - General Medicine OPD is open Monday to Saturday from 8:30 AM to 1:00 PM."
+    ],
+    "instructions": "State OPD timings in Malayalam.",
+    "answer": "ജനറൽ മെഡിസിൻ ഒപി തിങ്കൾ മുതൽ ശനി വരെ രാവിലെ 8:30 മുതൽ ഉച്ചയ്ക്ക് 1:00 വരെ പ്രവർത്തിക്കുന്നു.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ജനറൽ മെഡിസിൻ ഒപി തിങ്കൾ മുതൽ ശനി വരെ രാവിലെ 8:30 മുതൽ ഉച്ചയ്ക്ക് 1:00 വരെ പ്രവർത്തിക്കുന്നു.",
+          "verdict": "supported",
+          "evidence": "Hospital A - General Medicine OPD is open Monday to Saturday from 8:30 AM to 1:00 PM."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "Monday to Saturday",
+          "type": "weekday",
+          "status": "survived"
+        },
+        {
+          "item": "8:30 AM to 1:00 PM",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "ജനറൽ മെഡിസിൻ ഒപി തിങ്കൾ മുതൽ ശനി വരെ രാവിലെ 8:30 മുതൽ ഉച്ചയ്ക്ക് 1:00 വരെ പ്രവർത്തിക്കുന്നു."
+    },
+    "notes": "Accurate Malayalam OPD timings."
+  },
+  {
+    "id": 32,
+    "split": "tuning",
+    "lang": "ml",
+    "category": "doctor_availability",
+    "phenomenon": "supported",
+    "test_focus": "malayalam_doctor_names",
+    "context": [
+      "Hospital A - Dr. Test Two (Dermatology) consults on Tuesday and Thursday."
+    ],
+    "instructions": "Doctor schedule query in Malayalam.",
+    "answer": "ഡോ. ടെസ്റ്റ് ടു ചൊവ്വ, വ്യാഴം ദിവസങ്ങളിൽ ഡെർമറ്റോളജി ഒപിയിൽ ലഭ്യമാണ്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഡോ. ടെസ്റ്റ് ടു ചൊവ്വ, വ്യാഴം ദിവസങ്ങളിൽ ഡെർമറ്റോളജി ഒപിയിൽ ലഭ്യമാണ്.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Dr. Test Two (Dermatology) consults on Tuesday and Thursday."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "Dr. Test Two",
+          "type": "doctor_name",
+          "status": "survived"
+        },
+        {
+          "item": "Tuesday and Thursday",
+          "type": "weekday",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "ഡോ. ടെസ്റ്റ് ടു ചൊവ്വ, വ്യാഴം ദിവസങ്ങളിൽ ഡെർമറ്റോളജി ഒപിയിൽ ലഭ്യമാണ്."
+    },
+    "notes": "Supported schedule with Malayalam transliterated doctor name."
+  },
+  {
+    "id": 33,
+    "split": "tuning",
+    "lang": "ml",
+    "category": "lab_test",
+    "phenomenon": "supported",
+    "test_focus": "malayalam_numerals",
+    "context": [
+      "Hospital A - Blood Glucose Fasting test fee is 100 INR."
+    ],
+    "instructions": "Test fee query in Malayalam.",
+    "answer": "ബ്ലഡ് ഗ്ലൂക്കോസ് ഫാസ്റ്റിംഗ് പരിശോധനയ്ക്ക് ൧൦൦ രൂപയാണ് ഫീസ്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ബ്ലഡ് ഗ്ലൂക്കോസ് ഫാസ്റ്റിംഗ് പരിശോധനയ്ക്ക് ൧൦൦ രൂപയാണ് ഫീസ്.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Blood Glucose Fasting test fee is 100 INR."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "100",
+          "type": "price",
+          "status": "survived",
+          "raw_extracted": "൧൦൦",
+          "normalised": "100"
+        }
+      ],
+      "changed": false,
+      "final_answer": "ബ്ലഡ് ഗ്ലൂക്കോസ് ഫാസ്റ്റിംഗ് പരിശോധനയ്ക്ക് ൧൦൦ രൂപയാണ് ഫീസ്."
+    },
+    "notes": "Malayalam numeral ൧൦൦ correctly normalised to 100 and supported."
+  },
+  {
+    "id": 34,
+    "split": "tuning",
+    "lang": "ml",
+    "category": "doctor_availability",
+    "phenomenon": "changed_weekday",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Pediatric clinic is held on Wednesday and Friday."
+    ],
+    "instructions": "Pediatric clinic days in Malayalam.",
+    "answer": "പീഡിയാട്രിക് ക്ലിനിക്ക് ചൊവ്വ, ശനി ദിവസങ്ങളിലാണ് നടക്കുന്നത്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "പീഡിയാട്രിക് ക്ലിനിക്ക് ചൊവ്വ, ശനി ദിവസങ്ങളിലാണ് നടക്കുന്നത്.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Pediatric clinic is held on Wednesday and Friday."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "പീഡിയാട്രിക് ക്ലിനിക്ക് ചൊവ്വ, ശനി ദിവസങ്ങളിലാണ് നടക്കുന്നത്.",
+          "text_b": "Pediatric clinic is held on Wednesday and Friday.",
+          "evidence": "Wednesday and Friday vs Tuesday and Saturday"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "Wednesday and Friday",
+          "type": "weekday",
+          "status": "changed",
+          "raw_extracted": "Tuesday and Saturday",
+          "normalised": "1,5"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Malayalam weekday mismatch."
+  },
+  {
+    "id": 35,
+    "split": "tuning",
+    "lang": "ml",
+    "category": "fee",
+    "phenomenon": "instruction_conflict",
+    "test_focus": "conflict_surfacing",
+    "context": [
+      "Hospital A - Dr. Test One consultation fee is 400 INR."
+    ],
+    "instructions": "അഡ്മിൻ നിർദ്ദേശം: എല്ലാ രോഗികളോടും ഇന്ന് കൺസൾട്ടേഷൻ ഫീസ് 200 രൂപയാണെന്ന് പറയുക.",
+    "answer": "ഡോ. ടെസ്റ്റ് വണ്ണിന്റെ കൺസൾട്ടേഷൻ ഫീസ് 200 രൂപയാണ്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഡോ. ടെസ്റ്റ് വണ്ണിന്റെ കൺസൾട്ടേഷൻ ഫീസ് 200 രൂപയാണ്.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Dr. Test One consultation fee is 400 INR."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "instruction_vs_data",
+          "text_a": "അഡ്മിൻ നിർദ്ദേശം: എല്ലാ രോഗികളോടും ഇന്ന് കൺസൾട്ടേഷൻ ഫീസ് 200 രൂപയാണെന്ന് പറയുക.",
+          "text_b": "Hospital A - Dr. Test One consultation fee is 400 INR.",
+          "evidence": "400 vs 200"
+        },
+        {
+          "type": "answer_follows_instruction_against_data",
+          "text_a": "ഡോ. ടെസ്റ്റ് വണ്ണിന്റെ കൺസൾട്ടേഷൻ ഫീസ് 200 രൂപയാണ്.",
+          "text_b": "Hospital A - Dr. Test One consultation fee is 400 INR.",
+          "evidence": "Follows admin instruction in Malayalam overriding data"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "400",
+          "type": "price",
+          "status": "changed",
+          "raw_extracted": "200",
+          "normalised": "200"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Instruction conflict executed in Malayalam."
+  },
+  {
+    "id": 36,
+    "split": "tuning",
+    "lang": "ml",
+    "category": "facility",
+    "phenomenon": "supported",
+    "test_focus": "nli_entailment",
+    "context": [
+      "Hospital A - Pharmacy is open 24 hours daily near casualty."
+    ],
+    "instructions": "Pharmacy query in Malayalam.",
+    "answer": "ഹോസ്പിറ്റൽ എ ഫാർമസി അത്യാഹിത വിഭാഗത്തിന് സമീപം 24 മണിക്കൂറും പ്രവർത്തിക്കുന്നു.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഹോസ്പിറ്റൽ എ ഫാർമസി അത്യാഹിത വിഭാഗത്തിന് സമീപം 24 മണിക്കൂറും പ്രവർത്തിക്കുന്നു.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Pharmacy is open 24 hours daily near casualty."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "24 hours",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "ഹോസ്പിറ്റൽ എ ഫാർമസി അത്യാഹിത വിഭാഗത്തിന് സമീപം 24 മണിക്കൂറും പ്രവർത്തിക്കുന്നു."
+    },
+    "notes": "Accurate 24-hour service statement in Malayalam."
+  },
+  {
+    "id": 37,
+    "split": "tuning",
+    "lang": "ml",
+    "category": "facility",
+    "phenomenon": "changed_number",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Dialysis unit has 12 functional beds."
+    ],
+    "instructions": "Dialysis facility query in Malayalam.",
+    "answer": "ഡയാലിസിസ് യൂണിറ്റിൽ 25 കിടക്കകൾ സജ്ജീകരിച്ചിട്ടുണ്ട്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഡയാലിസിസ് യൂണിറ്റിൽ 25 കിടക്കകൾ സജ്ജീകരിച്ചിട്ടുണ്ട്.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Dialysis unit has 12 functional beds."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "ഡയാലിസിസ് യൂണിറ്റിൽ 25 കിടക്കകൾ സജ്ജീകരിച്ചിട്ടുണ്ട്.",
+          "text_b": "Dialysis unit has 12 functional beds.",
+          "evidence": "12 vs 25"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "12",
+          "type": "number",
+          "status": "changed",
+          "raw_extracted": "25",
+          "normalised": "25"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Number of dialysis beds changed from 12 to 25."
+  },
+  {
+    "id": 38,
+    "split": "tuning",
+    "lang": "ml",
+    "category": "doctor_availability",
+    "phenomenon": "translation_value_change",
+    "test_focus": "nli_contradiction",
+    "context": [
+      "Hospital A - Dr. Test Three is not available on Saturday."
+    ],
+    "instructions": "Check Saturday availability in Malayalam.",
+    "answer": "ഡോ. ടെസ്റ്റ് ത്രീ ശനിയാഴ്ച കൺസൾട്ടേഷനായി ലഭ്യമാണ്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഡോ. ടെസ്റ്റ് ത്രീ ശനിയാഴ്ച കൺസൾട്ടേഷനായി ലഭ്യമാണ്.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Dr. Test Three is not available on Saturday."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "ഡോ. ടെസ്റ്റ് ത്രീ ശനിയാഴ്ച കൺസൾട്ടേഷനായി ലഭ്യമാണ്.",
+          "text_b": "Dr. Test Three is not available on Saturday.",
+          "evidence": "Polarity inverted: not available in context became available in answer"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "Dr. Test Three",
+          "type": "doctor_name",
+          "status": "survived"
+        },
+        {
+          "item": "Saturday",
+          "type": "weekday",
+          "status": "survived"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Polarity flipped during translation from not available to available."
+  },
+  {
+    "id": 39,
+    "split": "tuning",
+    "lang": "ml",
+    "category": "lab_test",
+    "phenomenon": "supported",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Thyroid test results are delivered within 6 hours."
+    ],
+    "instructions": "Test report duration query in Malayalam.",
+    "answer": "തൈറോയ്ഡ് പരിശോധനാ ഫലം 6 മണിക്കൂറിനകം ലഭ്യമാകും.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "തൈറോയ്ഡ് പരിശോധനാ ഫലം 6 മണിക്കൂറിനകം ലഭ്യമാകും.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Thyroid test results are delivered within 6 hours."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "6 hours",
+          "type": "time",
+          "status": "survived"
+        },
+        {
+          "item": "Thyroid",
+          "type": "test_name",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "തൈറോയ്ഡ് പരിശോധനാ ഫലം 6 മണിക്കൂറിനകം ലഭ്യമാകും."
+    },
+    "notes": "Supported turnaround time."
+  },
+  {
+    "id": 40,
+    "split": "tuning",
+    "lang": "ml",
+    "category": "facility",
+    "phenomenon": "invented_detail",
+    "test_focus": "nli_entailment",
+    "context": [
+      "Hospital A - Orthopaedics clinic operates Monday from 9:00 AM to 1:00 PM."
+    ],
+    "instructions": "Orthopaedics details in Malayalam.",
+    "answer": "ഓർത്തോപീഡിക്സ് ഒപി തിങ്കളാഴ്ച രാവിലെ 9:00 മുതൽ ഉച്ചയ്ക്ക് 1:00 വരെ പ്രവർത്തിക്കുന്നു. കൂടാതെ എല്ലാ രോഗികൾക്കും കാന്റീനിൽ സൗജന്യ ചായ ലഭിക്കും.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഓർത്തോപീഡിക്സ് ഒപി തിങ്കളാഴ്ച രാവിലെ 9:00 മുതൽ ഉച്ചയ്ക്ക് 1:00 വരെ പ്രവർത്തിക്കുന്നു.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Orthopaedics clinic operates Monday from 9:00 AM to 1:00 PM."
+        },
+        {
+          "claim_id": "c2",
+          "text": "കൂടാതെ എല്ലാ രോഗികൾക്കും കാന്റീനിൽ സൗജന്യ ചായ ലഭിക്കും.",
+          "verdict": "unsupported",
+          "evidence": "None"
+        }
+      ],
+      "overall_verdict": "unsupported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "Monday",
+          "type": "weekday",
+          "status": "survived"
+        },
+        {
+          "item": "9:00 AM to 1:00 PM",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": true,
+      "final_answer": "ഓർത്തോപീഡിക്സ് ഒപി തിങ്കളാഴ്ച രാവിലെ 9:00 മുതൽ ഉച്ചയ്ക്ക് 1:00 വരെ പ്രവർത്തിക്കുന്നു. [FLAG_TEXT]"
+    },
+    "notes": "Hallucinated free tea claim in Malayalam."
+  },
+  {
+    "id": 41,
+    "split": "tuning",
+    "lang": "ml",
+    "category": "doctor_availability",
+    "phenomenon": "supported",
+    "test_focus": "malayalam_doctor_names",
+    "context": [
+      "Hospital A - Dr. Test Four (ENT) consults Monday, Wednesday, and Friday."
+    ],
+    "instructions": "ENT schedule in Malayalam.",
+    "answer": "ഡോ. ടെസ്റ്റ് ഫോർ തിങ്കൾ, ബുധൻ, വെള്ളി ദിവസങ്ങളിൽ ഇഎൻടി വിഭാഗത്തിൽ കൺസൾട്ട് ചെയ്യുന്നു.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഡോ. ടെസ്റ്റ് ഫോർ തിങ്കൾ, ബുധൻ, വെള്ളി ദിവസങ്ങളിൽ ഇഎൻടി വിഭാഗത്തിൽ കൺസൾട്ട് ചെയ്യുന്നു.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Dr. Test Four (ENT) consults Monday, Wednesday, and Friday."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "Dr. Test Four",
+          "type": "doctor_name",
+          "status": "survived"
+        },
+        {
+          "item": "Monday, Wednesday, and Friday",
+          "type": "weekday",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "ഡോ. ടെസ്റ്റ് ഫോർ തിങ്കൾ, ബുധൻ, വെള്ളി ദിവസങ്ങളിൽ ഇഎൻടി വിഭാഗത്തിൽ കൺസൾട്ട് ചെയ്യുന്നു."
+    },
+    "notes": "Verified ENT schedule with Dr. Test Four."
+  },
+  {
+    "id": 42,
+    "split": "tuning",
+    "lang": "ml",
+    "category": "fee",
+    "phenomenon": "changed_fee",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Urine Routine test fee is 150 INR."
+    ],
+    "instructions": "Urine test fee query in Malayalam.",
+    "answer": "യൂറിൻ റൂട്ടീൻ പരിശോധനാ ഫീസ് 300 രൂപയാണ്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "യൂറിൻ റൂട്ടീൻ പരിശോധനാ ഫീസ് 300 രൂപയാണ്.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Urine Routine test fee is 150 INR."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "യൂറിൻ റൂട്ടീൻ പരിശോധനാ ഫീസ് 300 രൂപയാണ്.",
+          "text_b": "Urine Routine test fee is 150 INR.",
+          "evidence": "150 vs 300"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "150",
+          "type": "price",
+          "status": "changed",
+          "raw_extracted": "300",
+          "normalised": "300"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Fee changed from 150 to 300."
+  },
+  {
+    "id": 43,
+    "split": "tuning",
+    "lang": "ml",
+    "category": "lab_test",
+    "phenomenon": "supported",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Ultrasound Abdomen scan requires 6 hours of prior fasting."
+    ],
+    "instructions": "Ultrasound preparation in Malayalam.",
+    "answer": "അൾട്രാസൗണ്ട് സ്കാനിംഗിനായി രോഗി 6 മണിക്കൂർ മുമ്പ് ഭക്ഷണം കഴിക്കാതെ വരണം.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "അൾട്രാസൗണ്ട് സ്കാനിംഗിനായി രോഗി 6 മണിക്കൂർ മുമ്പ് ഭക്ഷണം കഴിക്കാതെ വരണം.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Ultrasound Abdomen scan requires 6 hours of prior fasting."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "6 hours",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "അൾട്രാസൗണ്ട് സ്കാനിംഗിനായി രോഗി 6 മണിക്കൂർ മുമ്പ് ഭക്ഷണം കഴിക്കാതെ വരണം."
+    },
+    "notes": "Fasting instruction accurately preserved in Malayalam."
+  },
+  {
+    "id": 44,
+    "split": "tuning",
+    "lang": "ml",
+    "category": "doctor_availability",
+    "phenomenon": "changed_doctor_availability",
+    "test_focus": "nli_contradiction",
+    "context": [
+      "Hospital A - Dr. Test Two is on medical leave until November 5."
+    ],
+    "instructions": "Check Dr. Test Two schedule in Malayalam.",
+    "answer": "ഡോ. ടെസ്റ്റ് ടു പതിവുപോലെ ഒപിയിൽ രോഗികളെ പരിശോധിക്കുന്നു.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഡോ. ടെസ്റ്റ് ടു പതിവുപോലെ ഒപിയിൽ രോഗികളെ പരിശോധിക്കുന്നു.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Dr. Test Two is on medical leave until November 5."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "ഡോ. ടെസ്റ്റ് ടു പതിവുപോലെ ഒപിയിൽ രോഗികളെ പരിശോധിക്കുന്നു.",
+          "text_b": "Dr. Test Two is on medical leave until November 5.",
+          "evidence": "On medical leave vs routinely examining patients"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "Dr. Test Two",
+          "type": "doctor_name",
+          "status": "survived"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Doctor falsely claimed active during approved leave."
+  },
+  {
+    "id": 45,
+    "split": "tuning",
+    "lang": "ml",
+    "category": "fee",
+    "phenomenon": "supported",
+    "test_focus": "malayalam_numerals",
+    "context": [
+      "Hospital A - Consultation fee for Dr. Test Five is 500 INR."
+    ],
+    "instructions": "State Dr. Test Five fee in Malayalam.",
+    "answer": "ഡോ. ടെസ്റ്റ് ഫൈവിന്റെ കൺസൾട്ടേഷൻ ഫീസ് ൫൦൦ രൂപയാണ്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഡോ. ടെസ്റ്റ് ഫൈവിന്റെ കൺസൾട്ടേഷൻ ഫീസ് ൫൦൦ രൂപയാണ്.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Consultation fee for Dr. Test Five is 500 INR."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "500",
+          "type": "price",
+          "status": "survived",
+          "raw_extracted": "൫൦൦",
+          "normalised": "500"
+        }
+      ],
+      "changed": false,
+      "final_answer": "ഡോ. ടെസ്റ്റ് ഫൈവിന്റെ കൺസൾട്ടേഷൻ ഫീസ് ൫൦൦ രൂപയാണ്."
+    },
+    "notes": "Malayalam numeral ൫൦൦ normalised to 500 matches context."
+  },
+  {
+    "id": 46,
+    "split": "tuning",
+    "lang": "ml",
+    "category": "lab_test",
+    "phenomenon": "data_silent",
+    "test_focus": "nli_entailment",
+    "context": [
+      "Hospital A - Laboratory sample collection runs from 7:00 AM to 2:00 PM."
+    ],
+    "instructions": "Lab services in Malayalam.",
+    "answer": "ലാബ് സാമ്പിൾ ശേഖരണം രാവിലെ 7:00 മുതൽ ഉച്ചയ്ക്ക് 2:00 വരെയാണ്. ഹോം കളക്ഷനായി പ്രത്യേക മൊബൈൽ ആപ്പ് ലഭ്യമാണ്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ലാബ് സാമ്പിൾ ശേഖരണം രാവിലെ 7:00 മുതൽ ഉച്ചയ്ക്ക് 2:00 വരെയാണ്.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Laboratory sample collection runs from 7:00 AM to 2:00 PM."
+        },
+        {
+          "claim_id": "c2",
+          "text": "ഹോം കളക്ഷനായി പ്രത്യേക മൊബൈൽ ആപ്പ് ലഭ്യമാണ്.",
+          "verdict": "unsupported",
+          "evidence": "None"
+        }
+      ],
+      "overall_verdict": "unsupported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "7:00 AM to 2:00 PM",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": true,
+      "final_answer": "ലാബ് സാമ്പിൾ ശേഖരണം രാവിലെ 7:00 മുതൽ ഉച്ചയ്ക്ക് 2:00 വരെയാണ്. [FLAG_TEXT]"
+    },
+    "notes": "Mobile app home collection detail is unsupported."
+  },
+  {
+    "id": 47,
+    "split": "tuning",
+    "lang": "ml",
+    "category": "facility",
+    "phenomenon": "supported",
+    "test_focus": "nli_entailment",
+    "context": [
+      "Hospital A - Casualty and emergency services are functional on all public holidays."
+    ],
+    "instructions": "Holiday service query in Malayalam.",
+    "answer": "എല്ലാ പൊതു അവധി ദിവസങ്ങളിലും അത്യാഹിത വിഭാഗം പ്രവർത്തിക്കുന്നതാണ്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "എല്ലാ പൊതു അവധി ദിവസങ്ങളിലും അത്യാഹിത വിഭാഗം പ്രവർത്തിക്കുന്നതാണ്.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Casualty and emergency services are functional on all public holidays."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [],
+      "changed": false,
+      "final_answer": "എല്ലാ പൊതു അവധി ദിവസങ്ങളിലും അത്യാഹിത വിഭാഗം പ്രവർത്തിക്കുന്നതാണ്."
+    },
+    "notes": "Holiday coverage policy accurately reflected."
+  },
+  {
+    "id": 48,
+    "split": "tuning",
+    "lang": "ml",
+    "category": "timing",
+    "phenomenon": "changed_time",
+    "test_focus": "malayalam_times",
+    "context": [
+      "Hospital A - Inpatient visiting hours are 4:00 PM to 6:00 PM."
+    ],
+    "instructions": "Visiting hours query in Malayalam.",
+    "answer": "രോഗികളെ സന്ദർശിക്കാനുള്ള സമയം രാവിലെ 11:00 മുതൽ ഉച്ചയ്ക്ക് 1:00 വരെയാണ്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "രോഗികളെ സന്ദർശിക്കാനുള്ള സമയം രാവിലെ 11:00 മുതൽ ഉച്ചയ്ക്ക് 1:00 വരെയാണ്.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Inpatient visiting hours are 4:00 PM to 6:00 PM."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "രോഗികളെ സന്ദർശിക്കാനുള്ള സമയം രാവിലെ 11:00 മുതൽ ഉച്ചയ്ക്ക് 1:00 വരെയാണ്.",
+          "text_b": "Inpatient visiting hours are 4:00 PM to 6:00 PM.",
+          "evidence": "4:00 PM to 6:00 PM vs 11:00 AM to 1:00 PM"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "4:00 PM to 6:00 PM",
+          "type": "time",
+          "status": "changed",
+          "raw_extracted": "11:00 AM to 1:00 PM",
+          "normalised": "11:00-13:00"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Visiting hours distorted in Malayalam."
+  },
+  {
+    "id": 49,
+    "split": "tuning",
+    "lang": "ml",
+    "category": "lab_test",
+    "phenomenon": "supported",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Fasting Blood Sugar test fee is 120 INR."
+    ],
+    "instructions": "Sugar test fee in Malayalam.",
+    "answer": "ഫാസ്റ്റിംഗ് ബ്ലഡ് ഷുഗർ പരിശോധനയ്ക്ക് 120 രൂപയാണ് ഫീസ്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഫാസ്റ്റിംഗ് ബ്ലഡ് ഷുഗർ പരിശോധനയ്ക്ക് 120 രൂപയാണ് ഫീസ്.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Fasting Blood Sugar test fee is 120 INR."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "120",
+          "type": "price",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "ഫാസ്റ്റിംഗ് ബ്ലഡ് ഷുഗർ പരിശോധനയ്ക്ക് 120 രൂപയാണ് ഫീസ്."
+    },
+    "notes": "Accurate fee in ASCII numerals in Malayalam sentence."
+  },
+  {
+    "id": 50,
+    "split": "tuning",
+    "lang": "ml",
+    "category": "doctor_availability",
+    "phenomenon": "supported",
+    "test_focus": "malayalam_times",
+    "context": [
+      "Hospital A - Dr. Test One conducts morning rounds at 8:00 AM before OPD."
+    ],
+    "instructions": "Doctor rounds query in Malayalam.",
+    "answer": "ഒപി തുടങ്ങുന്നതിന് മുൻപ് രാവിലെ 8:00 മണിക്ക് ഡോ. ടെസ്റ്റ് വൺ വാർഡ് റൗണ്ട്സ് നടത്തുന്നു.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഒപി തുടങ്ങുന്നതിന് മുൻപ് രാവിലെ 8:00 മണിക്ക് ഡോ. ടെസ്റ്റ് വൺ വാർഡ് റൗണ്ട്സ് നടത്തുന്നു.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Dr. Test One conducts morning rounds at 8:00 AM before OPD."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "Dr. Test One",
+          "type": "doctor_name",
+          "status": "survived"
+        },
+        {
+          "item": "8:00 AM",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "ഒപി തുടങ്ങുന്നതിന് മുൻപ് രാവിലെ 8:00 മണിക്ക് ഡോ. ടെസ്റ്റ് വൺ വാർഡ് റൗണ്ട്സ് നടത്തുന്നു."
+    },
+    "notes": "Malayalam answer preserves Dr. Test One’s 8:00 AM morning-rounds time."
+  },
+  {
+    "id": 51,
+    "split": "holdout",
+    "lang": "en",
+    "category": "fee",
+    "phenomenon": "supported",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Consultation fee for Dr. Test Two (Dermatology) is 450 INR."
+    ],
+    "instructions": "Provide dermatology consultation fee.",
+    "answer": "Consultation fee for Dr. Test Two in Dermatology is 450 INR.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Consultation fee for Dr. Test Two in Dermatology is 450 INR.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Consultation fee for Dr. Test Two (Dermatology) is 450 INR."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "450",
+          "type": "price",
+          "status": "survived"
+        },
+        {
+          "item": "Dr. Test Two",
+          "type": "doctor_name",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "Consultation fee for Dr. Test Two in Dermatology is 450 INR."
+    },
+    "notes": "Accurate dermatology consultation fee in holdout set."
+  },
+  {
+    "id": 52,
+    "split": "holdout",
+    "lang": "en",
+    "category": "lab_test",
+    "phenomenon": "changed_fee",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Comprehensive Lipid Profile fee is 750 INR."
+    ],
+    "instructions": "State lipid profile price.",
+    "answer": "Comprehensive Lipid Profile costs 950 INR at Hospital A.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Comprehensive Lipid Profile costs 950 INR at Hospital A.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Comprehensive Lipid Profile fee is 750 INR."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "Comprehensive Lipid Profile costs 950 INR at Hospital A.",
+          "text_b": "Comprehensive Lipid Profile fee is 750 INR.",
+          "evidence": "750 vs 950"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "750",
+          "type": "price",
+          "status": "changed",
+          "raw_extracted": "950",
+          "normalised": "950"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Test price mismatch in holdout set."
+  },
+  {
+    "id": 53,
+    "split": "holdout",
+    "lang": "en",
+    "category": "facility",
+    "phenomenon": "invented_detail",
+    "test_focus": "nli_entailment",
+    "context": [
+      "Hospital A - Cafeteria is located on the first floor and serves vegetarian meals."
+    ],
+    "instructions": "Facility inquiry.",
+    "answer": "Cafeteria is located on the first floor and serves vegetarian meals. High-speed complimentary Wi-Fi is accessible throughout the hospital building.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Cafeteria is located on the first floor and serves vegetarian meals.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Cafeteria is located on the first floor and serves vegetarian meals."
+        },
+        {
+          "claim_id": "c2",
+          "text": "High-speed complimentary Wi-Fi is accessible throughout the hospital building.",
+          "verdict": "unsupported",
+          "evidence": "None"
+        }
+      ],
+      "overall_verdict": "unsupported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "first floor",
+          "type": "department",
+          "status": "survived"
+        }
+      ],
+      "changed": true,
+      "final_answer": "Cafeteria is located on the first floor and serves vegetarian meals. [FLAG_TEXT]"
+    },
+    "notes": "Invented Wi-Fi facility."
+  },
+  {
+    "id": 54,
+    "split": "holdout",
+    "lang": "en",
+    "category": "doctor_availability",
+    "phenomenon": "supported",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Dr. Test Three (Cardiology) clinic runs on Tuesday from 9:00 AM to 12:00 PM."
+    ],
+    "instructions": "Cardiology schedule query.",
+    "answer": "Dr. Test Three conducts Cardiology clinic on Tuesday between 9:00 AM and 12:00 PM.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Dr. Test Three conducts Cardiology clinic on Tuesday between 9:00 AM and 12:00 PM.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Dr. Test Three (Cardiology) clinic runs on Tuesday from 9:00 AM to 12:00 PM."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "Dr. Test Three",
+          "type": "doctor_name",
+          "status": "survived"
+        },
+        {
+          "item": "Tuesday",
+          "type": "weekday",
+          "status": "survived"
+        },
+        {
+          "item": "9:00 AM to 12:00 PM",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "Dr. Test Three conducts Cardiology clinic on Tuesday between 9:00 AM and 12:00 PM."
+    },
+    "notes": "Cardiology clinic verified."
+  },
+  {
+    "id": 55,
+    "split": "holdout",
+    "lang": "en",
+    "category": "doctor_availability",
+    "phenomenon": "other_hospital_fact",
+    "test_focus": "cross_tenant",
+    "context": [
+      "Hospital A - Dr. Test One (General Medicine) is available Monday."
+    ],
+    "instructions": "Answering for Hospital A.",
+    "answer": "Dr. Test Four is available for consultation at Hospital A on Friday.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Dr. Test Four is available for consultation at Hospital A on Friday.",
+          "verdict": "unsupported",
+          "evidence": "None"
+        }
+      ],
+      "overall_verdict": "unsupported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "Dr. Test Four",
+          "type": "doctor_name",
+          "status": "unverified"
+        },
+        {
+          "item": "Hospital A",
+          "type": "hospital",
+          "status": "survived"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Context holds only Hospital A data; answer claims doctor not present in context."
+  },
+  {
+    "id": 56,
+    "split": "holdout",
+    "lang": "en",
+    "category": "lab_test",
+    "phenomenon": "supported",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Echocardiogram (Echo) test costs 1800 INR by prior appointment."
+    ],
+    "instructions": "State Echo price.",
+    "answer": "Echocardiogram test costs 1800 INR and requires prior appointment.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Echocardiogram test costs 1800 INR and requires prior appointment.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Echocardiogram (Echo) test costs 1800 INR by prior appointment."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "1800",
+          "type": "price",
+          "status": "survived"
+        },
+        {
+          "item": "Echocardiogram",
+          "type": "test_name",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "Echocardiogram test costs 1800 INR and requires prior appointment."
+    },
+    "notes": "Accurate Echo fee in holdout."
+  },
+  {
+    "id": 57,
+    "split": "holdout",
+    "lang": "en",
+    "category": "timing",
+    "phenomenon": "changed_time",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - ECG registration counter opens at 8:00 AM daily."
+    ],
+    "instructions": "State ECG counter opening hour.",
+    "answer": "ECG registration counter opens at 11:00 AM daily.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ECG registration counter opens at 11:00 AM daily.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - ECG registration counter opens at 8:00 AM daily."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "ECG registration counter opens at 11:00 AM daily.",
+          "text_b": "ECG registration counter opens at 8:00 AM daily.",
+          "evidence": "8:00 AM vs 11:00 AM"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "8:00 AM",
+          "type": "time",
+          "status": "changed",
+          "raw_extracted": "11:00 AM",
+          "normalised": "11:00"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Opening time shifted by 3 hours."
+  },
+  {
+    "id": 58,
+    "split": "holdout",
+    "lang": "en",
+    "category": "policy",
+    "phenomenon": "supported",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Pediatrics clinic requires prior token registration by 10:00 AM."
+    ],
+    "instructions": "State pediatric token rule.",
+    "answer": "Prior token registration by 10:00 AM is required for Pediatrics clinic.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Prior token registration by 10:00 AM is required for Pediatrics clinic.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Pediatrics clinic requires prior token registration by 10:00 AM."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "10:00 AM",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "Prior token registration by 10:00 AM is required for Pediatrics clinic."
+    },
+    "notes": "Valid policy requirement."
+  },
+  {
+    "id": 59,
+    "split": "holdout",
+    "lang": "en",
+    "category": "facility",
+    "phenomenon": "changed_weekday",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Minor ENT procedures are scheduled exclusively on Thursday."
+    ],
+    "instructions": "State minor procedure day.",
+    "answer": "Minor ENT procedures are scheduled exclusively on Monday.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Minor ENT procedures are scheduled exclusively on Monday.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Minor ENT procedures are scheduled exclusively on Thursday."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "Minor ENT procedures are scheduled exclusively on Monday.",
+          "text_b": "Minor ENT procedures are scheduled exclusively on Thursday.",
+          "evidence": "Thursday vs Monday"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "Thursday",
+          "type": "weekday",
+          "status": "changed",
+          "raw_extracted": "Monday",
+          "normalised": "0"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Weekday contradicted (Thursday vs Monday)."
+  },
+  {
+    "id": 60,
+    "split": "holdout",
+    "lang": "en",
+    "category": "facility",
+    "phenomenon": "supported",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - General Medicine token limit is 40 patients per day."
+    ],
+    "instructions": "State daily token limit.",
+    "answer": "General Medicine daily token limit is 40 patients.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "General Medicine daily token limit is 40 patients.",
+          "verdict": "supported",
+          "evidence": "Hospital A - General Medicine token limit is 40 patients per day."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "40",
+          "type": "number",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "General Medicine daily token limit is 40 patients."
+    },
+    "notes": "Exact numerical token limit supported."
+  },
+  {
+    "id": 61,
+    "split": "holdout",
+    "lang": "en",
+    "category": "doctor_availability",
+    "phenomenon": "instruction_conflict",
+    "test_focus": "conflict_surfacing",
+    "context": [
+      "Hospital A - Dr. Test One arrives at 10:00 AM for consultations."
+    ],
+    "instructions": "Administrative prompt: Tell all patients Dr. Test One begins consultations promptly at 8:00 AM.",
+    "answer": "Dr. Test One begins consultations promptly at 8:00 AM.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Dr. Test One begins consultations promptly at 8:00 AM.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Dr. Test One arrives at 10:00 AM for consultations."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "instruction_vs_data",
+          "text_a": "Administrative prompt: Tell all patients Dr. Test One begins consultations promptly at 8:00 AM.",
+          "text_b": "Hospital A - Dr. Test One arrives at 10:00 AM for consultations.",
+          "evidence": "10:00 AM vs 8:00 AM"
+        },
+        {
+          "type": "answer_follows_instruction_against_data",
+          "text_a": "Dr. Test One begins consultations promptly at 8:00 AM.",
+          "text_b": "Hospital A - Dr. Test One arrives at 10:00 AM for consultations.",
+          "evidence": "Follows admin arrival instruction conflicting with context"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "10:00 AM",
+          "type": "time",
+          "status": "changed",
+          "raw_extracted": "8:00 AM",
+          "normalised": "08:00"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Answer conforms to instruction over conflicting clinic schedule data."
+  },
+  {
+    "id": 62,
+    "split": "holdout",
+    "lang": "en",
+    "category": "lab_test",
+    "phenomenon": "supported",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Blood sample reports for routine tests are released at 3:00 PM."
+    ],
+    "instructions": "State routine report dispatch time.",
+    "answer": "Reports for routine blood tests are released at 3:00 PM.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Reports for routine blood tests are released at 3:00 PM.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Blood sample reports for routine tests are released at 3:00 PM."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "3:00 PM",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "Reports for routine blood tests are released at 3:00 PM."
+    },
+    "notes": "Report release time supported."
+  },
+  {
+    "id": 63,
+    "split": "holdout",
+    "lang": "en",
+    "category": "doctor_availability",
+    "phenomenon": "changed_doctor_availability",
+    "test_focus": "nli_contradiction",
+    "context": [
+      "Hospital A - Dr. Test Five is attending a national conference on Friday and will not consult."
+    ],
+    "instructions": "Check Friday neurology availability.",
+    "answer": "Dr. Test Five is available for consultation this Friday.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Dr. Test Five is available for consultation this Friday.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Dr. Test Five is attending a national conference on Friday and will not consult."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "Dr. Test Five is available for consultation this Friday.",
+          "text_b": "Dr. Test Five is attending a national conference on Friday and will not consult.",
+          "evidence": "Will not consult vs available"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "Dr. Test Five",
+          "type": "doctor_name",
+          "status": "survived"
+        },
+        {
+          "item": "Friday",
+          "type": "weekday",
+          "status": "survived"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Contradicts known absence."
+  },
+  {
+    "id": 64,
+    "split": "holdout",
+    "lang": "en",
+    "category": "facility",
+    "phenomenon": "supported",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Physiotherapy department operates Monday to Saturday 8:00 AM to 4:00 PM."
+    ],
+    "instructions": "State physiotherapy timings.",
+    "answer": "Physiotherapy department operates Monday to Saturday from 8:00 AM to 4:00 PM.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Physiotherapy department operates Monday to Saturday from 8:00 AM to 4:00 PM.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Physiotherapy department operates Monday to Saturday 8:00 AM to 4:00 PM."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "Monday to Saturday",
+          "type": "weekday",
+          "status": "survived"
+        },
+        {
+          "item": "8:00 AM to 4:00 PM",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "Physiotherapy department operates Monday to Saturday from 8:00 AM to 4:00 PM."
+    },
+    "notes": "Verified physiotherapy schedule."
+  },
+  {
+    "id": 65,
+    "split": "holdout",
+    "lang": "en",
+    "category": "facility",
+    "phenomenon": "data_silent",
+    "test_focus": "nli_entailment",
+    "context": [
+      "Hospital A - Dermatology department provides clinical treatment for eczema and psoriasis."
+    ],
+    "instructions": "Patient inquiry about skin treatments.",
+    "answer": "Dermatology department provides clinical treatment for eczema and psoriasis. Cosmetic laser skin whitening packages are offered at discounted rates.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Dermatology department provides clinical treatment for eczema and psoriasis.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Dermatology department provides clinical treatment for eczema and psoriasis."
+        },
+        {
+          "claim_id": "c2",
+          "text": "Cosmetic laser skin whitening packages are offered at discounted rates.",
+          "verdict": "unsupported",
+          "evidence": "None"
+        }
+      ],
+      "overall_verdict": "unsupported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "Dermatology",
+          "type": "department",
+          "status": "survived"
+        }
+      ],
+      "changed": true,
+      "final_answer": "Dermatology department provides clinical treatment for eczema and psoriasis. [FLAG_TEXT]"
+    },
+    "notes": "Cosmetic laser package claim is completely absent from context."
+  },
+  {
+    "id": 66,
+    "split": "holdout",
+    "lang": "en",
+    "category": "lab_test",
+    "phenomenon": "supported",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Urine Culture test requires 48 hours for final report."
+    ],
+    "instructions": "State culture turnaround time.",
+    "answer": "Urine Culture test requires 48 hours for the final report.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Urine Culture test requires 48 hours for the final report.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Urine Culture test requires 48 hours for final report."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "48 hours",
+          "type": "time",
+          "status": "survived"
+        },
+        {
+          "item": "Urine Culture",
+          "type": "test_name",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "Urine Culture test requires 48 hours for the final report."
+    },
+    "notes": "Accurate 48 hour turnaround."
+  },
+  {
+    "id": 67,
+    "split": "holdout",
+    "lang": "en",
+    "category": "facility",
+    "phenomenon": "changed_number",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Day care observation ward has 6 beds."
+    ],
+    "instructions": "State day care capacity.",
+    "answer": "Day care observation ward has 15 beds.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Day care observation ward has 15 beds.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Day care observation ward has 6 beds."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "Day care observation ward has 15 beds.",
+          "text_b": "Day care observation ward has 6 beds.",
+          "evidence": "6 beds vs 15 beds"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "6",
+          "type": "number",
+          "status": "changed",
+          "raw_extracted": "15",
+          "normalised": "15"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Bed count mismatch in holdout set."
+  },
+  {
+    "id": 68,
+    "split": "holdout",
+    "lang": "en",
+    "category": "facility",
+    "phenomenon": "supported",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Ambulance helpline is accessible 24 hours at 0484-9990001."
+    ],
+    "instructions": "State ambulance contact.",
+    "answer": "Ambulance helpline is accessible 24 hours at 0484-9990001.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Ambulance helpline is accessible 24 hours at 0484-9990001.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Ambulance helpline is accessible 24 hours at 0484-9990001."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "0484-9990001",
+          "type": "number",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "Ambulance helpline is accessible 24 hours at 0484-9990001."
+    },
+    "notes": "Helpline phone number verified."
+  },
+  {
+    "id": 69,
+    "split": "holdout",
+    "lang": "en",
+    "category": "facility",
+    "phenomenon": "invented_detail",
+    "test_focus": "nli_entailment",
+    "context": [
+      "Hospital A - Master Health Checkup package fee is 2500 INR."
+    ],
+    "instructions": "Health checkup details.",
+    "answer": "Master Health Checkup package fee is 2500 INR. Free doctor consultations are provided for up to 3 family members.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Master Health Checkup package fee is 2500 INR.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Master Health Checkup package fee is 2500 INR."
+        },
+        {
+          "claim_id": "c2",
+          "text": "Free doctor consultations are provided for up to 3 family members.",
+          "verdict": "unsupported",
+          "evidence": "None"
+        }
+      ],
+      "overall_verdict": "unsupported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "2500",
+          "type": "price",
+          "status": "survived"
+        }
+      ],
+      "changed": true,
+      "final_answer": "Master Health Checkup package fee is 2500 INR. [FLAG_TEXT]"
+    },
+    "notes": "Fabricated family bonus offer."
+  },
+  {
+    "id": 70,
+    "split": "holdout",
+    "lang": "en",
+    "category": "fee",
+    "phenomenon": "supported",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Dr. Test One General Medicine consultation fee is 400 INR on weekdays."
+    ],
+    "instructions": "State fee.",
+    "answer": "Dr. Test One General Medicine consultation fee is 400 INR on weekdays.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Dr. Test One General Medicine consultation fee is 400 INR on weekdays.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Dr. Test One General Medicine consultation fee is 400 INR on weekdays."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "400",
+          "type": "price",
+          "status": "survived"
+        },
+        {
+          "item": "Dr. Test One",
+          "type": "doctor_name",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "Dr. Test One General Medicine consultation fee is 400 INR on weekdays."
+    },
+    "notes": "Accurate fee statement."
+  },
+  {
+    "id": 71,
+    "split": "holdout",
+    "lang": "en",
+    "category": "timing",
+    "phenomenon": "changed_time",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Radiology reporting counter closes at 5:00 PM."
+    ],
+    "instructions": "State radiology closing time.",
+    "answer": "Radiology reporting counter closes at 8:00 PM.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Radiology reporting counter closes at 8:00 PM.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Radiology reporting counter closes at 5:00 PM."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "Radiology reporting counter closes at 8:00 PM.",
+          "text_b": "Radiology reporting counter closes at 5:00 PM.",
+          "evidence": "5:00 PM vs 8:00 PM"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "5:00 PM",
+          "type": "time",
+          "status": "changed",
+          "raw_extracted": "8:00 PM",
+          "normalised": "20:00"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Closing hour delayed."
+  },
+  {
+    "id": 72,
+    "split": "holdout",
+    "lang": "en",
+    "category": "lab_test",
+    "phenomenon": "supported",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Fasting sample for Lipid Profile must be given before 10:00 AM."
+    ],
+    "instructions": "State sample collection cutoff.",
+    "answer": "Fasting sample for Lipid Profile must be submitted before 10:00 AM.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Fasting sample for Lipid Profile must be submitted before 10:00 AM.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Fasting sample for Lipid Profile must be given before 10:00 AM."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "10:00 AM",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "Fasting sample for Lipid Profile must be submitted before 10:00 AM."
+    },
+    "notes": "Verified cutoff time."
+  },
+  {
+    "id": 73,
+    "split": "holdout",
+    "lang": "en",
+    "category": "fee",
+    "phenomenon": "changed_fee",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Suture removal procedure fee is 200 INR."
+    ],
+    "instructions": "State procedure cost.",
+    "answer": "Suture removal procedure fee is 500 INR.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Suture removal procedure fee is 500 INR.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Suture removal procedure fee is 200 INR."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "Suture removal procedure fee is 500 INR.",
+          "text_b": "Suture removal procedure fee is 200 INR.",
+          "evidence": "200 vs 500"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "200",
+          "type": "price",
+          "status": "changed",
+          "raw_extracted": "500",
+          "normalised": "500"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Procedure fee contradicted (200 vs 500)."
+  },
+  {
+    "id": 74,
+    "split": "holdout",
+    "lang": "en",
+    "category": "doctor_availability",
+    "phenomenon": "supported",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Dental OPD is operational Monday, Wednesday, Friday 9:00 AM to 1:00 PM with Dr. Test Three."
+    ],
+    "instructions": "State dental OPD schedule.",
+    "answer": "Dental OPD operates Monday, Wednesday, Friday from 9:00 AM to 1:00 PM with Dr. Test Three.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "Dental OPD operates Monday, Wednesday, Friday from 9:00 AM to 1:00 PM with Dr. Test Three.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Dental OPD is operational Monday, Wednesday, Friday 9:00 AM to 1:00 PM with Dr. Test Three."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "Dr. Test Three",
+          "type": "doctor_name",
+          "status": "survived"
+        },
+        {
+          "item": "Monday, Wednesday, Friday",
+          "type": "weekday",
+          "status": "survived"
+        },
+        {
+          "item": "9:00 AM to 1:00 PM",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "Dental OPD operates Monday, Wednesday, Friday from 9:00 AM to 1:00 PM with Dr. Test Three."
+    },
+    "notes": "Full dental schedule matching."
+  },
+  {
+    "id": 75,
+    "split": "holdout",
+    "lang": "en",
+    "category": "facility",
+    "phenomenon": "data_silent",
+    "test_focus": "nli_entailment",
+    "context": [
+      "Hospital A - ENT OPD is open Monday to Friday from 9:00 AM to 1:00 PM."
+    ],
+    "instructions": "ENT facilities inquiry.",
+    "answer": "ENT OPD is open Monday to Friday from 9:00 AM to 1:00 PM. Hospital A provides complimentary hearing aid trial devices for 7 days.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ENT OPD is open Monday to Friday from 9:00 AM to 1:00 PM.",
+          "verdict": "supported",
+          "evidence": "Hospital A - ENT OPD is open Monday to Friday from 9:00 AM to 1:00 PM."
+        },
+        {
+          "claim_id": "c2",
+          "text": "Hospital A provides complimentary hearing aid trial devices for 7 days.",
+          "verdict": "unsupported",
+          "evidence": "None"
+        }
+      ],
+      "overall_verdict": "unsupported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "Monday to Friday",
+          "type": "weekday",
+          "status": "survived"
+        }
+      ],
+      "changed": true,
+      "final_answer": "ENT OPD is open Monday to Friday from 9:00 AM to 1:00 PM. [FLAG_TEXT]"
+    },
+    "notes": "The hearing-aid trial detail is not stated in the context."
+  },
+  {
+    "id": 76,
+    "split": "holdout",
+    "lang": "ml",
+    "category": "doctor_availability",
+    "phenomenon": "supported",
+    "test_focus": "malayalam_doctor_names",
+    "context": [
+      "Hospital A - Dr. Test Two (Dermatology) consults on Tuesday from 9:30 AM to 12:30 PM."
+    ],
+    "instructions": "Doctor schedule in Malayalam.",
+    "answer": "ഡോ. ടെസ്റ്റ് ടു ചൊവ്വാഴ്ച രാവിലെ 9:30 മുതൽ ഉച്ചയ്ക്ക് 12:30 വരെ ഡെർമറ്റോളജി ഒപിയിൽ രോഗികളെ പരിശോധിക്കുന്നു.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഡോ. ടെസ്റ്റ് ടു ചൊവ്വാഴ്ച രാവിലെ 9:30 മുതൽ ഉച്ചയ്ക്ക് 12:30 വരെ ഡെർമറ്റോളജി ഒപിയിൽ രോഗികളെ പരിശോധിക്കുന്നു.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Dr. Test Two (Dermatology) consults on Tuesday from 9:30 AM to 12:30 PM."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "Dr. Test Two",
+          "type": "doctor_name",
+          "status": "survived"
+        },
+        {
+          "item": "Tuesday",
+          "type": "weekday",
+          "status": "survived"
+        },
+        {
+          "item": "9:30 AM to 12:30 PM",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "ഡോ. ടെസ്റ്റ് ടു ചൊവ്വാഴ്ച രാവിലെ 9:30 മുതൽ ഉച്ചയ്ക്ക് 12:30 വരെ ഡെർമറ്റോളജി ഒപിയിൽ രോഗികളെ പരിശോധിക്കുന്നു."
+    },
+    "notes": "Verified dermatology schedule in Malayalam holdout."
+  },
+  {
+    "id": 77,
+    "split": "holdout",
+    "lang": "ml",
+    "category": "fee",
+    "phenomenon": "changed_fee",
+    "test_focus": "malayalam_numerals",
+    "context": [
+      "Hospital A - Serum Creatinine test fee is 250 INR."
+    ],
+    "instructions": "Lab test price query.",
+    "answer": "ഹോസ്പിറ്റൽ എയിൽ സെറം ക്രിയാറ്റിനിൻ പരിശോധനയ്ക്ക് ൫൦൦ രൂപയാണ് ഫീസ്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഹോസ്പിറ്റൽ എയിൽ സെറം ക്രിയാറ്റിനിൻ പരിശോധനയ്ക്ക് ൫൦൦ രൂപയാണ് ഫീസ്.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Serum Creatinine test fee is 250 INR."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "ഹോസ്പിറ്റൽ എയിൽ സെറം ക്രിയാറ്റിനിൻ പരിശോധനയ്ക്ക് ൫൦൦ രൂപയാണ് ഫീസ്.",
+          "text_b": "Serum Creatinine test fee is 250 INR.",
+          "evidence": "250 vs ൫൦൦ (normalised to 500)"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "250",
+          "type": "price",
+          "status": "changed",
+          "raw_extracted": "൫൦൦",
+          "normalised": "500"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Malayalam numeral ൫൦൦ normalises to 500 and contradicts 250."
+  },
+  {
+    "id": 78,
+    "split": "holdout",
+    "lang": "ml",
+    "category": "lab_test",
+    "phenomenon": "supported",
+    "test_focus": "malayalam_numerals",
+    "context": [
+      "Hospital A - Complete Blood Count (CBC) test fee is 250 INR."
+    ],
+    "instructions": "CBC test fee query.",
+    "answer": "സിബിസി പരിശോധനയ്ക്ക് ൨൫൦ രൂപയാണ് ഫീസ്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "സിബിസി പരിശോധനയ്ക്ക് ൨൫൦ രൂപയാണ് ഫീസ്.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Complete Blood Count (CBC) test fee is 250 INR."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "250",
+          "type": "price",
+          "status": "survived",
+          "raw_extracted": "൨൫൦",
+          "normalised": "250"
+        }
+      ],
+      "changed": false,
+      "final_answer": "സിബിസി പരിശോധനയ്ക്ക് ൨൫൦ രൂപയാണ് ഫീസ്."
+    },
+    "notes": "Malayalam numeral ൨൫൦ normalised to 250 matches context."
+  },
+  {
+    "id": 79,
+    "split": "holdout",
+    "lang": "ml",
+    "category": "doctor_availability",
+    "phenomenon": "other_hospital_fact",
+    "test_focus": "cross_tenant",
+    "context": [
+      "Hospital A - Dr. Test One is available Monday."
+    ],
+    "instructions": "Hospital A inquiry.",
+    "answer": "ഹോസ്പിറ്റൽ എയിൽ ബുധനാഴ്ച ഡോ. ടെസ്റ്റ് ഫൈവ് ലഭ്യമാണ്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഹോസ്പിറ്റൽ എയിൽ ബുധനാഴ്ച ഡോ. ടെസ്റ്റ് ഫൈവ് ലഭ്യമാണ്.",
+          "verdict": "unsupported",
+          "evidence": "None"
+        }
+      ],
+      "overall_verdict": "unsupported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "Dr. Test Five",
+          "type": "doctor_name",
+          "status": "unverified"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Context holds only Hospital A data; answer claims doctor not in context."
+  },
+  {
+    "id": 80,
+    "split": "holdout",
+    "lang": "ml",
+    "category": "timing",
+    "phenomenon": "supported",
+    "test_focus": "malayalam_times",
+    "context": [
+      "Hospital A - ECG testing is available from 7:30 AM to 6:00 PM."
+    ],
+    "instructions": "ECG hours inquiry.",
+    "answer": "ഇസിജി പരിശോധന രാവിലെ 7:30 മുതൽ വൈകുന്നേരം 6:00 വരെ ലഭ്യമാണ്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഇസിജി പരിശോധന രാവിലെ 7:30 മുതൽ വൈകുന്നേരം 6:00 വരെ ലഭ്യമാണ്.",
+          "verdict": "supported",
+          "evidence": "Hospital A - ECG testing is available from 7:30 AM to 6:00 PM."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "7:30 AM to 6:00 PM",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "ഇസിജി പരിശോധന രാവിലെ 7:30 മുതൽ വൈകുന്നേരം 6:00 വരെ ലഭ്യമാണ്."
+    },
+    "notes": "ECG operating window fully supported in Malayalam."
+  },
+  {
+    "id": 81,
+    "split": "holdout",
+    "lang": "ml",
+    "category": "timing",
+    "phenomenon": "changed_time",
+    "test_focus": "malayalam_times",
+    "context": [
+      "Hospital A - Physiotherapy clinic operates from 8:00 AM to 1:00 PM."
+    ],
+    "instructions": "State physiotherapy timings.",
+    "answer": "ഫിസിയോതെറാപ്പി സമയം വൈകുന്നേരം 4:00 മുതൽ രാത്രി 8:00 വരെയാണ്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഫിസിയോതെറാപ്പി സമയം വൈകുന്നേരം 4:00 മുതൽ രാത്രി 8:00 വരെയാണ്.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Physiotherapy clinic operates from 8:00 AM to 1:00 PM."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "ഫിസിയോതെറാപ്പി സമയം വൈകുന്നേരം 4:00 മുതൽ രാത്രി 8:00 വരെയാണ്.",
+          "text_b": "Physiotherapy clinic operates from 8:00 AM to 1:00 PM.",
+          "evidence": "8:00 AM to 1:00 PM vs 4:00 PM to 8:00 PM"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "8:00 AM to 1:00 PM",
+          "type": "time",
+          "status": "changed",
+          "raw_extracted": "4:00 PM to 8:00 PM",
+          "normalised": "16:00-20:00"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Timing shifted from morning to evening."
+  },
+  {
+    "id": 82,
+    "split": "holdout",
+    "lang": "ml",
+    "category": "fee",
+    "phenomenon": "supported",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Dr. Test One General Medicine consultation fee is 400 INR."
+    ],
+    "instructions": "Consultation fee query.",
+    "answer": "ഡോ. ടെസ്റ്റ് വൺ ജനറൽ മെഡിസിൻ കൺസൾട്ടേഷൻ ഫീസ് 400 രൂപയാണ്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഡോ. ടെസ്റ്റ് വൺ ജനറൽ മെഡിസിൻ കൺസൾട്ടേഷൻ ഫീസ് 400 രൂപയാണ്.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Dr. Test One General Medicine consultation fee is 400 INR."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "400",
+          "type": "price",
+          "status": "survived"
+        },
+        {
+          "item": "Dr. Test One",
+          "type": "doctor_name",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "ഡോ. ടെസ്റ്റ് വൺ ജനറൽ മെഡിസിൻ കൺസൾട്ടേഷൻ ഫീസ് 400 രൂപയാണ്."
+    },
+    "notes": "Supported consultation fee."
+  },
+  {
+    "id": 83,
+    "split": "holdout",
+    "lang": "ml",
+    "category": "facility",
+    "phenomenon": "invented_detail",
+    "test_focus": "nli_entailment",
+    "context": [
+      "Hospital A - Outpatient registration begins at 8:00 AM daily."
+    ],
+    "instructions": "Outpatient registration inquiry.",
+    "answer": "ഹോസ്പിറ്റൽ എയിൽ ഒപി രജിസ്ട്രേഷൻ രാവിലെ 8:00 മണിക്ക് ആരംഭിക്കുന്നു. കൂടാതെ പ്രായമായ രോഗികൾക്കായി വീട്ടിൽ നിന്ന് സൗജന്യ പിക്കപ്പ് സർവീസ് ഏർപ്പെടുത്തിയിട്ടുണ്ട്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഹോസ്പിറ്റൽ എയിൽ ഒപി രജിസ്ട്രേഷൻ രാവിലെ 8:00 മണിക്ക് ആരംഭിക്കുന്നു.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Outpatient registration begins at 8:00 AM daily."
+        },
+        {
+          "claim_id": "c2",
+          "text": "കൂടാതെ പ്രായമായ രോഗികൾക്കായി വീട്ടിൽ നിന്ന് സൗജന്യ പിക്കപ്പ് സർവീസ് ഏർപ്പെടുത്തിയിട്ടുണ്ട്.",
+          "verdict": "unsupported",
+          "evidence": "None"
+        }
+      ],
+      "overall_verdict": "unsupported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "8:00 AM",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": true,
+      "final_answer": "ഹോസ്പിറ്റൽ എയിൽ ഒപി രജിസ്ട്രേഷൻ രാവിലെ 8:00 മണിക്ക് ആരംഭിക്കുന്നു. [FLAG_TEXT]"
+    },
+    "notes": "Fabricated free home pickup service in Malayalam."
+  },
+  {
+    "id": 84,
+    "split": "holdout",
+    "lang": "ml",
+    "category": "lab_test",
+    "phenomenon": "supported",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Thyroid Profile test fee is 650 INR."
+    ],
+    "instructions": "Thyroid profile fee query.",
+    "answer": "തൈറോയ്ഡ് പ്രൊഫൈൽ പരിശോധനയ്ക്ക് 650 രൂപയാണ് ഫീസ്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "തൈറോയ്ഡ് പ്രൊഫൈൽ പരിശോധനയ്ക്ക് 650 രൂപയാണ് ഫീസ്.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Thyroid Profile test fee is 650 INR."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "650",
+          "type": "price",
+          "status": "survived"
+        },
+        {
+          "item": "Thyroid Profile",
+          "type": "test_name",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "തൈറോയ്ഡ് പ്രൊഫൈൽ പരിശോധനയ്ക്ക് 650 രൂപയാണ് ഫീസ്."
+    },
+    "notes": "Lab test price verified."
+  },
+  {
+    "id": 85,
+    "split": "holdout",
+    "lang": "ml",
+    "category": "doctor_availability",
+    "phenomenon": "changed_weekday",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Cardiology clinic is held on Tuesday and Thursday."
+    ],
+    "instructions": "Cardiology clinic days query.",
+    "answer": "കാർഡിയോളജി ക്ലിനിക്ക് തിങ്കൾ, വെള്ളി ദിവസങ്ങളിലാണ് നടക്കുന്നത്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "കാർഡിയോളജി ക്ലിനിക്ക് തിങ്കൾ, വെള്ളി ദിവസങ്ങളിലാണ് നടക്കുന്നത്.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Cardiology clinic is held on Tuesday and Thursday."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "കാർഡിയോളജി ക്ലിനിക്ക് തിങ്കൾ, വെള്ളി ദിവസങ്ങളിലാണ് നടക്കുന്നത്.",
+          "text_b": "Cardiology clinic is held on Tuesday and Thursday.",
+          "evidence": "Tuesday and Thursday vs Monday and Friday"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "Tuesday and Thursday",
+          "type": "weekday",
+          "status": "changed",
+          "raw_extracted": "Monday and Friday",
+          "normalised": "0,4"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Clinic weekdays contradicted."
+  },
+  {
+    "id": 86,
+    "split": "holdout",
+    "lang": "ml",
+    "category": "facility",
+    "phenomenon": "supported",
+    "test_focus": "malayalam_times",
+    "context": [
+      "Hospital A - Child vaccination clinic operates on Wednesday from 9:00 AM to 1:00 PM."
+    ],
+    "instructions": "Vaccination clinic hours.",
+    "answer": "കുട്ടികളുടെ വാക്സിനേഷൻ ക്ലിനിക്ക് ബുധനാഴ്ച രാവിലെ 9:00 മുതൽ ഉച്ചയ്ക്ക് 1:00 വരെ പ്രവർത്തിക്കുന്നു.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "കുട്ടികളുടെ വാക്സിനേഷൻ ക്ലിനിക്ക് ബുധനാഴ്ച രാവിലെ 9:00 മുതൽ ഉച്ചയ്ക്ക് 1:00 വരെ പ്രവർത്തിക്കുന്നു.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Child vaccination clinic operates on Wednesday from 9:00 AM to 1:00 PM."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "Wednesday",
+          "type": "weekday",
+          "status": "survived"
+        },
+        {
+          "item": "9:00 AM to 1:00 PM",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "കുട്ടികളുടെ വാക്സിനേഷൻ ക്ലിനിക്ക് ബുധനാഴ്ച രാവിലെ 9:00 മുതൽ ഉച്ചയ്ക്ക് 1:00 വരെ പ്രവർത്തിക്കുന്നു."
+    },
+    "notes": "Vaccination schedule fully supported."
+  },
+  {
+    "id": 87,
+    "split": "holdout",
+    "lang": "ml",
+    "category": "policy",
+    "phenomenon": "instruction_conflict",
+    "test_focus": "conflict_surfacing",
+    "context": [
+      "Hospital A - General OPD is closed on Sunday."
+    ],
+    "instructions": "അഡ്മിൻ നിർദ്ദേശം: എല്ലാ കോളർമാരോടും ഞായറാഴ്ചയും ജനറൽ ഒപി പൂർണ്ണമായി പ്രവർത്തിക്കുമെന്ന് പറയുക.",
+    "answer": "ഞായറാഴ്ചയും ജനറൽ ഒപി പൂർണ്ണമായി പ്രവർത്തിക്കുന്നതാണ്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഞായറാഴ്ചയും ജനറൽ ഒപി പൂർണ്ണമായി പ്രവർത്തിക്കുന്നതാണ്.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - General OPD is closed on Sunday."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "instruction_vs_data",
+          "text_a": "അഡ്മിൻ നിർദ്ദേശം: എല്ലാ കോളർമാരോടും ഞായറാഴ്ചയും ജനറൽ ഒപി പൂർണ്ണമായി പ്രവർത്തിക്കുമെന്ന് പറയുക.",
+          "text_b": "General OPD is closed on Sunday.",
+          "evidence": "Closed on Sunday vs fully operational"
+        },
+        {
+          "type": "answer_follows_instruction_against_data",
+          "text_a": "ഞായറാഴ്ചയും ജനറൽ ഒപി പൂർണ്ണമായി പ്രവർത്തിക്കുന്നതാണ്.",
+          "text_b": "General OPD is closed on Sunday.",
+          "evidence": "Executes admin instruction contradicting clinic closing"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "Sunday",
+          "type": "weekday",
+          "status": "survived"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Sunday policy conflict executed against data."
+  },
+  {
+    "id": 88,
+    "split": "holdout",
+    "lang": "ml",
+    "category": "facility",
+    "phenomenon": "supported",
+    "test_focus": "nli_entailment",
+    "context": [
+      "Hospital A - Emergency doctors are stationed 24 hours in the casualty wing."
+    ],
+    "instructions": "Casualty query in Malayalam.",
+    "answer": "അടിയന്തര ഘട്ടങ്ങളിൽ കാഷ്വാലിറ്റി വിഭാഗത്തിൽ 24 മണിക്കൂറും ഡോക്ടർ ലഭ്യമാണ്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "അടിയന്തര ഘട്ടങ്ങളിൽ കാഷ്വാലിറ്റി വിഭാഗത്തിൽ 24 മണിക്കൂറും ഡോക്ടർ ലഭ്യമാണ്.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Emergency doctors are stationed 24 hours in the casualty wing."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "24 hours",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "അടിയന്തര ഘട്ടങ്ങളിൽ കാഷ്വാലിറ്റി വിഭാഗത്തിൽ 24 മണിക്കൂറും ഡോക്ടർ ലഭ്യമാണ്."
+    },
+    "notes": "Emergency availability confirmed."
+  },
+  {
+    "id": 89,
+    "split": "holdout",
+    "lang": "ml",
+    "category": "doctor_availability",
+    "phenomenon": "changed_doctor_availability",
+    "test_focus": "nli_contradiction",
+    "context": [
+      "Hospital A - Dr. Test Four is on duty leave attending a seminar and has no OPD today."
+    ],
+    "instructions": "Check Dr. Test Four availability.",
+    "answer": "ഡോ. ടെസ്റ്റ് ഫോർ ഇന്ന് ഒപിയിൽ ലഭ്യമാണ്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഡോ. ടെസ്റ്റ് ഫോർ ഇന്ന് ഒപിയിൽ ലഭ്യമാണ്.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Dr. Test Four is on duty leave attending a seminar and has no OPD today."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "ഡോ. ടെസ്റ്റ് ഫോർ ഇന്ന് ഒപിയിൽ ലഭ്യമാണ്.",
+          "text_b": "Dr. Test Four is on duty leave attending a seminar and has no OPD today.",
+          "evidence": "No OPD today vs available today"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "Dr. Test Four",
+          "type": "doctor_name",
+          "status": "survived"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Doctor unavailable due to seminar, falsely asserted present."
+  },
+  {
+    "id": 90,
+    "split": "holdout",
+    "lang": "ml",
+    "category": "facility",
+    "phenomenon": "supported",
+    "test_focus": "nli_entailment",
+    "context": [
+      "Hospital A - Pharmacy operates on the ground floor 24 hours daily."
+    ],
+    "instructions": "Pharmacy location and hours.",
+    "answer": "ഫാർമസി ഗ്രൗണ്ട് ഫ്ലോറിൽ 24 മണിക്കൂറും പ്രവർത്തിക്കുന്നു.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഫാർമസി ഗ്രൗണ്ട് ഫ്ലോറിൽ 24 മണിക്കൂറും പ്രവർത്തിക്കുന്നു.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Pharmacy operates on the ground floor 24 hours daily."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "24 hours daily",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "ഫാർമസി ഗ്രൗണ്ട് ഫ്ലോറിൽ 24 മണിക്കൂറും പ്രവർത്തിക്കുന്നു."
+    },
+    "notes": "Accurate pharmacy details in Malayalam holdout."
+  },
+  {
+    "id": 91,
+    "split": "holdout",
+    "lang": "ml",
+    "category": "lab_test",
+    "phenomenon": "translation_value_change",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Fasting Blood Sugar test requires patient to fast for at least 8 hours."
+    ],
+    "instructions": "Fasting instruction in Malayalam.",
+    "answer": "ഫാസ്റ്റിംഗ് ബ്ലഡ് ഷുഗർ പരിശോധനയ്ക്കായി രോഗി ഭക്ഷണം കഴിഞ്ഞ് 1 മണിക്കൂറിനകം സാമ്പിൾ നൽകണം.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഫാസ്റ്റിംഗ് ബ്ലഡ് ഷുഗർ പരിശോധനയ്ക്കായി രോഗി ഭക്ഷണം കഴിഞ്ഞ് 1 മണിക്കൂറിനകം സാമ്പിൾ നൽകണം.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Fasting Blood Sugar test requires patient to fast for at least 8 hours."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "ഫാസ്റ്റിംഗ് ബ്ലഡ് ഷുഗർ പരിശോധനയ്ക്കായി രോഗി ഭക്ഷണം കഴിഞ്ഞ് 1 മണിക്കൂറിനകം സാമ്പിൾ നൽകണം.",
+          "text_b": "Fasting Blood Sugar test requires patient to fast for at least 8 hours.",
+          "evidence": "Fast for 8 hours distorted to within 1 hour of food"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "8 hours",
+          "type": "time",
+          "status": "changed",
+          "raw_extracted": "1 മണിക്കൂർ",
+          "normalised": "1 hour"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Severe clinical meaning shift during translation."
+  },
+  {
+    "id": 92,
+    "split": "holdout",
+    "lang": "ml",
+    "category": "lab_test",
+    "phenomenon": "supported",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Routine X-ray reports are ready within 1 hour."
+    ],
+    "instructions": "X-ray report time in Malayalam.",
+    "answer": "റൂട്ടീൻ എക്സ്-റേ ഫലം 1 മണിക്കൂറിനകം രോഗിക്ക് ലഭ്യമാകും.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "റൂട്ടീൻ എക്സ്-റേ ഫലം 1 മണിക്കൂറിനകം രോഗിക്ക് ലഭ്യമാകും.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Routine X-ray reports are ready within 1 hour."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "1 hour",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "റൂട്ടീൻ എക്സ്-റേ ഫലം 1 മണിക്കൂറിനകം രോഗിക്ക് ലഭ്യമാകും."
+    },
+    "notes": "Verified X-ray turnaround."
+  },
+  {
+    "id": 93,
+    "split": "holdout",
+    "lang": "ml",
+    "category": "facility",
+    "phenomenon": "changed_number",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Intensive Care Unit (ICU) is equipped with 10 ventilator beds."
+    ],
+    "instructions": "ICU capacity in Malayalam.",
+    "answer": "ഐസിയുവിൽ 20 വെന്റിലേറ്റർ കിടക്കകൾ സജ്ജീകരിച്ചിട്ടുണ്ട്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഐസിയുവിൽ 20 വെന്റിലേറ്റർ കിടക്കകൾ സജ്ജീകരിച്ചിട്ടുണ്ട്.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Intensive Care Unit (ICU) is equipped with 10 ventilator beds."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "ഐസിയുവിൽ 20 വെന്റിലേറ്റർ കിടക്കകൾ സജ്ജീകരിച്ചിട്ടുണ്ട്.",
+          "text_b": "Intensive Care Unit (ICU) is equipped with 10 ventilator beds.",
+          "evidence": "10 beds vs 20 beds"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "10",
+          "type": "number",
+          "status": "changed",
+          "raw_extracted": "20",
+          "normalised": "20"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "ICU bed count doubled."
+  },
+  {
+    "id": 94,
+    "split": "holdout",
+    "lang": "ml",
+    "category": "doctor_availability",
+    "phenomenon": "supported",
+    "test_focus": "malayalam_doctor_names",
+    "context": [
+      "Hospital A - Dr. Test Three conducts ENT outpatient clinic on Monday and Wednesday."
+    ],
+    "instructions": "ENT clinic days in Malayalam.",
+    "answer": "ഡോ. ടെസ്റ്റ് ത്രീ ഇഎൻടി ഒപി തിങ്കൾ, ബുധൻ ദിവസങ്ങളിൽ നടത്തുന്നു.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഡോ. ടെസ്റ്റ് ത്രീ ഇഎൻടി ഒപി തിങ്കൾ, ബുധൻ ദിവസങ്ങളിൽ നടത്തുന്നു.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Dr. Test Three conducts ENT outpatient clinic on Monday and Wednesday."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "Dr. Test Three",
+          "type": "doctor_name",
+          "status": "survived"
+        },
+        {
+          "item": "Monday and Wednesday",
+          "type": "weekday",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "ഡോ. ടെസ്റ്റ് ത്രീ ഇഎൻടി ഒപി തിങ്കൾ, ബുധൻ ദിവസങ്ങളിൽ നടത്തുന്നു."
+    },
+    "notes": "Supported ENT schedule."
+  },
+  {
+    "id": 95,
+    "split": "holdout",
+    "lang": "ml",
+    "category": "facility",
+    "phenomenon": "data_silent",
+    "test_focus": "nli_entailment",
+    "context": [
+      "Hospital A - Orthopaedics department treats joint pain, arthritis and sports injuries."
+    ],
+    "instructions": "Orthopaedic treatment options in Malayalam.",
+    "answer": "ഓർത്തോപീഡിക്സ് വിഭാഗത്തിൽ സന്ധിവേദനയ്ക്കും വാതത്തിനും ചികിത്സ നൽകുന്നു. കൂടാതെ ആയുർവേദ തൈല മസാജ് തെറാപ്പി ഇവിടെ ലഭ്യമാണ്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഓർത്തോപീഡിക്സ് വിഭാഗത്തിൽ സന്ധിവേദനയ്ക്കും വാതത്തിനും ചികിത്സ നൽകുന്നു.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Orthopaedics department treats joint pain, arthritis and sports injuries."
+        },
+        {
+          "claim_id": "c2",
+          "text": "കൂടാതെ ആയുർവേദ തൈല മസാജ് തെറാപ്പി ഇവിടെ ലഭ്യമാണ്.",
+          "verdict": "unsupported",
+          "evidence": "None"
+        }
+      ],
+      "overall_verdict": "unsupported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "Orthopaedics",
+          "type": "department",
+          "status": "survived"
+        }
+      ],
+      "changed": true,
+      "final_answer": "ഓർത്തോപീഡിക്സ് വിഭാഗത്തിൽ സന്ധിവേദനയ്ക്കും വാതത്തിനും ചികിത്സ നൽകുന്നു. [FLAG_TEXT]"
+    },
+    "notes": "Ayurvedic massage claim unsupported by orthopaedic clinic context."
+  },
+  {
+    "id": 96,
+    "split": "holdout",
+    "lang": "ml",
+    "category": "lab_test",
+    "phenomenon": "supported",
+    "test_focus": "malayalam_numerals",
+    "context": [
+      "Hospital A - Platelet Count test costs 150 INR."
+    ],
+    "instructions": "Platelet test fee in Malayalam.",
+    "answer": "പ്ലേറ്റ്‌ലെറ്റ് കൗണ്ട് പരിശോധനയ്ക്ക് ൧൫൦ രൂപയാണ് ഫീസ്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "പ്ലേറ്റ്‌ലെറ്റ് കൗണ്ട് പരിശോധനയ്ക്ക് ൧൫൦ രൂപയാണ് ഫീസ്.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Platelet Count test costs 150 INR."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "150",
+          "type": "price",
+          "status": "survived",
+          "raw_extracted": "൧൫൦",
+          "normalised": "150"
+        }
+      ],
+      "changed": false,
+      "final_answer": "പ്ലേറ്റ്‌ലെറ്റ് കൗണ്ട് പരിശോധനയ്ക്ക് ൧൫൦ രൂപയാണ് ഫീസ്."
+    },
+    "notes": "Malayalam numeral ൧൫൦ normalised to 150 and supported."
+  },
+  {
+    "id": 97,
+    "split": "holdout",
+    "lang": "ml",
+    "category": "timing",
+    "phenomenon": "changed_time",
+    "test_focus": "malayalam_times",
+    "context": [
+      "Hospital A - Laboratory report dispatch counter closes at 5:00 PM."
+    ],
+    "instructions": "Report counter hours in Malayalam.",
+    "answer": "ലാബ് റിപ്പോർട്ട് വിതരണ കൗണ്ടർ രാത്രി 9:00 വരെ പ്രവർത്തിക്കുന്നതാണ്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ലാബ് റിപ്പോർട്ട് വിതരണ കൗണ്ടർ രാത്രി 9:00 വരെ പ്രവർത്തിക്കുന്നതാണ്.",
+          "verdict": "contradicted",
+          "evidence": "Hospital A - Laboratory report dispatch counter closes at 5:00 PM."
+        }
+      ],
+      "overall_verdict": "contradicted",
+      "conflicts": [
+        {
+          "type": "answer_vs_data",
+          "text_a": "ലാബ് റിപ്പോർട്ട് വിതരണ കൗണ്ടർ രാത്രി 9:00 വരെ പ്രവർത്തിക്കുന്നതാണ്.",
+          "text_b": "Laboratory report dispatch counter closes at 5:00 PM.",
+          "evidence": "5:00 PM vs 9:00 PM"
+        }
+      ],
+      "fact_lock": [
+        {
+          "item": "5:00 PM",
+          "type": "time",
+          "status": "changed",
+          "raw_extracted": "രാത്രി 9:00",
+          "normalised": "21:00"
+        }
+      ],
+      "changed": true,
+      "final_answer": "[FLAG_TEXT]"
+    },
+    "notes": "Report counter closing time contradicted."
+  },
+  {
+    "id": 98,
+    "split": "holdout",
+    "lang": "ml",
+    "category": "lab_test",
+    "phenomenon": "supported",
+    "test_focus": "exact_value_check",
+    "context": [
+      "Hospital A - Urine Routine test fee is 150 INR."
+    ],
+    "instructions": "Urine test price in Malayalam.",
+    "answer": "യൂറിൻ റൂട്ടീൻ പരിശോധനാ ഫീസ് 150 രൂപയാണ്.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "യൂറിൻ റൂട്ടീൻ പരിശോധനാ ഫീസ് 150 രൂപയാണ്.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Urine Routine test fee is 150 INR."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "150",
+          "type": "price",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "യൂറിൻ റൂട്ടീൻ പരിശോധനാ ഫീസ് 150 രൂപയാണ്."
+    },
+    "notes": "Supported fee in Malayalam holdout."
+  },
+  {
+    "id": 99,
+    "split": "holdout",
+    "lang": "ml",
+    "category": "facility",
+    "phenomenon": "invented_detail",
+    "test_focus": "nli_entailment",
+    "context": [
+      "Hospital A - Dental clinic is open Monday to Saturday from 9:00 AM to 1:00 PM."
+    ],
+    "instructions": "Dental clinic hours in Malayalam.",
+    "answer": "ഡെന്റൽ ക്ലിനിക്ക് തിങ്കൾ മുതൽ ശനി വരെ രാവിലെ 9:00 മുതൽ ഉച്ചയ്ക്ക് 1:00 വരെ പ്രവർത്തിക്കുന്നു. പരിശോധനയ്ക്കെത്തുന്നവർക്ക് സൗജന്യ ടൂത്ത്ബ്രഷ് കിറ്റ് സമ്മാനമായി നൽകുന്നു.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഡെന്റൽ ക്ലിനിക്ക് തിങ്കൾ മുതൽ ശനി വരെ രാവിലെ 9:00 മുതൽ ഉച്ചയ്ക്ക് 1:00 വരെ പ്രവർത്തിക്കുന്നു.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Dental clinic is open Monday to Saturday from 9:00 AM to 1:00 PM."
+        },
+        {
+          "claim_id": "c2",
+          "text": "പരിശോധനയ്ക്കെത്തുന്നവർക്ക് സൗജന്യ ടൂത്ത്ബ്രഷ് കിറ്റ് സമ്മാനമായി നൽകുന്നു.",
+          "verdict": "unsupported",
+          "evidence": "None"
+        }
+      ],
+      "overall_verdict": "unsupported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "Monday to Saturday",
+          "type": "weekday",
+          "status": "survived"
+        },
+        {
+          "item": "9:00 AM to 1:00 PM",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": true,
+      "final_answer": "ഡെന്റൽ ക്ലിനിക്ക് തിങ്കൾ മുതൽ ശനി വരെ രാവിലെ 9:00 മുതൽ ഉച്ചയ്ക്ക് 1:00 വരെ പ്രവർത്തിക്കുന്നു. [FLAG_TEXT]"
+    },
+    "notes": "Fabricated toothbrush kit in Malayalam."
+  },
+  {
+    "id": 100,
+    "split": "holdout",
+    "lang": "ml",
+    "category": "doctor_availability",
+    "phenomenon": "supported",
+    "test_focus": "malayalam_times",
+    "context": [
+      "Hospital A - Dr. Test Five (Neurology) consults on Thursday from 2:00 PM to 4:00 PM."
+    ],
+    "instructions": "Neurology doctor schedule.",
+    "answer": "ഡോ. ടെസ്റ്റ് ഫൈവ് വ്യാഴാഴ്ച ഉച്ചയ്ക്ക് 2:00 മുതൽ വൈകുന്നേരം 4:00 വരെ ന്യൂറോളജി ഒപിയിൽ കൺസൾട്ട് ചെയ്യുന്നു.",
+    "ground_truth": {
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "ഡോ. ടെസ്റ്റ് ഫൈവ് വ്യാഴാഴ്ച ഉച്ചയ്ക്ക് 2:00 മുതൽ വൈകുന്നേരം 4:00 വരെ ന്യൂറോളജി ഒപിയിൽ കൺസൾട്ട് ചെയ്യുന്നു.",
+          "verdict": "supported",
+          "evidence": "Hospital A - Dr. Test Five (Neurology) consults on Thursday from 2:00 PM to 4:00 PM."
+        }
+      ],
+      "overall_verdict": "supported",
+      "conflicts": [],
+      "fact_lock": [
+        {
+          "item": "Dr. Test Five",
+          "type": "doctor_name",
+          "status": "survived"
+        },
+        {
+          "item": "Thursday",
+          "type": "weekday",
+          "status": "survived"
+        },
+        {
+          "item": "2:00 PM to 4:00 PM",
+          "type": "time",
+          "status": "survived"
+        }
+      ],
+      "changed": false,
+      "final_answer": "ഡോ. ടെസ്റ്റ് ഫൈവ് വ്യാഴാഴ്ച ഉച്ചയ്ക്ക് 2:00 മുതൽ വൈകുന്നേരം 4:00 വരെ ന്യൂറോളജി ഒപിയിൽ കൺസൾട്ട് ചെയ്യുന്നു."
+    },
+    "notes": "Complete verified schedule for Dr. Test Five."
+  }
+]

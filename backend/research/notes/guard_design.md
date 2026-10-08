@@ -27,6 +27,8 @@ GuardResult:
 
 *Operational note on inputs:* What exactly the runner passes in `context` (one string per passage?) and `instructions` (admin free text only, or the whole prompt?) is [LEAD TO DECIDE: confirm with Track 1, task M-08].
 
+The interface has no user question, no hospital identifier and no pre-translation English answer. The consequences are listed in Sections 4 and 7 and in the open decisions.
+
 ---
 
 ## 2. Part 1, Claim Check
@@ -49,20 +51,21 @@ GuardResult:
 ### c. Exact-Value Check
 - Natural Language Inference (NLI) models frequently overlook fine-grained numerical discrepancies (for example, failing to flag a shift from "9-1" to "2-5", or "400" to "500").
 - An exact-value verification layer operates in parallel with the NLI model. Numbers, operating hours, appointment times, dates, and consultation fees are extracted using regular expressions and matched against values present in the source passages.
-- Any entity value in the generated claim that does not appear in any context passage is treated as not supported, even if the NLI model outputs an entailment score.
+- Explicit rule: If a claim contains a locked value (number, time, price, date, weekday, name) and a passage mentions the same entity and attribute (for example the same doctor and the same fee) with a different value, the verdict is contradicted. If no passage mentions that entity and attribute, the verdict is unsupported even when the NLI model leans towards entailment. How "same entity and attribute" is decided (PROPOSED: matching the entity name plus a keyword for the attribute) is designed in G-07/G-08.
 
 ### d. Definitions & Verdicts
-- **supported**: At least one context passage entails the claim, and the exact-value check confirms no numerical or entity mismatches.
-- **contradicted**: At least one context passage contradicts the claim, or the exact-value check finds a differing value for the same entity or attribute.
-- **unsupported**: Neither condition is met (the context data is silent regarding the claim).
-- Decision thresholds for classification are deliberately not hardcoded here: [THRESHOLDS — SET IN G-08].
+- **supported**: A passage entails the claim and no exact-value mismatch exists.
+- **contradicted**: A passage contradicts the claim, or the exact-value check finds a different value for the same entity and attribute.
+- **unsupported**: Neither condition is met (the context data is silent regarding the claim, or no passage mentions that entity and attribute even when the NLI model leans towards entailment).
+- Score thresholds are chosen later on the tuning half only (task G-08); write [THRESHOLDS — SET IN G-08], no numbers.
 
 ### e. Actions per Verdict
 - PROPOSED policy:
   - `supported`: Retain the claim text unchanged.
-  - `unsupported`: Replace the unsupported claim text with `[FLAG_TEXT]` and record the event in `claims`.
-  - `contradicted`: Replace the contradicted claim text with `[FLAG_TEXT]`, record the event in `claims`, and set `changed = True`.
-- Alternative PROPOSED policy ("flag only, do not edit"): The guard leaves `final_answer` identical to the input `answer` without redacting text, but populates `claims`, `conflicts`, `fact_lock`, and sets `changed = False`. This mode is intended for telemetry, auditing, or human-in-the-loop review.
+  - `unsupported`: Replace that claim's text with `[FLAG_TEXT]`, record it in `claims`, and set `changed = True`.
+  - `contradicted`: Replace with `[FLAG_TEXT]`, record it in `claims`, and set `changed = True`.
+  - Under this policy, `changed = True` whenever any text is replaced (both unsupported and contradicted).
+- Alternative PROPOSED policy ("flag only, do not edit the answer"): The guard leaves `final_answer` identical to the input `answer` without redacting text, but populates `claims`, `conflicts`, `fact_lock`, and sets `changed = False`. This mode is intended for telemetry, auditing, or human-in-the-loop review.
 - [LEAD TO DECIDE: which action per verdict].
 
 ---
@@ -113,19 +116,21 @@ The following entity types are subject to mandatory tracking:
   1. The source context passages.
   2. The generated English answer.
   3. The final Malayalam answer.
+- Note that item 2 (the English answer) is available only if the guard also runs before translation or the interface receives it [LEAD TO DECIDE]. With the interface as given, fact-lock compares the context with the single `answer`.
 - Prior to comparison, values undergo normalisation:
   - Malayalam digits (`൦-൯`) are converted to standard ASCII digits (`0-9`).
   - Time representations are parsed into canonical 24-hour stamps or standard 12-hour AM/PM representations.
   - Weekday names across languages are mapped to canonical day indices (0 for Monday through 6 for Sunday).
 
 ### c. Reporting in `fact_lock`
-Each tracked entity is recorded in the `fact_lock` list with one of three status markers:
+Each tracked entity is recorded in the `fact_lock` list with status markers:
 - `survived`: The entity exists in the source context and appears unchanged and verified in the final response.
 - `changed`: The entity value was altered during generation or translation (e.g., a fee shifted from 400 to 500, or a morning clinic hour shifted to afternoon).
-- `lost`: The entity was present in the source context relevant to the user query but was omitted from the final answer.
+- `unverified`: A PROPOSED status: a locked item that appears in the answer but nowhere in the context.
+- `lost`: `lost` needs the user question, which the interface does not pass. It is PROPOSED only if the runner also passes the question [LEAD TO DECIDE]. Otherwise only survived, changed and unverified are used.
 
 ### d. Script and Language Mapping Constraints
-- The Malayalam mapping tables (script digits, weekday names, and relative time phrases) will be written in task G-10 and must be checked by a Malayalam reader. Do not invent them here.
+- The Malayalam mapping tables (script digits, weekday names, and relative time phrases) will be written in task G-10 and must be checked by a Malayalam reader. They are not defined in this note.
 - Cross-script phonetic transliteration of doctor names and medical terms (e.g., "Dr. Test One" vs "ഡോ. ടെസ്റ്റ് വൺ") is a known weak point of deterministic string matching and requires dedicated phoneme/n-gram tolerance rules defined in G-10.
 
 ---
@@ -135,12 +140,12 @@ Each tracked entity is recorded in the `fact_lock` list with one of three status
 Evaluating Malayalam responses presents a choice between two primary pipeline architectures. Task G-08 will experimentally evaluate both; their trade-offs are detailed below without prejudging the outcome.
 
 ### Option A: Direct Multilingual Verification
-Verify the Malayalam claim directly against Malayalam context using a multilingual NLI model.
+Verify the Malayalam claim with a multilingual NLI model; the premise may be an English passage (a cross-lingual pair) or a Malayalam passage if the knowledge base holds any [LEAD TO DECIDE: language of the context passages].
 - **Pros:**
   - Avoids an extra translation step, eliminating translation latency and translation error propagation.
   - Preserves exact source phrasing, dialectal nuances, and native honorifics.
 - **Cons:**
-  - Multilingual NLI models generally exhibit lower inference accuracy and higher variance on Indic languages compared to English.
+  - Multilingual NLI models may show lower accuracy and higher variance (to be measured in G-08) on Indic languages compared to English.
   - Malayalam's agglutinative morphology compounds tokenization and semantic alignment challenges.
 
 ### Option B: Pivot Translation Verification
@@ -158,7 +163,7 @@ Translate candidate Malayalam claims into English first, then run checking and N
 | :--- | :--- | :--- |
 | **Splitting** | PROPOSED: Rule-based Malayalam sentence tokenizer; clause splitting is complicated by agglutinative suffixes. | Standard English clause splitting applied post-translation. |
 | **Checking (NLI)** | Direct premise-hypothesis NLI on native Malayalam text. | English premise-hypothesis NLI on translated claims. |
-| **Conflict Surfacing** | Detects instruction-vs-data clashes directly in native text. | Operates over English translations of instructions and data. |
+| **Conflict Surfacing** | Detects instruction-vs-data clashes directly across Malayalam and English text. | Operates over English translations of instructions and data. |
 | **Fact-Lock** | Requires extracting Malayalam script digits, weekday words, and transliterated names directly. | Extracts English tokens, but still requires cross-checking that the translation step did not distort numerals or times. |
 
 ### Pipeline Placement Decision
@@ -181,7 +186,7 @@ Translate candidate Malayalam claims into English first, then run checking and N
 - **Claim Verdict**:
   - Claim 1: `contradicted` (Exact-value mismatch: context specifies 400, answer states 600; NLI contradiction: high, entailment: low; illustrative, not measured).
 - **Conflict Check**:
-  - None (`answer_vs_data` numerical clash).
+  - `answer_vs_data`: fee 600 against 400.
 - **Fact-Lock Result**:
   - Number `400`: `changed` to `600`.
 - **GuardResult**:
@@ -217,26 +222,27 @@ Translate candidate Malayalam claims into English first, then run checking and N
 
 ### English Example 3: Fact Belonging to the OTHER Hospital (Cross-Tenant Leakage)
 - **INPUT**:
-  - `context`: `["Hospital A - Dr. Test One (General Medicine) is available Monday.", "Hospital B - Dr. Test Two (Dermatology) is available Thursday."]`
+  - `context`: `["Hospital A - Dr. Test One (General Medicine) is available Monday."]`
   - `instructions`: `"You are answering for Hospital A."`
   - `answer`: `"Dr. Test Two is available for consultation at Hospital A on Thursday."`
   - `lang`: `"en"`
 - **Claim Split**:
   - Claim 1: `"Dr. Test Two is available for consultation at Hospital A on Thursday."`
 - **Claim Verdict**:
-  - Claim 1: `contradicted` (Data demonstrates Dr. Test Two is affiliated with Hospital B, not Hospital A; NLI contradiction: high against Hospital A context; illustrative, not measured).
+  - Claim 1: `unsupported` (The context contains only Hospital A data and is silent regarding Dr. Test Two; NLI entailment: low, contradiction: low; illustrative, not measured).
 - **Conflict Check**:
-  - `answer_vs_data` cross-tenant attribution error.
+  - None (`[]`).
 - **Fact-Lock Result**:
-  - Doctor name `"Dr. Test Two"`: `changed` (incorrect hospital association).
+  - Doctor name `"Dr. Test Two"`: `unverified` (appears in answer but nowhere in context).
   - Hospital `"Hospital A"`: `survived`.
-  - Weekday `"Thursday"`: `survived`.
+  - Weekday `"Thursday"`: `unverified`.
 - **GuardResult**:
   - `final_answer`: `"[FLAG_TEXT]"`
-  - `claims`: `[{"text": "Dr. Test Two is available for consultation at Hospital A on Thursday.", "verdict": "contradicted", "evidence": "Hospital B - Dr. Test Two (Dermatology) is available Thursday."}]`
-  - `conflicts`: `[{"type": "answer_vs_data", "text_a": "Dr. Test Two is available for consultation at Hospital A on Thursday.", "text_b": "Hospital B - Dr. Test Two (Dermatology) is available Thursday.", "evidence": "Hospital affiliation mismatch"}]`
-  - `fact_lock`: `[{"item": "Dr. Test Two", "type": "doctor_name", "status": "changed"}]`
+  - `claims`: `[{"text": "Dr. Test Two is available for consultation at Hospital A on Thursday.", "verdict": "unsupported", "evidence": "None"}]`
+  - `conflicts`: `[]`
+  - `fact_lock`: `[{"item": "Dr. Test Two", "type": "doctor_name", "status": "unverified"}]`
   - `changed`: `True`
+- Note: If both hospitals' passages were present in context (a retrieval leak), the verdict would be contradicted. The guard has no hospital identifier, so it cannot tell which hospital is current except from text in the context or instructions.
 
 ### English Example 4: Instruction Contradicts a Data Fact
 - **INPUT**:
@@ -287,7 +293,7 @@ Translate candidate Malayalam claims into English first, then run checking and N
 ---
 
 [MALAYALAM — NOT YET VERIFIED BY A NATIVE READER]
-### Malayalam Example 6: Time Changed by Translation
+### Malayalam Example 6: Time wrong in the Malayalam answer
 - **INPUT**:
   - `context`: `["Hospital A - Dr. Test One (General Medicine) is available Monday from 9:00 AM to 1:00 PM."]`
   - `instructions`: `"Doctor schedule query."`
@@ -305,7 +311,7 @@ Translate candidate Malayalam claims into English first, then run checking and N
 - **GuardResult**:
   - `final_answer`: `"[FLAG_TEXT]"`
   - `claims`: `[{"text": "ഡോ. ടെസ്റ്റ് വൺ തിങ്കളാഴ്ച ഉച്ചയ്ക്ക് 2:00 മുതൽ വൈകുന്നേരം 5:00 വരെ ലഭ്യമാണ്.", "verdict": "contradicted", "evidence": "Hospital A - Dr. Test One (General Medicine) is available Monday from 9:00 AM to 1:00 PM."}]`
-  - `conflicts`: `[{"type": "answer_vs_data", "text_a": "ഡോ. ടെസ്റ്റ് വൺ തിങ്കളാഴ്ച ഉച്ചയ്ക്ക് 2:00 മുതൽ വൈകുന്നേരം 5:00 വരെ ലഭ്യമാണ്.", "text_b": "9:00 AM to 1:00 PM", "evidence": "Time flipped during translation"}]`
+  - `conflicts`: `[{"type": "answer_vs_data", "text_a": "ഡോ. ടെസ്റ്റ് വൺ തിങ്കളാഴ്ച ഉച്ചയ്ക്ക് 2:00 മുതൽ വൈകുന്നേരം 5:00 വരെ ലഭ്യമാണ്.", "text_b": "9:00 AM to 1:00 PM", "evidence": "Time mismatch; whether the cause is the model or translation cannot be told from the final answer alone."}]`
   - `fact_lock`: `[{"item": "9:00 AM to 1:00 PM", "type": "time", "status": "changed"}]`
   - `changed`: `True`
 
@@ -316,22 +322,22 @@ Translate candidate Malayalam claims into English first, then run checking and N
 - **INPUT**:
   - `context`: `["Hospital A - Routine Hemogram test fee is 400 INR."]`
   - `instructions`: `"State lab test fee."`
-  - `answer`: `"ഹോസ്പിറ്റൽ എയിൽ റൂട്ടീൻ ഹീമോഗ്രാം പരിശോധനയ്ക്ക് 800 രൂപയാണ് ഫീസ്."`
+  - `answer`: `"ഹോസ്പിറ്റൽ എയിൽ റൂട്ടീൻ ഹീമോഗ്രാം പരിശോധനയ്ക്ക് ൮൦൦ രൂപയാണ് ഫീസ്."`
   - `lang`: `"ml"`
 - **Claim Split**:
-  - Claim 1: `"ഹോസ്പിറ്റൽ എയിൽ റൂട്ടീൻ ഹീമോഗ്രാം പരിശോധനയ്ക്ക് 800 രൂപയാണ് ഫീസ്."`
+  - Claim 1: `"ഹോസ്പിറ്റൽ എയിൽ റൂട്ടീൻ ഹീമോഗ്രാം പരിശോധനയ്ക്ക് ൮൦൦ രൂപയാണ് ഫീസ്."`
 - **Claim Verdict**:
-  - Claim 1: `contradicted` (Exact-value mismatch: context specifies 400, answer states 800; NLI contradiction: high, entailment: low; illustrative, not measured).
+  - Claim 1: `contradicted` (Exact-value mismatch: context specifies 400, answer states ൮൦൦ which normalises to 800; NLI contradiction: high, entailment: low; illustrative, not measured).
 - **Conflict Check**:
   - `answer_vs_data` fee mismatch.
 - **Fact-Lock Result**:
-  - Number `400`: `changed` to `800`.
+  - Number `400`: `changed` to `൮൦൦` (normalised to `800`).
   - Test name `"Routine Hemogram"`: `survived` (`റൂട്ടീൻ ഹീമോഗ്രാം`).
 - **GuardResult**:
   - `final_answer`: `"[FLAG_TEXT]"`
-  - `claims`: `[{"text": "ഹോസ്പിറ്റൽ എയിൽ റൂട്ടീൻ ഹീമോഗ്രാം പരിശോധനയ്ക്ക് 800 രൂപയാണ് ഫീസ്.", "verdict": "contradicted", "evidence": "Hospital A - Routine Hemogram test fee is 400 INR."}]`
-  - `conflicts`: `[{"type": "answer_vs_data", "text_a": "ഹോസ്പിറ്റൽ എയിൽ റൂട്ടീൻ ഹീമോഗ്രാം പരിശോധനയ്ക്ക് 800 രൂപയാണ് ഫീസ്.", "text_b": "Routine Hemogram test fee is 400 INR.", "evidence": "400 vs 800"}]`
-  - `fact_lock`: `[{"item": "400", "type": "price", "status": "changed"}]`
+  - `claims`: `[{"text": "ഹോസ്പിറ്റൽ എയിൽ റൂട്ടീൻ ഹീമോഗ്രാം പരിശോധനയ്ക്ക് ൮൦൦ രൂപയാണ് ഫീസ്.", "verdict": "contradicted", "evidence": "Hospital A - Routine Hemogram test fee is 400 INR."}]`
+  - `conflicts`: `[{"type": "answer_vs_data", "text_a": "ഹോസ്പിറ്റൽ എയിൽ റൂട്ടീൻ ഹീമോഗ്രാം പരിശോധനയ്ക്ക് ൮൦൦ രൂപയാണ് ഫീസ്.", "text_b": "Routine Hemogram test fee is 400 INR.", "evidence": "400 vs ൮൦൦ (normalised to 800)"}]`
+  - `fact_lock`: `[{"item": "400", "type": "price", "status": "changed", "raw_extracted": "൮൦൦", "normalised": "800"}]`
   - `changed`: `True`
 
 ---
@@ -366,24 +372,25 @@ Translate candidate Malayalam claims into English first, then run checking and N
 [MALAYALAM — NOT YET VERIFIED BY A NATIVE READER]
 ### Malayalam Example 9: Fact Belonging to the OTHER Hospital
 - **INPUT**:
-  - `context`: `["Hospital A - Dr. Test One is available Monday.", "Hospital B - Dr. Test Three is available Friday."]`
+  - `context`: `["Hospital A - Dr. Test One is available Monday."]`
   - `instructions`: `"Query regarding Hospital A doctors."`
   - `answer`: `"ഹോസ്പിറ്റൽ എയിൽ വെള്ളിയാഴ്ച ഡോ. ടെസ്റ്റ് ത്രീ ലഭ്യമാണ്."`
   - `lang`: `"ml"`
 - **Claim Split**:
   - Claim 1: `"ഹോസ്പിറ്റൽ എയിൽ വെള്ളിയാഴ്ച ഡോ. ടെസ്റ്റ് ത്രീ ലഭ്യമാണ്."`
 - **Claim Verdict**:
-  - Claim 1: `contradicted` (Context establishes Dr. Test Three belongs to Hospital B; NLI contradiction: high against Hospital A data; illustrative, not measured).
+  - Claim 1: `unsupported` (Context holds only Hospital A data and is silent regarding Dr. Test Three; NLI entailment: low, contradiction: low; illustrative, not measured).
 - **Conflict Check**:
-  - `answer_vs_data` cross-tenant attribution conflict.
+  - None (`[]`).
 - **Fact-Lock Result**:
-  - Doctor name `"Dr. Test Three"`: `changed` (`ഡോ. ടെസ്റ്റ് ത്രീ` attributed to wrong hospital).
+  - Doctor name `"Dr. Test Three"`: `unverified` (`ഡോ. ടെസ്റ്റ് ത്രീ` appears in answer but nowhere in context).
 - **GuardResult**:
   - `final_answer`: `"[FLAG_TEXT]"`
-  - `claims`: `[{"text": "ഹോസ്പിറ്റൽ എയിൽ വെള്ളിയാഴ്ച ഡോ. ടെസ്റ്റ് ത്രീ ലഭ്യമാണ്.", "verdict": "contradicted", "evidence": "Hospital B - Dr. Test Three is available Friday."}]`
-  - `conflicts`: `[{"type": "answer_vs_data", "text_a": "ഹോസ്പിറ്റൽ എയിൽ വെള്ളിയാഴ്ച ഡോ. ടെസ്റ്റ് ത്രീ ലഭ്യമാണ്.", "text_b": "Hospital B - Dr. Test Three is available Friday.", "evidence": "Hospital attribution clash"}]`
-  - `fact_lock`: `[{"item": "Dr. Test Three", "type": "doctor_name", "status": "changed"}]`
+  - `claims`: `[{"text": "ഹോസ്പിറ്റൽ എയിൽ വെള്ളിയാഴ്ച ഡോ. ടെസ്റ്റ് ത്രീ ലഭ്യമാണ്.", "verdict": "unsupported", "evidence": "None"}]`
+  - `conflicts`: `[]`
+  - `fact_lock`: `[{"item": "Dr. Test Three", "type": "doctor_name", "status": "unverified"}]`
   - `changed`: `True`
+- Note: If both hospitals' passages were present in context (a retrieval leak), the verdict would be contradicted. The guard has no hospital identifier, so it cannot tell which hospital is current except from text in the context or instructions.
 
 ---
 
@@ -431,10 +438,10 @@ The guard operates under specific structural limitations. The following failure 
    In Malayalam, postpositions, coordinating conjunctions, and case markers attach directly to nouns and verbs as suffixes (e.g., adding `ഉം` [-um] to conjoin entities). Rule-based tokenizers calibrated on whitespace separation fail to split these agglutinated compound clauses.
 
 6. **Degraded Multilingual NLI Quality in Low-Resource Languages**
-   NLI models have substantially lower benchmark accuracy on low-resource Indic languages such as Malayalam compared to English. Cross-lingual transfer often yields low-confidence scores and erratic contradiction classification.
+   NLI models may have lower accuracy on low-resource Indic languages such as Malayalam compared to English. Cross-lingual transfer often yields low-confidence scores and erratic contradiction classification.
 
 7. **Cross-Script Transliteration Discrepancies**
-   Doctor and medication names transliterated between Latin and Malayalam scripts (e.g., "Dr. Kumar" rendered variously as "കുമാർ", "കുമാര്‍", or "ഡോക്ടർ കുമാർ") fail exact-string equality checks in `fact_lock` without complex phonetic normalization.
+   Doctor and medication names transliterated between Latin and Malayalam scripts (e.g., "Dr. Test Four" rendered in different Malayalam spellings) fail exact-string equality checks in `fact_lock` without complex phonetic normalization.
 
 8. **Over-Redaction Degrading User Experience**
    Replacing every unsupported or borderline clause with `[FLAG_TEXT]` can fragment conversational answers into unreadable placeholders, causing severe user frustration over benign colloquial phrasing.
@@ -444,6 +451,15 @@ The guard operates under specific structural limitations. The following failure 
 
 10. **Conversational Coreference and Pronoun Drop**
     In multi-turn dialogues, answers frequently use pronouns (*"He is available Monday"*) or drop explicit subjects altogether (common in conversational Malayalam). Isolated claim checking lacks antecedent context and may mark valid statements as `unsupported`.
+
+11. **Over-Splitting Breaking Lists and Ranges**
+    Over-splitting breaks lists and ranges such as "Monday and Wednesday".
+
+12. **Interface Gaps (Missing Identifier and User Question)**
+    No hospital identifier or user question in the interface, so the guard cannot detect a leak by identity or compute `lost`.
+
+13. **Redaction of Valid Admin Promotions**
+    A correct admin promotion that contradicts stale data may be redacted.
 
 ---
 
@@ -474,3 +490,12 @@ The following open decisions collect every item requiring confirmation by the pr
 
 5. **Classification Thresholds:**
    `[THRESHOLDS — SET IN G-08]` — Entailment and contradiction score thresholds to be calibrated on the tuning half only in task G-08.
+
+6. **Interface Gaps:**
+   `[LEAD TO DECIDE: interface gaps (question, hospital identifier, English answer)]` — The interface has no user question (needed for `lost` in fact-lock), no hospital identifier (needed to detect retrieval leakage by hospital identity), and no pre-translation English answer. Confirm whether these inputs should be added to `apply_guard`.
+
+7. **Language of the Context Passages:**
+   `[LEAD TO DECIDE: language of the context passages]` — Confirm whether `context` passages supplied to the guard are English only, Malayalam only, or cross-lingual pairs.
+
+8. **Instruction-vs-Data Conflicts Policy:**
+   `[LEAD TO DECIDE: when an instruction conflicts with data, should the guard block the answer or only report it]` — When an instruction contradicts data facts, confirm whether the guard should block/redact the answer with `[FLAG_TEXT]` or only surface the clash in `conflicts` as an administrative warning.
