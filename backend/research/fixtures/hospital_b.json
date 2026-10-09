@@ -1,0 +1,481 @@
+{
+  "hospital_id": "hospital_b",
+  "name": "Larkfield Medical Centre",
+  "slug": "larkfield-medical-centre",
+  "address": "7 Larkfield Road, Westgate Quarter",
+  "system_prompt": "You are Arogya, an AI healthcare assistant for Larkfield Medical Centre. Provide helpful, accurate information on doctors, schedules, laboratory services, and pharmacy availability. Always verify doctor availability before confirming appointments.",
+  "metadata": {
+    "version": "1.0",
+    "stage": 2,
+    "facts_in_file": 60,
+    "total_facts_target": 60,
+    "is_fictional": true,
+    "description": "Fictional test hospital facts for research evaluation (Stage 2: complete 60-fact dataset)."
+  },
+  "facts": [
+    {
+      "fact_id": "B-GEN-001",
+      "category": "general_info",
+      "statement": "Larkfield Medical Centre is located at 7 Larkfield Road, Westgate Quarter.",
+      "attribute": "address",
+      "value": "7 Larkfield Road, Westgate Quarter"
+    },
+    {
+      "fact_id": "B-GEN-002",
+      "category": "general_info",
+      "statement": "General outpatient consultation hours at Larkfield Medical Centre are Monday through Saturday from 09:00 to 18:00.",
+      "attribute": "opd_hours",
+      "value": {
+        "days": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+        "start": "09:00",
+        "end": "18:00"
+      }
+    },
+    {
+      "fact_id": "B-GEN-003",
+      "category": "general_info",
+      "statement": "Inpatient visiting hours at Larkfield Medical Centre are 17:00 to 20:00 daily.",
+      "attribute": "visiting_hours",
+      "value": {
+        "days": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+        "start": "17:00",
+        "end": "20:00"
+      }
+    },
+    {
+      "fact_id": "B-GEN-004",
+      "category": "general_info",
+      "statement": "On-site visitor parking at Larkfield Medical Centre is paid; charges apply per hour.",
+      "attribute": "free_parking",
+      "value": false
+    },
+    {
+      "fact_id": "B-GEN-005",
+      "category": "general_info",
+      "statement": "Accepted payment methods at Larkfield Medical Centre are cash, credit card, UPI, and registered health insurance.",
+      "attribute": "accepted_payment_methods",
+      "value": "cash, credit card, UPI, health insurance"
+    },
+    {
+      "fact_id": "B-GEN-006",
+      "category": "general_info",
+      "statement": "The Larkfield Medical Centre emergency helpline is 1800-567-8901, available 24 hours.",
+      "attribute": "emergency_helpline",
+      "value": "1800-567-8901"
+    },
+    {
+      "fact_id": "B-GEN-007",
+      "category": "general_info",
+      "statement": "The Larkfield Medical Centre pharmacy operates Monday through Saturday from 08:30 to 21:00.",
+      "attribute": "pharmacy_hours",
+      "value": {
+        "days": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+        "start": "08:30",
+        "end": "21:00"
+      }
+    },
+    {
+      "fact_id": "B-GEN-008",
+      "category": "general_info",
+      "statement": "The Larkfield Medical Centre laboratory accepts samples Monday through Saturday from 07:00 to 17:00.",
+      "attribute": "lab_hours",
+      "value": {
+        "days": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+        "start": "07:00",
+        "end": "17:00"
+      }
+    },
+    {
+      "fact_id": "B-GEN-009",
+      "category": "general_info",
+      "statement": "The billing counter at Larkfield Medical Centre is open Monday through Friday from 09:00 to 16:30.",
+      "attribute": "billing_counter_hours",
+      "value": {
+        "days": ["Mon", "Tue", "Wed", "Thu", "Fri"],
+        "start": "09:00",
+        "end": "16:30"
+      }
+    },
+    {
+      "fact_id": "B-GEN-010",
+      "category": "general_info",
+      "statement": "Larkfield Medical Centre has a total inpatient bed capacity of 180 beds.",
+      "attribute": "total_inpatient_beds",
+      "value": 180
+    },
+    {
+      "fact_id": "B-ADMIN-001",
+      "category": "admin_instruction",
+      "statement": "The assistant must follow the greeting and appointment handling policy for Larkfield Medical Centre.",
+      "attribute": "greeting_and_appointment_policy",
+      "value": "Begin each interaction with a courteous welcome and ask the patient to state their concern or the service they require. When handling appointment bookings, verify the patient's contact number and the name of the doctor or department before searching for available slots. Present available timings clearly and confirm the selected slot along with the consulting doctor's name. Advise the patient to arrive at least fifteen minutes before the appointment time and to bring their health records or previous test reports."
+    },
+    {
+      "fact_id": "B-DEP-001",
+      "category": "department",
+      "statement": "The Department of General Medicine at Larkfield Medical Centre provides primary clinical care for adult patients.",
+      "attribute": "department_name",
+      "value": "General Medicine"
+    },
+    {
+      "fact_id": "B-DEP-002",
+      "category": "department",
+      "statement": "The Department of Dermatology at Larkfield Medical Centre offers outpatient consultations for skin conditions.",
+      "attribute": "department_name",
+      "value": "Dermatology"
+    },
+    {
+      "fact_id": "B-DEP-003",
+      "category": "department",
+      "statement": "The Department of ENT at Larkfield Medical Centre specialises in ear, nose, and throat conditions.",
+      "attribute": "department_name",
+      "value": "ENT"
+    },
+    {
+      "fact_id": "B-DEP-004",
+      "category": "department",
+      "statement": "The Department of Gynecology at Larkfield Medical Centre provides outpatient care for women's health.",
+      "attribute": "department_name",
+      "value": "Gynecology"
+    },
+    {
+      "fact_id": "B-DEP-005",
+      "category": "department",
+      "statement": "The Department of Ophthalmology at Larkfield Medical Centre offers outpatient eye care consultations.",
+      "attribute": "department_name",
+      "value": "Ophthalmology"
+    },
+    {
+      "fact_id": "B-DEP-006",
+      "category": "department",
+      "statement": "The Department of Neurology at Larkfield Medical Centre provides outpatient neurological consultations.",
+      "attribute": "department_name",
+      "value": "Neurology"
+    },
+    {
+      "fact_id": "B-DOC-001",
+      "category": "doctor",
+      "statement": "Dr. Priya Nair is a Consultant Dermatologist at Larkfield Medical Centre.",
+      "attribute": "department",
+      "value": "Dermatology"
+    },
+    {
+      "fact_id": "B-DOC-002",
+      "category": "doctor",
+      "statement": "Dr. Rajesh Varma is a Consultant ENT Surgeon at Larkfield Medical Centre.",
+      "attribute": "department",
+      "value": "ENT"
+    },
+    {
+      "fact_id": "B-DOC-003",
+      "category": "doctor",
+      "statement": "Dr. Samuel Okafor is a Consultant Physician in General Medicine at Larkfield Medical Centre.",
+      "attribute": "department",
+      "value": "General Medicine"
+    },
+    {
+      "fact_id": "B-DOC-004",
+      "category": "doctor",
+      "statement": "Dr. Ananya Singh is a Consultant Gynaecologist at Larkfield Medical Centre.",
+      "attribute": "department",
+      "value": "Gynecology"
+    },
+    {
+      "fact_id": "B-DOC-005",
+      "category": "doctor",
+      "statement": "Dr. Marcus Holt is a Consultant Ophthalmologist at Larkfield Medical Centre.",
+      "attribute": "department",
+      "value": "Ophthalmology"
+    },
+    {
+      "fact_id": "B-DOC-006",
+      "category": "doctor",
+      "statement": "Dr. Yusuf Adeyemi is a Consultant Neurologist at Larkfield Medical Centre.",
+      "attribute": "department",
+      "value": "Neurology"
+    },
+    {
+      "fact_id": "B-SCHED-001",
+      "category": "schedule",
+      "statement": "Dr. Priya Nair conducts outpatient dermatology clinics at Larkfield Medical Centre on Tuesday and Thursday from 14:00 to 18:00.",
+      "attribute": "clinic_schedule",
+      "value": {
+        "days": ["Tue", "Thu"],
+        "start": "14:00",
+        "end": "18:00"
+      }
+    },
+    {
+      "fact_id": "B-SCHED-002",
+      "category": "schedule",
+      "statement": "Dr. Rajesh Varma conducts outpatient ENT clinics at Larkfield Medical Centre on Monday, Wednesday, and Saturday from 10:00 to 13:00.",
+      "attribute": "clinic_schedule",
+      "value": {
+        "days": ["Mon", "Wed", "Sat"],
+        "start": "10:00",
+        "end": "13:00"
+      }
+    },
+    {
+      "fact_id": "B-SCHED-003",
+      "category": "schedule",
+      "statement": "Dr. Samuel Okafor holds outpatient general medicine clinics on Monday, Tuesday, Thursday, and Friday from 08:30 to 13:00.",
+      "attribute": "clinic_schedule",
+      "value": {
+        "days": ["Mon", "Tue", "Thu", "Fri"],
+        "start": "08:30",
+        "end": "13:00"
+      }
+    },
+    {
+      "fact_id": "B-SCHED-004",
+      "category": "schedule",
+      "statement": "Dr. Ananya Singh holds outpatient gynaecology clinics on Monday, Wednesday, and Friday from 10:00 to 14:00.",
+      "attribute": "clinic_schedule",
+      "value": {
+        "days": ["Mon", "Wed", "Fri"],
+        "start": "10:00",
+        "end": "14:00"
+      }
+    },
+    {
+      "fact_id": "B-SCHED-005",
+      "category": "schedule",
+      "statement": "Dr. Marcus Holt holds outpatient ophthalmology clinics on Tuesday, Thursday, and Saturday from 09:00 to 13:00.",
+      "attribute": "clinic_schedule",
+      "value": {
+        "days": ["Tue", "Thu", "Sat"],
+        "start": "09:00",
+        "end": "13:00"
+      }
+    },
+    {
+      "fact_id": "B-SCHED-006",
+      "category": "schedule",
+      "statement": "Dr. Yusuf Adeyemi holds outpatient neurology clinics on Monday, Wednesday, and Friday from 14:00 to 17:30.",
+      "attribute": "clinic_schedule",
+      "value": {
+        "days": ["Mon", "Wed", "Fri"],
+        "start": "14:00",
+        "end": "17:30"
+      }
+    },
+    {
+      "fact_id": "B-LAB-001",
+      "category": "lab_test",
+      "statement": "The Comprehensive Lipid Profile test costs 850 INR at Larkfield Medical Centre.",
+      "attribute": "price_inr",
+      "value": 850
+    },
+    {
+      "fact_id": "B-LAB-002",
+      "category": "lab_test",
+      "statement": "The Comprehensive Lipid Profile test at Larkfield Medical Centre requires 8 hours of fasting prior to sample collection.",
+      "attribute": "fasting_hours",
+      "value": 8
+    },
+    {
+      "fact_id": "B-LAB-003",
+      "category": "lab_test",
+      "statement": "The Comprehensive Lipid Profile test at Larkfield Medical Centre has a report turnaround time of 4 hours.",
+      "attribute": "turnaround_hours",
+      "value": 4
+    },
+    {
+      "fact_id": "B-LAB-004",
+      "category": "lab_test",
+      "statement": "The Complete Blood Count (CBC) test costs 350 INR at Larkfield Medical Centre.",
+      "attribute": "price_inr",
+      "value": 350
+    },
+    {
+      "fact_id": "B-LAB-005",
+      "category": "lab_test",
+      "statement": "The Complete Blood Count (CBC) test requires no special preparation before sample collection.",
+      "attribute": "preparation",
+      "value": "no_fasting_required"
+    },
+    {
+      "fact_id": "B-LAB-006",
+      "category": "lab_test",
+      "statement": "The Complete Blood Count (CBC) test at Larkfield Medical Centre has a report turnaround time of 2 hours.",
+      "attribute": "turnaround_hours",
+      "value": 2
+    },
+    {
+      "fact_id": "B-LAB-007",
+      "category": "lab_test",
+      "statement": "The Urine Routine Examination costs 180 INR at Larkfield Medical Centre.",
+      "attribute": "price_inr",
+      "value": 180
+    },
+    {
+      "fact_id": "B-LAB-008",
+      "category": "lab_test",
+      "statement": "The Urine Routine Examination requires no fasting; a fresh mid-stream urine sample is needed.",
+      "attribute": "preparation",
+      "value": "no_fasting_required"
+    },
+    {
+      "fact_id": "B-LAB-009",
+      "category": "lab_test",
+      "statement": "The Serum Creatinine test costs 280 INR at Larkfield Medical Centre.",
+      "attribute": "price_inr",
+      "value": 280
+    },
+    {
+      "fact_id": "B-LAB-010",
+      "category": "lab_test",
+      "statement": "The Serum Creatinine test requires no special fasting before sample collection.",
+      "attribute": "preparation",
+      "value": "no_fasting_required"
+    },
+    {
+      "fact_id": "B-LAB-011",
+      "category": "lab_test",
+      "statement": "The Random Blood Glucose test costs 120 INR at Larkfield Medical Centre.",
+      "attribute": "price_inr",
+      "value": 120
+    },
+    {
+      "fact_id": "B-LAB-012",
+      "category": "lab_test",
+      "statement": "The Random Blood Glucose test requires no fasting; patients may eat normally before the test.",
+      "attribute": "preparation",
+      "value": "no_fasting_required"
+    },
+    {
+      "fact_id": "B-LAB-013",
+      "category": "lab_test",
+      "statement": "The Vitamin D (25-OH) test costs 1100 INR at Larkfield Medical Centre.",
+      "attribute": "price_inr",
+      "value": 1100
+    },
+    {
+      "fact_id": "B-LAB-014",
+      "category": "lab_test",
+      "statement": "The Vitamin D (25-OH) test requires no fasting before sample collection.",
+      "attribute": "preparation",
+      "value": "no_fasting_required"
+    },
+    {
+      "fact_id": "B-LAB-015",
+      "category": "lab_test",
+      "statement": "The Thyroid Stimulating Hormone (TSH) test costs 480 INR at Larkfield Medical Centre.",
+      "attribute": "price_inr",
+      "value": 480
+    },
+    {
+      "fact_id": "B-LAB-016",
+      "category": "lab_test",
+      "statement": "The Thyroid Stimulating Hormone (TSH) test requires no fasting before sample collection.",
+      "attribute": "preparation",
+      "value": "no_fasting_required"
+    },
+    {
+      "fact_id": "B-MED-001",
+      "category": "medicine",
+      "statement": "Metformin 500mg tablets are priced at 5.50 INR per strip of 10 tablets at Larkfield Medical Centre.",
+      "attribute": "price_inr",
+      "value": 5.5
+    },
+    {
+      "fact_id": "B-MED-002",
+      "category": "medicine",
+      "statement": "Metformin 500mg tablets are currently in low stock at Larkfield Medical Centre pharmacy.",
+      "attribute": "stock_status",
+      "value": "low_stock"
+    },
+    {
+      "fact_id": "B-MED-003",
+      "category": "medicine",
+      "statement": "Metformin 500mg tablets require a valid prescription for dispensing at Larkfield Medical Centre.",
+      "attribute": "requires_prescription",
+      "value": true
+    },
+    {
+      "fact_id": "B-MED-004",
+      "category": "medicine",
+      "statement": "Amlodipine 5mg tablets are priced at 22.00 INR per strip of 10 tablets at Larkfield Medical Centre.",
+      "attribute": "price_inr",
+      "value": 22.0
+    },
+    {
+      "fact_id": "B-MED-005",
+      "category": "medicine",
+      "statement": "Amlodipine 5mg tablets are currently in stock at Larkfield Medical Centre pharmacy.",
+      "attribute": "stock_status",
+      "value": "in_stock"
+    },
+    {
+      "fact_id": "B-MED-006",
+      "category": "medicine",
+      "statement": "Amlodipine 5mg tablets require a valid prescription for dispensing.",
+      "attribute": "requires_prescription",
+      "value": true
+    },
+    {
+      "fact_id": "B-MED-007",
+      "category": "medicine",
+      "statement": "Pantoprazole 40mg tablets are priced at 30.00 INR per strip of 10 tablets at Larkfield Medical Centre.",
+      "attribute": "price_inr",
+      "value": 30.0
+    },
+    {
+      "fact_id": "B-MED-008",
+      "category": "medicine",
+      "statement": "Pantoprazole 40mg tablets are currently in stock at Larkfield Medical Centre pharmacy.",
+      "attribute": "stock_status",
+      "value": "in_stock"
+    },
+    {
+      "fact_id": "B-MED-009",
+      "category": "medicine",
+      "statement": "Pantoprazole 40mg tablets do not require a prescription for purchase.",
+      "attribute": "requires_prescription",
+      "value": false
+    },
+    {
+      "fact_id": "B-MED-010",
+      "category": "medicine",
+      "statement": "Loratadine 10mg tablets are priced at 15.00 INR per strip of 10 tablets at Larkfield Medical Centre.",
+      "attribute": "price_inr",
+      "value": 15.0
+    },
+    {
+      "fact_id": "B-MED-011",
+      "category": "medicine",
+      "statement": "Loratadine 10mg tablets are currently in stock at Larkfield Medical Centre pharmacy.",
+      "attribute": "stock_status",
+      "value": "in_stock"
+    },
+    {
+      "fact_id": "B-MED-012",
+      "category": "medicine",
+      "statement": "Loratadine 10mg tablets do not require a prescription for purchase.",
+      "attribute": "requires_prescription",
+      "value": false
+    },
+    {
+      "fact_id": "B-MED-013",
+      "category": "medicine",
+      "statement": "Azithromycin 250mg tablets are priced at 65.00 INR per strip of 6 tablets at Larkfield Medical Centre.",
+      "attribute": "price_inr",
+      "value": 65.0
+    },
+    {
+      "fact_id": "B-MED-014",
+      "category": "medicine",
+      "statement": "Azithromycin 250mg tablets are currently in stock at Larkfield Medical Centre pharmacy.",
+      "attribute": "stock_status",
+      "value": "in_stock"
+    },
+    {
+      "fact_id": "B-MED-015",
+      "category": "medicine",
+      "statement": "Azithromycin 250mg tablets require a valid prescription for dispensing.",
+      "attribute": "requires_prescription",
+      "value": true
+    }
+  ]
+}
