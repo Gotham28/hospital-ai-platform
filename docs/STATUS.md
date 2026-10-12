@@ -1749,8 +1749,8 @@ Review tier: Sonnet 5, medium effort. No Antigravity tier line existed, so this 
 Implemented Meta welcome messages and completed the approved review fixes. Four Codex review lenses reported no unresolved findings; the developer accepted the review on 2026-10-11. Close-out requested on 2026-10-12.
 
 Branch: codex/meta-whatsapp-welcome
-PR: pending
-Commits: pending
+PR: #43 - https://github.com/Gotham28/hospital-ai-platform/pull/43
+Commits: 2546a1e
 
 **Verification evidence from 2026-10-11:**
 
