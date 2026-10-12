@@ -12,6 +12,7 @@ from app.api.v1.endpoints.medicines import router as medicines_router
 from app.api.v1.endpoints.lab_tests import router as lab_tests_router
 from app.api.v1.endpoints.doctor_availability import router as availability_router
 from app.api.v1.endpoints.whatsapp import router as whatsapp_router
+from app.api.v1.endpoints.whatsapp_webhook import router as whatsapp_webhook_router
 from app.core.config import settings
 
 app = FastAPI(title="Hospital AI Platform")
@@ -26,6 +27,18 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logging.getLogger("httpx").setLevel(logging.WARNING)
+
+
+class _WhatsAppAccessFilter(logging.Filter):
+    def filter(self, record):
+        # Uvicorn access records include the query string on GET verification.
+        # Drop callback access records so verification tokens never reach app logs.
+        arguments = record.args if isinstance(record.args, tuple) else ()
+        return not any(isinstance(value, str) and "/api/v1/whatsapp/webhook" in value for value in arguments)
+
+
+logging.getLogger("uvicorn.access").addFilter(_WhatsAppAccessFilter())
+
 
 
 app.add_middleware(
@@ -44,6 +57,7 @@ app.include_router(medicines_router, prefix="/api/v1/medicines", tags=["Medicine
 app.include_router(lab_tests_router, prefix="/api/v1/lab-tests", tags=["Lab Tests"])
 app.include_router(availability_router, prefix="/api/v1/availability", tags=["Doctor Availability"])
 app.include_router(whatsapp_router, prefix="/api/v1/hospitals/{hospital_id}/whatsapp", tags=["WhatsApp"])
+app.include_router(whatsapp_webhook_router, prefix="/api/v1/whatsapp", tags=["WhatsApp callbacks"])
 
 @app.on_event("startup")
 def on_startup():
