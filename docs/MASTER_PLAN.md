@@ -603,3 +603,7 @@ items; a prerequisite for them.
 
 ### 2026-10-04 — IRIS patient page redesign to the Ease Health style
 Not in the original plan. Forest-green/cream `iris-*` token values, Fraunces + Inter with Noto Serif/Sans Malayalam, flat shadowless surfaces over a light-green page gradient, larger logo, shared theme motion constants, calmer chat motion, opening animation rebuilt (~2.4s, skippable, reduced-motion aware). Presentation only. Scope: `frontend/index.html`, `frontend/src/index.css`, `frontend/src/themes/iris-hospitals/`. Related: CURRENT_TASK.md dated 2026-10-04.
+
+### 2026-10-12 — Meta WhatsApp welcome messages
+Not in the original plan. Built developer-prioritized welcomes using a shared Arogya sender, explicit submit and permission, staff-selected English/Malayalam, hospital assistant links, authenticated status and signed delivery callbacks. Disabled until account/template/portal setup, separately approved migration application and controlled live acceptance; legacy Twilio bulk retained.
+Scope: admin Messaging form/tests, backend Meta service/config/APIs/webhook/audit model, additive migration draft, runtime dependencies and setup/evidence documentation. Related: CURRENT_TASK.md dated 2026-10-11.
