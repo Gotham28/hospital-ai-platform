@@ -1,0 +1,481 @@
+{
+  "hospital_id": "hospital_a",
+  "name": "Brightmoor Community Hospital",
+  "slug": "brightmoor-community-hospital",
+  "address": "14 Meadow Lane, Brightmoor District",
+  "system_prompt": "You are Arogya, an AI healthcare assistant for Brightmoor Community Hospital. Provide helpful, accurate information on doctors, schedules, laboratory services, and pharmacy availability. Always verify doctor availability before confirming appointments.",
+  "metadata": {
+    "version": "1.0",
+    "stage": 2,
+    "facts_in_file": 60,
+    "total_facts_target": 60,
+    "is_fictional": true,
+    "description": "Fictional test hospital facts for research evaluation (Stage 2: complete 60-fact dataset)."
+  },
+  "facts": [
+    {
+      "fact_id": "A-GEN-001",
+      "category": "general_info",
+      "statement": "Brightmoor Community Hospital is located at 14 Meadow Lane, Brightmoor District.",
+      "attribute": "address",
+      "value": "14 Meadow Lane, Brightmoor District"
+    },
+    {
+      "fact_id": "A-GEN-002",
+      "category": "general_info",
+      "statement": "General outpatient consultation hours are Monday through Saturday from 08:30 to 17:30.",
+      "attribute": "opd_hours",
+      "value": {
+        "days": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+        "start": "08:30",
+        "end": "17:30"
+      }
+    },
+    {
+      "fact_id": "A-GEN-003",
+      "category": "general_info",
+      "statement": "Inpatient visiting hours are strictly 16:00 to 19:00 daily.",
+      "attribute": "visiting_hours",
+      "value": {
+        "days": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+        "start": "16:00",
+        "end": "19:00"
+      }
+    },
+    {
+      "fact_id": "A-GEN-004",
+      "category": "general_info",
+      "statement": "On-site visitor parking is available free of charge.",
+      "attribute": "free_parking",
+      "value": true
+    },
+    {
+      "fact_id": "A-GEN-005",
+      "category": "general_info",
+      "statement": "Accepted payment methods at the hospital billing counter are cash, debit card, credit card, and UPI.",
+      "attribute": "accepted_payment_methods",
+      "value": "cash, debit card, credit card, UPI"
+    },
+    {
+      "fact_id": "A-ADMIN-001",
+      "category": "admin_instruction",
+      "statement": "The assistant must require patient phone number verification before confirming any doctor appointment.",
+      "attribute": "require_phone_verification",
+      "value": true
+    },
+    {
+      "fact_id": "A-DEP-001",
+      "category": "department",
+      "statement": "The Department of General Medicine provides primary clinical care for adult patients.",
+      "attribute": "department_name",
+      "value": "General Medicine"
+    },
+    {
+      "fact_id": "A-DEP-002",
+      "category": "department",
+      "statement": "The Department of Cardiology provides specialized outpatient care for cardiovascular conditions.",
+      "attribute": "department_name",
+      "value": "Cardiology"
+    },
+    {
+      "fact_id": "A-DOC-001",
+      "category": "doctor",
+      "statement": "Dr. Priya Nair is a Consultant Physician in General Medicine at Brightmoor Community Hospital.",
+      "attribute": "department",
+      "value": "General Medicine"
+    },
+    {
+      "fact_id": "A-DOC-002",
+      "category": "doctor",
+      "statement": "Dr. Rajesh Varma is a Consultant Cardiologist at Brightmoor Community Hospital.",
+      "attribute": "department",
+      "value": "Cardiology"
+    },
+    {
+      "fact_id": "A-SCHED-001",
+      "category": "schedule",
+      "statement": "Dr. Priya Nair conducts outpatient clinics on Monday, Wednesday, and Friday from 09:00 to 13:00.",
+      "attribute": "clinic_schedule",
+      "value": {
+        "days": ["Mon", "Wed", "Fri"],
+        "start": "09:00",
+        "end": "13:00"
+      }
+    },
+    {
+      "fact_id": "A-SCHED-002",
+      "category": "schedule",
+      "statement": "Dr. Rajesh Varma conducts outpatient cardiology clinics on Tuesday and Thursday from 09:00 to 12:30.",
+      "attribute": "clinic_schedule",
+      "value": {
+        "days": ["Tue", "Thu"],
+        "start": "09:00",
+        "end": "12:30"
+      }
+    },
+    {
+      "fact_id": "A-LAB-001",
+      "category": "lab_test",
+      "statement": "The Comprehensive Lipid Profile test costs 650 INR.",
+      "attribute": "price_inr",
+      "value": 650
+    },
+    {
+      "fact_id": "A-LAB-002",
+      "category": "lab_test",
+      "statement": "The Comprehensive Lipid Profile test requires 12 hours of fasting prior to sample collection.",
+      "attribute": "fasting_hours",
+      "value": 12
+    },
+    {
+      "fact_id": "A-LAB-003",
+      "category": "lab_test",
+      "statement": "The Thyroid Stimulating Hormone (TSH) test costs 420 INR.",
+      "attribute": "price_inr",
+      "value": 420
+    },
+    {
+      "fact_id": "A-LAB-004",
+      "category": "lab_test",
+      "statement": "The Thyroid Stimulating Hormone (TSH) test report turnaround time is 4 hours.",
+      "attribute": "turnaround_hours",
+      "value": 4
+    },
+    {
+      "fact_id": "A-MED-001",
+      "category": "medicine",
+      "statement": "Paracetamol 500mg tablets are priced at 2.50 INR per strip of 10 tablets.",
+      "attribute": "price_inr",
+      "value": 2.5
+    },
+    {
+      "fact_id": "A-MED-002",
+      "category": "medicine",
+      "statement": "Paracetamol 500mg tablets do not require a prescription for purchase.",
+      "attribute": "requires_prescription",
+      "value": false
+    },
+    {
+      "fact_id": "A-MED-003",
+      "category": "medicine",
+      "statement": "Metformin 500mg tablets are priced at 4.00 INR per strip of 10 tablets.",
+      "attribute": "price_inr",
+      "value": 4.0
+    },
+    {
+      "fact_id": "A-MED-004",
+      "category": "medicine",
+      "statement": "Metformin 500mg tablets require a valid prescription for dispensing.",
+      "attribute": "requires_prescription",
+      "value": true
+    },
+    {
+      "fact_id": "A-ADMIN-002",
+      "category": "admin_instruction",
+      "statement": "The assistant must follow the greeting and appointment handling policy for Brightmoor Community Hospital.",
+      "attribute": "greeting_and_appointment_policy",
+      "value": "When greeting patients, address them warmly by name and confirm the department or doctor they wish to consult before proceeding. For appointment requests, always collect the patient's registered phone number and preferred date before checking availability. If the requested slot is unavailable, offer the next two available options and let the patient choose. Confirm all booking details back to the patient before finalising, and remind them to bring any previous records on the day of their visit."
+    },
+    {
+      "fact_id": "A-GEN-006",
+      "category": "general_info",
+      "statement": "The Brightmoor Community Hospital emergency helpline is 1800-234-5678, available 24 hours.",
+      "attribute": "emergency_helpline",
+      "value": "1800-234-5678"
+    },
+    {
+      "fact_id": "A-GEN-007",
+      "category": "general_info",
+      "statement": "The hospital pharmacy operates Monday through Saturday from 08:00 to 20:00.",
+      "attribute": "pharmacy_hours",
+      "value": {
+        "days": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+        "start": "08:00",
+        "end": "20:00"
+      }
+    },
+    {
+      "fact_id": "A-GEN-008",
+      "category": "general_info",
+      "statement": "The hospital laboratory accepts samples Monday through Saturday from 07:30 to 18:00.",
+      "attribute": "lab_hours",
+      "value": {
+        "days": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+        "start": "07:30",
+        "end": "18:00"
+      }
+    },
+    {
+      "fact_id": "A-GEN-009",
+      "category": "general_info",
+      "statement": "The billing counter at Brightmoor Community Hospital is open Monday through Friday from 09:00 to 17:00.",
+      "attribute": "billing_counter_hours",
+      "value": {
+        "days": ["Mon", "Tue", "Wed", "Thu", "Fri"],
+        "start": "09:00",
+        "end": "17:00"
+      }
+    },
+    {
+      "fact_id": "A-DEP-003",
+      "category": "department",
+      "statement": "The Department of Orthopedics at Brightmoor Community Hospital manages bone, joint, and musculoskeletal conditions.",
+      "attribute": "department_name",
+      "value": "Orthopedics"
+    },
+    {
+      "fact_id": "A-DEP-004",
+      "category": "department",
+      "statement": "The Department of Dermatology at Brightmoor Community Hospital offers outpatient skin care consultations.",
+      "attribute": "department_name",
+      "value": "Dermatology"
+    },
+    {
+      "fact_id": "A-DEP-005",
+      "category": "department",
+      "statement": "The Department of Pediatrics at Brightmoor Community Hospital provides clinical care for children up to 18 years.",
+      "attribute": "department_name",
+      "value": "Pediatrics"
+    },
+    {
+      "fact_id": "A-DEP-006",
+      "category": "department",
+      "statement": "The Department of ENT at Brightmoor Community Hospital specialises in ear, nose, and throat conditions.",
+      "attribute": "department_name",
+      "value": "ENT"
+    },
+    {
+      "fact_id": "A-DOC-003",
+      "category": "doctor",
+      "statement": "Dr. Thomas Everett is a Consultant Orthopedic Surgeon at Brightmoor Community Hospital.",
+      "attribute": "department",
+      "value": "Orthopedics"
+    },
+    {
+      "fact_id": "A-SCHED-003",
+      "category": "schedule",
+      "statement": "Dr. Thomas Everett holds outpatient orthopedic clinics on Monday, Wednesday, and Friday from 14:00 to 17:30.",
+      "attribute": "clinic_schedule",
+      "value": {
+        "days": ["Mon", "Wed", "Fri"],
+        "start": "14:00",
+        "end": "17:30"
+      }
+    },
+    {
+      "fact_id": "A-DOC-004",
+      "category": "doctor",
+      "statement": "Dr. Sunita Kapoor is a Consultant Dermatologist at Brightmoor Community Hospital.",
+      "attribute": "department",
+      "value": "Dermatology"
+    },
+    {
+      "fact_id": "A-SCHED-004",
+      "category": "schedule",
+      "statement": "Dr. Sunita Kapoor holds outpatient dermatology clinics on Tuesday and Thursday from 10:00 to 13:00.",
+      "attribute": "clinic_schedule",
+      "value": {
+        "days": ["Tue", "Thu"],
+        "start": "10:00",
+        "end": "13:00"
+      }
+    },
+    {
+      "fact_id": "A-DOC-005",
+      "category": "doctor",
+      "statement": "Dr. Amelia Chen is a Consultant Paediatrician at Brightmoor Community Hospital.",
+      "attribute": "department",
+      "value": "Pediatrics"
+    },
+    {
+      "fact_id": "A-SCHED-005",
+      "category": "schedule",
+      "statement": "Dr. Amelia Chen holds outpatient paediatric clinics on Monday, Tuesday, Wednesday, and Thursday from 09:00 to 12:30.",
+      "attribute": "clinic_schedule",
+      "value": {
+        "days": ["Mon", "Tue", "Wed", "Thu"],
+        "start": "09:00",
+        "end": "12:30"
+      }
+    },
+    {
+      "fact_id": "A-DOC-006",
+      "category": "doctor",
+      "statement": "Dr. Felix Oduya is a Consultant ENT Surgeon at Brightmoor Community Hospital.",
+      "attribute": "department",
+      "value": "ENT"
+    },
+    {
+      "fact_id": "A-SCHED-006",
+      "category": "schedule",
+      "statement": "Dr. Felix Oduya holds outpatient ENT clinics on Monday, Wednesday, and Saturday from 14:00 to 17:00.",
+      "attribute": "clinic_schedule",
+      "value": {
+        "days": ["Mon", "Wed", "Sat"],
+        "start": "14:00",
+        "end": "17:00"
+      }
+    },
+    {
+      "fact_id": "A-LAB-005",
+      "category": "lab_test",
+      "statement": "The Complete Blood Count (CBC) test costs 380 INR.",
+      "attribute": "price_inr",
+      "value": 380
+    },
+    {
+      "fact_id": "A-LAB-006",
+      "category": "lab_test",
+      "statement": "The Complete Blood Count (CBC) test requires no special preparation before sample collection.",
+      "attribute": "preparation",
+      "value": "no_fasting_required"
+    },
+    {
+      "fact_id": "A-LAB-007",
+      "category": "lab_test",
+      "statement": "The Fasting Blood Glucose test costs 140 INR.",
+      "attribute": "price_inr",
+      "value": 140
+    },
+    {
+      "fact_id": "A-LAB-008",
+      "category": "lab_test",
+      "statement": "The Fasting Blood Glucose test requires 8 hours of fasting before sample collection.",
+      "attribute": "fasting_hours",
+      "value": 8
+    },
+    {
+      "fact_id": "A-LAB-009",
+      "category": "lab_test",
+      "statement": "The HbA1c (Glycated Haemoglobin) test costs 520 INR.",
+      "attribute": "price_inr",
+      "value": 520
+    },
+    {
+      "fact_id": "A-LAB-010",
+      "category": "lab_test",
+      "statement": "The HbA1c test requires no fasting; patients may eat and drink normally before the test.",
+      "attribute": "preparation",
+      "value": "no_fasting_required"
+    },
+    {
+      "fact_id": "A-LAB-011",
+      "category": "lab_test",
+      "statement": "The Liver Function Test (LFT) costs 750 INR.",
+      "attribute": "price_inr",
+      "value": 750
+    },
+    {
+      "fact_id": "A-LAB-012",
+      "category": "lab_test",
+      "statement": "The Liver Function Test (LFT) requires 8 hours of fasting before sample collection.",
+      "attribute": "fasting_hours",
+      "value": 8
+    },
+    {
+      "fact_id": "A-LAB-013",
+      "category": "lab_test",
+      "statement": "The Urine Routine Examination costs 160 INR.",
+      "attribute": "price_inr",
+      "value": 160
+    },
+    {
+      "fact_id": "A-LAB-014",
+      "category": "lab_test",
+      "statement": "The Urine Routine Examination requires no fasting; patients should provide a fresh mid-stream urine sample.",
+      "attribute": "preparation",
+      "value": "no_fasting_required"
+    },
+    {
+      "fact_id": "A-LAB-015",
+      "category": "lab_test",
+      "statement": "The Thyroid Stimulating Hormone (TSH) test requires no fasting before sample collection.",
+      "attribute": "preparation",
+      "value": "no_fasting_required"
+    },
+    {
+      "fact_id": "A-MED-005",
+      "category": "medicine",
+      "statement": "Amoxicillin 500mg capsules are priced at 28.00 INR per strip of 10 capsules.",
+      "attribute": "price_inr",
+      "value": 28.0
+    },
+    {
+      "fact_id": "A-MED-006",
+      "category": "medicine",
+      "statement": "Amoxicillin 500mg capsules are currently in stock at Brightmoor Community Hospital pharmacy.",
+      "attribute": "stock_status",
+      "value": "in_stock"
+    },
+    {
+      "fact_id": "A-MED-007",
+      "category": "medicine",
+      "statement": "Amoxicillin 500mg capsules require a valid prescription for dispensing.",
+      "attribute": "requires_prescription",
+      "value": true
+    },
+    {
+      "fact_id": "A-MED-008",
+      "category": "medicine",
+      "statement": "Atorvastatin 10mg tablets are priced at 35.00 INR per strip of 10 tablets.",
+      "attribute": "price_inr",
+      "value": 35.0
+    },
+    {
+      "fact_id": "A-MED-009",
+      "category": "medicine",
+      "statement": "Atorvastatin 10mg tablets are currently in stock at Brightmoor Community Hospital pharmacy.",
+      "attribute": "stock_status",
+      "value": "in_stock"
+    },
+    {
+      "fact_id": "A-MED-010",
+      "category": "medicine",
+      "statement": "Atorvastatin 10mg tablets require a valid prescription for dispensing.",
+      "attribute": "requires_prescription",
+      "value": true
+    },
+    {
+      "fact_id": "A-MED-011",
+      "category": "medicine",
+      "statement": "Omeprazole 20mg capsules are priced at 18.00 INR per strip of 10 capsules.",
+      "attribute": "price_inr",
+      "value": 18.0
+    },
+    {
+      "fact_id": "A-MED-012",
+      "category": "medicine",
+      "statement": "Omeprazole 20mg capsules are currently in stock at Brightmoor Community Hospital pharmacy.",
+      "attribute": "stock_status",
+      "value": "in_stock"
+    },
+    {
+      "fact_id": "A-MED-013",
+      "category": "medicine",
+      "statement": "Omeprazole 20mg capsules do not require a prescription for purchase.",
+      "attribute": "requires_prescription",
+      "value": false
+    },
+    {
+      "fact_id": "A-MED-014",
+      "category": "medicine",
+      "statement": "Cetirizine 10mg tablets are priced at 12.00 INR per strip of 10 tablets.",
+      "attribute": "price_inr",
+      "value": 12.0
+    },
+    {
+      "fact_id": "A-MED-015",
+      "category": "medicine",
+      "statement": "Cetirizine 10mg tablets are currently in stock at Brightmoor Community Hospital pharmacy.",
+      "attribute": "stock_status",
+      "value": "in_stock"
+    },
+    {
+      "fact_id": "A-MED-016",
+      "category": "medicine",
+      "statement": "Cetirizine 10mg tablets do not require a prescription for purchase.",
+      "attribute": "requires_prescription",
+      "value": false
+    }
+  ]
+}

@@ -388,6 +388,9 @@ A Twilio-backed WhatsApp messaging feature has been added outside the original p
 - **Credentials required**: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_NUMBER` in config. Gracefully degrades if not set.
 - **Verified locally**: Migration applied, PII masking confirmed.
 
+
+Meta welcome flow implemented on codex/meta-whatsapp-welcome; review accepted by the developer on 2026-10-11, awaiting close-out and activation. Explicit submit/permission, staff-selected English/Malayalam, public hospital assistant link and delivery status. Disabled by default. Migration draft, approved templates, sender/credentials, portal allowlist and live tests pending. Legacy Twilio bulk separate.
+
 ---
 
 ## Phase 2 — Research (MASTER_PLAN.md §3, later)
@@ -402,6 +405,8 @@ unscoped; IRIS Features 2/3 sign-off pending) — see Catch-up 2026-09-22. Next:
 ---
 
 ## Notes / Open Questions for Developer
+
+Meta activation requires approved bilingual templates, configured sender/version/credentials, verified portal allowlist, separately approved migration application and controlled live receipt/link/callback tests. SQLite concurrency is not deployed PostgreSQL acceptance. Full frontend lint remains outstanding. A pending/unknown send without provider ID can remain unreconciled; investigate instead of starting another request.
 
 - Feature 2 disclaimer wording and Feature 3 outsourced-note wording are both still
   pending sign-off from Iris Rheumatology Clinic administration — fields are live and
@@ -457,7 +462,7 @@ unscoped; IRIS Features 2/3 sign-off pending) — see Catch-up 2026-09-22. Next:
   section should collapse to one-liners pointing at their Catch-up entries — STILL OPEN.
   Swept and confirmed NOT stale on 2026-08-23: MASTER_PLAN.md §1.3a names neither
   `mayura:v1` nor a 1000-character input cap.
-- WhatsApp integration: confirm whether end-to-end testing against Twilio sandbox has been done, and whether it needs a frontend UI surface in the admin panel.
+- WhatsApp integration: Meta welcome UI is implemented in the admin Messaging screen and remains disabled pending activation and controlled live acceptance. Legacy Twilio sandbox end-to-end testing remains unconfirmed.
 - **Tenant-isolation audit (2026-08-08) — RESOLVED 2026-08-12 via PR #3.** Six endpoints in
   `backend/app/` fetched tenant-owned rows by primary key and mutated them without any
   `hospital_id` check, violating AGENTS.md §5.1 and §4. All six now enforce ownership as of
@@ -1738,3 +1743,452 @@ Browser, 1440 and 375 wide, dev servers on 5173/8000:
 Deferred / not verified: the recording and transcribing states were not reached (the dev server cannot load the VAD assets); a native Malayalam reader has not checked the serif headline and tagline; the language-notice fade-out was not visually confirmed; `components/iris/*` (dead code) and the duplicate `logonewiris.png` files are not deleted; the shared `ThemeLoader` has no per-theme loading screen; the 2 ESLint errors above pre-date this task; intro timeline literals live in `AnimatedIntro.tsx` not `motion.ts`; `introComplete` state in `index.tsx` is redundant; hero list double-fades; the sage rectangle sits inside the hero panel, not behind it; unused `--text-iris-display` tokens; the new Google Fonts link loads for every tenant; input placeholder has no trailing ellipsis; no live region for streamed replies; second tagline line is slightly wider than the front panel on desktop. The response-quality work (`fix/response-quality`, local commit `b9eb827`, unpushed) is a separate paused task and is not in this PR.
 
 Review tier: Sonnet 5, medium effort. No Antigravity tier line existed, so this classification is unratcheted.
+
+### Catch-up — 2026-10-12
+
+Implemented Meta welcome messages and completed the approved review fixes. Four Codex review lenses reported no unresolved findings; the developer accepted the review on 2026-10-11. Close-out requested on 2026-10-12.
+
+Branch: codex/meta-whatsapp-welcome
+PR: #43 - https://github.com/Gotham28/hospital-ai-platform/pull/43
+Commits: 2546a1e
+
+**Verification evidence from 2026-10-11:**
+
+<details>
+<summary>Exact commands and full raw outputs from the accepted fix pass</summary>
+
+Commands ran in the accepted fix pass on 2026-10-11; they were not rerun during close-out on 2026-10-12. Raw captured stdout/stderr appears before analysis. No configured database, provider sends or deployment were used.
+
+### Backend isolated tests
+
+CWD: C:\Users\aravi\.codex\worktrees\meta-whatsapp-welcome\hospital-ai-platform\backend
+
+```powershell
+$env:PYTHONPATH = "$env:TEMP\meta-whatsapp-test-deps"
+D:/Hospital/hospital-ai-platform/backend/venv/Scripts/python.exe run_meta_whatsapp_test.py 2>&1 | Tee-Object -FilePath ../.agents/runs/meta-whatsapp/fix-backend-tests.txt
+exit $LASTEXITCODE
+```
+
+Exit code: 0
+
+```text
+test_actual_insert_collision_recovers_one_saved_request (__main__.MetaWelcomeTests.test_actual_insert_collision_recovers_one_saved_request) ... ok
+test_auth_tenant_scope_and_non_echoing_validation (__main__.MetaWelcomeTests.test_auth_tenant_scope_and_non_echoing_validation) ... ok
+test_bad_success_and_server_errors_are_unknown (__main__.MetaWelcomeTests.test_bad_success_and_server_errors_are_unknown) ... ok
+test_both_template_payloads (__main__.MetaWelcomeTests.test_both_template_payloads) ... ok
+test_callback_access_log_omits_verify_token (__main__.MetaWelcomeTests.test_callback_access_log_omits_verify_token) ... ok
+test_concurrent_same_key_never_sends_twice (__main__.MetaWelcomeTests.test_concurrent_same_key_never_sends_twice) ... ok
+test_duplicate_out_of_order_and_failure_events (__main__.MetaWelcomeTests.test_duplicate_out_of_order_and_failure_events) ... ok
+test_early_callback_is_retryable_not_lost (__main__.MetaWelcomeTests.test_early_callback_is_retryable_not_lost) ... ok
+test_equal_second_provider_events_do_not_use_submission_microseconds (__main__.MetaWelcomeTests.test_equal_second_provider_events_do_not_use_submission_microseconds) ... ok
+test_failure_then_delivery_evidence (__main__.MetaWelcomeTests.test_failure_then_delivery_evidence) ... ok
+test_historical_twilio_rows_remain_usable (__main__.MetaWelcomeTests.test_historical_twilio_rows_remain_usable) ... ok
+test_import_bootstrap_engine_and_runtime_manifests (__main__.MetaWelcomeTests.test_import_bootstrap_engine_and_runtime_manifests) ... ok
+test_incomplete_config_fails_closed (__main__.MetaWelcomeTests.test_incomplete_config_fails_closed) ... ok
+test_initial_persistence_failure_prevents_send (__main__.MetaWelcomeTests.test_initial_persistence_failure_prevents_send) ... ok
+test_malformed_signed_callback_and_size_limit (__main__.MetaWelcomeTests.test_malformed_signed_callback_and_size_limit) ... ok
+test_migration_is_additive_offline_and_has_correct_parent (__main__.MetaWelcomeTests.test_migration_is_additive_offline_and_has_correct_parent) ... ok
+test_missing_permission_has_no_side_effect (__main__.MetaWelcomeTests.test_missing_permission_has_no_side_effect) ... ok
+test_phone_normalization (__main__.MetaWelcomeTests.test_phone_normalization) ... ok
+test_post_send_persistence_failure_is_ambiguous (__main__.MetaWelcomeTests.test_post_send_persistence_failure_is_ambiguous) ... ok
+test_preview_is_only_configured_copy_and_correct_link (__main__.MetaWelcomeTests.test_preview_is_only_configured_copy_and_correct_link) ... ok
+test_privacy_and_sanitized_rejection (__main__.MetaWelcomeTests.test_privacy_and_sanitized_rejection) ... ok
+test_repeated_sent_advances_clock_before_older_failure (__main__.MetaWelcomeTests.test_repeated_sent_advances_clock_before_older_failure) ... ok
+test_replay_and_conflict (__main__.MetaWelcomeTests.test_replay_and_conflict) ... ok
+test_replay_ignores_mutable_send_setup (__main__.MetaWelcomeTests.test_replay_ignores_mutable_send_setup) ... ok
+test_sender_mismatch_cannot_update (__main__.MetaWelcomeTests.test_sender_mismatch_cannot_update) ... ok
+test_stale_failure_does_not_undo_newer_sent_callback (__main__.MetaWelcomeTests.test_stale_failure_does_not_undo_newer_sent_callback) ... ok
+test_unknown_timeout_and_replay (__main__.MetaWelcomeTests.test_unknown_timeout_and_replay) ... ok
+test_unrelated_inbound_and_unknown_ids_not_persisted (__main__.MetaWelcomeTests.test_unrelated_inbound_and_unknown_ids_not_persisted) ... ok
+test_webhook_challenge_and_signature (__main__.MetaWelcomeTests.test_webhook_challenge_and_signature) ... ok
+
+----------------------------------------------------------------------
+Ran 29 tests in 3.305s
+
+OK
+
+OFFLINE PostgreSQL migration SQL (no database connection):
+ALTER TABLE whatsapp_logs ADD COLUMN provider VARCHAR(16);
+
+ALTER TABLE whatsapp_logs ADD COLUMN provider_message_id VARCHAR(255);
+
+ALTER TABLE whatsapp_logs ADD COLUMN request_id VARCHAR(36);
+
+ALTER TABLE whatsapp_logs ADD COLUMN request_fingerprint VARCHAR(64);
+
+ALTER TABLE whatsapp_logs ADD COLUMN language VARCHAR(8);
+
+ALTER TABLE whatsapp_logs ADD COLUMN consent_confirmed_at TIMESTAMP WITH TIME ZONE;
+
+ALTER TABLE whatsapp_logs ADD COLUMN consent_recorded_by VARCHAR(64);
+
+ALTER TABLE whatsapp_logs ADD COLUMN error_code VARCHAR(64);
+
+ALTER TABLE whatsapp_logs ADD COLUMN status_updated_at TIMESTAMP WITH TIME ZONE;
+
+ALTER TABLE whatsapp_logs ADD COLUMN provider_event_at TIMESTAMP WITH TIME ZONE;
+
+ALTER TABLE whatsapp_logs ADD CONSTRAINT uq_whatsapp_hospital_request UNIQUE (hospital_id, request_id);
+
+ALTER TABLE whatsapp_logs ADD CONSTRAINT uq_whatsapp_provider_message UNIQUE (provider_message_id);
+
+
+```
+
+Files touched: disposable synthetic SQLite (removed), ignored bytecode/test caches and evidence log; no configured database or applied migration.
+
+### Frontend tests
+
+CWD: C:\Users\aravi\.codex\worktrees\meta-whatsapp-welcome\hospital-ai-platform\frontend
+
+```powershell
+npx vitest run src/pages/Messaging.test.tsx 2>&1 | Tee-Object -FilePath ../.agents/runs/meta-whatsapp/fix-frontend-tests.txt
+exit $LASTEXITCODE
+```
+
+Exit code: 0
+
+```text
+
+ RUN  v5.0.0 C:/Users/aravi/.codex/worktrees/meta-whatsapp-welcome/hospital-ai-platform/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  15 passed (15)
+   Start at  21:53:12
+   Duration  2.98s (tests 41%, environment 38%, import 16%, transform 4%)
+
+```
+
+Files touched: ignored dependency/build caches and evidence log; build also frontend/dist (ignored). Build VAD line endings restored to original HEAD bytes.
+
+### Focused lint
+
+CWD: C:\Users\aravi\.codex\worktrees\meta-whatsapp-welcome\hospital-ai-platform\frontend
+
+```powershell
+npx eslint src/pages/Messaging.tsx src/pages/Messaging.test.tsx 2>&1 | Tee-Object -FilePath ../.agents/runs/meta-whatsapp/fix-scoped-lint.txt
+exit $LASTEXITCODE
+```
+
+Exit code: 0
+
+```text
+[no stdout/stderr]
+```
+
+Files touched: ignored dependency/build caches and evidence log; build also frontend/dist (ignored). Build VAD line endings restored to original HEAD bytes.
+
+### Focused TypeScript
+
+CWD: C:\Users\aravi\.codex\worktrees\meta-whatsapp-welcome\hospital-ai-platform\frontend
+
+```powershell
+npx tsc --noEmit --jsx react-jsx --target ES2022 --module ESNext --moduleResolution bundler --esModuleInterop --skipLibCheck --types vite/client src/pages/Messaging.tsx src/pages/Messaging.test.tsx 2>&1 | Tee-Object -FilePath ../.agents/runs/meta-whatsapp/fix-scoped-typecheck.txt
+exit $LASTEXITCODE
+```
+
+Exit code: 0
+
+```text
+[no stdout/stderr]
+```
+
+Files touched: ignored dependency/build caches and evidence log; build also frontend/dist (ignored). Build VAD line endings restored to original HEAD bytes.
+
+### Production build
+
+CWD: C:\Users\aravi\.codex\worktrees\meta-whatsapp-welcome\hospital-ai-platform\frontend
+
+```powershell
+npm run build 2>&1 | Tee-Object -FilePath ../.agents/runs/meta-whatsapp/fix-build.txt
+exit $LASTEXITCODE
+```
+
+Exit code: 0
+
+```text
+
+> frontend@0.0.0 prebuild
+> node scripts/copy-vad-assets.js
+
+✅ Copied vad.worklet.bundle.min.js
+✅ Copied silero_vad_legacy.onnx
+✅ Copied ort-wasm-simd-threaded.mjs
+✅ Copied ort-wasm-simd-threaded.wasm
+✅ Copied ort-wasm-simd-threaded.asyncify.mjs
+✅ Copied ort-wasm-simd-threaded.asyncify.wasm
+
+> frontend@0.0.0 build
+> vite build
+
+vite v7.3.1 building client environment for production...
+transforming...
+Browserslist: browsers data (caniuse-lite) is 8 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/react-router/dist/development/index.mjs (11:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/react-router/dist/development/index.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/react-router/dist/development/dom-export.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/react-router/dist/development/dom-export.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/components/AnimatePresence/PresenceChild.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/components/AnimatePresence/PresenceChild.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/components/LayoutGroup/index.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/components/LayoutGroup/index.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/components/AnimatePresence/PopChild.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/components/AnimatePresence/PopChild.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/components/LazyMotion/index.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/components/LazyMotion/index.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/components/MotionConfig/index.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/components/MotionConfig/index.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/utils/use-isomorphic-effect.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/utils/use-isomorphic-effect.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/motion/utils/use-visual-state.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/motion/utils/use-visual-state.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/utils/use-force-update.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/utils/use-force-update.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/render/dom/features-animation.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/render/dom/features-animation.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/utils/use-motion-value-event.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/utils/use-motion-value-event.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/utils/use-unmount-effect.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/utils/use-unmount-effect.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/render/dom/features-max.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/render/dom/features-max.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/render/dom/features-min.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/render/dom/features-min.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/value/use-spring.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/value/use-spring.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/value/use-motion-template.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/value/use-motion-template.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/value/use-motion-value.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/value/use-motion-value.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/value/use-scroll.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/value/use-scroll.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/value/use-will-change/index.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/value/use-will-change/index.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/value/use-time.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/value/use-time.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/value/use-follow-value.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/value/use-follow-value.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/components/AnimatePresence/index.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/components/AnimatePresence/index.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/animation/hooks/use-animate-style.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/animation/hooks/use-animate-style.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/utils/reduced-motion/use-reduced-motion-config.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/utils/reduced-motion/use-reduced-motion-config.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/animation/hooks/use-animate.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/animation/hooks/use-animate.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/events/use-dom-event.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/events/use-dom-event.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/value/use-velocity.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/value/use-velocity.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/animation/hooks/use-animation.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/animation/hooks/use-animation.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/components/AnimatePresence/use-presence.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/components/AnimatePresence/use-presence.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/utils/use-cycle.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/utils/use-cycle.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/value/use-transform.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/value/use-transform.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/utils/use-page-in-view.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/utils/use-page-in-view.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/utils/use-animation-frame.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/utils/use-animation-frame.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/context/LayoutGroupContext.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/context/LayoutGroupContext.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/utils/use-instant-transition.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/utils/use-instant-transition.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/components/AnimatePresence/use-presence-data.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/components/AnimatePresence/use-presence-data.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/context/MotionConfigContext.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/context/MotionConfigContext.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/utils/use-in-view.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/utils/use-in-view.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/context/MotionContext/index.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/context/MotionContext/index.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/context/PresenceContext.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/context/PresenceContext.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/components/AnimateSharedLayout.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/components/AnimateSharedLayout.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/context/DeprecatedLayoutGroupContext.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/context/DeprecatedLayoutGroupContext.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/context/SwitchLayoutGroupContext.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/context/SwitchLayoutGroupContext.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/animation/hooks/use-animated-state.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/animation/hooks/use-animated-state.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/value/use-inverted-scale.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/value/use-inverted-scale.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/utils/reduced-motion/use-reduced-motion.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/utils/reduced-motion/use-reduced-motion.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/utils/use-constant.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/utils/use-constant.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/context/LazyContext.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/context/LazyContext.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/utils/use-is-mounted.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/utils/use-is-mounted.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/value/use-combine-values.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/value/use-combine-values.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/value/use-computed.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/value/use-computed.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/components/Reorder/Item.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/components/Reorder/Item.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/components/Reorder/Group.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/components/Reorder/Group.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/motion/features/layout/MeasureLayout.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/motion/features/layout/MeasureLayout.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/context/ReorderContext.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/context/ReorderContext.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/motion/index.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/motion/index.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/context/MotionContext/create.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/context/MotionContext/create.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/render/svg/use-svg-visual-state.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/render/svg/use-svg-visual-state.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/render/dom/use-render.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/render/dom/use-render.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/motion/utils/use-motion-ref.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/motion/utils/use-motion-ref.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/render/html/use-html-visual-state.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/render/html/use-html-visual-state.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/motion/utils/use-visual-element.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/motion/utils/use-visual-element.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/render/svg/use-props.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/render/svg/use-props.mjs" was ignored.
+../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/render/html/use-props.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../../../../../../D:/Hospital/hospital-ai-platform/frontend/node_modules/framer-motion/dist/es/render/html/use-props.mjs" was ignored.
+✓ 2425 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                       1.01 kB │ gzip:   0.51 kB
+dist/assets/iris-logo-D3mIfQHc.png   17.11 kB
+dist/assets/index-DbOZAUCO.css       65.73 kB │ gzip:  12.36 kB
+dist/assets/zap-CTVPR7vs.js           0.26 kB │ gzip:   0.21 kB
+dist/assets/index-7lO0uxxT.js         7.69 kB │ gzip:   2.84 kB
+dist/assets/index-B83UqoEm.js         8.09 kB │ gzip:   2.97 kB
+dist/assets/index-yd0a09zs.js       145.61 kB │ gzip:  46.83 kB
+dist/assets/index-5qhnKvrF.js       395.01 kB │ gzip: 121.70 kB
+dist/assets/ChatCore-CHA0huuN.js    555.13 kB │ gzip: 157.64 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 5.49s
+```
+
+Files touched: ignored dependency/build caches and evidence log; build also frontend/dist (ignored). Build VAD line endings restored to original HEAD bytes.
+
+### Full frontend lint
+
+CWD: C:\Users\aravi\.codex\worktrees\meta-whatsapp-welcome\hospital-ai-platform\frontend
+
+```powershell
+npm run lint 2>&1 | Tee-Object -FilePath ../.agents/runs/meta-whatsapp/fix-full-lint.txt
+exit $LASTEXITCODE
+```
+
+Exit code: 1
+
+```text
+
+> frontend@0.0.0 lint
+> eslint .
+
+
+C:\Users\aravi\.codex\worktrees\meta-whatsapp-welcome\hospital-ai-platform\frontend\src\App.tsx
+   82:46  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  104:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  147:28  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\aravi\.codex\worktrees\meta-whatsapp-welcome\hospital-ai-platform\frontend\src\components\AppointmentsTab.tsx
+   68:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   97:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  112:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\aravi\.codex\worktrees\meta-whatsapp-welcome\hospital-ai-platform\frontend\src\components\CreateHospitalModal.tsx
+  48:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\aravi\.codex\worktrees\meta-whatsapp-welcome\hospital-ai-platform\frontend\src\components\HospitalStats.tsx
+   6:42  error    Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+  15:14  error    'err' is defined but never used                                                                                  @typescript-eslint/no-unused-vars
+  22:6   warning  React Hook useEffect has a missing dependency: 'fetchBilling'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  30:14  error    'err' is defined but never used                                                                                  @typescript-eslint/no-unused-vars
+
+C:\Users\aravi\.codex\worktrees\meta-whatsapp-welcome\hospital-ai-platform\frontend\src\components\common\ChatCore.tsx
+  13:10  error  'useState' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\aravi\.codex\worktrees\meta-whatsapp-welcome\hospital-ai-platform\frontend\src\components\iris\chat-bot-ui.tsx
+   12:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   63:33  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  148:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  188:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  188:55  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  202:26  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\aravi\.codex\worktrees\meta-whatsapp-welcome\hospital-ai-platform\frontend\src\context\AuthContext.tsx
+  54:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\aravi\.codex\worktrees\meta-whatsapp-welcome\hospital-ai-platform\frontend\src\hooks\useHospitalChat.tsx
+   30:26  error    Unexpected any. Specify a different type                                                                                                                                                                                              @typescript-eslint/no-explicit-any
+   84:6   warning  React Hook useEffect has a missing dependency: 'language'. Either include it or remove the dependency array. You can also replace multiple useState variables with useReducer if 'setMessages' needs the current value of 'language'  react-hooks/exhaustive-deps
+  266:7   warning  React Hook useMemo has missing dependencies: 'hospitalId' and 'vadPause'. Either include them or remove the dependency array                                                                                                          react-hooks/exhaustive-deps
+
+C:\Users\aravi\.codex\worktrees\meta-whatsapp-welcome\hospital-ai-platform\frontend\src\layouts\DashboardLayout.tsx
+  2:34  error  'Building2' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\aravi\.codex\worktrees\meta-whatsapp-welcome\hospital-ai-platform\frontend\src\pages\Doctors.tsx
+   10:42  error    Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+   15:48  error    Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+   21:46  error    Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+   22:46  error    Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+   23:40  error    Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+   36:19  error    Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+   45:40  warning  React Hook useEffect has a missing dependency: 'fetchDoctors'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+   61:19  error    Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+   71:33  error    Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+  105:14  error    'err' is defined but never used                                                                                  @typescript-eslint/no-unused-vars
+  115:14  error    'err' is defined but never used                                                                                  @typescript-eslint/no-unused-vars
+  122:39  error    Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+  150:14  error    'err' is defined but never used                                                                                  @typescript-eslint/no-unused-vars
+  163:14  error    'err' is defined but never used                                                                                  @typescript-eslint/no-unused-vars
+
+C:\Users\aravi\.codex\worktrees\meta-whatsapp-welcome\hospital-ai-platform\frontend\src\pages\KnowledgeBase.tsx
+  109:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  148:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\aravi\.codex\worktrees\meta-whatsapp-welcome\hospital-ai-platform\frontend\src\pages\LabTests.tsx
+    8:38  error    Unexpected any. Specify a different type                                                                       @typescript-eslint/no-explicit-any
+   12:50  error    Unexpected any. Specify a different type                                                                       @typescript-eslint/no-explicit-any
+   31:38  warning  React Hook useEffect has a missing dependency: 'fetchTests'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+   33:34  error    Unexpected any. Specify a different type                                                                       @typescript-eslint/no-explicit-any
+   70:14  error    'err' is defined but never used                                                                                @typescript-eslint/no-unused-vars
+   80:14  error    'err' is defined but never used                                                                                @typescript-eslint/no-unused-vars
+   99:19  error    Unexpected any. Specify a different type                                                                       @typescript-eslint/no-explicit-any
+  107:47  error    Unexpected any. Specify a different type                                                                       @typescript-eslint/no-explicit-any
+  109:20  error    Unexpected any. Specify a different type                                                                       @typescript-eslint/no-explicit-any
+  120:14  error    'err' is defined but never used                                                                                @typescript-eslint/no-unused-vars
+  132:14  error    'err' is defined but never used                                                                                @typescript-eslint/no-unused-vars
+  137:31  error    Unexpected any. Specify a different type                                                                       @typescript-eslint/no-explicit-any
+
+C:\Users\aravi\.codex\worktrees\meta-whatsapp-welcome\hospital-ai-platform\frontend\src\pages\Login.tsx
+  38:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\aravi\.codex\worktrees\meta-whatsapp-welcome\hospital-ai-platform\frontend\src\pages\Pharmacy.tsx
+   8:46  error    Unexpected any. Specify a different type                                                                           @typescript-eslint/no-explicit-any
+  12:48  error    Unexpected any. Specify a different type                                                                           @typescript-eslint/no-explicit-any
+  29:42  warning  React Hook useEffect has a missing dependency: 'fetchMedicines'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  31:33  error    Unexpected any. Specify a different type                                                                           @typescript-eslint/no-explicit-any
+  68:14  error    'err' is defined but never used                                                                                    @typescript-eslint/no-unused-vars
+  78:14  error    'err' is defined but never used                                                                                    @typescript-eslint/no-unused-vars
+  97:19  error    Unexpected any. Specify a different type                                                                           @typescript-eslint/no-explicit-any
+
+C:\Users\aravi\.codex\worktrees\meta-whatsapp-welcome\hospital-ai-platform\frontend\src\pages\Settings.tsx
+  33:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\aravi\.codex\worktrees\meta-whatsapp-welcome\hospital-ai-platform\frontend\src\themes\ThemeLoader.tsx
+  41:10  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Users\aravi\.codex\worktrees\meta-whatsapp-welcome\hospital-ai-platform\frontend\src\themes\ThemeLoader.tsx:41:10
+  39 |     <Suspense fallback={<div className="h-screen flex items-center justify-center">Loading Portal...</div>}>
+  40 |       {hospitalData ? (
+> 41 |         <SelectedTheme hospitalId={hospitalData.id} hospitalName={hospitalData.name} />
+     |          ^^^^^^^^^^^^^ This component is created during render
+  42 |       ) : (
+  43 |         <div className="h-screen flex items-center justify-center">Connecting to Arogya Brain...</div>
+  44 |       )}
+
+C:\Users\aravi\.codex\worktrees\meta-whatsapp-welcome\hospital-ai-platform\frontend\src\themes\ThemeLoader.tsx:11:40
+   9 |
+  10 |   // Dynamically find the component based on the URL slug
+> 11 |   const SelectedTheme = hospitalSlug ? getThemeComponent(hospitalSlug) : null;
+     |                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ The component is created during render here
+  12 |
+  13 |   useEffect(() => {
+  14 |   if (hospitalSlug) {  react-hooks/static-components
+
+C:\Users\aravi\.codex\worktrees\meta-whatsapp-welcome\hospital-ai-platform\frontend\src\themes\iris-hospitals\Chat.tsx
+  86:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\aravi\.codex\worktrees\meta-whatsapp-welcome\hospital-ai-platform\frontend\src\themes\iris-hospitals\Chat.tsx:86:5
+  84 |       return;
+  85 |     }
+> 86 |     setShowSwitchNotice(true);
+     |     ^^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  87 |     const t = setTimeout(() => setShowSwitchNotice(false), 3000);
+  88 |     return () => clearTimeout(t);
+  89 |   }, [language]);                           react-hooks/set-state-in-effect
+  97:7  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\aravi\.codex\worktrees\meta-whatsapp-welcome\hospital-ai-platform\frontend\src\themes\iris-hospitals\Chat.tsx:97:7
+   95 |   useEffect(() => {
+   96 |     if (micState !== 'recording') {
+>  97 |       setRecordingSeconds(0);
+      |       ^^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+   98 |       return;
+   99 |     }
+  100 |     const interval = setInterval(() => setRecordingSeconds(s => s + 1), 1000);  react-hooks/set-state-in-effect
+
+C:\Users\aravi\.codex\worktrees\meta-whatsapp-welcome\hospital-ai-platform\frontend\src\themes\registry.ts
+  17:51  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+✖ 64 problems (58 errors, 6 warnings)
+
+```
+
+Files touched: ignored dependency/build caches and evidence log; build also frontend/dist (ignored). Build VAD line endings restored to original HEAD bytes.
+
+</details>
+
+**Result and limits:** Isolated backend suite: 29 passed; admin component suite: 15 passed; focused lint/typecheck and production build exited 0. Full frontend lint exited 1 with 64 pre-existing problems outside scoped files. Migration compiled offline only; no migration application or external delivery evidence. Concurrency used disposable SQLite, not deployed PostgreSQL. Component submit events do not establish physical-browser acceptance. Root dependency declaration and import checks do not establish a fresh full dependency installation. Full verification and accepted four-lens review: HANDOFF.md.
+
+**Deliberately deferred:** Meta account/sender/version/credentials, exact approved bilingual template assets, verified public portal origin/allowlist, separately approved migration application against an explicit target, deployment and authorized controlled live receipt/link/callback tests. Feature stays disabled. These activation inputs remain in docs/WHATSAPP_SETUP.md. Bulk campaigns and two-way bot replies remain outside this task. Full frontend lint remains outstanding outside scope. Existing governance workflow/model references remain a separately scoped follow-up. AGENTS.md sections 2/3 still describe only the legacy Twilio messaging service/config; the new Meta service and configuration need a separate documentation task. No AGENTS.md changes are included here.

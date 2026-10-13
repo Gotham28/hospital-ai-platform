@@ -33,6 +33,24 @@ class Settings(BaseSettings):
     TWILIO_AUTH_TOKEN: str = ""
     TWILIO_WHATSAPP_NUMBER: str = ""
 
+    # Meta welcome messages stay disabled until sender, templates and portals are approved.
+    META_WHATSAPP_ENABLED: bool = False
+    META_WHATSAPP_ACCESS_TOKEN: str = ""
+    META_WHATSAPP_PHONE_NUMBER_ID: str = ""
+    META_WHATSAPP_GRAPH_VERSION: str = ""
+    META_WHATSAPP_APP_SECRET: str = ""
+    META_WHATSAPP_VERIFY_TOKEN: str = ""
+    META_WHATSAPP_TEMPLATE_EN: str = ""
+    META_WHATSAPP_TEMPLATE_ML: str = ""
+    # TODO: supply the exact approved copy, never a generated welcome/disclaimer.
+    META_WHATSAPP_TEMPLATE_BODY_EN: str = ""
+    META_WHATSAPP_TEMPLATE_BODY_ML: str = ""
+    META_WHATSAPP_LANGUAGE_EN: str = "en_US"
+    META_WHATSAPP_LANGUAGE_ML: str = "ml"
+    PUBLIC_PATIENT_BASE_URL: str = ""
+    META_WHATSAPP_ENABLED_HOSPITAL_SLUGS: str = ""
+    WHATSAPP_RECIPIENT_HASH_SECRET: str = ""
+
     # CORS allowed origins — read from backend/.env for local dev, or from the
     # hosting platform's environment variables for production. The default is
     # dev-origins-only; production must supply its own explicit value via env var.
