@@ -1,0 +1,31 @@
+{
+  "nli_model": "MoritzLaurer/mDeBERTa-v3-base-mnli-xnli",
+  "translation_model": "Helsinki-NLP/opus-mt-ml-en",
+  "optimization": "macro_f1_on_tuning_split_only",
+  "results": {
+    "direct": {
+      "en": {
+        "entailment": 0.9,
+        "contradiction": 0.3,
+        "macro_f1_tuning": 1.0
+      },
+      "ml": {
+        "entailment": 0.85,
+        "contradiction": 0.75,
+        "macro_f1_tuning": 0.721111111111111
+      }
+    },
+    "pivot": {
+      "en": {
+        "entailment": 0.9,
+        "contradiction": 0.3,
+        "macro_f1_tuning": 1.0
+      },
+      "ml": {
+        "entailment": 0.9,
+        "contradiction": 0.4,
+        "macro_f1_tuning": 0.39572192513368987
+      }
+    }
+  }
+}

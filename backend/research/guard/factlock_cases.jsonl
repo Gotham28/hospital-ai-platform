@@ -1,0 +1,40 @@
+{"id":"en-01","lang":"en","context":["Consultation fee is 500 rupees."],"answer":"The consultation fee is 500 rupees.","target_type":"price","expected":"survived"}
+{"id":"en-02","lang":"en","context":["Clinic opens at 9:00 AM."],"answer":"Clinic opens at 09:00.","target_type":"time","expected":"survived"}
+{"id":"en-03","lang":"en","context":["Clinic operates on Monday."],"answer":"Clinic operates on Monday.","target_type":"weekday","expected":"survived"}
+{"id":"en-04","lang":"en","context":["Dr. Test One is on duty."],"answer":"Dr. Test One is on duty.","target_type":"doctor_name","expected":"survived"}
+{"id":"en-05","lang":"en","context":["Lipid Profile test is available."],"answer":"The Lipid Profile test is available.","target_type":"test_name","expected":"survived"}
+{"id":"en-06","lang":"en","context":["Blood Glucose test costs 250 rupees."],"answer":"Blood Glucose test costs 250 rupees.","target_type":"price","expected":"survived"}
+{"id":"en-07","lang":"en","context":["Visiting time is 10:00 AM."],"answer":"Visiting time is 10:00 AM.","target_type":"time","expected":"survived"}
+{"id":"en-08","lang":"en","context":["The clinic is open Tuesday."],"answer":"The clinic is open Tuesday.","target_type":"weekday","expected":"survived"}
+{"id":"en-09","lang":"en","context":["Dr. Test Four consults today."],"answer":"Dr. Test Four consults today.","target_type":"doctor_name","expected":"survived"}
+{"id":"en-10","lang":"en","context":["The Hemogram test is offered."],"answer":"The Hemogram test is offered.","target_type":"test_name","expected":"survived"}
+{"id":"en-11","lang":"en","context":["Consultation fee is 400 rupees."],"answer":"The consultation fee is 500 rupees.","target_type":"price","expected":"changed"}
+{"id":"en-12","lang":"en","context":["Clinic opens at 9:00 AM."],"answer":"Clinic opens at 10:00 AM.","target_type":"time","expected":"changed"}
+{"id":"en-13","lang":"en","context":["Clinic operates on Monday."],"answer":"Clinic operates on Friday.","target_type":"weekday","expected":"changed"}
+{"id":"en-14","lang":"en","context":["Dr. Test One is on duty."],"answer":"Dr. Test Two is on duty.","target_type":"doctor_name","expected":"changed"}
+{"id":"en-15","lang":"en","context":["Lipid Profile test is available."],"answer":"The Thyroid test is available.","target_type":"test_name","expected":"changed"}
+{"id":"en-16","lang":"en","context":["The test costs 200 rupees."],"answer":"The test costs 300 rupees.","target_type":"price","expected":"changed"}
+{"id":"en-17","lang":"en","context":["The lab closes at 2:00 PM."],"answer":"The lab closes at 3:00 PM.","target_type":"time","expected":"changed"}
+{"id":"en-18","lang":"en","context":["Appointments are on Wednesday."],"answer":"Appointments are on Thursday.","target_type":"weekday","expected":"changed"}
+{"id":"en-19","lang":"en","context":["The clinic is open Monday."],"answer":"The consultation costs 450 rupees.","target_type":"price","expected":"unverified"}
+{"id":"en-20","lang":"en","context":["Hospital A has a cardiology clinic."],"answer":"Dr. Test Seven is available.","target_type":"doctor_name","expected":"unverified"}
+{"id":"ml-01","lang":"ml","context":["Consultation fee is 500 rupees."],"answer":"കൺസൾട്ടേഷൻ ഫീസ് ൫൦൦ രൂപയാണ്.","target_type":"price","expected":"survived"}
+{"id":"ml-02","lang":"ml","context":["Clinic opens at 9:00 AM."],"answer":"ക്ലിനിക്ക് രാവിലെ 9:00 മണിക്ക് തുറക്കും.","target_type":"time","expected":"survived"}
+{"id":"ml-03","lang":"ml","context":["Clinic operates on Monday."],"answer":"ക്ലിനിക്ക് തിങ്കളാഴ്ച പ്രവർത്തിക്കുന്നു.","target_type":"weekday","expected":"survived"}
+{"id":"ml-04","lang":"ml","context":["Dr. Test One is on duty."],"answer":"ഡോ. ടെസ്റ്റ് വൺ ഡ്യൂട്ടിയിലുണ്ട്.","target_type":"doctor_name","expected":"survived"}
+{"id":"ml-05","lang":"ml","context":["Lipid Profile test is available."],"answer":"ലിപിഡ് പ്രൊഫൈൽ പരിശോധന ലഭ്യമാണ്.","target_type":"test_name","expected":"survived"}
+{"id":"ml-06","lang":"ml","context":["Blood Glucose test costs 250 rupees."],"answer":"ബ്ലഡ് ഗ്ലൂക്കോസ് പരിശോധനയ്ക്ക് ൨൫൦ രൂപയാണ് ഫീസ്.","target_type":"price","expected":"survived"}
+{"id":"ml-07","lang":"ml","context":["Visiting time is 10:00 AM."],"answer":"സന്ദർശന സമയം രാവിലെ 10:00 മണിയാണ്.","target_type":"time","expected":"survived"}
+{"id":"ml-08","lang":"ml","context":["The clinic is open Tuesday."],"answer":"ക്ലിനിക്ക് ചൊവ്വാഴ്ച തുറന്നിരിക്കും.","target_type":"weekday","expected":"survived"}
+{"id":"ml-09","lang":"ml","context":["Dr. Test Four consults today."],"answer":"ഡോ. ടെസ്റ്റ് ഫോർ ഇന്ന് കൺസൾട്ട് ചെയ്യുന്നു.","target_type":"doctor_name","expected":"survived"}
+{"id":"ml-10","lang":"ml","context":["The Hemogram test is offered."],"answer":"ഹീമോഗ്രാം പരിശോധന ലഭ്യമാണ്.","target_type":"test_name","expected":"survived"}
+{"id":"ml-11","lang":"ml","context":["Consultation fee is 400 rupees."],"answer":"കൺസൾട്ടേഷൻ ഫീസ് ൫൦൦ രൂപയാണ്.","target_type":"price","expected":"changed"}
+{"id":"ml-12","lang":"ml","context":["Clinic opens at 9:00 AM."],"answer":"ക്ലിനിക്ക് രാവിലെ 10:00 മണിക്ക് തുറക്കും.","target_type":"time","expected":"changed"}
+{"id":"ml-13","lang":"ml","context":["Clinic operates on Monday."],"answer":"ക്ലിനിക്ക് വെള്ളിയാഴ്ച പ്രവർത്തിക്കുന്നു.","target_type":"weekday","expected":"changed"}
+{"id":"ml-14","lang":"ml","context":["Dr. Test One is on duty."],"answer":"ഡോ. ടെസ്റ്റ് ടു ഡ്യൂട്ടിയിലുണ്ട്.","target_type":"doctor_name","expected":"changed"}
+{"id":"ml-15","lang":"ml","context":["Lipid Profile test is available."],"answer":"തൈറോയ്ഡ് പരിശോധന ലഭ്യമാണ്.","target_type":"test_name","expected":"changed"}
+{"id":"ml-16","lang":"ml","context":["The test costs 200 rupees."],"answer":"പരിശോധനയ്ക്ക് ൩൦൦ രൂപയാണ് ഫീസ്.","target_type":"price","expected":"changed"}
+{"id":"ml-17","lang":"ml","context":["The lab closes at 2:00 PM."],"answer":"ലാബ് വൈകുന്നേരം 3:00 മണിക്ക് അടയ്ക്കും.","target_type":"time","expected":"changed"}
+{"id":"ml-18","lang":"ml","context":["Appointments are on Wednesday."],"answer":"അപ്പോയിന്റ്മെന്റുകൾ വ്യാഴാഴ്ചയാണ്.","target_type":"weekday","expected":"changed"}
+{"id":"ml-19","lang":"ml","context":["The clinic is open Monday."],"answer":"കൺസൾട്ടേഷൻ ഫീസ് ൪൫൦ രൂപയാണ്.","target_type":"price","expected":"unverified"}
+{"id":"ml-20","lang":"ml","context":["Hospital A has a cardiology clinic."],"answer":"ഡോ. ടെസ്റ്റ് സെവൻ ലഭ്യമാണ്.","target_type":"doctor_name","expected":"unverified"}
