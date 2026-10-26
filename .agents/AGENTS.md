@@ -48,8 +48,9 @@ Research-only code (benchmarks, evaluation scripts) belongs in a separate, isola
   for their current locations. Task C (Redis translation cache, Opus tier) is the
   remaining §1.3a item, not yet built.
 - **Migrations**: Alembic
-- **Messaging**: Twilio WhatsApp via `services/whatsapp.py` (degrades gracefully if
-  credentials are unset)
+- **Messaging**: Meta WhatsApp Cloud API welcome messages via
+  `services/meta_whatsapp.py`; disabled until production setup and controlled
+  acceptance are complete
 
 ---
 
@@ -69,9 +70,9 @@ below rather than containing this logic itself.
 | Malayalam output normaliser — `normalise_malayalam()`, provider-agnostic, wired into the three English-to-Malayalam translate call sites in `ai.py` (PR #17, 2026-08-29) | `backend/app/services/ml_postprocess.py` |
 | Booking state machine / session logic | `backend/app/services/booking.py` |
 | Relevance gate (IRIS Feature 4) | `backend/app/services/relevance.py` |
-| WhatsApp messaging | `backend/app/services/whatsapp.py` |
+| WhatsApp welcome messaging | `backend/app/services/meta_whatsapp.py` |
 | Other services | `backend/app/services/` — `booking_rules.py`, `email.py`, `reminders.py` |
-| Config | `backend/app/core/config.py` — contains `SARVAM_API_KEY`, `TWILIO_*`, (soon) `GROQ_API_KEY` |
+| Config | `backend/app/core/config.py` — contains `SARVAM_API_KEY`, `META_WHATSAPP_*`, (soon) `GROQ_API_KEY` |
 | DB models | `backend/app/models/` — `Hospital`, `Doctor`, `DoctorSchedule`, `DoctorLeave`, `KnowledgeBase`, `Appointment`, `LabTest`, `Medicine`, `UsageLedger`, `User`, `WhatsAppLog` |
 | Research code (isolated, do not import into production) | `backend/research/` |
 | Current task scope (ephemeral — overwritten each task, not history) | `.agents/CURRENT_TASK.md` |

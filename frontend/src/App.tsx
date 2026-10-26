@@ -8,7 +8,7 @@ import SettingsPage from './pages/Settings';
 import ThemeLoader from './themes/ThemeLoader';
 import api from './api/axios';
 import { useEffect, useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, MessageCircle } from 'lucide-react';
 import { useAuth } from './context/AuthContext';
 import AppointmentsTab from './components/AppointmentsTab';
 import PharmacyPage from './pages/Pharmacy';
@@ -183,6 +183,14 @@ function HospitalList() {
                 className="flex-1 text-center text-[12px] font-medium text-cyan-700 bg-cyan-50 hover:bg-cyan-100 py-1.5 rounded-md transition-colors"
               >
                 Train AI
+              </Link>
+              <Link
+                to={`/p/${encodeURIComponent(h.slug)}`}
+                className="flex-1 text-center text-[12px] font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 py-1.5 rounded-md transition-colors"
+              >
+                <span className="inline-flex items-center justify-center gap-1">
+                  <MessageCircle className="w-3.5 h-3.5" /> Chatbot
+                </span>
               </Link>
               <Link
                 to={`/hospitals/${h.id}/settings`}

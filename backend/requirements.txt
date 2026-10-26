@@ -1,4 +1,2 @@
-twilio
-openpyxl
 httpx>=0.28,<1
 phonenumbers>=9,<10

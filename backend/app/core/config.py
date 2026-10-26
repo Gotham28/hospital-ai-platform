@@ -1,9 +1,11 @@
 from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
+from dotenv import load_dotenv
 
 # Compute absolute path to backend/.env relative to this file
 _env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+load_dotenv(_env_path)
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=str(_env_path), extra="ignore")
@@ -29,10 +31,6 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = "sk-placeholder"
     JWT_SECRET: str = "supersecret"
     SARVAM_API_KEY: str = ""
-    TWILIO_ACCOUNT_SID: str = ""
-    TWILIO_AUTH_TOKEN: str = ""
-    TWILIO_WHATSAPP_NUMBER: str = ""
-
     # Meta welcome messages stay disabled until sender, templates and portals are approved.
     META_WHATSAPP_ENABLED: bool = False
     META_WHATSAPP_ACCESS_TOKEN: str = ""
