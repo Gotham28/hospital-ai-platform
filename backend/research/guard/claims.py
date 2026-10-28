@@ -4,7 +4,13 @@ from __future__ import annotations
 
 import re
 
-_SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?।])\s+|\r?\n+")
+_BOUNDARY_PATTERN = re.compile(r"(\r?\n+|(?<=[.!?।])\s+)")
+_ABBREVIATIONS = {
+    "dr", "mr", "mrs", "ms", "prof", "sr", "jr", "st",
+    "v", "vs", "eg", "ie", "etc", "inc", "ltd", "corp", "co",
+    "dept", "approx", "no", "vol", "us", "uk",
+    "ഡോ",  # Malayalam Dr.
+}
 _ENGLISH_CLAUSE_BOUNDARY = re.compile(
     r"\s+(?:and|but|while)\s+"
     r"(?=(?:the|a|an|our|their|this|that|it|they|he|she|we|clinic|"
@@ -46,6 +52,38 @@ def _is_factual_candidate(piece: str) -> bool:
     return any(char.isalnum() or "\u0d00" <= char <= "\u0d7f" for char in piece)
 
 
+def _split_sentences(text: str) -> list[str]:
+    tokens = _BOUNDARY_PATTERN.split(text)
+    sentences: list[str] = []
+    current_chunk = ""
+
+    for i in range(0, len(tokens), 2):
+        piece = tokens[i]
+        delim = tokens[i + 1] if i + 1 < len(tokens) else ""
+        current_chunk += piece
+        if not delim:
+            if current_chunk:
+                sentences.append(current_chunk)
+            break
+
+        if "\n" in delim or "\r" in delim:
+            sentences.append(current_chunk)
+            current_chunk = ""
+            continue
+
+        match = re.search(r"(\b[\w\u0d00-\u0d7f]+)[.!?।]$", current_chunk)
+        if match:
+            word = match.group(1).casefold()
+            if word in _ABBREVIATIONS or (len(word) == 1 and word.isalpha()):
+                current_chunk += delim
+                continue
+
+        sentences.append(current_chunk)
+        current_chunk = ""
+
+    return sentences
+
+
 def split_claims(answer: str, lang: str = "en") -> list[str]:
     """Split an answer into candidate factual claims, preserving source text.
 
@@ -62,7 +100,7 @@ def split_claims(answer: str, lang: str = "en") -> list[str]:
     malayalam = _is_malayalam(answer, lang)
     clause_boundary = _MALAYALAM_CLAUSE_BOUNDARY if malayalam else _ENGLISH_CLAUSE_BOUNDARY
     claims: list[str] = []
-    for sentence in _SENTENCE_BOUNDARY.split(answer):
+    for sentence in _split_sentences(answer):
         for clause in clause_boundary.split(sentence):
             cleaned = _clean_piece(clause)
             if _is_factual_candidate(cleaned):

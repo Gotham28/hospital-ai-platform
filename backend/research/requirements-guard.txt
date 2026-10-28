@@ -1,0 +1,8 @@
+# Python 3.11. Install CPU torch separately from the official PyTorch CPU index.
+torch==2.8.0
+transformers==4.57.1
+huggingface-hub==0.36.0
+sentencepiece==0.2.1
+sacremoses==0.1.1
+protobuf==6.33.0
+numpy==2.3.4

@@ -7,16 +7,16 @@ import re
 
 _DIGIT_TRANSLATION = str.maketrans("൦൧൨൩൪൫൬൭൮൯", "0123456789")
 _NUMBER = re.compile(r"(?<!\w)(\d+(?::\d+)?(?:\.\d+)?)(?!\w)")
-_PRICE = re.compile(r"₹|\brs\.?\b|\brupees?\b|\bfee\b|\bcosts?\b|രൂപ|ഫീസ്|വില|ചെലവ്", re.I)
+_PRICE = re.compile(r"₹|\brs\.?\b|\brupees?\b|\binr\b|\bfee\b|\bcosts?\b|രൂപ|ഫീസ്|(?<!രാ)വില|ചെലവ്", re.I)
 _DATE = re.compile(r"(?<!\d)(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})(?!\d)")
 _MONTH_DATE = re.compile(
     r"\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})\b",
     re.I,
 )
-_TIME_12 = re.compile(r"\b(1[0-2]|0?[1-9])(?::([0-5]\d))?\s*(am|pm)\b", re.I)
-_TIME_24 = re.compile(r"\b([01]?\d|2[0-3]):([0-5]\d)\b")
+_TIME_12 = re.compile(r"\b(1[0-2]|0?[1-9])(?::([0-5]\d|0))?\s*(am|pm)\b", re.I)
+_TIME_24 = re.compile(r"\b([01]?\d|2[0-3]):([0-5]\d|0)\b")
 _TIME_ML = re.compile(
-    r"(രാവിലെ|ഉച്ചയ്ക്ക്|വൈകുന്നേരം|രാത്രി)\s*(\d{1,2})(?::([0-5]\d))?",
+    r"(രാവിലെ|ഉച്ചയ്ക്ക്|വൈകുന്നേരം|രാത്രി)\s*(\d{1,2})(?::([0-5]\d|0))?",
     re.I,
 )
 _DURATION = re.compile(r"\b(?:days?|weeks?|hours?)\b|ദിവസം|ആഴ്ച|മണിക്കൂർ", re.I)
@@ -149,7 +149,15 @@ def _extract(text: str) -> list[_Lock]:
             kind = "number"
         else:
             kind = "number"
-        locks.append(_Lock(match.group(0), kind, match.group(1), _nearest_entity(match.start(), mentions)))
+        val = match.group(1)
+        if kind in ("price", "number"):
+            try:
+                fval = float(val)
+                if fval.is_integer():
+                    val = str(int(fval))
+            except ValueError:
+                pass
+        locks.append(_Lock(match.group(0), kind, val, _nearest_entity(match.start(), mentions)))
 
     for start, end, kind, key in mentions:
         locks.append(_Lock(text[start:end], kind, key, ""))
