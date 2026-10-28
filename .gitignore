@@ -38,3 +38,4 @@ backend/seed_local_test_users.py
 backend/pgvector/
 .claude/settings.local.json
 backend/research/results/
+handoff/
