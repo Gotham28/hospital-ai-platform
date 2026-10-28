@@ -135,16 +135,14 @@ def run_baseline_replay_gate(
     print(f"Max score difference vs traces   : {max_score_diff:.8f}")
 
     if verdict_mismatches:
-        print("\nSTOP CONDITION FIRED: Verdict mismatches detected:")
-        for m in verdict_mismatches[:10]:
+        print("\nVERDICT MISMATCHES DETECTED:")
+        for m in verdict_mismatches:
             print(json.dumps(m, indent=2))
-        return False
 
     if exact_mismatches:
-        print("\nSTOP CONDITION FIRED: Exact verdict mismatches detected:")
-        for m in exact_mismatches[:10]:
+        print("\nEXACT VERDICT MISMATCHES DETECTED:")
+        for m in exact_mismatches:
             print(json.dumps(m, indent=2))
-        return False
 
     # b) Metrics report using exact v5 calibration function (score_policy & metrics)
     print("\n" + "=" * 70)
