@@ -228,12 +228,10 @@ class MultilingualNLIScorer:
         for kind, values in claim_values.items():
             if not values:
                 continue
-            for passage, passage_values in zip(active_passages, context_values):
-                expected = passage_values[kind]
-                if expected and values.isdisjoint(expected):
-                    exact_verdict, exact_evidence = "contradicted", passage
-                    break
-            if exact_verdict:
+            has_matching = any(not values.isdisjoint(pv[kind]) for pv in context_values if pv[kind])
+            conflicting = [p for p, pv in zip(active_passages, context_values) if pv[kind] and values.isdisjoint(pv[kind])]
+            if conflicting and not has_matching:
+                exact_verdict, exact_evidence = "contradicted", conflicting[0]
                 break
         if any(claim_values.values()) and not any(
             values for passage_values in context_values for values in passage_values.values()
