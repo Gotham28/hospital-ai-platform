@@ -1,4 +1,4 @@
-"""
+r"""
 Pure-Python diagnostic (no model, no GPU):
 Runs bundle v5 claim segmentation and exact typed-value logic on the
 46 'supported' fixture answers.

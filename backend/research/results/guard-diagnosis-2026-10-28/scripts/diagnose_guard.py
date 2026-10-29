@@ -1,4 +1,4 @@
-"""
+r"""
 Diagnostic script for guard false-alteration causes.
 
 Runs the BUNDLE v5 guard code on the guard_dev_set.json fixture
