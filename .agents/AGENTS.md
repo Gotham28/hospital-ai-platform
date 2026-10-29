@@ -1,5 +1,46 @@
 # AGENTS.md — AROGYA Project
 
+## Research development coordination (2026-10-29)
+
+For research planning, development, experiments and review, every AI must first read
+`docs/research/GUARD_RESEARCH_PLAN.md`, `docs/research/FRIEND_START_HERE.md`, and the
+current `.agents/CURRENT_TASK.md`. The roadmap governs this research program; the
+approved current task governs executable scope. A roadmap or DRAFT task is not
+execution approval. If new research falls outside the roadmap, scope it explicitly.
+
+Developer-approved responsibility split: Codex coordinates research thinking,
+planning and independent assessment. Astra is reserved for difficult research
+judgments; GPT-6.1 handles precise briefs and independent high-assurance review;
+GPT-6 Sol handles clerical checks. The friend's external AI performs most coding,
+data preparation, offline tests and experiment execution under a portable approved
+packet. Record its actual provider/model when known. No automatic fallback to
+Codex implementation or local Antigravity. Use bounded batches and consolidated
+handoffs to minimise round trips. Minor reversible choices inside approved scope
+are autonomous; scientific changes require the developer/coordinator checkpoint.
+
+This newer research workflow supersedes legacy fixed-author/vendor and separate
+Chat routing in section 12 for these tasks. All safety, privacy, isolation,
+permission, protected-data, independent-review and developer-acceptance rules
+remain. Research review assurance is not downgraded by changing models or executor.
+Permission denials are never bypassed; do not change guards to force execution.
+
+Keep the answer generator unchanged and check only caller-supplied evidence. No
+new retrieval or generated corrections in the guard. Preserve English/Malayalam
+and fictional hospital fact-isolation evaluation. No paid models/APIs, private
+patient data or production operations. Never alter protected final test data or
+label inspected data as untouched. Follow the roadmap's provenance and evidence
+requirements. See its explicit experiment, budget and stop-condition rules.
+
+Before handing work to an external AI, provide the allowlisted planning package,
+exact approved task/version and named source/data artifact manifests. Never export
+the entire workspace or credentials. Preserve an unfinished current task before
+replacing it with developer approval. Return branch work/approved snapshot and
+root HANDOFF.md with raw evidence; no early PR or unapproved publication.
+
+These rules apply only when actually present and read in the recipient checkout.
+A transfer bundle is not a security sandbox and does not update GitHub by itself.
+
+
 This file is read by the coding agent at the start of every session. It contains the
 standing rules and architecture of the project — this file rarely changes.
 
