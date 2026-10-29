@@ -24,6 +24,7 @@ _NON_FACTUAL = {
     "good morning",
     "good afternoon",
     "good evening",
+    "sure",
     "thanks",
     "thank you",
     "i hope this helps",
@@ -31,6 +32,11 @@ _NON_FACTUAL = {
     "നമസ്കാരം",
     "സുപ്രഭാതം",
 }
+_NON_CLAIM_PATTERNS = (
+    re.compile(r"^\s*(\d+|[a-zA-Z])[\.\)]\s*$"),  # List markers ("3.", "1.", "a)")
+    re.compile(r"^\s*\(?passage\s*\d+\)?\s*:?\s*$", re.IGNORECASE),  # Passage headers ("Passage 1:", "(Passage 1)")
+    re.compile(r"^\s*unable to answer based on (?:the )?(?:given )?passages?\.?\s*$", re.IGNORECASE),  # Bare refusals
+)
 
 
 def _is_malayalam(text: str, lang: str) -> bool:
@@ -48,6 +54,8 @@ def _clean_piece(piece: str) -> str:
 def _is_factual_candidate(piece: str) -> bool:
     normalized = re.sub(r"[.!?।]+$", "", piece).strip().casefold()
     if not normalized or normalized in _NON_FACTUAL:
+        return False
+    if any(pat.match(piece) for pat in _NON_CLAIM_PATTERNS):
         return False
     return any(char.isalnum() or "\u0d00" <= char <= "\u0d7f" for char in piece)
 
