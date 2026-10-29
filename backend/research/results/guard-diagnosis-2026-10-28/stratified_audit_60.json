@@ -1,0 +1,1082 @@
+[
+  {
+    "sample_id": 1,
+    "trace_id": "9264",
+    "task": "Data2txt",
+    "bucket": "E_0.5_0.9",
+    "claim": "It offers a casual yet classy ambience, with free Wi-Fi, outdoor seating, and is suitable for groups.",
+    "scores": {
+      "entailment": 0.8418,
+      "neutral": 0.1276,
+      "contradiction": 0.0307
+    },
+    "exact_verdict": null,
+    "category": "guard_error",
+    "mechanism": "extreme_threshold_0.90",
+    "reasoning": "Entailment=0.8418 is dominant and contradiction=0.0307 is low, but threshold 0.90 marked it unsupported.",
+    "active_passages_count": 4,
+    "primary_passage": "{'name': \"Renaud's Patisserie & Bistro\", 'address': '3315 State St', 'city': 'Santa Barbara', 'state': 'CA', 'categories': 'French, Cafes, Restaurants, Breakfast & Brunch, Food, Sandwiches, Bakeries', 'hours': {'Monday': '0:0-0:0', 'Tuesday': '6:30-16:0', 'Wednesday': '6:30-16:0', 'Thursday': '6:30-16:0', 'Friday': '6:30-16:0', 'Saturday': '6:30-16:0', 'Sunday': '6:30-15:0'}, 'attributes': {'BusinessParking': {'garage': False, 'street': False, 'validated': False, 'lot': True, 'valet': False}, 'RestaurantsReservations': False, 'OutdoorSeating': True, 'WiFi': 'free', 'RestaurantsTakeOut': True, 'RestaurantsGoodForGroups': True, 'Music': None, 'Ambience': {'touristy': False, 'hipster': False, 'romantic': False, 'divey': False, 'intimate': False, 'trendy': False, 'upscale': False, 'classy': True, 'casual': True}}, 'business_stars': 4.5, 'review_info': [{'review_stars': 5.0, 'review_date': '2022-01-18 18:26:49', 'review_text': 'Wow wow wow!"
+  },
+  {
+    "sample_id": 2,
+    "trace_id": "9289",
+    "task": "Data2txt",
+    "bucket": "E_0.5_0.9",
+    "claim": "The cafe has outdoor seating and is known for its casual and classy ambience.",
+    "scores": {
+      "entailment": 0.7568,
+      "neutral": 0.2037,
+      "contradiction": 0.0395
+    },
+    "exact_verdict": null,
+    "category": "guard_error",
+    "mechanism": "extreme_threshold_0.90",
+    "reasoning": "Entailment=0.7568 is dominant and contradiction=0.0395 is low, but threshold 0.90 marked it unsupported.",
+    "active_passages_count": 3,
+    "primary_passage": "{'name': 'Shoreline Beach Cafe', 'address': '801 Shoreline Dr', 'city': 'Santa Barbara', 'state': 'CA', 'categories': 'Cafes, Burgers, American (Traditional), Tacos, Seafood, Restaurants, Mexican', 'hours': {'Monday': '9:0-17:30', 'Tuesday': '9:0-17:30', 'Wednesday': '9:0-17:30', 'Thursday': '9:0-17:30', 'Friday': '8:0-17:30', 'Saturday': '8:0-17:30', 'Sunday': '8:0-17:30'}, 'attributes': {'BusinessParking': {'garage': False, 'street': True, 'validated': False, 'lot': True, 'valet': False}, 'RestaurantsReservations': False, 'OutdoorSeating': True, 'WiFi': 'no', 'RestaurantsTakeOut': True, 'RestaurantsGoodForGroups': True, 'Music': None, 'Ambience': {'touristy': False, 'hipster': False, 'romantic': False, 'divey': False, 'intimate': False, 'trendy': False, 'upscale': False, 'classy': True, 'casual': True}}, 'business_stars': 4.0, 'review_info': [{'review_stars': 4.0, 'review_date': '2022-01-09 00:26:18', 'review_text': 'Great view!"
+  },
+  {
+    "sample_id": 3,
+    "trace_id": "10093",
+    "task": "Data2txt",
+    "bucket": "E_0.5_0.9",
+    "claim": "the seasoning of the food.",
+    "scores": {
+      "entailment": 0.6233,
+      "neutral": 0.2553,
+      "contradiction": 0.1214
+    },
+    "exact_verdict": null,
+    "category": "guard_error",
+    "mechanism": "extreme_threshold_0.90",
+    "reasoning": "Entailment=0.6233 is dominant and contradiction=0.1214 is low, but threshold 0.90 marked it unsupported.",
+    "active_passages_count": 4,
+    "primary_passage": "While smaller and more pricey ($16) than Sun Sushi, their uni still hits the quality mark as they are fresh, vibrant, and delicious. Highly recommend everyone to try some fresh sea urchin in their lifetime.\\n\\nMy biggest problem with this restaurant is that place has both the unpleasant attributes of penny pinching and expensive food. I think it's pretty ridiculous for an upscale restaurant to charge for something as basic as tea, sauce, and condiments if you ask me.\"}, {'review_stars': 5.0, 'review_date': '2021-12-18 17:48:18', 'review_text': 'My new \"go-to\" for sushi!"
+  },
+  {
+    "sample_id": 4,
+    "trace_id": "9289",
+    "task": "Data2txt",
+    "bucket": "E_0.5_0.9",
+    "claim": "It offers a variety of cuisines including cafes, burgers, American (Traditional), tacos, seafood, and Mexican.",
+    "scores": {
+      "entailment": 0.8988,
+      "neutral": 0.0985,
+      "contradiction": 0.0027
+    },
+    "exact_verdict": null,
+    "category": "guard_error",
+    "mechanism": "extreme_threshold_0.90",
+    "reasoning": "Entailment=0.8988 is dominant and contradiction=0.0027 is low, but threshold 0.90 marked it unsupported.",
+    "active_passages_count": 3,
+    "primary_passage": "{'name': 'Shoreline Beach Cafe', 'address': '801 Shoreline Dr', 'city': 'Santa Barbara', 'state': 'CA', 'categories': 'Cafes, Burgers, American (Traditional), Tacos, Seafood, Restaurants, Mexican', 'hours': {'Monday': '9:0-17:30', 'Tuesday': '9:0-17:30', 'Wednesday': '9:0-17:30', 'Thursday': '9:0-17:30', 'Friday': '8:0-17:30', 'Saturday': '8:0-17:30', 'Sunday': '8:0-17:30'}, 'attributes': {'BusinessParking': {'garage': False, 'street': True, 'validated': False, 'lot': True, 'valet': False}, 'RestaurantsReservations': False, 'OutdoorSeating': True, 'WiFi': 'no', 'RestaurantsTakeOut': True, 'RestaurantsGoodForGroups': True, 'Music': None, 'Ambience': {'touristy': False, 'hipster': False, 'romantic': False, 'divey': False, 'intimate': False, 'trendy': False, 'upscale': False, 'classy': True, 'casual': True}}, 'business_stars': 4.0, 'review_info': [{'review_stars': 4.0, 'review_date': '2022-01-09 00:26:18', 'review_text': 'Great view!"
+  },
+  {
+    "sample_id": 5,
+    "trace_id": "5707",
+    "task": "Data2txt",
+    "bucket": "E_0.5_0.9",
+    "claim": "The ambience is described as classy.",
+    "scores": {
+      "entailment": 0.8627,
+      "neutral": 0.097,
+      "contradiction": 0.0403
+    },
+    "exact_verdict": null,
+    "category": "guard_error",
+    "mechanism": "extreme_threshold_0.90",
+    "reasoning": "Entailment=0.8627 is dominant and contradiction=0.0403 is low, but threshold 0.90 marked it unsupported.",
+    "active_passages_count": 4,
+    "primary_passage": "{'name': 'Bistro 1111', 'address': '1111 E Cabrillo Blvd', 'city': 'Santa Barbara', 'state': 'CA', 'categories': 'Breakfast & Brunch, American (New), Restaurants', 'hours': {'Monday': '6:30-22:0', 'Tuesday': '6:30-22:0', 'Wednesday': '6:30-22:0', 'Thursday': '6:30-22:0', 'Friday': '6:30-22:0', 'Saturday': '6:30-22:0', 'Sunday': '6:30-22:0'}, 'attributes': {'BusinessParking': {'garage': False, 'street': True, 'validated': False, 'lot': False, 'valet': True}, 'RestaurantsReservations': True, 'OutdoorSeating': False, 'WiFi': 'no', 'RestaurantsTakeOut': True, 'RestaurantsGoodForGroups': True, 'Music': None, 'Ambience': {'romantic': False, 'intimate': False, 'touristy': False, 'hipster': False, 'divey': False, 'classy': True, 'trendy': False, 'upscale': False, 'casual': False}}, 'business_stars': 3.5, 'review_info': [{'review_stars': 4.0, 'review_date': '2016-01-30 13:04:56', 'review_text': \"We came here to eat and grab drinks while waiting for our hotel room to be ready."
+  },
+  {
+    "sample_id": 6,
+    "trace_id": "10260",
+    "task": "Data2txt",
+    "bucket": "high_contradiction",
+    "claim": "Saigon Noodle House, located at 6831 Hollister Ave, Ste L in Goleta, CA, is a Vietnamese restaurant specializing in noodles.",
+    "scores": {
+      "entailment": 0.0022,
+      "neutral": 0.0738,
+      "contradiction": 0.924
+    },
+    "exact_verdict": null,
+    "category": "genuinely_unsupported",
+    "mechanism": "hallucination_or_annotation_gap",
+    "reasoning": "Claim asserts specific details or relationships contradicted by or absent from the source text (incomplete gold label in RAGTruth).",
+    "active_passages_count": 4,
+    "primary_passage": "{'name': 'Saigon Noodle House', 'address': '6831 Hollister Ave, Ste L', 'city': 'Goleta', 'state': 'CA', 'categories': 'Vietnamese, Restaurants, Noodles', 'hours': {'Monday': '10:0-21:0', 'Tuesday': '10:0-20:0', 'Wednesday': '10:0-21:0', 'Thursday': '10:0-21:0', 'Friday': '10:0-22:0', 'Saturday': '10:0-22:0', 'Sunday': '10:0-21:0'}, 'attributes': {'BusinessParking': {'garage': False, 'street': False, 'validated': False, 'lot': True, 'valet': False}, 'RestaurantsReservations': False, 'OutdoorSeating': True, 'WiFi': 'no', 'RestaurantsTakeOut': True, 'RestaurantsGoodForGroups': True, 'Music': None, 'Ambience': {'romantic': False, 'intimate': False, 'touristy': False, 'hipster': False, 'divey': False, 'classy': False, 'trendy': False, 'upscale': False, 'casual': True}}, 'business_stars': 3.0, 'review_info': [{'review_stars': 5.0, 'review_date': '2022-01-12 01:28:49', 'review_text': 'Always go here when I need a bowl of feel good food."
+  },
+  {
+    "sample_id": 7,
+    "trace_id": "8429",
+    "task": "Data2txt",
+    "bucket": "high_contradiction",
+    "claim": "New Baja Grill is a Mexican restaurant located in Goleta, CA, with a 4.0-star rating based on 3 customer reviews.",
+    "scores": {
+      "entailment": 0.0006,
+      "neutral": 0.0088,
+      "contradiction": 0.9906
+    },
+    "exact_verdict": null,
+    "category": "genuinely_unsupported",
+    "mechanism": "hallucination_or_annotation_gap",
+    "reasoning": "Claim asserts specific details or relationships contradicted by or absent from the source text (incomplete gold label in RAGTruth).",
+    "active_passages_count": 4,
+    "primary_passage": "{'name': 'New Baja Grill', 'address': '7024 Market Place Dr', 'city': 'Goleta', 'state': 'CA', 'categories': 'Mexican, Restaurants', 'hours': {'Monday': '11:0-21:0', 'Tuesday': '11:0-21:0', 'Wednesday': '11:0-21:0', 'Thursday': '11:0-21:0', 'Friday': '11:0-21:0', 'Saturday': '11:0-21:0', 'Sunday': '11:0-21:0'}, 'attributes': {'BusinessParking': {'garage': False, 'street': False, 'validated': False, 'lot': True, 'valet': False}, 'RestaurantsReservations': False, 'OutdoorSeating': True, 'WiFi': 'no', 'RestaurantsTakeOut': True, 'RestaurantsGoodForGroups': True, 'Music': None, 'Ambience': {'romantic': False, 'intimate': False, 'touristy': False, 'hipster': False, 'divey': False, 'classy': False, 'trendy': False, 'upscale': False, 'casual': True}}, 'business_stars': 4.0, 'review_info': [{'review_stars': 5.0, 'review_date': '2021-02-01 05:20:19', 'review_text': \"I don't know if you'll ever see this but, this place had the best torta de asada and salsa de aguacate."
+  },
+  {
+    "sample_id": 8,
+    "trace_id": "11376",
+    "task": "Data2txt",
+    "bucket": "high_contradiction",
+    "claim": "Open every day with varying hours, the establishment offers free WiFi, outdoor seating, and take-out options, but does not take reservations or cater to large groups.",
+    "scores": {
+      "entailment": 0.0154,
+      "neutral": 0.2335,
+      "contradiction": 0.7511
+    },
+    "exact_verdict": null,
+    "category": "genuinely_unsupported",
+    "mechanism": "hallucination_or_annotation_gap",
+    "reasoning": "Claim asserts specific details or relationships contradicted by or absent from the source text (incomplete gold label in RAGTruth).",
+    "active_passages_count": 4,
+    "primary_passage": "{'name': \"Cantwell's Market & Deli\", 'address': '1533 State St', 'city': 'Santa Barbara', 'state': 'CA', 'categories': 'Food, Breakfast & Brunch, Grocery, Sandwiches, Beer, Wine & Spirits, Meat Shops, Delis, Specialty Food, Restaurants, Health Markets', 'hours': {'Monday': '6:15-21:0', 'Tuesday': '6:15-21:0', 'Wednesday': '6:15-21:0', 'Thursday': '7:0-17:45', 'Friday': '7:0-19:45', 'Saturday': '7:0-21:0', 'Sunday': '7:0-20:0'}, 'attributes': {'BusinessParking': {'garage': False, 'street': True, 'validated': False, 'lot': True, 'valet': False}, 'RestaurantsReservations': False, 'OutdoorSeating': True, 'WiFi': 'free', 'RestaurantsTakeOut': True, 'RestaurantsGoodForGroups': False, 'Music': None, 'Ambience': {'romantic': False, 'intimate': False, 'touristy': False, 'hipster': False, 'divey': False, 'classy': False, 'trendy': False, 'upscale': False, 'casual': True}}, 'business_stars': 3.0, 'review_info': [{'review_stars': 1.0, 'review_date': '2021-12-19 21:04:23', 'review_text': \"Well, we placed an order for five items online."
+  },
+  {
+    "sample_id": 9,
+    "trace_id": "5839",
+    "task": "Data2txt",
+    "bucket": "high_contradiction",
+    "claim": "Tupelo Junction Cafe is a local business located at 1218 State St, Santa Barbara, CA.",
+    "scores": {
+      "entailment": 0.0012,
+      "neutral": 0.0534,
+      "contradiction": 0.9455
+    },
+    "exact_verdict": null,
+    "category": "genuinely_unsupported",
+    "mechanism": "hallucination_or_annotation_gap",
+    "reasoning": "Claim asserts specific details or relationships contradicted by or absent from the source text (incomplete gold label in RAGTruth).",
+    "active_passages_count": 4,
+    "primary_passage": "{'name': 'Tupelo Junction Cafe', 'address': '1218 State St', 'city': 'Santa Barbara', 'state': 'CA', 'categories': 'Restaurants, Breakfast & Brunch, American (Traditional), American (New), Southern', 'hours': {'Monday': '8:0-14:0', 'Tuesday': '17:0-20:0', 'Wednesday': '17:0-20:0', 'Thursday': '17:0-20:0', 'Friday': '17:0-20:0', 'Saturday': '17:0-20:0', 'Sunday': '17:0-20:0'}, 'attributes': {'BusinessParking': {'garage': True, 'street': True, 'validated': False, 'lot': False, 'valet': False}, 'RestaurantsReservations': True, 'OutdoorSeating': True, 'WiFi': 'no', 'RestaurantsTakeOut': True, 'RestaurantsGoodForGroups': True, 'Music': None, 'Ambience': {'romantic': False, 'intimate': False, 'touristy': False, 'hipster': False, 'divey': False, 'classy': False, 'trendy': False, 'upscale': False, 'casual': True}}, 'business_stars': 4.0, 'review_info': [{'review_stars': 4.0, 'review_date': '2019-12-13 18:24:08', 'review_text': \"The food was great!"
+  },
+  {
+    "sample_id": 10,
+    "trace_id": "10020",
+    "task": "Data2txt",
+    "bucket": "high_contradiction",
+    "claim": "The eatery does not provide Wi-Fi",
+    "scores": {
+      "entailment": 0.0061,
+      "neutral": 0.3444,
+      "contradiction": 0.6495
+    },
+    "exact_verdict": null,
+    "category": "genuinely_unsupported",
+    "mechanism": "hallucination_or_annotation_gap",
+    "reasoning": "Claim asserts specific details or relationships contradicted by or absent from the source text (incomplete gold label in RAGTruth).",
+    "active_passages_count": 3,
+    "primary_passage": "{'name': 'El  Sitio', 'address': '2830 De La Vina St', 'city': 'Santa  Barbara', 'state': 'CA', 'categories': 'Restaurants, Mexican', 'hours': {'Monday': '8:0-20:30', 'Tuesday': '8:0-20:30', 'Wednesday': '8:0-20:30', 'Thursday': '8:0-20:30', 'Friday': '8:0-20:30', 'Saturday': '8:0-20:30', 'Sunday': '8:0-15:30'}, 'attributes': {'BusinessParking': {'garage': False, 'street': True, 'validated': False, 'lot': True, 'valet': False}, 'RestaurantsReservations': False, 'OutdoorSeating': True, 'WiFi': 'no', 'RestaurantsTakeOut': True, 'RestaurantsGoodForGroups': False, 'Music': None, 'Ambience': {'touristy': False, 'hipster': False, 'romantic': False, 'divey': None, 'intimate': False, 'trendy': False, 'upscale': False, 'classy': False, 'casual': None}}, 'business_stars': 4.0, 'review_info': [{'review_stars': 5.0, 'review_date': '2022-01-16 02:18:48', 'review_text': 'Love El Sitio!"
+  },
+  {
+    "sample_id": 11,
+    "trace_id": "7410",
+    "task": "Data2txt",
+    "bucket": "high_neutral",
+    "claim": "However, other customers have reported negative experiences primarily related to customer service",
+    "scores": {
+      "entailment": 0.0036,
+      "neutral": 0.994,
+      "contradiction": 0.0023
+    },
+    "exact_verdict": null,
+    "category": "ambiguous",
+    "mechanism": "unverified_neutral_paraphrase",
+    "reasoning": "Neutral score reflecting loose paraphrase or background detail not explicitly grounded.",
+    "active_passages_count": 4,
+    "primary_passage": "We had brunch for my sons birthday with few of his friends and I was really impressed. I've been so many Mexican restaurants and this by far the best I always love ambiance and the food was really amazing so many choices on the buffet and all of them we're good. We also love our server Princess she made sure we're all comfortable and having a good time, definitely will come back here when we visit our son and his wife again.\"}, {'review_stars': 1.0, 'review_date': '2022-01-06 22:57:54', 'review_text': 'The WORST customer service I have ever experienced in my ENTIRE life."
+  },
+  {
+    "sample_id": 12,
+    "trace_id": "11562",
+    "task": "Data2txt",
+    "bucket": "high_neutral",
+    "claim": "However, customer reviews are mixed.",
+    "scores": {
+      "entailment": 0.0985,
+      "neutral": 0.8943,
+      "contradiction": 0.0071
+    },
+    "exact_verdict": null,
+    "category": "ambiguous",
+    "mechanism": "unverified_neutral_paraphrase",
+    "reasoning": "Neutral score reflecting loose paraphrase or background detail not explicitly grounded.",
+    "active_passages_count": 4,
+    "primary_passage": "{'name': \"Peet's Coffee\", 'address': '3905 State St', 'city': 'Santa Barbara', 'state': 'CA', 'categories': 'Coffee & Tea, Restaurants, Food', 'hours': {'Monday': '6:0-16:0', 'Tuesday': '6:0-16:0', 'Wednesday': '6:0-16:0', 'Thursday': '6:0-16:0', 'Friday': '6:0-16:0', 'Saturday': '6:0-16:0', 'Sunday': '6:0-16:0'}, 'attributes': {'BusinessParking': {'garage': False, 'street': False, 'validated': False, 'lot': True, 'valet': False}, 'RestaurantsReservations': None, 'OutdoorSeating': False, 'WiFi': 'free', 'RestaurantsTakeOut': True, 'RestaurantsGoodForGroups': None, 'Music': None, 'Ambience': None}, 'business_stars': 4.0, 'review_info': [{'review_stars': 1.0, 'review_date': '2022-01-06 21:43:05', 'review_text': 'Rude, and unfriendly customer service for a flavorless cup of steamed milk that was supposed to be a latte..."
+  },
+  {
+    "sample_id": 13,
+    "trace_id": "7796",
+    "task": "Data2txt",
+    "bucket": "high_neutral",
+    "claim": "However, some customers have had negative experiences with the restaurant, complaining about the quality of the food",
+    "scores": {
+      "entailment": 0.0191,
+      "neutral": 0.9784,
+      "contradiction": 0.0025
+    },
+    "exact_verdict": null,
+    "category": "ambiguous",
+    "mechanism": "unverified_neutral_paraphrase",
+    "reasoning": "Neutral score reflecting loose paraphrase or background detail not explicitly grounded.",
+    "active_passages_count": 3,
+    "primary_passage": "{'name': 'Taqueria El Pastorcito', 'address': '2009 De La Vina St', 'city': 'Santa Barbara', 'state': 'CA', 'categories': 'Mexican, Food, Restaurants', 'hours': {'Monday': '10:0-21:0', 'Tuesday': '10:0-21:0', 'Wednesday': '10:0-21:0', 'Thursday': '10:0-22:0', 'Friday': '10:0-22:0', 'Saturday': '10:0-22:0'}, 'attributes': {'BusinessParking': {'garage': False, 'street': True, 'validated': False, 'lot': True, 'valet': False}, 'RestaurantsReservations': False, 'OutdoorSeating': True, 'WiFi': 'no', 'RestaurantsTakeOut': True, 'RestaurantsGoodForGroups': True, 'Music': None, 'Ambience': {'romantic': False, 'intimate': False, 'classy': False, 'hipster': False, 'divey': True, 'touristy': False, 'trendy': False, 'upscale': False, 'casual': False}}, 'business_stars': 4.0, 'review_info': [{'review_stars': 5.0, 'review_date': '2016-04-25 05:55:08', 'review_text': \"It's an average priced taco place in this high priced town!"
+  },
+  {
+    "sample_id": 14,
+    "trace_id": "9720",
+    "task": "Data2txt",
+    "bucket": "high_neutral",
+    "claim": "The Sportsman has an overall rating of 4 stars, with recent reviews awarding it 5 stars for an excellent experience.",
+    "scores": {
+      "entailment": 0.2736,
+      "neutral": 0.7172,
+      "contradiction": 0.0092
+    },
+    "exact_verdict": null,
+    "category": "ambiguous",
+    "mechanism": "unverified_neutral_paraphrase",
+    "reasoning": "Neutral score reflecting loose paraphrase or background detail not explicitly grounded.",
+    "active_passages_count": 4,
+    "primary_passage": "{'name': 'The Sportsman', 'address': '1226 State St', 'city': 'Santa Barbara', 'state': 'CA', 'categories': 'Bars, Nightlife, Dive Bars, Sports Bars, Lounges', 'hours': {'Monday': '0:0-0:0', 'Tuesday': '13:0-2:0', 'Wednesday': '13:0-2:0', 'Thursday': '13:0-2:0', 'Friday': '13:0-2:0', 'Saturday': '13:0-2:0', 'Sunday': '13:0-2:0'}, 'attributes': {'BusinessParking': {'garage': True, 'street': True, 'validated': False, 'lot': False, 'valet': False}, 'RestaurantsReservations': False, 'OutdoorSeating': True, 'WiFi': 'free', 'RestaurantsTakeOut': None, 'RestaurantsGoodForGroups': True, 'Music': True, 'Ambience': {'touristy': None, 'hipster': False, 'romantic': False, 'divey': True, 'intimate': False, 'trendy': False, 'upscale': False, 'classy': None, 'casual': None}}, 'business_stars': 4.0, 'review_info': [{'review_stars': 5.0, 'review_date': '2021-12-28 02:54:43', 'review_text': \"This bar is awesome!"
+  },
+  {
+    "sample_id": 15,
+    "trace_id": "11378",
+    "task": "Data2txt",
+    "bucket": "high_neutral",
+    "claim": "Another reviewer complained that the quality and size of the sandwiches have decreased significantly over time, leaving them disappointed.",
+    "scores": {
+      "entailment": 0.003,
+      "neutral": 0.9361,
+      "contradiction": 0.0608
+    },
+    "exact_verdict": null,
+    "category": "ambiguous",
+    "mechanism": "unverified_neutral_paraphrase",
+    "reasoning": "Neutral score reflecting loose paraphrase or background detail not explicitly grounded.",
+    "active_passages_count": 4,
+    "primary_passage": "You used to be the go to for big tasty sandwiches? The market is still great but the quality and size of your sandwiches are the same as a supermarket deli. Very sad!\"}, {'review_stars': 5.0, 'review_date': '2021-10-10 15:35:37', 'review_text': 'We stayed in a hotel across the street and Cantwell was our place to grab a sandwich and drinks to go before heading out.\\n\\nService is fast and the sandwiches were tasty!"
+  },
+  {
+    "sample_id": 16,
+    "trace_id": "9720",
+    "task": "Data2txt",
+    "bucket": "numeric",
+    "claim": "It opens from 1:00 PM to 2:00 AM from Tuesday to Sunday, and remains closed on Mondays.",
+    "scores": {
+      "entailment": 0.0184,
+      "neutral": 0.4221,
+      "contradiction": 0.5595
+    },
+    "exact_verdict": "contradicted",
+    "category": "guard_error",
+    "mechanism": "numeric_rule_mismatch",
+    "reasoning": "Numeric override contradicted fired on claim.",
+    "active_passages_count": 4,
+    "primary_passage": "{'name': 'The Sportsman', 'address': '1226 State St', 'city': 'Santa Barbara', 'state': 'CA', 'categories': 'Bars, Nightlife, Dive Bars, Sports Bars, Lounges', 'hours': {'Monday': '0:0-0:0', 'Tuesday': '13:0-2:0', 'Wednesday': '13:0-2:0', 'Thursday': '13:0-2:0', 'Friday': '13:0-2:0', 'Saturday': '13:0-2:0', 'Sunday': '13:0-2:0'}, 'attributes': {'BusinessParking': {'garage': True, 'street': True, 'validated': False, 'lot': False, 'valet': False}, 'RestaurantsReservations': False, 'OutdoorSeating': True, 'WiFi': 'free', 'RestaurantsTakeOut': None, 'RestaurantsGoodForGroups': True, 'Music': True, 'Ambience': {'touristy': None, 'hipster': False, 'romantic': False, 'divey': True, 'intimate': False, 'trendy': False, 'upscale': False, 'classy': None, 'casual': None}}, 'business_stars': 4.0, 'review_info': [{'review_stars': 5.0, 'review_date': '2021-12-28 02:54:43', 'review_text': \"This bar is awesome!"
+  },
+  {
+    "sample_id": 17,
+    "trace_id": "10093",
+    "task": "Data2txt",
+    "bucket": "numeric",
+    "claim": "The restaurant is open from 5:00 PM to 9:30 PM from Monday to Thursday, and until 10:00 PM on Fridays and Saturdays.",
+    "scores": {
+      "entailment": 0.1364,
+      "neutral": 0.8003,
+      "contradiction": 0.0633
+    },
+    "exact_verdict": "contradicted",
+    "category": "guard_error",
+    "mechanism": "numeric_rule_mismatch",
+    "reasoning": "Numeric override contradicted fired on claim.",
+    "active_passages_count": 4,
+    "primary_passage": "{'name': 'Sushi Bar 29', 'address': '1134 Chapala St', 'city': 'Santa Barbara', 'state': 'CA', 'categories': 'Japanese, Restaurants, Noodles, Sushi Bars', 'hours': {'Monday': '17:0-21:30', 'Tuesday': '17:0-21:30', 'Wednesday': '17:0-21:30', 'Thursday': '17:0-21:30', 'Friday': '17:0-22:0', 'Saturday': '17:0-22:0'}, 'attributes': {'BusinessParking': {'garage': False, 'street': True, 'validated': False, 'lot': False, 'valet': False}, 'RestaurantsReservations': True, 'OutdoorSeating': False, 'WiFi': 'no', 'RestaurantsTakeOut': True, 'RestaurantsGoodForGroups': True, 'Music': None, 'Ambience': {'divey': False, 'hipster': None, 'casual': True, 'touristy': False, 'trendy': None, 'intimate': None, 'romantic': False, 'classy': False, 'upscale': None}}, 'business_stars': 4.5, 'review_info': [{'review_stars': 3.0, 'review_date': '2022-01-16 08:22:01', 'review_text': \"Back in Santa Barbara is another sushi place, at Sushi Bar 29."
+  },
+  {
+    "sample_id": 18,
+    "trace_id": "10020",
+    "task": "Data2txt",
+    "bucket": "numeric",
+    "claim": "It operates from 8:00 to 20:30 from Monday to Saturday, and from 8:00 to 15:30 on Sundays.",
+    "scores": {
+      "entailment": 0.6898,
+      "neutral": 0.2709,
+      "contradiction": 0.0392
+    },
+    "exact_verdict": "contradicted",
+    "category": "guard_error",
+    "mechanism": "numeric_disjoint_multi_passage",
+    "reasoning": "Claim numbers ['20:30', '15:30'] exist in context, but disjoint check against another passage fired exact contradiction.",
+    "active_passages_count": 3,
+    "primary_passage": "{'name': 'El  Sitio', 'address': '2830 De La Vina St', 'city': 'Santa  Barbara', 'state': 'CA', 'categories': 'Restaurants, Mexican', 'hours': {'Monday': '8:0-20:30', 'Tuesday': '8:0-20:30', 'Wednesday': '8:0-20:30', 'Thursday': '8:0-20:30', 'Friday': '8:0-20:30', 'Saturday': '8:0-20:30', 'Sunday': '8:0-15:30'}, 'attributes': {'BusinessParking': {'garage': False, 'street': True, 'validated': False, 'lot': True, 'valet': False}, 'RestaurantsReservations': False, 'OutdoorSeating': True, 'WiFi': 'no', 'RestaurantsTakeOut': True, 'RestaurantsGoodForGroups': False, 'Music': None, 'Ambience': {'touristy': False, 'hipster': False, 'romantic': False, 'divey': None, 'intimate': False, 'trendy': False, 'upscale': False, 'classy': False, 'casual': None}}, 'business_stars': 4.0, 'review_info': [{'review_stars': 5.0, 'review_date': '2022-01-16 02:18:48', 'review_text': 'Love El Sitio!"
+  },
+  {
+    "sample_id": 19,
+    "trace_id": "5706",
+    "task": "Data2txt",
+    "bucket": "numeric",
+    "claim": "Open every day from 6:30 am to 10 pm, the restaurant is known for its valet parking and reservations.",
+    "scores": {
+      "entailment": 0.0137,
+      "neutral": 0.2515,
+      "contradiction": 0.7348
+    },
+    "exact_verdict": "contradicted",
+    "category": "guard_error",
+    "mechanism": "numeric_disjoint_multi_passage",
+    "reasoning": "Claim numbers ['6:30'] exist in context, but disjoint check against another passage fired exact contradiction.",
+    "active_passages_count": 4,
+    "primary_passage": "{'name': 'Bistro 1111', 'address': '1111 E Cabrillo Blvd', 'city': 'Santa Barbara', 'state': 'CA', 'categories': 'Breakfast & Brunch, American (New), Restaurants', 'hours': {'Monday': '6:30-22:0', 'Tuesday': '6:30-22:0', 'Wednesday': '6:30-22:0', 'Thursday': '6:30-22:0', 'Friday': '6:30-22:0', 'Saturday': '6:30-22:0', 'Sunday': '6:30-22:0'}, 'attributes': {'BusinessParking': {'garage': False, 'street': True, 'validated': False, 'lot': False, 'valet': True}, 'RestaurantsReservations': True, 'OutdoorSeating': False, 'WiFi': 'no', 'RestaurantsTakeOut': True, 'RestaurantsGoodForGroups': True, 'Music': None, 'Ambience': {'romantic': False, 'intimate': False, 'touristy': False, 'hipster': False, 'divey': False, 'classy': True, 'trendy': False, 'upscale': False, 'casual': False}}, 'business_stars': 3.5, 'review_info': [{'review_stars': 4.0, 'review_date': '2016-01-30 13:04:56', 'review_text': \"We came here to eat and grab drinks while waiting for our hotel room to be ready."
+  },
+  {
+    "sample_id": 20,
+    "trace_id": "8322",
+    "task": "Data2txt",
+    "bucket": "numeric",
+    "claim": "Operating from 8:00 PM to 2:00 AM on Thursdays, Fridays, and Saturdays, the club provides free Wi-Fi and is suitable for group outings.",
+    "scores": {
+      "entailment": 0.0328,
+      "neutral": 0.0396,
+      "contradiction": 0.9276
+    },
+    "exact_verdict": "contradicted",
+    "category": "guard_error",
+    "mechanism": "numeric_rule_mismatch",
+    "reasoning": "Numeric override contradicted fired on claim.",
+    "active_passages_count": 3,
+    "primary_passage": "{'name': 'Tonic Nightclub', 'address': '634 State St', 'city': 'Santa Barbara', 'state': 'CA', 'categories': 'Nightlife, Dance Clubs, Bars', 'hours': {'Thursday': '20:0-2:0', 'Friday': '20:0-2:0', 'Saturday': '20:0-2:0'}, 'attributes': {'BusinessParking': {'garage': True, 'street': True, 'validated': False, 'lot': False, 'valet': False}, 'RestaurantsReservations': True, 'OutdoorSeating': True, 'WiFi': 'free', 'RestaurantsTakeOut': None, 'RestaurantsGoodForGroups': True, 'Music': None, 'Ambience': {'romantic': False, 'intimate': False, 'touristy': False, 'hipster': False, 'divey': False, 'classy': False, 'trendy': True, 'upscale': False, 'casual': False}}, 'business_stars': 2.5, 'review_info': [{'review_stars': 1.0, 'review_date': '2018-01-29 00:07:18', 'review_text': \"This place closed down for good last night."
+  },
+  {
+    "sample_id": 21,
+    "trace_id": "14830",
+    "task": "QA",
+    "bucket": "E_0.5_0.9",
+    "claim": "Based on the given passages, here are the steps to properly use a helicoil insert:",
+    "scores": {
+      "entailment": 0.5948,
+      "neutral": 0.3538,
+      "contradiction": 0.0514
+    },
+    "exact_verdict": null,
+    "category": "guard_error",
+    "mechanism": "extreme_threshold_0.90",
+    "reasoning": "Entailment=0.5948 is dominant and contradiction=0.0514 is low, but threshold 0.90 marked it unsupported.",
+    "active_passages_count": 4,
+    "primary_passage": "passage 1:First step in installing a helical thread insert is to drill out the hole to the proper size for the thread repair tap. I put the fork leg semi-snugly in the milling machine vise and lined it up using a 1-2-3 block. Once in position, I locked down the vise."
+  },
+  {
+    "sample_id": 22,
+    "trace_id": "14614",
+    "task": "QA",
+    "bucket": "E_0.5_0.9",
+    "claim": "Here's how you can adjust the row height in Excel at once based on the given passages:",
+    "scores": {
+      "entailment": 0.6259,
+      "neutral": 0.2697,
+      "contradiction": 0.1044
+    },
+    "exact_verdict": null,
+    "category": "guard_error",
+    "mechanism": "extreme_threshold_0.90",
+    "reasoning": "Entailment=0.6259 is dominant and contradiction=0.1044 is low, but threshold 0.90 marked it unsupported.",
+    "active_passages_count": 4,
+    "primary_passage": "You can also right-click the selected rows and choose Row Height from the context menu. Related Reading: How to Format a Row Based on the Value of a Cell in Excel 2007."
+  },
+  {
+    "sample_id": 23,
+    "trace_id": "17463",
+    "task": "QA",
+    "bucket": "E_0.5_0.9",
+    "claim": "Softwood cuttings are from the soft, pliable tips of new growth, while hardwood is thicker and may snap if bent.",
+    "scores": {
+      "entailment": 0.6447,
+      "neutral": 0.3502,
+      "contradiction": 0.0051
+    },
+    "exact_verdict": null,
+    "category": "guard_error",
+    "mechanism": "extreme_threshold_0.90",
+    "reasoning": "Entailment=0.6447 is dominant and contradiction=0.0051 is low, but threshold 0.90 marked it unsupported.",
+    "active_passages_count": 3,
+    "primary_passage": "passage 1:You can start lavender from hardwood or softwood cuttings. Softwood cuttings are taken from the soft, pliable tips of new growth. Hardwood is thicker than softwood and resists bending. It may snap if you force it to bend. The best type of cutting to use depends on the type of lavender and the time of year."
+  },
+  {
+    "sample_id": 24,
+    "trace_id": "17400",
+    "task": "QA",
+    "bucket": "E_0.5_0.9",
+    "claim": "This brief boiling helps the egg retain its shape once it's cracked and poured into simmering water later.",
+    "scores": {
+      "entailment": 0.8746,
+      "neutral": 0.117,
+      "contradiction": 0.0084
+    },
+    "exact_verdict": null,
+    "category": "guard_error",
+    "mechanism": "extreme_threshold_0.90",
+    "reasoning": "Entailment=0.8746 is dominant and contradiction=0.0084 is low, but threshold 0.90 marked it unsupported.",
+    "active_passages_count": 4,
+    "primary_passage": "passage 1:3. Boil the egg for 10 seconds. Place the whole egg (still in the shell) in the boiling water for exactly 10 seconds. Remove the egg from the water, and lower the heat to bring the water to a simmer. Boiling the egg helps it to retain its shape once it's cracked and poured into simmering water later. 4. Poach the egg."
+  },
+  {
+    "sample_id": 25,
+    "trace_id": "13986",
+    "task": "QA",
+    "bucket": "E_0.5_0.9",
+    "claim": "Also, if you crave snacks, buy individual serving sizes instead of family sizes.",
+    "scores": {
+      "entailment": 0.6175,
+      "neutral": 0.3787,
+      "contradiction": 0.0039
+    },
+    "exact_verdict": null,
+    "category": "guard_error",
+    "mechanism": "extreme_threshold_0.90",
+    "reasoning": "Entailment=0.6175 is dominant and contradiction=0.0039 is low, but threshold 0.90 marked it unsupported.",
+    "active_passages_count": 3,
+    "primary_passage": "passage 1:But at the end of the day, the best way to train yourself to just know when your body's had enough food is to really pay attention when you're eating. That means no having dinner in front of the latest episode of Scandal\u2014and you definitely shouldn't be munching away in front of your computer screen."
+  },
+  {
+    "sample_id": 26,
+    "trace_id": "12742",
+    "task": "QA",
+    "bucket": "high_contradiction",
+    "claim": "Select \"View My Account\" from the dropdown menu.",
+    "scores": {
+      "entailment": 0.0432,
+      "neutral": 0.3543,
+      "contradiction": 0.6025
+    },
+    "exact_verdict": null,
+    "category": "genuinely_unsupported",
+    "mechanism": "hallucination_or_annotation_gap",
+    "reasoning": "Claim asserts specific details or relationships contradicted by or absent from the source text (incomplete gold label in RAGTruth).",
+    "active_passages_count": 4,
+    "primary_passage": "2. From the Store menu, select View my Account.... 3. Sign in with your Apple ID and password. 4. Under Computer Authorizations select De-authorize All. 5. Authorize each computer you still have, as you may require. You may only do this once per year."
+  },
+  {
+    "sample_id": 27,
+    "trace_id": "14830",
+    "task": "QA",
+    "bucket": "high_contradiction",
+    "claim": "5.",
+    "scores": {
+      "entailment": 0.0106,
+      "neutral": 0.1,
+      "contradiction": 0.8894
+    },
+    "exact_verdict": null,
+    "category": "genuinely_unsupported",
+    "mechanism": "hallucination_or_annotation_gap",
+    "reasoning": "Claim asserts specific details or relationships contradicted by or absent from the source text (incomplete gold label in RAGTruth).",
+    "active_passages_count": 4,
+    "primary_passage": "passage 1:First step in installing a helical thread insert is to drill out the hole to the proper size for the thread repair tap. I put the fork leg semi-snugly in the milling machine vise and lined it up using a 1-2-3 block. Once in position, I locked down the vise."
+  },
+  {
+    "sample_id": 28,
+    "trace_id": "12427",
+    "task": "QA",
+    "bucket": "high_contradiction",
+    "claim": "Unable to answer based on given passages.",
+    "scores": {
+      "entailment": 0.0004,
+      "neutral": 0.004,
+      "contradiction": 0.9956
+    },
+    "exact_verdict": null,
+    "category": "genuinely_unsupported",
+    "mechanism": "hallucination_or_annotation_gap",
+    "reasoning": "Claim asserts specific details or relationships contradicted by or absent from the source text (incomplete gold label in RAGTruth).",
+    "active_passages_count": 3,
+    "primary_passage": "passage 1:Weekly Weather Report for Stuttgart, Germany. Looking at the weather in Stuttgart, Germany over the next 7 days, the maximum temperature will be 33\u2103 (or 92\u2109) on Saturday 26th August at around 4 pm. In the same week the minimum temperature will be 14\u2103 (or 58\u2109) on Wednesday 23rd August at around 4 am."
+  },
+  {
+    "sample_id": 29,
+    "trace_id": "16952",
+    "task": "QA",
+    "bucket": "high_contradiction",
+    "claim": "Discard the marinade before cooking.",
+    "scores": {
+      "entailment": 0.0025,
+      "neutral": 0.2671,
+      "contradiction": 0.7304
+    },
+    "exact_verdict": null,
+    "category": "genuinely_unsupported",
+    "mechanism": "hallucination_or_annotation_gap",
+    "reasoning": "Claim asserts specific details or relationships contradicted by or absent from the source text (incomplete gold label in RAGTruth).",
+    "active_passages_count": 3,
+    "primary_passage": "passage 1:1 Cover the grill and allow the roast to cook for about 1 hour for a medium rare 2-3 lb. roast. 2  The temperature of the grill should be around 400\u00b0 F. Check for doneness with a meat thermometer. 3  For medium rare - 145\u00b0, medium - 160\u00b0, and well done - 170\u00b0. 4  Cook for approximately 1 1/2 for medium and 2 hours for well done."
+  },
+  {
+    "sample_id": 30,
+    "trace_id": "12742",
+    "task": "QA",
+    "bucket": "high_contradiction",
+    "claim": "Click on the Store menu in the top bar.",
+    "scores": {
+      "entailment": 0.0012,
+      "neutral": 0.0126,
+      "contradiction": 0.9862
+    },
+    "exact_verdict": null,
+    "category": "genuinely_unsupported",
+    "mechanism": "hallucination_or_annotation_gap",
+    "reasoning": "Claim asserts specific details or relationships contradicted by or absent from the source text (incomplete gold label in RAGTruth).",
+    "active_passages_count": 4,
+    "primary_passage": "passage 1:To deauthorize all computers: Click to open iTunes and sign in to your Account Information, or use the steps below: 1  Open iTunes. 2  Click Sign In, and then enter your Apple ID and password. 3  Click your name and select Account Info from the menu.4  Enter your password again.ee how many computers you've authorized. Click to open iTunes and sign in to your Account Information, or use the steps below: 1  Open iTunes."
+  },
+  {
+    "sample_id": 31,
+    "trace_id": "12092",
+    "task": "QA",
+    "bucket": "high_neutral",
+    "claim": "Generally, older age groups tend to have higher median weekly earnings than younger age groups.",
+    "scores": {
+      "entailment": 0.4243,
+      "neutral": 0.5453,
+      "contradiction": 0.0304
+    },
+    "exact_verdict": null,
+    "category": "ambiguous",
+    "mechanism": "unverified_neutral_paraphrase",
+    "reasoning": "Neutral score reflecting loose paraphrase or background detail not explicitly grounded.",
+    "active_passages_count": 4,
+    "primary_passage": "passage 1:According to the U.S. Bureau of Labor Statistics, reporting on the usual weekly earnings of wage and salary workers for the second quarter of 2012, the median weekly earnings for men and women were higher in older age groups. Men ages 45 to 54 had median weekly earnings of $1,003; for men 55 to 64, the median weekly earnings were $1,015. For women, the usual weekly earnings were highest for those 55 to 64 at $760."
+  },
+  {
+    "sample_id": 32,
+    "trace_id": "17461",
+    "task": "QA",
+    "bucket": "high_neutral",
+    "claim": "the time of year.",
+    "scores": {
+      "entailment": 0.0057,
+      "neutral": 0.9699,
+      "contradiction": 0.0244
+    },
+    "exact_verdict": null,
+    "category": "ambiguous",
+    "mechanism": "unverified_neutral_paraphrase",
+    "reasoning": "Neutral score reflecting loose paraphrase or background detail not explicitly grounded.",
+    "active_passages_count": 3,
+    "primary_passage": "passage 1:You can start lavender from hardwood or softwood cuttings. Softwood cuttings are taken from the soft, pliable tips of new growth. Hardwood is thicker than softwood and resists bending. It may snap if you force it to bend. The best type of cutting to use depends on the type of lavender and the time of year."
+  },
+  {
+    "sample_id": 33,
+    "trace_id": "12485",
+    "task": "QA",
+    "bucket": "high_neutral",
+    "claim": "Therefore, the answer is:",
+    "scores": {
+      "entailment": 0.0085,
+      "neutral": 0.7146,
+      "contradiction": 0.2769
+    },
+    "exact_verdict": null,
+    "category": "ambiguous",
+    "mechanism": "unverified_neutral_paraphrase",
+    "reasoning": "Neutral score reflecting loose paraphrase or background detail not explicitly grounded.",
+    "active_passages_count": 4,
+    "primary_passage": "passage 1:Method 1 of 2: Determine Your Ideal Shape. 1. Determine where your inner brow should end. Hold a straight edge, such as an eyebrow pencil or a ruler, vertically in front of your face. 1  Line it up so that it touches the outermost of edge your nose and the inside of your eye.2  This line will determine where your eyebrow should start.ethod 1 of 2: Determine Your Ideal Shape."
+  },
+  {
+    "sample_id": 34,
+    "trace_id": "13991",
+    "task": "QA",
+    "bucket": "high_neutral",
+    "claim": "3.",
+    "scores": {
+      "entailment": 0.0181,
+      "neutral": 0.8617,
+      "contradiction": 0.1201
+    },
+    "exact_verdict": null,
+    "category": "ambiguous",
+    "mechanism": "unverified_neutral_paraphrase",
+    "reasoning": "Neutral score reflecting loose paraphrase or background detail not explicitly grounded.",
+    "active_passages_count": 3,
+    "primary_passage": "passage 1:But at the end of the day, the best way to train yourself to just know when your body's had enough food is to really pay attention when you're eating. That means no having dinner in front of the latest episode of Scandal\u2014and you definitely shouldn't be munching away in front of your computer screen."
+  },
+  {
+    "sample_id": 35,
+    "trace_id": "16113",
+    "task": "QA",
+    "bucket": "high_neutral",
+    "claim": "If you have any further questions or concerns, please feel free to ask.",
+    "scores": {
+      "entailment": 0.0041,
+      "neutral": 0.9428,
+      "contradiction": 0.0531
+    },
+    "exact_verdict": null,
+    "category": "ambiguous",
+    "mechanism": "unverified_neutral_paraphrase",
+    "reasoning": "Neutral score reflecting loose paraphrase or background detail not explicitly grounded.",
+    "active_passages_count": 3,
+    "primary_passage": "passage 1:This course provides study material for the CDL Air Brakes test. If you want to drive a truck or bus with air brakes, or pull a trailer with air brakes, you need to pass the Air Brakes test."
+  },
+  {
+    "sample_id": 36,
+    "trace_id": "15702",
+    "task": "QA",
+    "bucket": "numeric",
+    "claim": "Then, they are simmered covered for 2 hours until tender.",
+    "scores": {
+      "entailment": 0.6878,
+      "neutral": 0.0674,
+      "contradiction": 0.2449
+    },
+    "exact_verdict": "contradicted",
+    "category": "guard_error",
+    "mechanism": "numeric_disjoint_multi_passage",
+    "reasoning": "Claim numbers ['2'] exist in context, but disjoint check against another passage fired exact contradiction.",
+    "active_passages_count": 4,
+    "primary_passage": "passage 1:1 Preheat grill to medium. 2  Remove ribs from water and place in a large bowl. 3  Drench the ribs in additional barbecue sauce. 4  Transfer ribs to preheated grill. 5  Close grill lid. 6  Grill for 10 to 20 minutes, basting generously with barbecue sauce & turning often (every 2 minutes). Cover, and bring to a boil. 2  Reduce heat. 3  Simmer covered for 2 hours, until ribs are tender."
+  },
+  {
+    "sample_id": 37,
+    "trace_id": "16950",
+    "task": "QA",
+    "bucket": "numeric",
+    "claim": "Cover the grill and allow the roast to cook for about 1 hour for a medium rare 2-3 lb.",
+    "scores": {
+      "entailment": 0.9955,
+      "neutral": 0.0041,
+      "contradiction": 0.0004
+    },
+    "exact_verdict": "contradicted",
+    "category": "guard_error",
+    "mechanism": "numeric_disjoint_multi_passage",
+    "reasoning": "Claim numbers ['1', '2', '3'] exist in context, but disjoint check against another passage fired exact contradiction.",
+    "active_passages_count": 3,
+    "primary_passage": "passage 1:1 Cover the grill and allow the roast to cook for about 1 hour for a medium rare 2-3 lb. roast. 2  The temperature of the grill should be around 400\u00b0 F. Check for doneness with a meat thermometer. 3  For medium rare - 145\u00b0, medium - 160\u00b0, and well done - 170\u00b0. 4  Cook for approximately 1 1/2 for medium and 2 hours for well done."
+  },
+  {
+    "sample_id": 38,
+    "trace_id": "16950",
+    "task": "QA",
+    "bucket": "numeric",
+    "claim": "Allow it to marinate in the refrigerator for at least half an hour or up to 4 hours before grilling.",
+    "scores": {
+      "entailment": 0.0035,
+      "neutral": 0.0962,
+      "contradiction": 0.9003
+    },
+    "exact_verdict": "contradicted",
+    "category": "guard_error",
+    "mechanism": "numeric_disjoint_multi_passage",
+    "reasoning": "Claim numbers ['4'] exist in context, but disjoint check against another passage fired exact contradiction.",
+    "active_passages_count": 3,
+    "primary_passage": "passage 1:1 Cover the grill and allow the roast to cook for about 1 hour for a medium rare 2-3 lb. roast. 2  The temperature of the grill should be around 400\u00b0 F. Check for doneness with a meat thermometer. 3  For medium rare - 145\u00b0, medium - 160\u00b0, and well done - 170\u00b0. 4  Cook for approximately 1 1/2 for medium and 2 hours for well done."
+  },
+  {
+    "sample_id": 39,
+    "trace_id": "15706",
+    "task": "QA",
+    "bucket": "numeric",
+    "claim": "Reduce the heat and simmer, covered, for 2 hours, until the ribs are tender.",
+    "scores": {
+      "entailment": 0.9893,
+      "neutral": 0.009,
+      "contradiction": 0.0017
+    },
+    "exact_verdict": "contradicted",
+    "category": "guard_error",
+    "mechanism": "numeric_disjoint_multi_passage",
+    "reasoning": "Claim numbers ['2'] exist in context, but disjoint check against another passage fired exact contradiction.",
+    "active_passages_count": 4,
+    "primary_passage": "passage 1:1 Preheat grill to medium. 2  Remove ribs from water and place in a large bowl. 3  Drench the ribs in additional barbecue sauce. 4  Transfer ribs to preheated grill. 5  Close grill lid. 6  Grill for 10 to 20 minutes, basting generously with barbecue sauce & turning often (every 2 minutes). Cover, and bring to a boil. 2  Reduce heat. 3  Simmer covered for 2 hours, until ribs are tender."
+  },
+  {
+    "sample_id": 40,
+    "trace_id": "15702",
+    "task": "QA",
+    "bucket": "numeric",
+    "claim": "the ribs are cooked at 350 degrees for 1 and 1/2 hours.",
+    "scores": {
+      "entailment": 0.0063,
+      "neutral": 0.0933,
+      "contradiction": 0.9004
+    },
+    "exact_verdict": "contradicted",
+    "category": "guard_error",
+    "mechanism": "numeric_disjoint_multi_passage",
+    "reasoning": "Claim numbers ['350', '1', '1', '2'] exist in context, but disjoint check against another passage fired exact contradiction.",
+    "active_passages_count": 4,
+    "primary_passage": "passage 3:Best Answer: Simple. Put aluminum foil down in like a corning ware dish with enough excess to fold over them, pour in BBQ sauce over the ribs, fold foil over and put a lid on and cook at 350 degrees for 1 and 1/2 hours.est Answer: Simple. Put aluminum foil down in like a corning ware dish with enough excess to fold over them, pour in BBQ sauce over the ribs, fold foil over and put a lid on and cook at 350 degrees for 1 and 1/2 hours."
+  },
+  {
+    "sample_id": 41,
+    "trace_id": "2767",
+    "task": "Summary",
+    "bucket": "E_0.5_0.9",
+    "claim": "The manuscript, written by John Hughes, reveals that Molly Ringwald's character was originally named Cathy Douglas.",
+    "scores": {
+      "entailment": 0.804,
+      "neutral": 0.1296,
+      "contradiction": 0.0664
+    },
+    "exact_verdict": null,
+    "category": "guard_error",
+    "mechanism": "extreme_threshold_0.90",
+    "reasoning": "Entailment=0.8040 is dominant and contradiction=0.0664 is low, but threshold 0.90 marked it unsupported.",
+    "active_passages_count": 4,
+    "primary_passage": "The cast of \"The Breakfast Crew\" escaped from Principal Richard Vernon 30 years ago, but a draft script of the 1985 teen classic has just been found in a filing cabinet in the school district where it was filmed, the Chicago Tribune reported. \"One day a few weeks ago, one of the assistants was going through a filing cabinet and found a file that had a manuscript from 'The Breakfast Club' dated Sept."
+  },
+  {
+    "sample_id": 42,
+    "trace_id": "2711",
+    "task": "Summary",
+    "bucket": "E_0.5_0.9",
+    "claim": "This decision has sparked a discussion about the role of sports in society, particularly in the context of racial tensions and social inequality.",
+    "scores": {
+      "entailment": 0.8722,
+      "neutral": 0.1241,
+      "contradiction": 0.0037
+    },
+    "exact_verdict": null,
+    "category": "guard_error",
+    "mechanism": "extreme_threshold_0.90",
+    "reasoning": "Entailment=0.8722 is dominant and contradiction=0.0037 is low, but threshold 0.90 marked it unsupported.",
+    "active_passages_count": 4,
+    "primary_passage": "It seems almost silly to be writing about baseball in the context of recent events. Except it isn't. Last weekend, as Baltimore reacted to the death of Freddie Gray, the young man who died last week from a spinal cord injury he suffered while in police custody, Major League Baseball had a problem on its hands. Saturday's game between the Orioles and Red Sox had gone into extra innings in Camden Yards, with plenty of fans for both teams glued to their seats."
+  },
+  {
+    "sample_id": 43,
+    "trace_id": "4597",
+    "task": "Summary",
+    "bucket": "E_0.5_0.9",
+    "claim": "Pitching played a crucial role in their success, with Jordan Montgomery and Nathan Eovaldi performing brilliantly.",
+    "scores": {
+      "entailment": 0.8455,
+      "neutral": 0.1479,
+      "contradiction": 0.0066
+    },
+    "exact_verdict": null,
+    "category": "guard_error",
+    "mechanism": "extreme_threshold_0.90",
+    "reasoning": "Entailment=0.8455 is dominant and contradiction=0.0066 is low, but threshold 0.90 marked it unsupported.",
+    "active_passages_count": 4,
+    "primary_passage": "We all know it was the pitching, and pitching wins championships. Jordan Montgomery has been brilliant throughout the Rangers\u2019 run so far, and so has Nathan Eovaldi. The bullpen, a serious weakness in the regular season, also got the job done. Jose LeClerc successfully shut down the opponents in the first seven games of the postseason. Josh Sborz has been lights out."
+  },
+  {
+    "sample_id": 44,
+    "trace_id": "2789",
+    "task": "Summary",
+    "bucket": "E_0.5_0.9",
+    "claim": "the Knights Who Say \"Ni.\" It is considered a comedy classic and has been widely quoted in popular culture.",
+    "scores": {
+      "entailment": 0.7292,
+      "neutral": 0.2601,
+      "contradiction": 0.0107
+    },
+    "exact_verdict": null,
+    "category": "guard_error",
+    "mechanism": "extreme_threshold_0.90",
+    "reasoning": "Entailment=0.7292 is dominant and contradiction=0.0107 is low, but threshold 0.90 marked it unsupported.",
+    "active_passages_count": 4,
+    "primary_passage": "It got better. On the day of its first American screening in New York, a thousand people were in line by 8 a.m. Thanks to the popularity of \"Python\" on American TV, the movie was a box-office hit, making $5 million -- more than 10 times its budget. More importantly, it soon became a comedy classic. The dialogue alone has been widely quoted, with such lines as \"It's just a flesh wound\" and \"Your mother was a hamster and your father smelt of elderberries\" referenced on shows such as \"The Simpsons,\" \"Game of Thrones\" and \"The Blacklist.\"  Python member Eric Idle turned the film into the Tony-winning Broadway play \"Spamalot.\" The troupe ended up making three movies -- well, four, if you count \"And Now for Something Completely Different,\" five if you include \"Monty Python Live at the Hollywood Bowl,\" five-and-a-half if you allow \"The Rutles,\" six if you ..."
+  },
+  {
+    "sample_id": 45,
+    "trace_id": "3432",
+    "task": "Summary",
+    "bucket": "E_0.5_0.9",
+    "claim": "He stood trial with 14 co-defendants, including some of his presidential staff, all of whom were also convicted of violence and inciting violence, but were acquitted of murder.",
+    "scores": {
+      "entailment": 0.8959,
+      "neutral": 0.0876,
+      "contradiction": 0.0164
+    },
+    "exact_verdict": null,
+    "category": "guard_error",
+    "mechanism": "extreme_threshold_0.90",
+    "reasoning": "Entailment=0.8959 is dominant and contradiction=0.0164 is low, but threshold 0.90 marked it unsupported.",
+    "active_passages_count": 4,
+    "primary_passage": "Cairo (CNN)Mohamed Morsy went from prison to the presidency. And now he's going back to prison. The ousted President was convicted on charges of violence and inciting violence and sentenced to 20 years in prison for the torture of protesters outside the presidential palace in December 2012. But he was acquitted of murder in the deaths of protesters. He stood trial with 14 co-defendants, including some of his presidential staff."
+  },
+  {
+    "sample_id": 46,
+    "trace_id": "3514",
+    "task": "Summary",
+    "bucket": "high_contradiction",
+    "claim": "Sure!",
+    "scores": {
+      "entailment": 0.0165,
+      "neutral": 0.125,
+      "contradiction": 0.8585
+    },
+    "exact_verdict": null,
+    "category": "genuinely_unsupported",
+    "mechanism": "hallucination_or_annotation_gap",
+    "reasoning": "Claim asserts specific details or relationships contradicted by or absent from the source text (incomplete gold label in RAGTruth).",
+    "active_passages_count": 4,
+    "primary_passage": "Is there anything laser can't do? From cutting diamonds to preserving endangered sites, all the way to building terrifying weapons and turning your eyes from brown to blue, there is apparently no end to the list of applications for laser. Swiss physicist Jean-Pierre Wolf is working on yet another impressive addition to that list: using focused laser beams to affect the weather."
+  },
+  {
+    "sample_id": 47,
+    "trace_id": "2587",
+    "task": "Summary",
+    "bucket": "high_contradiction",
+    "claim": "The survivors claim that BFMTV broadcasted their location live during the siege, putting them at risk.",
+    "scores": {
+      "entailment": 0.0065,
+      "neutral": 0.4474,
+      "contradiction": 0.5461
+    },
+    "exact_verdict": null,
+    "category": "guard_error",
+    "mechanism": "passage_selection_omission",
+    "reasoning": "Supporting passage omitted by candidate selection, forcing DeBERTa to evaluate against non-supporting passages.",
+    "active_passages_count": 4,
+    "primary_passage": "The media outlet, CNN affiliate BFMTV, is accused of endangering the lives of the hostages, who were hiding in a cold room during the attack, by broadcasting their location live during the siege. BFM in a statement Friday said one of its journalists \"mentioned only once the presence of a woman hidden inside the Hyper Cacher, on the basis of police sources on the ground.\" \"Immediately, the chief editor felt that this information should not be released."
+  },
+  {
+    "sample_id": 48,
+    "trace_id": "2709",
+    "task": "Summary",
+    "bucket": "high_contradiction",
+    "claim": "the ongoing protests and demonstrations in the city following the death of Freddie Gray.",
+    "scores": {
+      "entailment": 0.0037,
+      "neutral": 0.0473,
+      "contradiction": 0.949
+    },
+    "exact_verdict": null,
+    "category": "genuinely_unsupported",
+    "mechanism": "hallucination_or_annotation_gap",
+    "reasoning": "Claim asserts specific details or relationships contradicted by or absent from the source text (incomplete gold label in RAGTruth).",
+    "active_passages_count": 4,
+    "primary_passage": "It seems almost silly to be writing about baseball in the context of recent events. Except it isn't. Last weekend, as Baltimore reacted to the death of Freddie Gray, the young man who died last week from a spinal cord injury he suffered while in police custody, Major League Baseball had a problem on its hands. Saturday's game between the Orioles and Red Sox had gone into extra innings in Camden Yards, with plenty of fans for both teams glued to their seats."
+  },
+  {
+    "sample_id": 49,
+    "trace_id": "2788",
+    "task": "Summary",
+    "bucket": "high_contradiction",
+    "claim": "\"Meaning of Life\" is the most uneven of the three narrative Python films,",
+    "scores": {
+      "entailment": 0.0012,
+      "neutral": 0.0052,
+      "contradiction": 0.9936
+    },
+    "exact_verdict": null,
+    "category": "genuinely_unsupported",
+    "mechanism": "hallucination_or_annotation_gap",
+    "reasoning": "Claim asserts specific details or relationships contradicted by or absent from the source text (incomplete gold label in RAGTruth).",
+    "active_passages_count": 4,
+    "primary_passage": "Verdict: Funnier than the Spanish Inquisition. \"Meaning of Life,\" constructed as a series of sketches, is the most uneven of the three narrative Python films. After the stunning opening sequence, Gilliam's \"The Crimson Permanent Assurance\" -- about the revenge of some pirate-like accountants -- the film struggles to find its footing. Even the Pythons thought so."
+  },
+  {
+    "sample_id": 50,
+    "trace_id": "2953",
+    "task": "Summary",
+    "bucket": "high_contradiction",
+    "claim": "After several days of waiting, the individual received a call and began their journey on a small boat with around 100 other migrants.",
+    "scores": {
+      "entailment": 0.0016,
+      "neutral": 0.1618,
+      "contradiction": 0.8365
+    },
+    "exact_verdict": null,
+    "category": "guard_error",
+    "mechanism": "passage_selection_omission",
+    "reasoning": "Supporting passage omitted by candidate selection, forcing DeBERTa to evaluate against non-supporting passages.",
+    "active_passages_count": 4,
+    "primary_passage": "\"Be ready all day, every day for the next few days, because you might receive the call to go,\" the smuggler told me. One evening a few days later, I got the call and my journey began. They gathered 100 men and women in five buses and drove us to the smuggling point. It was far from Mersin. We walked for 30 minutes, through rough terrain and orange farms near the beach, in darkness to avoid detection by police."
+  },
+  {
+    "sample_id": 51,
+    "trace_id": "3667",
+    "task": "Summary",
+    "bucket": "high_neutral",
+    "claim": "However, during a conversation about Pope Francis' upcoming trip to the United States, Bernardini felt compelled to finally read the Good Book.",
+    "scores": {
+      "entailment": 0.0019,
+      "neutral": 0.909,
+      "contradiction": 0.0891
+    },
+    "exact_verdict": null,
+    "category": "ambiguous",
+    "mechanism": "unverified_neutral_paraphrase",
+    "reasoning": "Neutral score reflecting loose paraphrase or background detail not explicitly grounded.",
+    "active_passages_count": 4,
+    "primary_passage": "I'm also a lifelong Catholic. At work this week, I was talking with some colleagues about Pope Francis' upcoming trip to the United States. During the course of that conversation, I admitted something that has privately bothered me for a long time. I have never read the Bible from Genesis to Revelation. This from someone who jokingly refers to herself as the highest-ranking Catholic in the bureau."
+  },
+  {
+    "sample_id": 52,
+    "trace_id": "3003",
+    "task": "Summary",
+    "bucket": "high_neutral",
+    "claim": "the potential risk of harm to innocent bystanders.",
+    "scores": {
+      "entailment": 0.3102,
+      "neutral": 0.6789,
+      "contradiction": 0.0109
+    },
+    "exact_verdict": null,
+    "category": "ambiguous",
+    "mechanism": "unverified_neutral_paraphrase",
+    "reasoning": "Neutral score reflecting loose paraphrase or background detail not explicitly grounded.",
+    "active_passages_count": 4,
+    "primary_passage": "The officer, who has been a cop for more than a decade but joined the Marana Police Department in 2014, said he was 50 yards away from the suspect and worried a missed shot might hit another officer or bystanders. \"There were occupied businesses, and there were two officers at the other side of the street,\" he says on the recording. \"This is what I deem as a lethal force encounter."
+  },
+  {
+    "sample_id": 53,
+    "trace_id": "3435",
+    "task": "Summary",
+    "bucket": "high_neutral",
+    "claim": "The trial has been criticized for being politically motivated, with many arguing that the outcome was predetermined.",
+    "scores": {
+      "entailment": 0.0778,
+      "neutral": 0.9152,
+      "contradiction": 0.007
+    },
+    "exact_verdict": null,
+    "category": "ambiguous",
+    "mechanism": "unverified_neutral_paraphrase",
+    "reasoning": "Neutral score reflecting loose paraphrase or background detail not explicitly grounded.",
+    "active_passages_count": 4,
+    "primary_passage": "Cairo (CNN)Mohamed Morsy went from prison to the presidency. And now he's going back to prison. The ousted President was convicted on charges of violence and inciting violence and sentenced to 20 years in prison for the torture of protesters outside the presidential palace in December 2012. But he was acquitted of murder in the deaths of protesters. He stood trial with 14 co-defendants, including some of his presidential staff."
+  },
+  {
+    "sample_id": 54,
+    "trace_id": "2785",
+    "task": "Summary",
+    "bucket": "high_neutral",
+    "claim": "Despite its flaws, it had memorable moments and songs such as \"Every Sperm Is Sacred\" and \"The Galaxy Song.\" Overall, \"Holy Grail\" is regarded as the best and most quotable of the Monty Python movies, while \"Life of Brian\" also received critical acclaim.",
+    "scores": {
+      "entailment": 0.279,
+      "neutral": 0.6738,
+      "contradiction": 0.0473
+    },
+    "exact_verdict": null,
+    "category": "guard_error",
+    "mechanism": "passage_selection_omission",
+    "reasoning": "Key content words (12 in full context vs 8 in active passages) were omitted by passage selection.",
+    "active_passages_count": 4,
+    "primary_passage": "It also has the sweetest of all Python songs: Idle's \"The Galaxy Song,\" which is even more uplifting than \"Brian's\" \"Always Look on the Bright Side of Life.\" Not a bad conclusion, given what happened to Mr. Creosote. Pros: \"Permanent Assurance.\" Mr. Creosote. \"The Galaxy Song.\" Cons: The fish. The schoolmaster's sex lesson. The fish. Verdict: More enjoyable than watching the Upper-Class Twit of the Year competition."
+  },
+  {
+    "sample_id": 55,
+    "trace_id": "2942",
+    "task": "Summary",
+    "bucket": "high_neutral",
+    "claim": "the production of medical marijuana to increase dramatically.",
+    "scores": {
+      "entailment": 0.0669,
+      "neutral": 0.8963,
+      "contradiction": 0.0368
+    },
+    "exact_verdict": null,
+    "category": "ambiguous",
+    "mechanism": "unverified_neutral_paraphrase",
+    "reasoning": "Neutral score reflecting loose paraphrase or background detail not explicitly grounded.",
+    "active_passages_count": 4,
+    "primary_passage": "We know it won't consistently have such dramatic results (or any impact at all) in others, but what medicine does? I see this medical marijuana revolution in surprising places. Girl's seizures spur medical marijuana legislation in Georgia. Among my colleagues, my patients and my friends. I have even seen the revolution in my own family. A few years ago, when I told my mother I was investigating the topic for a documentary, I was met with a long pause."
+  },
+  {
+    "sample_id": 56,
+    "trace_id": "2788",
+    "task": "Summary",
+    "bucket": "numeric",
+    "claim": "the Holy Grail\" turns 40 this week,",
+    "scores": {
+      "entailment": 0.4181,
+      "neutral": 0.1608,
+      "contradiction": 0.421
+    },
+    "exact_verdict": "unsupported",
+    "category": "guard_error",
+    "mechanism": "numeric_no_values_in_passage",
+    "reasoning": "Exact rule fired unsupported because active passages had no extracted typed values.",
+    "active_passages_count": 4,
+    "primary_passage": "Monty Python in a movie? What a silly idea. But the timing was right for the gang of British comedians (along with their token American, Terry Gilliam), who were looking to hit the big screen after four seasons of \"Monty Python's Flying Circus,\" their groundbreaking British TV series. \"Monty Python and the Holy Grail,\" which premiered 40 years ago Thursday, was the result."
+  },
+  {
+    "sample_id": 57,
+    "trace_id": "1344",
+    "task": "Summary",
+    "bucket": "numeric",
+    "claim": "The prison is one of the most high-tech in the United States, with 366 cameras recording 24 hours a day.",
+    "scores": {
+      "entailment": 0.0013,
+      "neutral": 0.9462,
+      "contradiction": 0.0525
+    },
+    "exact_verdict": "contradicted",
+    "category": "guard_error",
+    "mechanism": "numeric_disjoint_multi_passage",
+    "reasoning": "Claim numbers ['366', '24'] exist in context, but disjoint check against another passage fired exact contradiction.",
+    "active_passages_count": 4,
+    "primary_passage": "It's called Souza, for short, and it's the state's newest prison, opened in 1998, with a matrix of 366 cameras recording live 24 hours a day and a microwave detection perimeter with taut wire. \"I don't know the date, but he'll be going there. That's the maximum-security facility,\" Department of Corrections spokesman Darren Duarte said. Legal advocates for inmates describe Souza as sterile and violent at once."
+  },
+  {
+    "sample_id": 58,
+    "trace_id": "1345",
+    "task": "Summary",
+    "bucket": "numeric",
+    "claim": "However, the majority of his time will be spent in a small cell, with inmates locked up for 19 hours a day.",
+    "scores": {
+      "entailment": 0.4322,
+      "neutral": 0.2003,
+      "contradiction": 0.3675
+    },
+    "exact_verdict": "contradicted",
+    "category": "guard_error",
+    "mechanism": "numeric_disjoint_multi_passage",
+    "reasoning": "Claim numbers ['19'] exist in context, but disjoint check against another passage fired exact contradiction.",
+    "active_passages_count": 4,
+    "primary_passage": "About 90% of the inmates in the maximum-security prison are locked in their cells for 19 hours a day, said Walker, the legal advocate. \"It's pretty grim,\" Walker said. Souza has slightly larger cells than most other Massachusetts prisons, but not by much, Walker said. Even so, the cells are stark, small rooms of painted cinder-block walls with metal fixtures: a bunk mounted to the wall, a toilet and sink combination, a small writing shelf attached to the wall, and a nearby small stool affixed to the floor, Walker said."
+  },
+  {
+    "sample_id": 59,
+    "trace_id": "1349",
+    "task": "Summary",
+    "bucket": "numeric",
+    "claim": "a microwave detection perimeter, and inmates are kept in their cells for 19 hours a day.",
+    "scores": {
+      "entailment": 0.0058,
+      "neutral": 0.396,
+      "contradiction": 0.5982
+    },
+    "exact_verdict": "contradicted",
+    "category": "guard_error",
+    "mechanism": "numeric_disjoint_multi_passage",
+    "reasoning": "Claim numbers ['19'] exist in context, but disjoint check against another passage fired exact contradiction.",
+    "active_passages_count": 4,
+    "primary_passage": "About 90% of the inmates in the maximum-security prison are locked in their cells for 19 hours a day, said Walker, the legal advocate. \"It's pretty grim,\" Walker said. Souza has slightly larger cells than most other Massachusetts prisons, but not by much, Walker said. Even so, the cells are stark, small rooms of painted cinder-block walls with metal fixtures: a bunk mounted to the wall, a toilet and sink combination, a small writing shelf attached to the wall, and a nearby small stool affixed to the floor, Walker said."
+  },
+  {
+    "sample_id": 60,
+    "trace_id": "2957",
+    "task": "Summary",
+    "bucket": "numeric",
+    "claim": "Undeterred, the man tried again two days later, joining 391 other refugees on a cargo ship that was rescued by an Icelandic ship and taken to Catania, Sicily.",
+    "scores": {
+      "entailment": 0.0035,
+      "neutral": 0.6888,
+      "contradiction": 0.3078
+    },
+    "exact_verdict": "unsupported",
+    "category": "guard_error",
+    "mechanism": "numeric_no_values_in_passage",
+    "reasoning": "Exact rule fired unsupported because active passages had no extracted typed values.",
+    "active_passages_count": 4,
+    "primary_passage": "My family didn't know what I was doing, but I dreamed of being a human being who is treated like one. I wasn't going to stop. So I called the smuggler the same night I was released, and said I wanted to get on the next ship out. Two days later I received the call, and again I headed to a smuggling point. This time, they had a bigger boat -- a cargo ship, in fact, maybe 85 meters long or more."
+  }
+]

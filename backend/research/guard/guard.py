@@ -10,6 +10,7 @@ from typing import TypedDict
 
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 
+from .action_policy import ACTIVE_ENGLISH, should_alter
 from .claims import split_claims
 from .conflict import ConflictThresholds, detect_conflicts
 from .factlock import compare_fact_locks
@@ -23,7 +24,7 @@ _TRANSLATOR = None
 
 class GuardResult(TypedDict):
     final_answer: str
-    claims: list[dict[str, str]]
+    claims: list[dict[str, object]]
     conflicts: list[dict[str, str]]
     fact_lock: list[dict[str, str]]
     changed: bool
@@ -78,7 +79,7 @@ def apply_guard_with_options(
     if lang not in {"en", "ml"}:
         raise ValueError("lang must be 'en' or 'ml'")
     final_answer = answer
-    claims: list[dict[str, str]] = []
+    claims: list[dict[str, object]] = []
     conflicts: list[dict[str, str]] = []
     fact_lock: list[dict[str, str]] = []
 
@@ -99,14 +100,17 @@ def apply_guard_with_options(
                     entailment_threshold=thresholds.entailment,
                     contradiction_threshold=thresholds.contradiction,
                 )
-                claims.append(
-                    {
+                action = (should_alter(assessment.verdict, assessment.scores, assessment.exact_verdict, ACTIVE_ENGLISH)
+                          if lang == "en" else assessment.verdict in {"unsupported", "contradicted"})
+                claim_result: dict[str, object] = {
                         "text": claim,
                         "verdict": assessment.verdict,
                         "evidence": assessment.evidence or "None",
                     }
-                )
-                if assessment.verdict in {"unsupported", "contradicted"}:
+                if lang == "en":
+                    claim_result["altered"] = action
+                claims.append(claim_result)
+                if action:
                     final_answer = final_answer.replace(claim, "[FLAG_TEXT]")
 
         if options.conflict_surfacing:

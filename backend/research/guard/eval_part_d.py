@@ -1,18 +1,16 @@
 """Part D evaluation module for AROGYA hospital RAG benchmarks.
 
-Measures error reduction, the English-Malayalam performance gap before and after
-applying the guard, and component ablations.
+Measures residual gold-error spans after redaction, not factual correction.
+False alterations are reported separately, not hidden in the interception score.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-import json
-from pathlib import Path
 from typing import Any
 
-from backend.research.baselines.rarr_style import apply_baseline
 from backend.research.guard.guard import GuardOptions, apply_guard_with_options
+from backend.research.guard.eval_performance import interception
 
 
 @dataclass(frozen=True)
@@ -71,8 +69,9 @@ def evaluate_part_d(items: list[dict[str, Any]]) -> PartDMetrics:
         if not is_error_before and changed:
             false_alterations += 1
 
-        # If it had an error before, was it successfully intercepted/redacted?
-        is_error_after = is_error_before and not changed
+        # A change to some other text does not prove the erroneous claim vanished.
+        removed = interception(item, guard_res)["fully_intercepted"]
+        is_error_after = is_error_before and not removed
         if lang == "en" and is_error_after:
             en_errors_after += 1
         elif lang == "ml" and is_error_after:
