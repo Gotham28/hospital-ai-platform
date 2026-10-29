@@ -241,22 +241,28 @@ class MultilingualNLIScorer:
             exact_verdict = "unsupported"
 
         scores = self.score_pairs((passage, claim) for passage in active_passages)
-        best_index = max(
-            range(len(scores)),
-            key=lambda index: max(
-                scores[index].entailment, scores[index].contradiction
-            ),
-        )
-        best = scores[best_index]
-        if (
-            best.contradiction >= contradiction_threshold
-            and best.contradiction > best.entailment
-        ):
-            verdict = "contradicted"
-        elif best.entailment >= entailment_threshold:
+        best_e_index = max(range(len(scores)), key=lambda index: scores[index].entailment)
+        if scores[best_e_index].entailment >= entailment_threshold:
             verdict = "supported"
+            best_index = best_e_index
+            best = scores[best_index]
         else:
-            verdict = "unsupported"
+            best_index = max(
+                range(len(scores)),
+                key=lambda index: max(
+                    scores[index].entailment, scores[index].contradiction
+                ),
+            )
+            best = scores[best_index]
+            if (
+                best.contradiction >= contradiction_threshold
+                and best.contradiction > best.entailment
+            ):
+                verdict = "contradicted"
+            elif best.entailment >= entailment_threshold:
+                verdict = "supported"
+            else:
+                verdict = "unsupported"
         if exact_verdict is not None:
             verdict = exact_verdict
         evidence = exact_evidence or active_passages[best_index]
