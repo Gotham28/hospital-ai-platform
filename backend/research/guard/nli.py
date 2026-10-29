@@ -8,8 +8,6 @@ from pathlib import Path
 import re
 from typing import Iterable
 
-from backend.research.guard.claims import _split_sentences
-
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 
 MODEL_ID = "MoritzLaurer/mDeBERTa-v3-base-mnli-xnli"
@@ -83,19 +81,35 @@ def _typed_values(text: str) -> dict[str, set[str]]:
 def _decompose_passages(passages: list[str]) -> list[str]:
     chunks: list[str] = []
     for p in passages:
-        sents = _split_sentences(p)
-        buf, buf_len = [], 0
-        for s in sents:
-            s_clean = s.strip()
-            if not s_clean:
-                continue
-            buf.append(s_clean)
-            buf_len += len(s_clean)
-            if buf_len >= 350:
+        paragraphs = [para.strip() for para in re.split(r"\n\s*\n+", p) if para.strip()]
+        if len(paragraphs) > 1:
+            for para in paragraphs:
+                if len(para) <= 500:
+                    chunks.append(para)
+                else:
+                    sents = re.split(r"(?<=[.!?])\s+", para)
+                    buf, buf_len = [], 0
+                    for s in sents:
+                        buf.append(s)
+                        buf_len += len(s)
+                        if buf_len >= 350:
+                            chunks.append(" ".join(buf))
+                            buf, buf_len = [], 0
+                    if buf:
+                        chunks.append(" ".join(buf))
+        elif len(p) > 500:
+            sents = re.split(r"(?<=[.!?])\s+", p)
+            buf, buf_len = [], 0
+            for s in sents:
+                buf.append(s)
+                buf_len += len(s)
+                if buf_len >= 350:
+                    chunks.append(" ".join(buf))
+                    buf, buf_len = [], 0
+            if buf:
                 chunks.append(" ".join(buf))
-                buf, buf_len = [], 0
-        if buf:
-            chunks.append(" ".join(buf))
+        else:
+            chunks.append(p)
     return chunks or passages
 
 
