@@ -2198,8 +2198,8 @@ Files touched: ignored dependency/build caches and evidence log; build also fron
 Added an employee handover guide for activating Meta WhatsApp welcome messages, including a ready-to-paste prompt for the employee's AI assistant: docs/WHATSAPP_ACTIVATION_HANDOVER.md. Docs only; no code, configuration, Meta, Render, Vercel or Neon changes.
 
 Branch: docs/whatsapp-activation-handover
-PR: pending
-Commits: pending
+PR: #46 - https://github.com/Gotham28/hospital-ai-platform/pull/46
+Commits: 82aee08
 
 Verification: No commands run beyond git; docs-only change. Facts in the guide were checked by reading backend/app/services/meta_whatsapp.py, backend/app/api/v1/endpoints/whatsapp_webhook.py, backend/app/main.py, backend/app/core/config.py, backend/.env.example and the Alembic revision chain (7a8b9c0d1e2f is the only head; its parent is 0c682ef81de1).
 
