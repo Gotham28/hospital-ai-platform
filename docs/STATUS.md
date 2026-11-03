@@ -2192,3 +2192,15 @@ Files touched: ignored dependency/build caches and evidence log; build also fron
 **Result and limits:** Isolated backend suite: 29 passed; admin component suite: 15 passed; focused lint/typecheck and production build exited 0. Full frontend lint exited 1 with 64 pre-existing problems outside scoped files. Migration compiled offline only; no migration application or external delivery evidence. Concurrency used disposable SQLite, not deployed PostgreSQL. Component submit events do not establish physical-browser acceptance. Root dependency declaration and import checks do not establish a fresh full dependency installation. Full verification and accepted four-lens review: HANDOFF.md.
 
 **Deliberately deferred:** Meta account/sender/version/credentials, exact approved bilingual template assets, verified public portal origin/allowlist, separately approved migration application against an explicit target, deployment and authorized controlled live receipt/link/callback tests. Feature stays disabled. These activation inputs remain in docs/WHATSAPP_SETUP.md. Bulk campaigns and two-way bot replies remain outside this task. Full frontend lint remains outstanding outside scope. Existing governance workflow/model references remain a separately scoped follow-up. AGENTS.md sections 2/3 still describe only the legacy Twilio messaging service/config; the new Meta service and configuration need a separate documentation task. No AGENTS.md changes are included here.
+
+### Catch-up — 2026-11-03
+
+Added an employee handover guide for activating Meta WhatsApp welcome messages, including a ready-to-paste prompt for the employee's AI assistant: docs/WHATSAPP_ACTIVATION_HANDOVER.md. Docs only; no code, configuration, Meta, Render, Vercel or Neon changes.
+
+Branch: docs/whatsapp-activation-handover
+PR: #46 - https://github.com/Gotham28/hospital-ai-platform/pull/46
+Commits: 82aee08
+
+Verification: No commands run beyond git; docs-only change. Facts in the guide were checked by reading backend/app/services/meta_whatsapp.py, backend/app/api/v1/endpoints/whatsapp_webhook.py, backend/app/main.py, backend/app/core/config.py, backend/.env.example and the Alembic revision chain (7a8b9c0d1e2f is the only head; its parent is 0c682ef81de1).
+
+Deferred: All activation work belongs to the employee, following the guide, with developer checkpoints A–E (subdomain, template wording, Neon migration target, first live test, patient go-live). Not verified: whether Render already runs the PR #43 code without migration 7a8b9c0d1e2f applied on Neon; Phase 6 of the guide checks this. docs/WHATSAPP_AI_HANDOFF.md (2026-10-19) is still untracked and not part of this change.
