@@ -1,14 +1,27 @@
 # Current Task
 
 ## Feature
-Add a per-hospital chatbot link to each card in the superadmin Hospital Management list. The link uses that hospital's slug to open the existing public `/p/:hospitalSlug` route in the same tab.
+Remove predictable authentication and database-password defaults. JWT signing and validation must use one configured secret and fail closed when it is missing; the local superadmin seed must require an explicit password.
 
 ## Files/areas in scope
-- `frontend/src/App.tsx`: add the dynamic Chatbot link to every hospital card.
+- `backend/app/core/config.py`: remove static database-password/JWT-secret defaults and provide required JWT-secret validation.
+- `backend/app/api/deps.py` and `backend/app/api/v1/endpoints/auth.py`: use the same validated settings value for token signing and verification.
+- `backend/app/main.py`: fail startup when JWT secret configuration is absent.
+- `backend/.env.example`: show blank required secrets with setup guidance, not usable fixed defaults.
+- `backend/seed_rich_data.py`: require an explicit superadmin seed password and never print it.
+- `backend/run_endpoint_auth_test.py` and `backend/run_meta_whatsapp_test.py`: use synthetic JWT secrets that satisfy the production minimum.
+- `PROJECT_NOTES.md`: remove the fixed login credential and document the required environment setting.
 - `.agents/CURRENT_TASK.md`: this task record.
 
 ## Explicitly out of scope
-- Do not change the public chatbot route, theme loading, chatbot behavior, hospital API, or tenant data.
-- Do not change card actions other than adding the Chatbot link.
-- Do not update `docs/STATUS.md` directly; provide a proposed update for review.
-- Do not run tests unless separately requested.
+- Patient-session logging, tenant-isolation query changes, Google key rotation/removal/history rewriting.
+- Database schema or hosted database changes.
+- WhatsApp activation settings, template content, or deployment changes.
+- Direct push to `main`, merging, or edits outside the listed files.
+
+## Order
+1. Remove unsafe authentication and seed defaults.
+2. Inspect the scoped diff and report it for review.
+
+## Suggested review tier
+Opus 5, high effort — touches authentication secrets.

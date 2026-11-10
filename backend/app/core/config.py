@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     # Database Defaults (Keep these for local dev)
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_USER: str = "postgres"
-    POSTGRES_PASSWORD: str = "NewStrongPassword123!"
+    POSTGRES_PASSWORD: str = ""
     POSTGRES_DB: str = "hospital_ai"
     POSTGRES_PORT: str = "5432"
     
@@ -29,7 +29,8 @@ class Settings(BaseSettings):
     # App Secrets
     REDIS_URL: str = "redis://localhost:6379"
     OPENAI_API_KEY: str = "sk-placeholder"
-    JWT_SECRET: str = "supersecret"
+    # No signing-key fallback: auth and app startup require this to be configured.
+    JWT_SECRET: str = ""
     SARVAM_API_KEY: str = ""
     # Meta welcome messages stay disabled until sender, templates and portals are approved.
     META_WHATSAPP_ENABLED: bool = False
@@ -66,3 +67,11 @@ class Settings(BaseSettings):
         return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
 settings = Settings()
+
+
+def get_jwt_secret() -> str:
+    """Return the configured signing key or fail closed when it is missing or weak."""
+    secret = settings.JWT_SECRET.strip()
+    if len(secret) < 32:
+        raise RuntimeError("JWT_SECRET must be a unique secret of at least 32 characters.")
+    return secret
