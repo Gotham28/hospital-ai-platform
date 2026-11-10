@@ -163,7 +163,7 @@ const KnowledgeBaseUpload = ({ hospitalId }: { hospitalId: string | undefined })
   const handleDelete = async (id: number) => {
     setDeletingId(id);
     try {
-      await api.delete(`/ai/knowledge/entry/${id}`);
+      await api.delete(`/ai/knowledge/entry/${id}`, { params: { hospital_id: hospitalId } });
       setEntries(prev => prev.filter(e => e.id !== id));
     } catch {
       alert('Failed to delete entry. Please try again.');
@@ -187,7 +187,7 @@ const KnowledgeBaseUpload = ({ hospitalId }: { hospitalId: string | undefined })
     if (!editContent.trim()) return;
     setEditSaving(true);
     try {
-      await api.patch(`/ai/knowledge/entry/${id}`, { content: editContent.trim() });
+      await api.patch(`/ai/knowledge/entry/${id}`, { content: editContent.trim() }, { params: { hospital_id: hospitalId } });
       setEntries(prev => prev.map(e => e.id === id ? { ...e, content: editContent.trim() } : e));
       setEditingId(null);
     } catch {

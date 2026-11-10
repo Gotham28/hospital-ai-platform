@@ -122,7 +122,10 @@ def _run_reminders() -> None:
                     if (now - updated_aware) < timedelta(hours=23):
                         continue
 
-                doctor = db.query(Doctor).filter(Doctor.id == appt.doctor_id).first()
+                doctor = db.query(Doctor).filter(
+                    Doctor.id == appt.doctor_id,
+                    Doctor.hospital_id == appt.hospital_id,
+                ).first()
 
                 sent = _send_reminder_email(
                     staff_email=staff_email,

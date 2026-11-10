@@ -2204,3 +2204,7 @@ Commits: 82aee08
 Verification: No commands run beyond git; docs-only change. Facts in the guide were checked by reading backend/app/services/meta_whatsapp.py, backend/app/api/v1/endpoints/whatsapp_webhook.py, backend/app/main.py, backend/app/core/config.py, backend/.env.example and the Alembic revision chain (7a8b9c0d1e2f is the only head; its parent is 0c682ef81de1).
 
 Deferred: All activation work belongs to the employee, following the guide, with developer checkpoints A–E (subdomain, template wording, Neon migration target, first live test, patient go-live). Not verified: whether Render already runs the PR #43 code without migration 7a8b9c0d1e2f applied on Neon; Phase 6 of the guide checks this. docs/WHATSAPP_AI_HANDOFF.md (2026-10-19) is still untracked and not part of this change.
+
+### Catch-up — 2026-11-10
+
+**Tenant query scoping:** Scoped doctor availability, knowledge-entry mutations, appointment actions and doctor lookups to the selected hospital. Updated the corresponding frontend requests. No tests were run.

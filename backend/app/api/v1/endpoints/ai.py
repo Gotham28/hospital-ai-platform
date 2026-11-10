@@ -529,7 +529,10 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
                 else "Here is the status of your recent appointments:\n"
             ]
             for a in appts:
-                doc = db.query(Doctor).filter(Doctor.id == a.doctor_id).first()
+                doc = db.query(Doctor).filter(
+                    Doctor.id == a.doctor_id,
+                    Doctor.hospital_id == hospital_id,
+                ).first()
                 doc_name = doc.name if doc else "Unknown"
                 status_str = {
                     "pending":  "⏳ Pending — hospital will call to confirm",
@@ -1192,15 +1195,18 @@ class UpdateKnowledgeRequest(BaseModel):
 
 
 @router.patch("/knowledge/entry/{entry_id}")
-async def update_knowledge_entry(entry_id: int, request: UpdateKnowledgeRequest, db: Session = Depends(get_db), _tenant: int = Depends(get_current_tenant), token_data: dict = Depends(get_token_payload)):
-    entry = db.query(KnowledgeBase).filter(KnowledgeBase.id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="Knowledge entry not found")
-
+async def update_knowledge_entry(entry_id: int, hospital_id: int, request: UpdateKnowledgeRequest, db: Session = Depends(get_db), token_data: dict = Depends(get_token_payload)):
     user_role = token_data.get("role")
     user_hospital = token_data.get("hospital_id")
-    if user_role != "superadmin" and str(user_hospital) != str(entry.hospital_id):
+    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
         raise HTTPException(status_code=403, detail="Not authorized to modify this resource")
+
+    entry = db.query(KnowledgeBase).filter(
+        KnowledgeBase.id == entry_id,
+        KnowledgeBase.hospital_id == hospital_id,
+    ).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Knowledge entry not found")
 
     try:
         resp = client.embeddings.create(input=request.content, model="text-embedding-3-small")
@@ -1214,15 +1220,18 @@ async def update_knowledge_entry(entry_id: int, request: UpdateKnowledgeRequest,
 
 
 @router.delete("/knowledge/entry/{entry_id}")
-async def delete_knowledge_entry(entry_id: int, db: Session = Depends(get_db), _tenant: int = Depends(get_current_tenant), token_data: dict = Depends(get_token_payload)):
-    entry = db.query(KnowledgeBase).filter(KnowledgeBase.id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="Knowledge entry not found")
-
+async def delete_knowledge_entry(entry_id: int, hospital_id: int, db: Session = Depends(get_db), token_data: dict = Depends(get_token_payload)):
     user_role = token_data.get("role")
     user_hospital = token_data.get("hospital_id")
-    if user_role != "superadmin" and str(user_hospital) != str(entry.hospital_id):
+    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
         raise HTTPException(status_code=403, detail="Not authorized to modify this resource")
+
+    entry = db.query(KnowledgeBase).filter(
+        KnowledgeBase.id == entry_id,
+        KnowledgeBase.hospital_id == hospital_id,
+    ).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Knowledge entry not found")
 
     try:
         db.delete(entry)
