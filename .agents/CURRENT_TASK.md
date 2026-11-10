@@ -1,14 +1,21 @@
 # Current Task
 
 ## Feature
-Add a per-hospital chatbot link to each card in the superadmin Hospital Management list. The link uses that hospital's slug to open the existing public `/p/:hospitalSlug` route in the same tab.
+Stop logging serialized patient-session context to application logs. Preserve Redis persistence and existing patient-context behavior; log only non-sensitive operational metadata if logging is needed.
 
 ## Files/areas in scope
-- `frontend/src/App.tsx`: add the dynamic Chatbot link to every hospital card.
+- `backend/app/services/patient_context.py`: remove the raw serialized context log from `_save_patient_ctx`.
 - `.agents/CURRENT_TASK.md`: this task record.
 
 ## Explicitly out of scope
-- Do not change the public chatbot route, theme loading, chatbot behavior, hospital API, or tenant data.
-- Do not change card actions other than adding the Chatbot link.
-- Do not update `docs/STATUS.md` directly; provide a proposed update for review.
-- Do not run tests unless separately requested.
+- JWT secret configuration, seed credentials, tenant-isolation audit, Google service-account rotation or Git-history cleanup.
+- Any database schema or hosted database changes.
+- Changes to the WhatsApp activation workflow.
+- Direct push to `main`, merging, or changes outside the listed files.
+
+## Order
+1. Remove the patient-context payload from logging.
+2. Inspect the scoped diff and report it for review.
+
+## Suggested review tier
+Opus 5, high effort — touches logging and handles raw patient context.
