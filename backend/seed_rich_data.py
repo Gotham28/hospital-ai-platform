@@ -18,9 +18,12 @@ def seed_rich_data():
         superadmin_email = "superadmin@gothos.com"
         sa_user = db.query(User).filter(User.email == superadmin_email).first()
         if not sa_user:
+            superadmin_password = os.environ.get("SUPERADMIN_PASSWORD", "")
+            if len(superadmin_password) < 16:
+                raise RuntimeError("Set SUPERADMIN_PASSWORD to at least 16 characters before creating the seeded superadmin.")
             sa_user = User(
                 email=superadmin_email,
-                hashed_password=pwd_context.hash("superadmin123"),
+                hashed_password=pwd_context.hash(superadmin_password),
                 hospital_id=None,
                 role="superadmin",
                 is_superuser=True,
@@ -28,7 +31,7 @@ def seed_rich_data():
             )
             db.add(sa_user)
             db.commit()
-            print("Superadmin created: superadmin@gothos.com / superadmin123")
+            print(f"Superadmin created: {superadmin_email}")
         else:
             print("Superadmin already exists.")
 
