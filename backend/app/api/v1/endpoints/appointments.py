@@ -151,7 +151,10 @@ def list_appointments(
 
     results = []
     for a in appts:
-        doctor = db.query(Doctor).filter(Doctor.id == a.doctor_id).first()
+        doctor = db.query(Doctor).filter(
+            Doctor.id == a.doctor_id,
+            Doctor.hospital_id == a.hospital_id,
+        ).first()
         results.append({
             "id": a.id,
             "reference_number": a.reference_number,
@@ -177,24 +180,23 @@ def list_appointments(
 @router.patch("/{appointment_id}/approve")
 def approve_appointment(
     appointment_id: int,
+    hospital_id: int,
     body : ApprovePayload,
     db: Session = Depends(get_db),
     _tenant: int = Depends(get_current_tenant),
     payload: dict = Depends(get_token_payload) # Inject token data
 ):
-    appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
-    if not appt:
-        raise HTTPException(status_code=404, detail="Appointment not found")
-
-    # ==========================================
-    # THE BOUNCER: Security Check
-    # ==========================================
     user_role = payload.get("role")
     user_hospital = payload.get("hospital_id")
+    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied.")
 
-    if user_role != "superadmin" and str(user_hospital) != str(appt.hospital_id):
-        raise HTTPException(status_code=403, detail="Access denied. You can only approve appointments for your assigned hospital.")
-    # ==========================================
+    appt = db.query(Appointment).filter(
+        Appointment.id == appointment_id,
+        Appointment.hospital_id == hospital_id,
+    ).first()
+    if not appt:
+        raise HTTPException(status_code=404, detail="Appointment not found")
 
     if appt.status != "pending":
         raise HTTPException(status_code=400, detail=f"Appointment is already {appt.status}")
@@ -206,7 +208,10 @@ def approve_appointment(
 
     # Email staff to call patient
     hospital = db.query(Hospital).filter(Hospital.id == appt.hospital_id).first()
-    doctor   = db.query(Doctor).filter(Doctor.id == appt.doctor_id).first()
+    doctor   = db.query(Doctor).filter(
+        Doctor.id == appt.doctor_id,
+        Doctor.hospital_id == appt.hospital_id,
+    ).first()
     if hospital:
         config = get_booking_config(hospital)
         staff_email = config.get("notification_email", "")
@@ -232,24 +237,23 @@ def approve_appointment(
 @router.patch("/{appointment_id}/reject")
 def reject_appointment(
     appointment_id: int,
+    hospital_id: int,
     body : RejectPayload,
     db: Session = Depends(get_db),
     _tenant: int = Depends(get_current_tenant),
     payload: dict = Depends(get_token_payload) # Inject token data
 ):
-    appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
-    if not appt:
-        raise HTTPException(status_code=404, detail="Appointment not found")
-
-    # ==========================================
-    # THE BOUNCER: Security Check
-    # ==========================================
     user_role = payload.get("role")
     user_hospital = payload.get("hospital_id")
+    if user_role != "superadmin" and str(user_hospital) != str(hospital_id):
+        raise HTTPException(status_code=403, detail="Access denied.")
 
-    if user_role != "superadmin" and str(user_hospital) != str(appt.hospital_id):
-        raise HTTPException(status_code=403, detail="Access denied. You can only reject appointments for your assigned hospital.")
-    # ==========================================
+    appt = db.query(Appointment).filter(
+        Appointment.id == appointment_id,
+        Appointment.hospital_id == hospital_id,
+    ).first()
+    if not appt:
+        raise HTTPException(status_code=404, detail="Appointment not found")
 
     if appt.status != "pending":
         raise HTTPException(status_code=400, detail=f"Appointment is already {appt.status}")
@@ -292,7 +296,10 @@ def get_appointment_status(
 
     results = []
     for a in appts:
-        doctor = db.query(Doctor).filter(Doctor.id == a.doctor_id).first()
+        doctor = db.query(Doctor).filter(
+            Doctor.id == a.doctor_id,
+            Doctor.hospital_id == a.hospital_id,
+        ).first()
         results.append({
             "reference_number": a.reference_number,
             "doctor_name": doctor.name if doctor else "Unknown",

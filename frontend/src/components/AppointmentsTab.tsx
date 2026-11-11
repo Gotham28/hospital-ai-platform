@@ -90,7 +90,7 @@ export default function AppointmentsTab() {
     setActionLoading(true);
     setActionError(null);
     try {
-      await api.patch(`/appointments/${approveModal.id}/approve`, { confirmed_time: confirmedTime });
+      await api.patch(`/appointments/${approveModal.id}/approve`, { confirmed_time: confirmedTime }, { params: { hospital_id: hospitalId } });
       setApproveModal(null);
       setConfirmedTime('');
       fetchAppointments();
@@ -106,7 +106,7 @@ export default function AppointmentsTab() {
     setActionLoading(true);
     setActionError(null);
     try {
-      await api.patch(`/appointments/${rejectModal.id}/reject`, { reason: rejectionReason });
+      await api.patch(`/appointments/${rejectModal.id}/reject`, { reason: rejectionReason }, { params: { hospital_id: hospitalId } });
       setRejectModal(null);
       fetchAppointments();
     } catch (e: any) {

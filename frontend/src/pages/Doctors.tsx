@@ -127,8 +127,8 @@ export default function DoctorsPage() {
   const fetchAvailability = async (doctorId: number) => {
     try {
       const [schedRes, leaveRes] = await Promise.all([
-        api.get(`/availability/schedules/doctor/${doctorId}`),
-        api.get(`/availability/leaves/doctor/${doctorId}`)
+        api.get(`/availability/schedules/doctor/${doctorId}`, { params: { hospital_id: hospitalId } }),
+        api.get(`/availability/leaves/doctor/${doctorId}`, { params: { hospital_id: hospitalId } })
       ]);
       setSchedules(schedRes.data);
       setLeaves(leaveRes.data);
@@ -145,7 +145,7 @@ export default function DoctorsPage() {
         day_of_week: parseInt(schedDay),
         start_time: schedStart,
         end_time: schedEnd
-      });
+      }, { params: { hospital_id: hospitalId } });
       fetchAvailability(manageDoc.id);
     } catch (err) { alert("Failed to add schedule"); }
   };
@@ -157,19 +157,19 @@ export default function DoctorsPage() {
         doctor_id: manageDoc.id,
         date: leaveDate,
         reason: leaveReason
-      });
+      }, { params: { hospital_id: hospitalId } });
       setLeaveDate(''); setLeaveReason('');
       fetchAvailability(manageDoc.id);
     } catch (err) { alert("Failed to add leave"); }
   };
 
   const deleteSchedule = async (id: number) => {
-    await api.delete(`/availability/schedules/${id}`);
+    await api.delete(`/availability/schedules/${id}`, { params: { hospital_id: hospitalId } });
     fetchAvailability(manageDoc.id);
   };
 
   const deleteLeave = async (id: number) => {
-    await api.delete(`/availability/leaves/${id}`);
+    await api.delete(`/availability/leaves/${id}`, { params: { hospital_id: hospitalId } });
     fetchAvailability(manageDoc.id);
   };
 
