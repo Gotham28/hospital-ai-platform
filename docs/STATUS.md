@@ -2207,4 +2207,4 @@ Deferred: All activation work belongs to the employee, following the guide, with
 
 ### Catch-up — 2026-11-10
 
-**Tenant query scoping:** Scoped doctor availability, knowledge-entry mutations, appointment actions and doctor lookups to the selected hospital. Updated the corresponding frontend requests. No tests were run.
+**Patient-session context logging cleanup —** Removed the serialized context success log from `services/patient_context.py`; save failures now log the exception type only. Redis persistence and response behavior are unchanged. No tests were run for this change.

@@ -1,13 +1,10 @@
-import os
 from typing import Generator
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
+from app.core.config import get_jwt_secret
 from app.db.session import SessionLocal
 
-# FIX #1: Load SECRET_KEY from environment, never hardcode it.
-# Set JWT_SECRET in your .env and Render environment variables.
-SECRET_KEY = os.getenv("JWT_SECRET", "dev-secret-key-change-in-production")
 ALGORITHM = "HS256"
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login")
@@ -24,7 +21,7 @@ def get_current_tenant(token: str = Depends(oauth2_scheme)) -> int:
     The Magic Key: Extracts the hospital_id from the JWT.
     """
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, get_jwt_secret(), algorithms=[ALGORITHM])
         hospital_id = payload.get("hospital_id")
         role = payload.get("role")
         
@@ -42,7 +39,7 @@ def get_current_tenant(token: str = Depends(oauth2_scheme)) -> int:
         )
 def get_current_user_role(token: str = Depends(oauth2_scheme)) -> str:
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, get_jwt_secret(), algorithms=[ALGORITHM])
         return payload.get("role", "staff")
     except JWTError:
         raise HTTPException(status_code=401, detail="Could not validate credentials")
@@ -57,7 +54,7 @@ def get_token_payload(token: str = Depends(oauth2_scheme)) -> dict:
     so routes can verify permissions.
     """
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, get_jwt_secret(), algorithms=[ALGORITHM])
         return payload
     except JWTError:
         raise HTTPException(

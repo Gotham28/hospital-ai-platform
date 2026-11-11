@@ -6,7 +6,7 @@ Synthetic template fixtures are not approved production copy.
 import os
 # Guard the actual application engine before importing settings/dependencies.
 os.environ['DATABASE_URL'] = 'sqlite://'
-os.environ['JWT_SECRET'] = 'synthetic-test-jwt-secret'
+os.environ['JWT_SECRET'] = 'synthetic-test-jwt-secret-32-characters-long'
 
 import hashlib
 import hmac
@@ -92,7 +92,7 @@ class MetaWelcomeTests(unittest.TestCase):
         self.temp.cleanup()
 
     def auth(self, tenant):
-        token = jwt.encode({'sub':'synthetic-staff', 'hospital_id':tenant, 'role':'staff'}, 'synthetic-test-jwt-secret', algorithm='HS256')
+        token = jwt.encode({'sub':'synthetic-staff', 'hospital_id':tenant, 'role':'staff'}, os.environ['JWT_SECRET'], algorithm='HS256')
         return {'Authorization':'Bearer '+token}
 
     def send(self, **kwargs):

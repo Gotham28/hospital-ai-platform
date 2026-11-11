@@ -4,7 +4,7 @@ import unittest.mock
 from jose import jwt
 
 # 1. Fake environment variables before imports
-os.environ["JWT_SECRET"] = "test-secret"
+os.environ["JWT_SECRET"] = "auth-test-secret-32-characters-long"
 os.environ["DATABASE_URL"] = "postgresql://test:test@localhost:5432/test_db"
 os.environ["OPENAI_API_KEY"] = "fake-key"
 os.environ["REDIS_URL"] = "redis://localhost:6379/0"
@@ -53,9 +53,9 @@ app.dependency_overrides[get_db] = lambda: mock_session
 client = TestClient(app, raise_server_exceptions=False)
 
 # 3. Mint tokens
-superadmin_token = jwt.encode({"sub": "super@test.invalid", "role": "superadmin", "hospital_id": None}, "test-secret", algorithm="HS256")
-admin1_token = jwt.encode({"sub": "admin1@test.invalid", "role": "admin", "hospital_id": 1}, "test-secret", algorithm="HS256")
-admin2_token = jwt.encode({"sub": "admin2@test.invalid", "role": "admin", "hospital_id": 2}, "test-secret", algorithm="HS256")
+superadmin_token = jwt.encode({"sub": "super@test.invalid", "role": "superadmin", "hospital_id": None}, os.environ["JWT_SECRET"], algorithm="HS256")
+admin1_token = jwt.encode({"sub": "admin1@test.invalid", "role": "admin", "hospital_id": 1}, os.environ["JWT_SECRET"], algorithm="HS256")
+admin2_token = jwt.encode({"sub": "admin2@test.invalid", "role": "admin", "hospital_id": 2}, os.environ["JWT_SECRET"], algorithm="HS256")
 
 headers_super = {"Authorization": f"Bearer {superadmin_token}"}
 headers_admin1 = {"Authorization": f"Bearer {admin1_token}"}

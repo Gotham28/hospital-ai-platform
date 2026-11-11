@@ -13,7 +13,7 @@ from app.api.v1.endpoints.lab_tests import router as lab_tests_router
 from app.api.v1.endpoints.doctor_availability import router as availability_router
 from app.api.v1.endpoints.whatsapp import router as whatsapp_router
 from app.api.v1.endpoints.whatsapp_webhook import router as whatsapp_webhook_router
-from app.core.config import settings
+from app.core.config import get_jwt_secret, settings
 
 app = FastAPI(title="Hospital AI Platform")
 
@@ -61,6 +61,7 @@ app.include_router(whatsapp_webhook_router, prefix="/api/v1/whatsapp", tags=["Wh
 
 @app.on_event("startup")
 def on_startup():
+    get_jwt_secret()
     start_reminder_scheduler()
 
 @app.on_event("shutdown")
