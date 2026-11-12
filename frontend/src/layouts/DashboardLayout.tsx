@@ -1,6 +1,7 @@
 import { Outlet, Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Users, Building2, Settings, LogOut, BrainCircuit, CalendarCheck, Pill, TestTube, MessageSquare } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import GothosByline from '../components/common/GothosByline';
 
 export default function DashboardLayout() {
   const navigate = useNavigate();
@@ -14,91 +15,92 @@ export default function DashboardLayout() {
   };
 
   const isActive = (path: string) => location.pathname === path;
-  
-  const linkBase = 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200';
-  
+
+  const focusRing = 'focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-gothos-focus focus-visible:outline-offset-3';
+  const linkBase = `flex items-center gap-3 px-3 py-2.5 rounded-gothos-bubble text-sm font-medium transition-colors duration-[250ms] motion-reduce:transition-none ${focusRing}`;
+  const linkState = (active: boolean) =>
+    active ? 'bg-gothos-sage text-gothos-forest' : 'text-gothos-muted hover:bg-gothos-mist';
+  const sectionLabel = 'mt-8 mb-4 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-gothos-emerald-text';
+
   return (
-    <div className="flex h-screen bg-slate-50 admin-shell font-sans text-slate-900">
-      {/* Dark Sidebar with gradient */}
-      <aside 
-        className="w-[260px] flex flex-col shadow-xl z-10"
-        style={{ background: 'linear-gradient(180deg, #0f2318 0%, #081410 100%)' }}
-      >
-        <div className="p-6 border-b border-white/10 flex flex-col justify-center">
-          <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
+    <div className="flex h-screen bg-gothos-bg admin-shell font-gothos text-gothos-ink">
+      {/* Light sidebar */}
+      <aside className="w-[260px] flex flex-col bg-white border-r border-gothos-line-soft shadow-[0_30px_80px_rgba(30,91,63,.12)] z-10">
+        <div className="p-6 border-b border-gothos-line-soft flex flex-col justify-center gap-1">
+          <h2 className="text-xl font-bold tracking-[-0.03em] text-gothos-forest flex items-center gap-2">
             AROGYA
           </h2>
-          <span className="text-xs text-brand-400 font-medium mt-1 uppercase tracking-wider">by Gothos Labs</span>
+          <GothosByline />
         </div>
 
         <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
           {role === 'superadmin' && (
             <Link
               to="/"
-              className={`${linkBase} ${isActive('/') ? 'bg-brand-500/15 text-brand-300' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}
+              className={`${linkBase} ${linkState(isActive('/'))}`}
             >
-              <LayoutDashboard className={`w-5 h-5 ${isActive('/') ? 'text-brand-400' : 'text-brand-500/70'}`} /> Hospitals
+              <LayoutDashboard className="w-5 h-5" /> Hospitals
             </Link>
           )}
 
           {hospitalId && (
             <>
-              <div className="mt-8 mb-4 px-3 text-[10px] font-bold text-white/40 uppercase tracking-widest">
+              <div className={sectionLabel}>
                 Management
               </div>
 
               <Link
                 to={`/hospitals/${hospitalId}/appointments`}
-                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/appointments`) ? 'bg-indigo-500/15 text-indigo-300' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}
+                className={`${linkBase} ${linkState(isActive(`/hospitals/${hospitalId}/appointments`))}`}
               >
-                <CalendarCheck className={`w-5 h-5 ${isActive(`/hospitals/${hospitalId}/appointments`) ? 'text-indigo-400' : 'text-indigo-400/60'}`} /> Appointments
+                <CalendarCheck className="w-5 h-5" /> Appointments
               </Link>
 
               <Link
                 to={`/hospitals/${hospitalId}/doctors`}
-                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/doctors`) ? 'bg-violet-500/15 text-violet-300' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}
+                className={`${linkBase} ${linkState(isActive(`/hospitals/${hospitalId}/doctors`))}`}
               >
-                <Users className={`w-5 h-5 ${isActive(`/hospitals/${hospitalId}/doctors`) ? 'text-violet-400' : 'text-violet-400/60'}`} /> Doctors
+                <Users className="w-5 h-5" /> Doctors
               </Link>
 
               <Link
                 to={`/hospitals/${hospitalId}/pharmacy`}
-                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/pharmacy`) ? 'bg-brand-500/15 text-brand-300' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}
+                className={`${linkBase} ${linkState(isActive(`/hospitals/${hospitalId}/pharmacy`))}`}
               >
-                <Pill className={`w-5 h-5 ${isActive(`/hospitals/${hospitalId}/pharmacy`) ? 'text-brand-400' : 'text-brand-400/60'}`} /> Pharmacy
+                <Pill className="w-5 h-5" /> Pharmacy
               </Link>
 
               <Link
                 to={`/hospitals/${hospitalId}/lab-tests`}
-                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/lab-tests`) ? 'bg-cyan-500/15 text-cyan-300' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}
+                className={`${linkBase} ${linkState(isActive(`/hospitals/${hospitalId}/lab-tests`))}`}
               >
-                <TestTube className={`w-5 h-5 ${isActive(`/hospitals/${hospitalId}/lab-tests`) ? 'text-cyan-400' : 'text-cyan-400/60'}`} /> Lab Tests
+                <TestTube className="w-5 h-5" /> Lab Tests
               </Link>
 
               <Link
                 to={`/hospitals/${hospitalId}/messaging`}
-                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/messaging`) ? 'bg-indigo-500/15 text-indigo-300' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}
+                className={`${linkBase} ${linkState(isActive(`/hospitals/${hospitalId}/messaging`))}`}
               >
-                <MessageSquare className={`w-5 h-5 ${isActive(`/hospitals/${hospitalId}/messaging`) ? 'text-indigo-400' : 'text-indigo-400/60'}`} /> Messaging
+                <MessageSquare className="w-5 h-5" /> Messaging
               </Link>
 
               <Link
                 to={`/hospitals/${hospitalId}/settings`}
-                className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/settings`) ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}
+                className={`${linkBase} ${linkState(isActive(`/hospitals/${hospitalId}/settings`))}`}
               >
-                <Settings className={`w-5 h-5 ${isActive(`/hospitals/${hospitalId}/settings`) ? 'text-slate-300' : 'text-slate-400/60'}`} /> Settings
+                <Settings className="w-5 h-5" /> Settings
               </Link>
 
               {role === 'superadmin' && (
                 <>
-                  <div className="mt-8 mb-4 px-3 text-[10px] font-bold text-white/40 uppercase tracking-widest">
+                  <div className={sectionLabel}>
                     Platform Admin
                   </div>
                   <Link
                     to={`/hospitals/${hospitalId}/training`}
-                    className={`${linkBase} ${isActive(`/hospitals/${hospitalId}/training`) ? 'bg-cyan-500/15 text-cyan-300' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}
+                    className={`${linkBase} ${linkState(isActive(`/hospitals/${hospitalId}/training`))}`}
                   >
-                    <BrainCircuit className={`w-5 h-5 ${isActive(`/hospitals/${hospitalId}/training`) ? 'text-cyan-400' : 'text-cyan-400/60'}`} /> AI Training
+                    <BrainCircuit className="w-5 h-5" /> AI Training
                   </Link>
                 </>
               )}
@@ -106,17 +108,17 @@ export default function DashboardLayout() {
           )}
         </nav>
 
-        <div className="p-4 border-t border-white/10">
+        <div className="p-4 border-t border-gothos-line-soft">
           <button
             onClick={handleSignOut}
-            className="flex items-center gap-3 px-3 py-2 text-white/50 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg text-sm font-medium w-full transition-colors"
+            className={`flex items-center gap-3 px-3 py-2 text-gothos-muted hover:text-rose-600 hover:bg-rose-500/10 rounded-gothos-bubble text-sm font-medium w-full transition-colors duration-[250ms] motion-reduce:transition-none ${focusRing}`}
           >
-            <LogOut className="w-5 h-5" /> Sign Out
+            <LogOut className="w-5 h-5" /> Sign out
           </button>
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto bg-slate-50 relative">
+      <main className="flex-1 overflow-auto bg-gothos-bg relative">
         <div className="max-w-7xl mx-auto px-8 py-8">
           <Outlet />
         </div>

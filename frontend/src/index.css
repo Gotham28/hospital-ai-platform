@@ -1,20 +1,55 @@
 @import "tailwindcss";
 
+/* Gothos Labs brand font — Poppins, served from frontend/public/brand/gothos/ */
+@font-face { font-family: 'Poppins'; src: url('/brand/gothos/poppins-300.woff2') format('woff2'); font-weight: 300; font-display: swap; }
+@font-face { font-family: 'Poppins'; src: url('/brand/gothos/poppins-400.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Poppins'; src: url('/brand/gothos/poppins-500.woff2') format('woff2'); font-weight: 500; font-display: swap; }
+@font-face { font-family: 'Poppins'; src: url('/brand/gothos/poppins-600.woff2') format('woff2'); font-weight: 600; font-display: swap; }
+@font-face { font-family: 'Poppins'; src: url('/brand/gothos/poppins-700.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+@font-face { font-family: 'Poppins'; src: url('/brand/gothos/poppins-800.woff2') format('woff2'); font-weight: 800; font-display: swap; }
+
 @theme {
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 
-  /* Brand: Teal-Emerald */
-  --color-brand-50: #ecfdf5;
-  --color-brand-100: #d1fae5;
-  --color-brand-200: #a7f3d0;
-  --color-brand-300: #6ee7b7;
-  --color-brand-400: #34d399;
-  --color-brand-500: #10b981;
-  --color-brand-600: #059669;
-  --color-brand-700: #047857;
-  --color-brand-800: #065f46;
-  --color-brand-900: #064e3b;
-  --color-brand-950: #022c22;
+  /* Brand scale — maps Gothos Labs kit values (brand/gothos/tokens.css) onto the admin brand-* steps */
+  --color-brand-50: #eef4ef;
+  --color-brand-100: #dde9df;
+  --color-brand-200: #c4d6c8;
+  --color-brand-300: #a9d3b4;
+  --color-brand-400: #79a98a;
+  --color-brand-500: #2f8f5b;
+  --color-brand-600: #1e5b3f;
+  --color-brand-700: #123d2b;
+  --color-brand-800: #123d2b;
+  --color-brand-900: #14231b;
+  --color-brand-950: #14231b;
+
+  /* Gothos Labs brand kit — values from brand/gothos/tokens.css */
+  --font-gothos: 'Poppins', 'Noto Sans Malayalam', system-ui, sans-serif;
+
+  --color-gothos-bg: #f7f6f1;
+  --color-gothos-ink: #14231b;
+  --color-gothos-forest: #1e5b3f;
+  --color-gothos-deep: #123d2b;
+  --color-gothos-emerald: #2f8f5b;
+  --color-gothos-emerald-text: #1f7a49;
+  --color-gothos-muted: #4a5f53;
+  --color-gothos-soft-ink: #3f5448;
+  --color-gothos-sage: #dde9df;
+  --color-gothos-mist: #eef4ef;
+  --color-gothos-mint: #a9d3b4;
+  --color-gothos-leaf: #79a98a;
+  --color-gothos-line: #9eb7a5;
+  --color-gothos-line-soft: #c4d6c8;
+  --color-gothos-focus: #33824e;
+
+  --radius-gothos-field: 9px;
+  --radius-gothos-bubble: 14px;
+  --radius-gothos-card: 24px;
+  --radius-gothos-panel: 28px;
+
+  --shadow-gothos-card: 0 30px 80px rgba(30,91,63,.12);
+  --shadow-gothos-card-hover: 0 34px 80px rgba(30,91,63,.2);
 
   /* IRIS palette — Refero 'Ease Health' style, approved by the developer 2026-10-04 */
   --font-malayalam: 'Noto Sans Malayalam', 'Manjari', sans-serif;

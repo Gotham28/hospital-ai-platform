@@ -607,3 +607,7 @@ Not in the original plan. Forest-green/cream `iris-*` token values, Fraunces + I
 ### 2026-10-12 — Meta WhatsApp welcome messages
 Not in the original plan. Built developer-prioritized welcomes using a shared Arogya sender, explicit submit and permission, staff-selected English/Malayalam, hospital assistant links, authenticated status and signed delivery callbacks. Disabled until account/template/portal setup, separately approved migration application and controlled live acceptance; legacy Twilio bulk retained.
 Scope: admin Messaging form/tests, backend Meta service/config/APIs/webhook/audit model, additive migration draft, runtime dependencies and setup/evidence documentation. Related: CURRENT_TASK.md dated 2026-10-11.
+
+### 2026-11-12 — Admin portal Gothos Labs brand foundation
+Not in the original plan. Brought the Gothos Labs brand kit (`brand/gothos/`) onto main and restyled the admin portal's foundation to it: Poppins and the kit's colour, radius and shadow tokens, the brand-* scale remapped to kit values, a light dashboard sidebar, the sign-in page, and the "by GOTHOS LABS" by-line. Presentation only; admin pages inside the shell and every patient-facing hospital theme are unchanged.
+Scope: `brand/gothos/`, `.claude/rules/gothos-brand.md`, `frontend/public/brand/gothos/`, `frontend/src/index.css`, `frontend/src/layouts/DashboardLayout.tsx`, `frontend/src/pages/Login.tsx`, `frontend/src/components/common/GothosByline.tsx`. Related: CURRENT_TASK.md dated 2026-11-12.

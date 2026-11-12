@@ -2,6 +2,10 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import GothosByline from '../components/common/GothosByline';
+
+const inputClass =
+  'w-full min-h-10 px-3 py-[9px] bg-white border border-gothos-muted rounded-gothos-field mt-1 text-[15px] text-gothos-ink outline-none focus:outline-[3px] focus:outline-solid focus:outline-gothos-focus focus:outline-offset-3';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -43,23 +47,30 @@ const Login = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <form onSubmit={handleLogin} className="p-8 bg-white shadow-lg rounded-xl w-96">
-        <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">
+    <div className="flex items-center justify-center min-h-screen bg-gothos-bg font-gothos text-gothos-ink">
+      <form
+        onSubmit={handleLogin}
+        className="px-[30px] py-[26px] bg-white/64 border border-white/90 shadow-gothos-card rounded-gothos-card w-96"
+      >
+        <div className="flex flex-col items-center gap-1 mb-4">
+          <span className="text-3xl font-bold tracking-[-0.03em] text-gothos-forest">AROGYA</span>
+          <GothosByline />
+        </div>
+        <h2 className="text-2xl font-semibold mb-6 text-center text-gothos-ink">
           Hospital Admin Portal
         </h2>
 
         {error && (
-          <p className="text-red-500 text-sm mb-4 p-3 bg-red-50 rounded-lg border border-red-100">
+          <p className="text-red-500 text-sm mb-4 p-3 bg-red-50 rounded-gothos-field border border-red-100">
             {error}
           </p>
         )}
 
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700">Email</label>
+          <label className="block text-[11px] font-medium text-gothos-ink">Email</label>
           <input
             type="email"
-            className="w-full p-2 border rounded mt-1 outline-none focus:ring-2 focus:ring-blue-500"
+            className={inputClass}
             value={email}
             onChange={e => setEmail(e.target.value)}
             required
@@ -69,10 +80,10 @@ const Login = () => {
         </div>
 
         <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700">Password</label>
+          <label className="block text-[11px] font-medium text-gothos-ink">Password</label>
           <input
             type="password"
-            className="w-full p-2 border rounded mt-1 outline-none focus:ring-2 focus:ring-blue-500"
+            className={inputClass}
             value={password}
             onChange={e => setPassword(e.target.value)}
             required
@@ -84,9 +95,9 @@ const Login = () => {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
+          className="w-full bg-gothos-forest text-white text-[13px] font-semibold px-[22px] py-3 rounded-full transition-[transform,background-color] duration-[250ms] hover:bg-gothos-deep hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0 disabled:opacity-[.68] disabled:cursor-not-allowed disabled:hover:translate-y-0 focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-gothos-focus focus-visible:outline-offset-3"
         >
-          {loading ? 'Signing in...' : 'Sign In'}
+          {loading ? 'Signing in…' : 'Sign in'}
         </button>
       </form>
     </div>
