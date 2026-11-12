@@ -2208,3 +2208,17 @@ Deferred: All activation work belongs to the employee, following the guide, with
 ### Catch-up — 2026-11-10
 
 **Patient-session context logging cleanup —** Removed the serialized context success log from `services/patient_context.py`; save failures now log the exception type only. Redis persistence and response behavior are unchanged. No tests were run for this change.
+
+### Catch-up — 2026-11-12
+
+**Admin portal Gothos Labs brand foundation —** Brought the Gothos Labs brand kit (`brand/gothos/`, cherry-picked from the local branch `gothos-branding`) onto the task branch and restyled the admin portal's foundation to it: Poppins `@font-face`, `gothos-*` colour, radius and shadow tokens and `--font-gothos` in `frontend/src/index.css`, the existing `brand-*` scale remapped to kit values, a light dashboard sidebar with live-text AROGYA wordmark, the sign-in page, and a new `GothosByline` component ("by GOTHOS LABS", linked to gothoslabs.com) in the sidebar and on the sign-in page. Labels changed to sentence case: "Sign in", "Signing in…", "Sign out". Presentation only: no change to `handleLogin`, `useAuth`, routes, link targets or role checks, and nothing under `frontend/src/themes/`, `IrisPage.tsx`, `index.html`, `App.tsx`, `context/` or `api/`. Admin pages inside the shell keep their existing styling until later tasks.
+
+Branch: feat/admin-gothos-brand
+PR: #50 - https://github.com/Gotham28/hospital-ai-platform/pull/50
+Commits: 92a291f (cherry-pick of e838c09), ab6b918, plus the backfill commit that records this line
+
+Verification: `npm run build` exited 0; `npm test` 2 files / 23 tests passed; `npm run lint` reports 64 problems (58 errors, 6 warnings), unchanged from `origin/main` (the only touched files with errors, `Login.tsx` and `DashboardLayout.tsx`, have the same single error before and after; `GothosByline.tsx` is clean — baseline for those two files measured from `origin/main`, total derived, not measured on a full checkout). `git diff origin/main` over `frontend/src/themes`, `IrisPage.tsx`, `index.html`, `App.tsx`, `context/`, `api/` is empty and the `index.css` diff touches no `--font-sans`, `iris` or `.admin-shell` line. Seven of the eight copied assets are byte-identical to the kit (sha256); fonts and owl image loaded with HTTP 200 in a local dev browser. `/login` and the logged-in shell were screenshotted at 1440px and 375px with a 3px keyboard focus ring visible; the shell was rendered with a locally built throwaway token and no backend.
+
+Not verified: a hospital-themed `/p/<slug>` page was not rendered (it needs the backend, which was not started); accepted by the developer on the empty themes diff plus the Inter computed-font check. No mobile layout work: the shell sidebar is a fixed 260px, so at 375px the main pane is squeezed (pre-existing, not changed).
+
+Deferred: the Poppins subset has no ₹ (U+20B9), so rupee amounts on `HospitalStats`, `LabTests` and `Pharmacy` fall back to another font until those pages are restyled; `Poppins-OFL.txt` copy has LF line endings against the kit's CRLF (text identical, kept by the developer); the task file's "14 kit files" is really 12; `AGENTS.md` still routes some steps through a chat app; per-page admin restyles (hospital list and modal, Dashboard/Settings, Doctors, Knowledge base, Lab tests, Pharmacy, Messaging, Appointments) are follow-up tasks.
