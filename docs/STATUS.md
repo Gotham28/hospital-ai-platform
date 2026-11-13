@@ -2229,8 +2229,8 @@ Deferred: the Poppins subset has no ₹ (U+20B9), so rupee amounts on `HospitalS
 **Superadmin access to WhatsApp welcomes —** `_welcome_tenant` in `backend/app/api/v1/endpoints/whatsapp.py` now lets a token with `role == "superadmin"` and a `sub` use welcome-config, send-welcome and message status for any hospital, so the platform superadmin can run the IRIS test send without a separate hospital staff login. Tokens with any other role keep the exact own-hospital rule. A token with no `sub` still gets 403. Service checks are unchanged: active hospital, per-hospital slug allowlist, `META_WHATSAPP_ENABLED`, and message lookup scoped to the URL's hospital. The sender is recorded as the existing keyed hash of the token's `sub`. 5 new tests (34 total). No migration, no frontend change. `docs/WHATSAPP_SETUP.md` now says a superadmin token may use the welcome routes for any hospital, replacing the sentence that said there was no cross-hospital override.
 
 Branch: feat/superadmin-whatsapp-welcome
-PR: pending
-Commits: pending
+PR: #51 - https://github.com/Gotham28/hospital-ai-platform/pull/51
+Commits: 6c04e2d, plus the backfill commit that records this line
 
 Verification: `python run_meta_whatsapp_test.py`, run from `backend/`, before the change: `Ran 29 tests ... OK`. Final run after the change: `Ran 34 tests in 4.193s`, `OK`. A draft of the new tests was run against the old code and 6 failure records appeared, as expected. Three test-side bugs were fixed afterwards, and the corrected tests were then re-run against the old code (5 failures). The raw outputs are in `HANDOFF.md` sections 1–4, which is not committed because it would overwrite #43's handoff on main. The test venv was not a clean install of the root `requirements.txt` (30 of 76 pins differ), so these runs are not against the repo's pinned versions. All sends were mocked; no database, Render, Neon or Meta access.
 
