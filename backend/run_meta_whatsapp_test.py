@@ -95,6 +95,13 @@ class MetaWelcomeTests(unittest.TestCase):
         token = jwt.encode({'sub':'synthetic-staff', 'hospital_id':tenant, 'role':'staff'}, os.environ['JWT_SECRET'], algorithm='HS256')
         return {'Authorization':'Bearer '+token}
 
+    def auth_claims(self, **claims):
+        token = jwt.encode(claims, os.environ['JWT_SECRET'], algorithm='HS256')
+        return {'Authorization':'Bearer '+token}
+
+    def send_body(self):
+        return {'phone':'9876543210','language':'en','consent_confirmed':True,'request_id':str(uuid4())}
+
     def send(self, **kwargs):
         args=dict(db=self.db, hospital_id=1, phone='9876543210', language='en', consent_confirmed=True, request_id=uuid4(), actor='synthetic-staff', config=self.config)
         args.update(kwargs)
@@ -316,6 +323,103 @@ class MetaWelcomeTests(unittest.TestCase):
         log_id=response.json()['message_id']
         foreign=self.client.get(f'/api/v1/hospitals/2/whatsapp/messages/{log_id}',headers=self.auth(2))
         self.assertEqual(foreign.status_code,404)
+
+    def test_superadmin_reaches_any_hospital(self):
+        base='/api/v1/hospitals/2/whatsapp'
+        for tenant in (1, None):
+            with self.subTest(token_hospital_id=tenant):
+                headers=self.auth_claims(sub='synthetic-superadmin', hospital_id=tenant, role='superadmin')
+                self.sender.return_value=httpx.Response(200,json={'messages':[{'id':f'wamid.superadmin.{tenant}'}]})
+                config=self.client.get(base+'/welcome-config',headers=headers)
+                self.assertEqual(config.status_code,200)
+                self.assertEqual(config.json()['hospital_name'],'Synthetic Hospital Two')
+                sent=self.client.post(base+'/send-welcome',headers=headers,json=self.send_body())
+                self.assertEqual(sent.status_code,200)
+                self.assertEqual(sent.json()['status'],'accepted')
+                status=self.client.get(base+f"/messages/{sent.json()['message_id']}",headers=headers)
+                self.assertEqual(status.status_code,200)
+                self.assertEqual(status.json()['message_id'],sent.json()['message_id'])
+        self.assertEqual(self.sender.call_count,2)
+        self.assertEqual({row.hospital_id for row in self.db.query(WhatsAppLog).all()},{2})
+
+    def test_superadmin_without_sub_is_not_authorized(self):
+        base='/api/v1/hospitals/2/whatsapp'
+        for claims in ({'role':'superadmin','hospital_id':1},{'role':'superadmin','hospital_id':None,'sub':''},{'role':'superadmin','hospital_id':2}):
+            with self.subTest(claims=claims):
+                headers=self.auth_claims(**claims)
+                for response in (
+                    self.client.get(base+'/welcome-config',headers=headers),
+                    self.client.post(base+'/send-welcome',headers=headers,json=self.send_body()),
+                    self.client.get(base+'/messages/1',headers=headers),
+                ):
+                    self.assertEqual(response.status_code,403)
+                    self.assertEqual(response.json()['detail'],{'code':'not_authorized'})
+        self.sender.assert_not_called()
+        self.assertEqual(self.db.query(WhatsAppLog).count(),0)
+
+    def test_superadmin_message_lookup_stays_scoped_to_url_hospital(self):
+        superadmin=self.auth_claims(sub='synthetic-superadmin', hospital_id=None, role='superadmin')
+        sent=self.client.post('/api/v1/hospitals/1/whatsapp/send-welcome',headers=superadmin,json=self.send_body())
+        self.assertEqual(sent.status_code,200)
+        log_id=sent.json()['message_id']
+        self.assertEqual(self.client.get(f'/api/v1/hospitals/1/whatsapp/messages/{log_id}',headers=superadmin).status_code,200)
+        wrong=self.client.get(f'/api/v1/hospitals/2/whatsapp/messages/{log_id}',headers=superadmin)
+        self.assertEqual(wrong.status_code,404)
+        self.assertEqual(wrong.json()['detail'],{'code':'message_not_found'})
+
+    def test_superadmin_still_gets_service_errors_without_sending(self):
+        base='/api/v1/hospitals/2/whatsapp'
+        superadmin=self.auth_claims(sub='synthetic-superadmin', hospital_id=None, role='superadmin')
+        own_staff=self.auth_claims(sub='synthetic-staff', hospital_id=2, role='staff')
+        # Not on the allowlist: the service's own error, identical to what the hospital's own staff get.
+        self.global_settings.META_WHATSAPP_ENABLED_HOSPITAL_SLUGS='synthetic-one'
+        for response in (
+            self.client.get(base+'/welcome-config',headers=superadmin),
+            self.client.post(base+'/send-welcome',headers=superadmin,json=self.send_body()),
+        ):
+            self.assertEqual(response.status_code,503)
+            self.assertEqual(response.json()['detail'],{'code':'hospital_not_enabled'})
+        self.assertEqual(self.client.get(base+'/welcome-config',headers=own_staff).json(),self.client.get(base+'/welcome-config',headers=superadmin).json())
+        self.global_settings.META_WHATSAPP_ENABLED_HOSPITAL_SLUGS='synthetic-one,synthetic-two'
+        # Inactive hospital: the service's own error.
+        self.db.get(Hospital,2).is_active=False; self.db.commit()
+        for response in (
+            self.client.get(base+'/welcome-config',headers=superadmin),
+            self.client.post(base+'/send-welcome',headers=superadmin,json=self.send_body()),
+        ):
+            self.assertEqual(response.status_code,404)
+            self.assertEqual(response.json()['detail'],{'code':'hospital_unavailable'})
+        self.sender.assert_not_called()
+        self.assertEqual(self.db.query(WhatsAppLog).count(),0)
+
+    def test_non_superadmin_roles_keep_exact_tenant_rule(self):
+        base='/api/v1/hospitals/1/whatsapp'
+        cases=[
+            {'sub':'synthetic-user','hospital_id':2,'role':'admin'},
+            {'sub':'synthetic-user','hospital_id':2,'role':'staff'},
+            {'sub':'synthetic-user','hospital_id':None,'role':'admin'},
+            {'sub':'synthetic-user','hospital_id':2},
+            {'sub':'synthetic-user','hospital_id':2,'role':'other'},
+            {'sub':'synthetic-user','hospital_id':2,'role':'SuperAdmin'},
+            {'sub':'synthetic-user','hospital_id':2,'role':['superadmin']},
+            {'sub':'synthetic-user','hospital_id':2,'role':None},
+        ]
+        for claims in cases:
+            with self.subTest(claims=claims):
+                headers=self.auth_claims(**claims)
+                for response in (
+                    self.client.get(base+'/welcome-config',headers=headers),
+                    self.client.post(base+'/send-welcome',headers=headers,json=self.send_body()),
+                    self.client.get(base+'/messages/1',headers=headers),
+                ):
+                    self.assertEqual(response.status_code,403)
+                    self.assertEqual(response.json()['detail'],{'code':'not_authorized'})
+        self.sender.assert_not_called()
+        self.assertEqual(self.db.query(WhatsAppLog).count(),0)
+        # Own hospital still works for admin and for a token with no role at all.
+        for claims in ({'sub':'synthetic-user','hospital_id':1,'role':'admin'},{'sub':'synthetic-user','hospital_id':1}):
+            with self.subTest(own_hospital=claims):
+                self.assertEqual(self.client.get(base+'/welcome-config',headers=self.auth_claims(**claims)).status_code,200)
 
     def test_webhook_challenge_and_signature(self):
         path='/api/v1/whatsapp/webhook'

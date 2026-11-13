@@ -42,7 +42,12 @@ class SendWelcomeRequest(BaseModel):
 
 
 def _welcome_tenant(hospital_id, payload):
-    if payload.get("hospital_id") != hospital_id or not payload.get("sub"):
+    if not payload.get("sub"):
+        raise HTTPException(status_code=403, detail={"code": "not_authorized"})
+    # The platform superadmin may act for any hospital; the service still scopes every lookup by hospital_id.
+    if payload.get("role") == "superadmin":
+        return
+    if payload.get("hospital_id") != hospital_id:
         raise HTTPException(status_code=403, detail={"code": "not_authorized"})
 
 

@@ -553,6 +553,7 @@ Meta activation requires approved bilingual templates, configured sender/version
 - **Patient text in application logs — RESOLVED 2026-08-27.** Both findings from
   Catch-up 2026-08-23 (the `translation.py` exception-object leak, and the httpx
   INFO-level URL logging) are closed. See Catch-up 2026-08-27.
+- **Superadmin WhatsApp welcome access (2026-11-13):** a demoted superadmin's token keeps working on the welcome routes until it expires, because the role claim is not re-checked per request. The message-status route skips the active-hospital and allowlist checks that welcome-config and send-welcome apply. Both are tracked in the auth-hardening follow-up.
 
 ### Catch-up — 2026-08-29
 
@@ -2222,3 +2223,17 @@ Verification: `npm run build` exited 0; `npm test` 2 files / 23 tests passed; `n
 Not verified: a hospital-themed `/p/<slug>` page was not rendered (it needs the backend, which was not started); accepted by the developer on the empty themes diff plus the Inter computed-font check. No mobile layout work: the shell sidebar is a fixed 260px, so at 375px the main pane is squeezed (pre-existing, not changed).
 
 Deferred: the Poppins subset has no ₹ (U+20B9), so rupee amounts on `HospitalStats`, `LabTests` and `Pharmacy` fall back to another font until those pages are restyled; `Poppins-OFL.txt` copy has LF line endings against the kit's CRLF (text identical, kept by the developer); the task file's "14 kit files" is really 12; `AGENTS.md` still routes some steps through a chat app; per-page admin restyles (hospital list and modal, Dashboard/Settings, Doctors, Knowledge base, Lab tests, Pharmacy, Messaging, Appointments) are follow-up tasks.
+
+### Catch-up — 2026-11-13
+
+**Superadmin access to WhatsApp welcomes —** `_welcome_tenant` in `backend/app/api/v1/endpoints/whatsapp.py` now lets a token with `role == "superadmin"` and a `sub` use welcome-config, send-welcome and message status for any hospital, so the platform superadmin can run the IRIS test send without a separate hospital staff login. Tokens with any other role keep the exact own-hospital rule. A token with no `sub` still gets 403. Service checks are unchanged: active hospital, per-hospital slug allowlist, `META_WHATSAPP_ENABLED`, and message lookup scoped to the URL's hospital. The sender is recorded as the existing keyed hash of the token's `sub`. 5 new tests (34 total). No migration, no frontend change. `docs/WHATSAPP_SETUP.md` now says a superadmin token may use the welcome routes for any hospital, replacing the sentence that said there was no cross-hospital override.
+
+Branch: feat/superadmin-whatsapp-welcome
+PR: pending
+Commits: pending
+
+Verification: `python run_meta_whatsapp_test.py`, run from `backend/`, before the change: `Ran 29 tests ... OK`. Final run after the change: `Ran 34 tests in 4.193s`, `OK`. A draft of the new tests was run against the old code and 6 failure records appeared, as expected. Three test-side bugs were fixed afterwards, and the corrected tests were then re-run against the old code (5 failures). The raw outputs are in `HANDOFF.md` sections 1–4, which is not committed because it would overwrite #43's handoff on main. The test venv was not a clean install of the root `requirements.txt` (30 of 76 pins differ), so these runs are not against the repo's pinned versions. All sends were mocked; no database, Render, Neon or Meta access.
+
+Not verified / waived: three Opus/xhigh review rounds found the code sound. The developer waived the remaining §5.10 evidence-formatting findings (trimmed or stale HANDOFF.md blocks, all re-run by two reviewers and found true) on 2026-11-13 ("Waive, close out"). The Render redeploy and the IRIS (hospital 4) Messaging re-test are the developer's to do after merge.
+
+Deferred: auth-hardening follow-up, tracked separately. A demoted superadmin's token keeps working until it expires (see Notes). Sender is not recorded as "superadmin" in a separate field, because that would need a migration.
