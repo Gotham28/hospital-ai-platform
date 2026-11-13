@@ -21,7 +21,7 @@ The Uvicorn callback access records are suppressed to avoid recording the GET ve
 
 ## API and delivery behavior
 
-All hospital APIs require the existing signed JWT with matching hospital_id and a staff subject; there is no cross-hospital superadmin override.
+All hospital APIs require the existing signed JWT with a staff subject and a matching hospital_id; a superadmin token may use the WhatsApp welcome routes for any hospital.
 
 - GET /api/v1/hospitals/{hospital_id}/whatsapp/welcome-config returns enabled state and approved previews without secrets.
 - POST /api/v1/hospitals/{hospital_id}/whatsapp/send-welcome accepts phone, language (en or ml), consent_confirmed (true), and request_id (UUID). It returns internal message_id, masked_phone, language, status and a sanitized error_code. Indian mobile input is normalized to +91; international input needs a country code. No free text or client-supplied link/sender is accepted.
