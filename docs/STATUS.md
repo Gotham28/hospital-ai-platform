@@ -2245,8 +2245,8 @@ Deferred: auth-hardening follow-up, tracked separately. A demoted superadmin's t
 - **Hospital Management responsive layout and styling.** Long names and slugs wrap, the action links reflow within each card, and the delete control stays visible. The narrow layout moves AROGYA navigation above the hospital list. The landing page uses a light paper texture and the existing forest and cream palette. Verified with the frontend production build and synthetic Edge checks at 320, 390, 768, 1024 and 1440 CSS pixels and at native 200% zoom.
 
 Branch: `codex/hospital-management-ui`
-PR: pending
-Commits: pending
+PR: #52 - https://github.com/Gotham28/hospital-ai-platform/pull/52
+Commits: e9adb9f, plus the backfill commit that records this line
 
 Verification: `npm run build` from `frontend` exited 0 and printed `✓ built in 12.52s`. `git diff --check` exited 0. The local Playwright harness ran in Microsoft Edge 157 with synthetic records. Its native zoom output was `Native Edge zoom 200% {"viewport":720,"doc":720,"main":[720,720],"dpr":2,"sidebarRight":720,"cards":3,"links":12,"minHeight":44,"actionColumns":2,"out":[]}`. The execution worktree handoff contains the full command output and screenshots.
 
