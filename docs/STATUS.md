@@ -554,6 +554,8 @@ Meta activation requires approved bilingual templates, configured sender/version
   Catch-up 2026-08-23 (the `translation.py` exception-object leak, and the httpx
   INFO-level URL logging) are closed. See Catch-up 2026-08-27.
 - **Superadmin WhatsApp welcome access (2026-11-13):** a demoted superadmin's token keeps working on the welcome routes until it expires, because the role claim is not re-checked per request. The message-status route skips the active-hospital and allowlist checks that welcome-config and send-welcome apply. Both are tracked in the auth-hardening follow-up.
+- **Repomix snapshot.** Refresh deferred because the current snapshot is in the preserved source checkout and the isolated worktree has no existing snapshot.
+- **Dialog keyboard focus.** The existing create and delete dialogs can allow Tab to reach background controls after opening.
 
 ### Catch-up — 2026-08-29
 
@@ -2237,3 +2239,15 @@ Verification: `python run_meta_whatsapp_test.py`, run from `backend/`, before th
 Not verified / waived: three Opus/xhigh review rounds found the code sound. The developer waived the remaining §5.10 evidence-formatting findings (trimmed or stale HANDOFF.md blocks, all re-run by two reviewers and found true) on 2026-11-13 ("Waive, close out"). The Render redeploy and the IRIS (hospital 4) Messaging re-test are the developer's to do after merge.
 
 Deferred: auth-hardening follow-up, tracked separately. A demoted superadmin's token keeps working until it expires (see Notes). Sender is not recorded as "superadmin" in a separate field, because that would need a migration.
+
+### Catch-up — 2026-11-16
+
+- **Hospital Management responsive layout and styling.** Long names and slugs wrap, the action links reflow within each card, and the delete control stays visible. The narrow layout moves AROGYA navigation above the hospital list. The landing page uses a light paper texture and the existing forest and cream palette. Verified with the frontend production build and synthetic Edge checks at 320, 390, 768, 1024 and 1440 CSS pixels and at native 200% zoom.
+
+Branch: `codex/hospital-management-ui`
+PR: pending
+Commits: pending
+
+Verification: `npm run build` from `frontend` exited 0 and printed `✓ built in 12.52s`. `git diff --check` exited 0. The local Playwright harness ran in Microsoft Edge 157 with synthetic records. Its native zoom output was `Native Edge zoom 200% {"viewport":720,"doc":720,"main":[720,720],"dpr":2,"sidebarRight":720,"cards":3,"links":12,"minHeight":44,"actionColumns":2,"out":[]}`. The execution worktree handoff contains the full command output and screenshots.
+
+Deferred items are recorded under Notes / Open Questions for Developer.

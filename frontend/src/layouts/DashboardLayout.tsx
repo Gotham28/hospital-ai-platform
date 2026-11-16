@@ -8,6 +8,7 @@ export default function DashboardLayout() {
   const { hospitalId } = useParams();
   const location = useLocation();
   const { logout, role } = useAuth();
+  const isHospitalManagement = role === 'superadmin' && location.pathname === '/';
 
   const handleSignOut = () => {
     logout();
@@ -23,10 +24,10 @@ export default function DashboardLayout() {
   const sectionLabel = 'mt-8 mb-4 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-gothos-emerald-text';
 
   return (
-    <div className="flex h-screen bg-gothos-bg admin-shell font-gothos text-gothos-ink">
+    <div className={`flex h-screen bg-gothos-bg admin-shell font-gothos text-gothos-ink${isHospitalManagement ? ' hospital-management-shell' : ''}`}>
       {/* Light sidebar */}
       <aside className="w-[260px] flex flex-col bg-white border-r border-gothos-line-soft shadow-[0_30px_80px_rgba(30,91,63,.12)] z-10">
-        <div className="p-6 border-b border-gothos-line-soft flex flex-col justify-center gap-1">
+        <div className="p-6 border-b border-gothos-line-soft flex flex-col justify-center gap-1" data-sidebar-brand>
           <h2 className="text-xl font-bold tracking-[-0.03em] text-gothos-forest flex items-center gap-2">
             AROGYA
           </h2>
@@ -108,7 +109,7 @@ export default function DashboardLayout() {
           )}
         </nav>
 
-        <div className="p-4 border-t border-gothos-line-soft">
+        <div className="p-4 border-t border-gothos-line-soft" data-sidebar-account>
           <button
             onClick={handleSignOut}
             className={`flex items-center gap-3 px-3 py-2 text-gothos-muted hover:text-rose-600 hover:bg-rose-500/10 rounded-gothos-bubble text-sm font-medium w-full transition-colors duration-[250ms] motion-reduce:transition-none ${focusRing}`}

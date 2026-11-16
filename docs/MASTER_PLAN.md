@@ -615,3 +615,9 @@ Scope: `brand/gothos/`, `.claude/rules/gothos-brand.md`, `frontend/public/brand/
 ### 2026-11-13 — Superadmin access to WhatsApp welcomes
 Not in the original plan. Extends the 2026-10-12 Meta WhatsApp welcome feature: a token with `role == "superadmin"` and a `sub` may now use welcome-config, send-welcome and message status for any hospital, so the platform superadmin can run the IRIS test send without a separate hospital staff login. Hospital admins and staff stay limited to their own hospital. Every service-level check (active hospital, per-hospital slug allowlist, `META_WHATSAPP_ENABLED`, message lookup scoped to the URL's hospital) is unchanged. No migration, no frontend change; the sender is recorded only as the existing keyed hash of the token's `sub`.
 Scope: `backend/app/api/v1/endpoints/whatsapp.py` (`_welcome_tenant` only), `backend/run_meta_whatsapp_test.py`, `docs/WHATSAPP_SETUP.md` (one sentence on the superadmin override). Related: CURRENT_TASK.md dated 2026-11-13.
+
+### 2026-11-16 — Hospital Management overflow and styling
+
+The superadmin hospital list now wraps long names and slugs, reflows its action links within each card, and keeps the delete control visible with keyboard focus. On narrow screens, the AROGYA sidebar moves above the list. The landing page uses a subtle paper texture and the existing forest and cream palette.
+
+Verified with `npm run build` and synthetic data in Microsoft Edge at 320, 390, 768, 1024 and 1440 CSS pixels and at native 200% browser zoom. The browser checks covered action bounds and destinations, keyboard focus, mocked create and delete, and the Appointments screen. The execution worktree's `HANDOFF.md` records measured results and screenshots. Related: CURRENT_TASK.md dated 2026-11-16.

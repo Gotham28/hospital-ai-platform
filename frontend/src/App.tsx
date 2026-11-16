@@ -8,7 +8,7 @@ import SettingsPage from './pages/Settings';
 import ThemeLoader from './themes/ThemeLoader';
 import api from './api/axios';
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, MessageCircle } from 'lucide-react';
+import { Building2, CalendarCheck, BrainCircuit, MessageCircle, Plus, Settings, Trash2 } from 'lucide-react';
 import { useAuth } from './context/AuthContext';
 import AppointmentsTab from './components/AppointmentsTab';
 import PharmacyPage from './pages/Pharmacy';
@@ -28,13 +28,13 @@ function DeleteConfirmDialog({ hospital, onConfirm, onCancel, isDeleting }: Dele
   if (!hospital) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-[2px]">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full mx-4 overflow-hidden">
+      <div className="hospital-management-delete-panel bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full mx-4 overflow-hidden">
         <div className="px-6 pt-6 pb-4 border-b border-slate-100">
           <div className="w-10 h-10 bg-rose-50 rounded-full flex items-center justify-center mb-4">
             <Trash2 className="w-5 h-5 text-rose-500" />
           </div>
           <h3 className="text-lg font-bold text-slate-900 mb-1">Delete Hospital?</h3>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-slate-500 wrap-anywhere">
             You are about to permanently delete <span className="font-semibold text-slate-900">"{hospital.name}"</span>
           </p>
         </div>
@@ -46,7 +46,7 @@ function DeleteConfirmDialog({ hospital, onConfirm, onCancel, isDeleting }: Dele
           </p>
         </div>
 
-        <div className="px-6 pb-6 pt-2 flex gap-3 justify-end">
+        <div className="px-6 pb-6 pt-2 flex flex-wrap gap-3 justify-end">
           <button
             onClick={onCancel}
             disabled={isDeleting}
@@ -110,113 +110,90 @@ function HospitalList() {
     }
   };
 
-  // Assign distinct colors based on index to give the list variety
-  const getAvatarColors = (id: number) => {
-    const variants = [
-      'bg-indigo-50 text-indigo-600',
-      'bg-violet-50 text-violet-600',
-      'bg-cyan-50 text-cyan-600',
-      'bg-amber-50 text-amber-600'
-    ];
-    return variants[id % variants.length];
-  };
-
   return (
-    <div>
+    <section className="hospital-management" aria-labelledby="hospital-management-title">
       {/* Header */}
-      <div className="flex justify-between items-center mb-8">
-        <h2 className="text-2xl font-bold text-slate-900">Hospital Management</h2>
+      <header className="hospital-management-header">
+        <h2 id="hospital-management-title">Hospital Management</h2>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500/30 transition-colors"
+          className="hospital-management-add"
         >
-          <Plus className="w-4 h-4" /> Add Hospital
+          <Plus size={18} aria-hidden="true" /> Add Hospital
         </button>
-      </div>
+      </header>
 
       {/* Error banner */}
       {deleteError && (
-        <div className="mb-6 px-4 py-3 bg-rose-50 border border-rose-200 rounded-lg text-sm text-rose-700 flex justify-between items-center">
+        <div className="mb-6 px-4 py-3 bg-rose-50 border border-rose-200 rounded-lg text-sm text-rose-700 flex justify-between items-center wrap-anywhere">
           {deleteError}
-          <button onClick={() => setDeleteError(null)} className="text-rose-400 hover:text-rose-600 ml-4 font-bold">×</button>
+          <button onClick={() => setDeleteError(null)} aria-label="Dismiss error" className="text-rose-600 hover:text-rose-700 ml-4 font-bold">×</button>
         </div>
       )}
 
       {/* Hospital cards */}
-      <div className="grid gap-5 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+      <div className="hospital-management-grid">
         {hospitals.map((h: any) => (
-          <div
-            key={h.id}
-            className="bg-white rounded-xl border border-slate-200 hover:border-slate-300 transition-all duration-150 relative group overflow-hidden"
-          >
-            {/* Delete button — top-right, appears on hover */}
-            <button
-              onClick={() => setDeleteTarget({ id: h.id, name: h.name })}
-              title="Delete hospital"
-              className="absolute top-3 right-3 p-1.5 rounded-md text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-
-            <div className="px-5 py-5">
-              <div className="flex items-start gap-3 mb-4">
-                {/* Hospital initial avatar */}
-                <div className={`w-9 h-9 rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0 ${getAvatarColors(h.id)}`}>
-                  {h.name[0]}
-                </div>
-                <div className="min-w-0 pr-6">
-                  <h3 className="font-semibold text-slate-900 text-sm truncate">{h.name}</h3>
-                  <p className="text-[11px] text-slate-400 mt-0.5 font-mono truncate">{h.slug}</p>
-                </div>
+          <article key={h.id} className="hospital-management-card">
+            <div className="hospital-management-card-heading">
+              <span className="hospital-management-icon">
+                <Building2 size={21} aria-hidden="true" />
+              </span>
+              <div className="hospital-management-identity">
+                <h3 dir="auto">{h.name}</h3>
+                <p dir="auto">{h.slug}</p>
               </div>
+              <button
+                onClick={() => setDeleteTarget({ id: h.id, name: h.name })}
+                aria-label={`Delete hospital: ${h.name}`}
+                className="hospital-management-delete"
+              >
+                <Trash2 size={18} aria-hidden="true" />
+              </button>
             </div>
 
-            <div className="px-5 pb-5 flex gap-2 border-t border-slate-100 pt-4">
+            <div className="hospital-management-actions">
               <Link
                 to={`/hospitals/${h.id}/appointments`}
-                className="flex-1 text-center text-[12px] font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 py-1.5 rounded-md transition-colors"
+                className="hospital-management-appointments"
               >
-                Appointments
+                <CalendarCheck size={16} aria-hidden="true" /> <span>Appointments</span>
               </Link>
               <Link
                 to={`/hospitals/${h.id}/training`}
-                className="flex-1 text-center text-[12px] font-medium text-cyan-700 bg-cyan-50 hover:bg-cyan-100 py-1.5 rounded-md transition-colors"
               >
-                Train AI
+                <BrainCircuit size={16} aria-hidden="true" /> <span>Train AI</span>
               </Link>
               <Link
                 to={`/p/${encodeURIComponent(h.slug)}`}
-                className="flex-1 text-center text-[12px] font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 py-1.5 rounded-md transition-colors"
               >
-                <span className="inline-flex items-center justify-center gap-1">
-                  <MessageCircle className="w-3.5 h-3.5" /> Chatbot
-                </span>
+                <MessageCircle size={16} aria-hidden="true" /> <span>Chatbot</span>
               </Link>
               <Link
                 to={`/hospitals/${h.id}/settings`}
-                className="flex-1 text-center text-[12px] font-medium text-slate-600 hover:text-slate-700 hover:bg-slate-50 py-1.5 rounded-md transition-colors border border-slate-200"
               >
-                Settings
+                <Settings size={16} aria-hidden="true" /> <span>Settings</span>
               </Link>
             </div>
-          </div>
+          </article>
         ))}
       </div>
 
-      {/* Modals */}
-      <CreateHospitalModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSuccess={fetchHospitals}
-      />
+      <div className="hospital-management-dialogs">
+        <CreateHospitalModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSuccess={fetchHospitals}
+        />
 
-      <DeleteConfirmDialog
-        hospital={deleteTarget}
-        onConfirm={handleDeleteConfirm}
-        onCancel={() => { setDeleteTarget(null); setDeleteError(null); }}
-        isDeleting={isDeleting}
-      />
-    </div>
+        <DeleteConfirmDialog
+          hospital={deleteTarget}
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => { setDeleteTarget(null); setDeleteError(null); }}
+          isDeleting={isDeleting}
+        />
+      </div>
+    </section>
   );
 }
 
