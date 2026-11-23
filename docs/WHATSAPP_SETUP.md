@@ -1,6 +1,14 @@
 # Meta WhatsApp patient welcomes
 
-Implementation uses the Meta WhatsApp Cloud API and one shared Arogya sender. Staff enter one mobile number, select English or Malayalam, confirm that the patient agreed, preview the approved copy and submit explicitly. The message identifies the hospital and links to its public patient assistant. Free-form messages and bulk sending are not supported.
+Implementation uses the Meta WhatsApp Cloud API and one shared Arogya sender. Staff select English or Malayalam, confirm that the patient agreed, preview the approved copy and submit explicitly. The message identifies the hospital and links to its public patient assistant. Batch uploads use the same approved templates.
+
+## Optional batch welcome setup
+
+- Keep `META_WHATSAPP_BATCH_ENABLED=false` until the base welcome activation is signed off and the additional batch migration has separate owner approval. Existing activation checkpoints still apply.
+- Provision a private Fernet key in `WHATSAPP_BATCH_ENCRYPTION_KEY`. Keep this key and the existing recipient hash secret stable while batches are queued. Install local Tesseract English and Malayalam traineddata, then set `WHATSAPP_OCR_TESSDATA` to its directory and `WHATSAPP_OCR_LANGUAGES=eng+mal`. OCR runs on the backend and sends no file to an external OCR provider.
+- In Patient Messaging, upload a single-sheet XLSX or UTF-8 CSV with a `Phone` column and optional `Name` column, or upload a PDF, JPG, or PNG. Limits are 5 MB, five document pages, and 100 recipient rows. Store phone cells as text to preserve leading zeros and plus signs.
+- Compare the extracted name and number against the original file, then select verification and permission per row. One approval queues the selected rows, using the chosen approved template for each. Original files and names are not stored by the batch flow. The queue encrypts full numbers until processing or expiry, and status shows masked numbers.
+- The worker processes in the background. Queued rows expire after one hour. If you disable batch sending, keep the encryption key configured and the worker online so expired recipient data is cleared. Use batch status and investigate any uncertain submission through the existing support procedure. If status is unknown, do not send again to that number.
 
 ## Current activation status
 

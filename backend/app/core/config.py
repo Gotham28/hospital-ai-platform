@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     PUBLIC_PATIENT_BASE_URL: str = ""
     META_WHATSAPP_ENABLED_HOSPITAL_SLUGS: str = ""
     WHATSAPP_RECIPIENT_HASH_SECRET: str = ""
+    META_WHATSAPP_BATCH_ENABLED: bool = False
+    WHATSAPP_BATCH_ENCRYPTION_KEY: str = ""
+    WHATSAPP_OCR_TESSDATA: str = ""
+    WHATSAPP_OCR_LANGUAGES: str = "eng+mal"
 
     # CORS allowed origins — read from backend/.env for local dev, or from the
     # hosting platform's environment variables for production. The default is
