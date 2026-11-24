@@ -11,3 +11,4 @@ from app.models.doctor_availability import DoctorSchedule, DoctorLeave # noqa
 from app.models.knowledge import KnowledgeBase # noqa
 from app.models.usage import UsageLedger # noqa
 from app.models.whatsapp_log import WhatsAppLog # noqa
+from app.models.whatsapp_batch import WhatsAppBatchItem # noqa

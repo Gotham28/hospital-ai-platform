@@ -2251,3 +2251,7 @@ Commits: e9adb9f, plus the backfill commit that records this line
 Verification: `npm run build` from `frontend` exited 0 and printed `✓ built in 12.52s`. `git diff --check` exited 0. The local Playwright harness ran in Microsoft Edge 157 with synthetic records. Its native zoom output was `Native Edge zoom 200% {"viewport":720,"doc":720,"main":[720,720],"dpr":2,"sidebarRight":720,"cards":3,"links":12,"minHeight":44,"actionColumns":2,"out":[]}`. The execution worktree handoff contains the full command output and screenshots.
 
 Deferred items are recorded under Notes / Open Questions for Developer.
+
+### Catch-up — 2026-11-23
+
+**WhatsApp batch welcomes** — Added patient list uploads with editable recipient review, per-recipient consent, and background sending through the existing Arogya sender. Synthetic CSV and text PDF checks passed. Excel, OCR extraction, and live delivery remain unverified. The queue migration was drafted and not applied.

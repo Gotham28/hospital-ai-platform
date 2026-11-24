@@ -3,6 +3,7 @@ import { isAxiosError } from 'axios';
 import { useParams } from 'react-router-dom';
 import { MessageSquare, Send, Loader2 } from 'lucide-react';
 import api from '../api/axios';
+import WelcomeBatch from './WelcomeBatch';
 
 type Language = 'en' | 'ml';
 type MessageState = {
@@ -18,6 +19,7 @@ function latestState(previous: MessageState | undefined, next: MessageState): Me
 
 type WelcomeConfig = {
   enabled: boolean; assistant_url?: string;
+  batch_enabled?: boolean;
   templates: Partial<Record<Language, { preview: string }>>;
 };
 const messageLabels: Record<MessageState['status'], string> = {
@@ -230,6 +232,9 @@ function HospitalMessaging({ hospitalId }: { hospitalId: string }) {
             </form>
           </div>
         </section>
+
+        <WelcomeBatch hospitalId={hospitalId} enabled={!!(config?.enabled && config.batch_enabled)}
+          templates={config?.templates ?? {}} />
 
 
 

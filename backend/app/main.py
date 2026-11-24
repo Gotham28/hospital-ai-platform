@@ -8,6 +8,7 @@ from app.api.v1.endpoints.ai import router as ai_router
 from app.db.session import engine
 from app.api.v1.endpoints.appointments import router as appointments_router
 from app.services.reminders import start_reminder_scheduler, stop_reminder_scheduler
+from app.services.whatsapp_batch import start_whatsapp_batch_worker, stop_whatsapp_batch_worker
 from app.api.v1.endpoints.medicines import router as medicines_router
 from app.api.v1.endpoints.lab_tests import router as lab_tests_router
 from app.api.v1.endpoints.doctor_availability import router as availability_router
@@ -63,10 +64,12 @@ app.include_router(whatsapp_webhook_router, prefix="/api/v1/whatsapp", tags=["Wh
 def on_startup():
     get_jwt_secret()
     start_reminder_scheduler()
+    start_whatsapp_batch_worker()
 
 @app.on_event("shutdown")
 def on_shutdown():
     stop_reminder_scheduler()
+    stop_whatsapp_batch_worker()
 
 @app.get("/")
 def read_root():
